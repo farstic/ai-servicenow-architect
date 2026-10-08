@@ -9,35 +9,230 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**Grounding is a budget the answer declares.** A gateway grounds its Envelope on eight documentation
-pages by default. When it needs more, it says which construct is still unverified and what it will open,
-then continues, rather than stopping at a cap. A session the user has set to Ultracode or max effort may
-ground with parallel readers, and the answer says so.
+**This release makes a write report a value the platform cut and refuse one longer than its column before it
+is sent, runs and authors ATF tests through the interfaces the documentation describes, and tells the
+Architect to ask, when no engagement is named, which engagement a first write to an instance is for.** There
+is no migration step: an existing checkout keeps its instance store, its preset and its flags untouched, and
+the documentation corpus stays pinned at `68c0d11`. The server has 399 tools, two more than 2.0.10
+(`snow_atf_atf_test_add` and `snow_atf_atf_step_add`). The error registry gains four codes (68 to 72):
+`VALUE_TRUNCATED`, `FIELD_NOT_STORED` and `VALUE_NOT_AS_SENT` are warnings on a write that succeeded, not
+errors, and `VALUE_TOO_LONG` refuses a write before it is sent. The roster is supported on Claude Sonnet or
+a more capable model; smaller models are not supported. One command can stop a script that used to finish:
+`./snowarch upgrade` without `--yes` now stops when its input is closed (below).
 
-**The ATF exec tools run suites through the CI/CD API.** `snow_atf_atf_suite_exec` starts the suite with
-the documented `POST /api/sn_cicd/testsuite/run`, waits for it within `budget_seconds` (300 by default),
-and returns the outcome, the test counts and the suite's result record. The platform documents no call
-that runs a single test, so `snow_atf_atf_test_exec` runs the one suite that holds the test and says so.
-A test in no suite, or in several, is refused and nothing is created. The account needs the
-`sn_cicd.sys_ci_automation` or `admin` role.
+**The release candidates, and what a live instance has confirmed.** `v2.0.11-rc.1` (`b661cf4`) and
+`v2.0.11-rc.2` (`d331001`) were cut before this release. On rc.1, a Business Rule was created in one write
+with its filter, the Advanced switch and `active` read back as sent, and a 41-character name came back as 40
+with `VALUE_TRUNCATED`, `column_limit: 40` and `confirmed: true`, on the POST and on the PATCH. The ATF exec
+fix shipped in rc.2; its live confirmation is pending. ATF test and step authoring and the refusal of a
+too-long value before the write are built, and their live runs are planned for rc.3. The Batch API's Base64
+bodies are checked against the documentation page, not yet against an instance. The live procedures are in
+`packages/snowarch/tests/live/README.md`.
+
+**What a user of the MCP tools sees.**
+
+- **A Business Rule is created in one write.** `snow_scr_business_rule_add` takes `filter_condition` (an
+  encoded query) and `advanced` (default true) beside `active`, and sends them in one POST, the filter
+  whenever one is given. The filter goes in the create, so the rule is not left without it between two
+  calls, and the write gate asks once. `active` and `advanced` must be true or false: the string `"false"`
+  used to create a live rule, and that or any other non-boolean is now refused with `INVALID_REQUEST`. `when`
+  must be one of before, after, async or display, and `order` a whole number (a string such as `"50"` is
+  refused); an `order` of 0 is sent as 0, where it used to become 100, and 100 is the default only when
+  `order` is omitted or null.
+- **A write reports a value the platform cut, and the session reports it before anything else.** When the
+  platform answers a write with only the first part of a string it was sent, for example a name cut at its
+  column's length, the result carries `warnings`, as its first key, with a `VALUE_TRUNCATED` entry: the field,
+  the lengths sent and stored, the limit (the stored length when the dictionary states none) and whether the
+  dictionary confirmed it. A Business Rule add whose answer does not show the filter it sent, or the Advanced
+  switch it set to true, carries `FIELD_NOT_STORED`, after the record's own fields. The Business Rule add's
+  success line names the name the platform stored. The check covers every tool that writes through the
+  client's create and update calls, `snow_fluent_request_batch` on Table API paths, the file name of an
+  attachment upload and a `createChangeRequest` method that no tool calls yet; the Now Assist and catalogue
+  calls, fields the answer does not echo and values that are not strings are not checked, so an absent
+  `warnings` key proves nothing. A result carries at most ten warnings: ten whole or, from eleven, the first
+  nine whole and one roll-up for the rest. The always-loaded rule file tells a session to report each warning
+  in full before it does anything else, and says the correcting modify is its own write with its own "write
+  approved". In `snow_orch_playbook_exec` each step lists, uncapped, the cut values its own writes stored, and
+  under `on_error: "stop"`, the default, the playbook halts after a step that stored a cut value or returned a
+  warning, with `halted_at_step` and `halt_reason` (a step that stored one and then failed stops it as an error
+  step); `"continue"` and `"skip"` go on. The audit line carries the warning codes, the tables, the field
+  names and a count, never a value.
+  **The premise was confirmed on rc.1:** the answer to a POST and to a PATCH on `sys_script` carries the value
+  the platform stored. The check can only see a cut that the answer shows. The names `filter_condition` and
+  `advanced` for the `sys_script` columns are not printed in the bundled corpus; on rc.1 a read-back showed
+  both set, and `FIELD_NOT_STORED` is what catches it where they are not.
+- **A string longer than its column is refused before it is sent.** Before a record is created or updated,
+  the server reads each string's column from `sys_dictionary`, on the record's table and then up the tables it
+  extends to the one that defines the column, and refuses a longer value with `VALUE_TOO_LONG`: nothing is
+  written, so no record and no update-set entry is left to correct. Lengths are counted in code points, and
+  only a String column with a stated `max_length` is judged. When the account cannot read the dictionary (it
+  needs `personalize_dictionary`), or the read fails or takes more than three seconds, the write goes ahead
+  and a cut is still reported as `VALUE_TRUNCATED`. A refusal after an earlier write of the same call names
+  the records the call already wrote. The Batch API, attachments and change requests are not checked before
+  the write. The `super_class` column the walk reads is not printed in the bundled corpus, and the refusal
+  has not yet been run against an instance.
+- **A 403 is not retried.** A 403 now fails at once from one request, with `INSUFFICIENT_PRIVILEGES`
+  (`DELETE_ACL_DENIED` on a delete). Before, under the default policy, the same request went out four times
+  with 1 s, 2 s and 4 s between them, about 7 s, to be refused each time. A 429, a 5xx, a request that never
+  arrived and every other status that was retried before still are.
+- **`snow_fluent_request_batch` follows the Batch API's Base64 bodies and `unserviced` list as the
+  documentation describes them.** Each operation's body goes out Base64-encoded and each answer's body comes
+  back decoded, as JSON when it is JSON and as text otherwise; callers no longer receive Base64 in
+  `results[].body` for a JSON or text answer, and a body that is not UTF-8 text is returned as it came. The
+  answer always carries `unserviced`, the ids of the operations the platform did not run because the batch
+  reached a size or processing limit, and a `note` when it is not empty. It still carries only `id`,
+  `status_code` and `body` for each item. This is checked against the documentation page, not against an
+  instance: that the platform accepts the encoded body is not yet confirmed live. The tool's input schema still
+  declares `body` as an object and every item is sent as `application/json`, so an XML body is not supported
+  through the tool.
+- **`snow_disco_table_discover` returns the table's own and inherited columns.** In the tests, against a fake
+  dictionary, `incident` comes back with `short_description`, `number` and `state`, which `task` is expected to
+  define, because the parent chain is walked; the dictionary is read in pages and not cut at 200 rows; a
+  `max_length` the dictionary does not state is `null`, not 255; the cache is kept per instance, so a second
+  instance is no longer answered with the first one's columns. An inherited column carries its parent's
+  `mandatory`, `read_only` and `default_value`: a dictionary override on the child is not read. An answer cut
+  short because the hierarchy could not be read, or because the table has more than 5,000 dictionary rows,
+  carries a `note` and is not cached. That `sys_db_object.super_class` holds the parent, that a blank
+  `max_length` means none is stated, and the shape of `internal_type` and `reference` (passed through as the
+  instance sends them) are not printed in the bundled corpus and not yet confirmed live.
+- **ATF suites run through the CI/CD API.** `snow_atf_atf_suite_exec` starts the suite with the documented
+  `POST /api/sn_cicd/testsuite/run`, waits for it within `budget_seconds` (300 by default), and returns the
+  outcome, the test counts and the suite's result record. The platform documents no call that runs a single
+  test, so `snow_atf_atf_test_exec` runs the one suite that holds the test and says so; a test in no suite, or
+  in several, is refused and nothing is created. Both used to fail with `INVALID_REQUEST` and "Requested URI
+  does not represent any resource": they posted to `/api/now/atf/runner/run_*`, which the platform does not
+  serve. The account needs the `sn_cicd.sys_ci_automation` or `admin` role. `snow_atf_atf_tests_index` with
+  `suite_sys_id` lists the tests the suite holds, read from its Test Suite Tests rows; it could list every
+  active test as the suite's own.
+- **ATF tests and steps can be authored, and every record is read back.** `snow_atf_atf_test_add` and
+  `snow_atf_atf_step_add` create a test and its steps, and a step's script is proven attached to the step. A
+  value the instance stored differently comes back in `warnings[]`, under `VALUE_NOT_AS_SENT`,
+  `VALUE_TRUNCATED` or `FIELD_NOT_STORED`. A Run Server Side Script step also needs `SCRIPTING_ENABLED`.
+- **`./snowarch upgrade` does not proceed on a closed stdin.** At `Proceed? [Y/n]` a closed input (a pipe that
+  had ended, `< /dev/null`, a CI step) was taken as a yes and the checkout was moved. It now prints `upgrade:
+  no answer on stdin (it is closed, or not a terminal) — nothing was changed; pass --yes to accept the plan
+  without asking` and exits 2. A script that ran `upgrade` without `--yes` and relied on that now needs
+  `--yes`. An answer that is not Enter, `y` or `yes` now also changes nothing and exits 0, as `n` always did;
+  any other word used to proceed.
+
+**What a consultant sees.**
+
+- **The specialists name what the corpus names.** The HRSD specialist no longer lists five notification names
+  that are not in the bundled corpus as baseline; it says the baseline HR case notification names are not
+  documented there and to verify them on the instance. The FSO specialist names the Personal Lines Claims
+  adjuster, processor and manager roles, and the CMDB & CSDM specialist lists `cmdb_ci_cluster` and
+  `cmdb_ci_cluster_node` as baseline cluster classes. The ITSM gateway says that the name of the field linking
+  a problem to a change request is not documented in the bundled corpus, and the citation format of the six
+  domain gateways now asks for a page's full path from `markdown/`, never a bare file name.
+- **One engagement file.** Phase 1 Step 2 reads `clients/<name>/<name>-engagement-state.md`, the file
+  onboarding creates; the Story Writer, Technical Designer, HLD/LLD Writer and Now Assist Specialist read its
+  Roles section when they are pointed to the file. There is no separate instructions file: a role matrix kept
+  in an old `<client>-instructions-v*.md` is no longer read, so move it into the Roles section.
+- **`clients/_unfiled/`.** When no engagement is named, the design artefacts a session produces are saved
+  under `clients/_unfiled/`, in `design-only` and `live` mode alike, never in a scratchpad or temp directory,
+  and the reply says where they went. An instance change is never filed there.
+- **The engagement question.** In a live session with no engagement named, the Architect asks once, before
+  the session's first write to an instance and after the capabilities pre-flight has passed, `Which engagement
+  is this for?`. The answer is the engagement in the update-set name, `<engagement>-<topic>`, and the engagement
+  whose state file records the change. It is not a write approval; the "write approved" question still
+  follows. What a session does when the user declines to name one is not ruled: the rule says to wait, so no
+  write is made. Whether the question fires at `snow_core_instance_switch`, which writes nothing, is an open
+  row: the line says "first mutating call", and the rule file counts that tool as one.
+- **OPEN QUESTION ids carry their artefact.** Every id a format prescribes is `OQ-<kind>-<n>`, with the kinds
+  ES, ST, DS, EV, DC and CN defined once in `governance/governance-rules.md`, so an answer no longer holds two
+  questions that are both a bare `OQ-1`, and an id quoted outside its artefact is followed by that artefact's
+  name. The Architect also keeps the text of a prompt it wrote for a helper, and an error its own tooling
+  raised about that prompt, out of the answer; a remedy line from the rule file is still printed.
+- **Grounding is a budget the answer declares.** Eight documentation pages by default; past that, the
+  gateway says what is still unverified and what it will open, and continues. Parallel readers ground an
+  Envelope only under Ultracode or max effort (below).
+- **An Envelope is the engagement's context.** A gateway Envelope for a named engagement is saved under
+  `clients/<engagement>/envelopes/`, and every later session in that engagement starts from it. Under
+  Ultracode the Architect says how many workflows it will run and reports each one (below).
+- **The sub-agents have no web tool.** They ground in the bundled documentation, and a counterparty's API
+  documentation is supplied as a file or as pasted text (below).
+- No real Claude session has yet been observed following the new lines in `CLAUDE.md`, the agents or the rule
+  file; the tests pin the wording and the places that state it, not what a session does. The live case of
+  T-25 needs an instance and has not been run, and T-26 and T-27 wait for a sitting.
 
 ### Fixed
 
+- A write that the platform answers with a cut value is now reported when its answer shows the cut: a
+  `VALUE_TRUNCATED` entry in `warnings`, the first key of the result. This covers every tool that writes
+  through the client's create and update calls, the batch tool on Table API paths and an attachment's file
+  name; on rc.1 it was seen for a POST and a PATCH on `sys_script`. The Now Assist and catalogue calls are
+  not compared.
+- A write no longer sends a string longer than its column when the dictionary can be read: it is refused
+  with `VALUE_TOO_LONG` before anything is written.
+- `snow_scr_business_rule_add` no longer creates a live rule from `active: "false"` (it refuses that and any
+  `active` or `advanced` that is not a boolean), no longer turns an `order` of 0 into 100, and refuses before
+  it writes a `when` the form does not offer, an `order` that is not a whole number (a string such as `"50"`
+  included) and a `filter_condition` that is not a string.
+- A 403 is no longer retried three times with a 7 s wait at the defaults. It fails at once, as
+  `INSUFFICIENT_PRIVILEGES` (`DELETE_ACL_DENIED` for a delete).
+- `snow_disco_table_discover` no longer leaves out inherited columns when the hierarchy can be read (checked
+  against a mock, not yet live), stops at 200 dictionary rows (the ceiling is now 5,000 and a cut answer says
+  so), turns an unstated `max_length` into 255, or answers one instance from another's cache. A `table` that
+  is not a plain identifier is refused with `INVALID_REQUEST`.
+- `snow_fluent_request_batch` no longer sends a JSON body the Batch API documents as Base64, no longer returns
+  Base64 for a body it should decode, and no longer leaves the operations the platform did not run out of its
+  answer.
 - `snow_atf_atf_suite_exec` and `snow_atf_atf_test_exec` no longer fail with `INVALID_REQUEST` and
-  "Requested URI does not represent any resource". They posted to `/api/now/atf/runner/run_*`, which the
-  platform does not serve. They now run through the CI/CD API the documentation describes. A refusal
-  names its cause: the role, an API this instance does not serve, a suite that does not exist, or the
-  platform's own reason for not starting the run.
-- `snow_atf_atf_tests_index` with `suite_sys_id` lists the tests the suite holds, read from its Test Suite
-  Tests rows. Before, it filtered tests on a column the documentation does not show, so a suite could
-  list every active test as its own.
+  "Requested URI does not represent any resource"; they run through the CI/CD API. A refusal names its cause:
+  the role, an API this instance does not serve, a suite that does not exist, or the platform's own reason for
+  not starting the run.
+- `snow_atf_atf_tests_index` with `suite_sys_id` no longer filters tests on a column the documentation does
+  not show, which could list every active test as the suite's own.
+- `./snowarch upgrade`, with or without `--to <tag>`, no longer moves the checkout when its input is closed;
+  it exits 2.
+- The user guide no longer links four documents that do not exist, and three links in `docs/decisions/` and
+  `docs/spikes/` that were at the wrong depth point at their pages.
+- The specialists no longer give a model names the corpus does not contain: five HR notification names, the
+  three Personal Lines Claims roles and two cluster classes that were missing (above), and eight
+  table-and-field claims in four skill files, seven of them now in the corpus's own words, five with a page
+  citation, and one marked as not documented in the corpus.
+- Phase 1 Step 2 and the four builders that read a role matrix no longer read an instructions file that
+  onboarding never wrote, and the Architect is now told to file work with no engagement under
+  `clients/_unfiled/` and not in a session scratchpad, where it was lost at the next restart; no session has
+  yet been seen to do so.
+- A question id now says which kind of artefact it belongs to: an engagement-state question and a story's are
+  `OQ-ES-1` and `OQ-ST-1`, where both were `OQ-1`; two artefacts of one kind are told apart by the artefact's
+  name quoted after the id. No example or format in the roster numbers a question `OQ-1` any more, and a test
+  fails on a bare one.
+- A full `npm test` no longer leaves four `w17-win32-*` directories in the temporary directory, and no test
+  file in `tests/`, `tools/snowarch/tests/` and `packages/snowarch/tests/` makes a temporary directory outside
+  `tempDir()` or `trackTempDir()`, except the one file that tests the helper itself.
 
 ### Changed
 
-- A gateway grounds its Envelope on a budget it declares: eight documentation pages by default, and
-  past that it says which construct is still unverified and what it will open, then continues. Parallel
-  readers ground an Envelope only in a session where the user has enabled Ultracode or max effort, and the
-  answer says so.
+- Under `on_error: "stop"`, the default, `snow_orch_playbook_exec` halts after a step that stored a cut value
+  or returned a warning, and each step shows the cut values of its own writes in `warnings`, tagged with the
+  step and the tool.
+- The always-loaded rule file has a section on warnings (one sentence, then a line for `FIELD_NOT_STORED`
+  and one for `VALUE_TRUNCATED` and `VALUE_NOT_AS_SENT`) and one more bullet in §2.1, the engagement
+  question. The rule file is now 72 of its 72 lines.
+- `snow_fluent_request_batch`'s description says what it sends and returns, names 50 operations as this tool's
+  own cap and no longer says it "reduces round-trips by 50-70%", which nothing in the corpus states.
+- An answer to the upgrade prompt that is not Enter, `y` or `yes` now changes nothing and exits 0; it used to
+  go ahead unless it began with `n`.
+- `./snowarch docs verify` also checks dotted names such as `hr_case.opened`, and CamelCase names on a line
+  that says baseline, and prints `dotted names:` and `camelcase names:` beside the `identifiers:` line.
+- The validation runner runs every case of `tests/VALIDATION-TESTS.md`, 27 of them now, as design-only
+  sessions (the live cases as their dormant variants; the live variants are not run). It is written to run
+  each session with only the checkout's project settings and hooks, no MCP server and a fixed tool set,
+  prints for each turn the skills invoked, how many corpus pages were read and the cited pages that are
+  missing, ambiguous or given by a bare file name, and runs a case's design-only Setup in the clone before
+  the case (only T-25's has anything to run: it creates the `acme` engagement file); a Setup that needs an
+  instance is not run, and one it cannot classify or that fails stops its case. Its flags are checked
+  against `claude --help` and its text; no case has been run through it yet.
+- The documentation link check covers the decision records, the spike write-ups, the user guide and four more
+  top-level pages, and it fails for a top-level page that is neither checked nor excused; `docs/plans/` stays
+  unchecked. The sweeps in `tests/no-legacy-surfaces.test.mjs` read each file they cover whole; only the
+  changelog keeps a history boundary there.
+- A gateway grounds its Envelope on a budget it declares: eight documentation pages by default, and past
+  that it says which construct is still unverified and what it will open, then continues. Parallel readers
+  ground an Envelope only in a session where the user has enabled Ultracode or max effort, and the answer
+  says so.
 - Under Ultracode or max effort, the Architect says up front how many workflows it will run and roughly how
   long, and prints a line as each one completes. It runs a second review round only when the first changed a
   verdict, a table, a citation or an open question. The run itself is not capped. A gateway Envelope for a
@@ -49,10 +244,24 @@ A test in no suite, or in several, is refused and nothing is created. The accoun
 
 ### Added
 
-- `snow_atf_atf_test_add` and `snow_atf_atf_step_add` create an ATF test and its steps and read every record
-  back. A step's script is proven attached to the step. A value the instance stored differently comes back
-  in `warnings[]`, under the new `VALUE_NOT_AS_SENT` or the existing `VALUE_TRUNCATED` and
-  `FIELD_NOT_STORED`. A Run Server Side Script step also needs `SCRIPTING_ENABLED`.
+- `snow_atf_atf_test_add` and `snow_atf_atf_step_add`, which create an ATF test and its steps and read every
+  record back.
+- `filter_condition` and `advanced` on `snow_scr_business_rule_add`; `warnings` on write results;
+  `VALUE_TOO_LONG`, an error raised before a write that would not fit; `unserviced`, and a `note` when it is
+  not empty, on `snow_fluent_request_batch`; a `note` on a `snow_disco_table_discover` answer that lacks
+  inherited columns or stops at 5,000 dictionary rows.
+- Six platform notes in `docs/PLATFORM-NOTES.md`: PN-10, a Business Rule's name cut at 40 characters without
+  an error, and what a write's answer carries (confirmed on rc.1); PN-11, the Batch API's Base64 bodies and
+  `unserviced_requests` list (on the documentation page, not yet seen on an instance); PN-12 to PN-14, what
+  rc.1 showed of an update set's entries and of a stored `filter_condition`; and PN-15, what an instance
+  answers for a path it does not serve. PN-07 no longer says the Developer skill keeps a name to 40
+  characters, which it never did.
+- The live procedures for the cut-value premise, the ATF exec and authoring tools and the refusal before the
+  write, in `packages/snowarch/tests/live/README.md`.
+- A test that fails, naming the file and line, when a test file in the three test trees calls `mkdtemp` or
+  `tmpdir()` instead of `tempDir()`; the helper's own test file is exempt.
+- A test that fails when a sub-agent's tool list, or its instructions, name a web tool.
+- The engagement question, `clients/_unfiled/` and the `OQ-<kind>-<n>` scheme (above).
 
 ## 2.0.10 — 2026-10-04
 
