@@ -13,7 +13,7 @@
 # The `./snowarch status` panel
 
 ```
-Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 397 tools (contract)
+Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
 Engine: snowarch 9.9.9 · contract deadbeefdead
 Docs: vendor/ServiceNowDocs @ 68c0d1123adf (australia) · sparse
 Roster: 29 skills / 9 agents
