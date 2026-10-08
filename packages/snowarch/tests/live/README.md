@@ -175,6 +175,8 @@ count says nothing.
 
 **Teardown.** None if step 4 is 0. If it is 1, delete the record in Studio and say so in the result.
 
+**Answered for `sys_script`, not yet for a Script Include (2026-10-08).** The teardown of the C92/C93 sitting removed a `sys_script` row with `snow_core_record_remove`: `action: "deleted"`, a read-back `NOT_FOUND`, an update-set entry `DELETE` (`docs/validation/2.0.11-rc.1-live-sitting.md`). The procedure above, on `sys_script_include`, is still the one that settles the 1.0.0 report.
+
 ## ARC-02-S10 open question — does an invalid `close_code` still surface as a privilege error?
 
 Not a limitation claim: an unsettled question about this server, recorded here because it cannot be
@@ -465,7 +467,11 @@ missing `filter_condition` or `advanced`.
 - **the negative control:** step 3 returns no `warnings` key, and the server's stderr log has no
   `Querying ServiceNow table: sys_dictionary` line for it (the server logs each query at info level). A
   check that warned on every write, or looked up the dictionary before every write, would pass the
-  positive half every time;
+  positive half every time. **Under Claude Code the log half is not observable:** the log it keeps for the
+  server (`mcp-logs-servicenow`) carries no `Querying ServiceNow table` line for any call — info logging is
+  not on there — so its absence after step 3 proves nothing. To see it, run the server on a terminal with
+  info logging. The audit trail (`.local/audit.jsonl`) separates the two calls instead: step 1's line carries
+  the `VALUE_TRUNCATED` warning and step 3's carries none (2.0.11-rc.1 sitting);
 - **the false-alarm check:** step 6 — whether a trailing `^` that the platform trims produces a
   `VALUE_TRUNCATED` for `filter_condition`. If it does, that is a benign shape the detector flags
   today (`looksCut` exempts only a decimal's trailing zeros) and it becomes a PN entry.

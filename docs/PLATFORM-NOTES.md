@@ -178,9 +178,10 @@ observed behaviour. Reading `sys_dictionary` needs the `personalize_dictionary` 
 (`markdown/platform-security/access-control/r_SecurityJumpStartACLRules.md`).
 **Evidence:** the owner's live test. **Not reproduced here** — this repository's tests have no
 instance. PN-07 observed, on a PDI, one POST whose response carried the CUT value; that the response
-for `sys_script`, and for a PATCH, does too is **assumed, not seen**, and it is the single point of
-failure of the design below. `packages/snowarch/tests/live/README.md` has the run that settles it,
-for the POST and the PATCH separately. Regression tests, with a fake that stores a shorter value:
+for `sys_script`, and for a PATCH, does too was **assumed, not seen**, and it was the single point of
+failure of the design below. **Seen on 2026-10-08:** the live run in `packages/snowarch/tests/live/README.md`,
+on `v2.0.11-rc.1`, showed the response carrying the cut value on the POST and on the PATCH, with
+`sys_dictionary` stating `max_length` 40 (`confirmed: true`) — `docs/validation/2.0.11-rc.1-live-sitting.md`. Regression tests, with a fake that stores a shorter value:
 `packages/snowarch/tests/tools/silent-truncation.test.ts`,
 `packages/snowarch/tests/servicenow/stored-values.test.ts` and, over the real client with the HTTP seam
 mocked, `packages/snowarch/tests/servicenow/silent-truncation-http.test.ts`
@@ -266,6 +267,50 @@ anything that is not Base64 is kept as it came), and returns `unserviced` (alway
 operations that did not run. The cut-value check (PN-10) reads the same answer. This tool's own cap of 50
 operations is not a platform limit the page states. `error_message`, `status_text`, `redirect_url`,
 `execution_time` and `headers` are still not passed to the caller.
+
+## PN-12 — An update set holds one entry per record, and the entry carries the record's latest version
+
+**Applies to:** `sys_update_xml` (update-set capture of REST writes) · release family not recorded by the
+sitting · observed in the 2.0.11-rc.1 live sitting (ARC-09-C93)
+**Behaviour:** A Business Rule written three times through the Table API — an insert, then two modifies —
+while the same update set was the capture target had **one** `sys_update_xml` row, not three. Its payload
+was the LATEST version: the name of the last write and `<sys_mod_count>2</sys_mod_count>`. A modify that
+corrects a value, made while the same update set is the capture target, therefore leaves the corrected value
+in the entry.
+**Grounding:** observed behaviour. It is consistent with
+`markdown/application-development/system-update-sets/using-system-update-sets.md` ("This action ensures that
+the latest version of the object is included in the desired update set and prevents duplicate updates for
+the same object in a single update set"), which says so of a UI procedure, not of REST writes.
+**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, step 5 — the preview, then the
+`sys_update_xml` rows read with `snow_core_records_query`.
+**Engine consequence:** the `VALUE_TRUNCATED` warning's advice (PN-10) holds: **modify** the record rather
+than add it again, and the update set then carries the corrected value. That is true only while the same
+update set is still the capture target.
+
+## PN-13 — `filter_condition` is stored as the plain encoded query; the update-set payload adds an `<item>` child
+
+**Applies to:** `sys_script.filter_condition` · release family not recorded by the sitting · observed in the
+2.0.11-rc.1 live sitting (ARC-09-C92)
+**Behaviour:** Read back from `sys_script`, `filter_condition` is the sent string unchanged —
+`number=INC0000000`, with no `^EQ` and no item lines appended. In the `sys_update_xml` payload the same field
+is rendered as `<filter_condition table="incident">number=INC0000000<item … field="number" operator="="
+value="INC0000000"/></filter_condition>`: the platform adds the `<item>` child to the XML only.
+**Grounding:** none in ServiceNowDocs (`markdown/api-reference/business-rules-classic/c_BusinessRules.md` describes a business rule's conditions and names no `filter_condition` column); observed behaviour.
+**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, steps 2 and 5.
+**Engine consequence:** the stored-value check (PN-10) compares the column read back, which is the plain
+string, so the payload's `<item>` raises no `VALUE_TRUNCATED` or `FIELD_NOT_STORED`. A reader of update-set
+payloads must not compare the payload's XML text with the column's value.
+
+## PN-14 — A trailing `^` in `filter_condition` is kept
+
+**Applies to:** `sys_script.filter_condition` · release family not recorded by the sitting · observed in the
+2.0.11-rc.1 live sitting (ARC-09-C93, the false-alarm check)
+**Behaviour:** A rule created with `filter_condition` `number=INC0000000^` read back as `number=INC0000000^`:
+the trailing `^` was kept, not trimmed.
+**Grounding:** none in ServiceNowDocs (`markdown/api-reference/business-rules-classic/c_BusinessRules.md` describes a business rule's conditions and names no `filter_condition` column); observed behaviour.
+**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, step 6.
+**Engine consequence:** the cut-value detector (`looksCut`) needs no exemption for a trailing `^` on this
+release. If a release trims it, the detector would flag a benign shape; that has not been observed.
 
 ## Windows notes — this repository, not ServiceNow
 
