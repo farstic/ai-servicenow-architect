@@ -744,6 +744,12 @@ export const AUDIT_PATTERNS = [
     // app offered as a decision the designer resolves alone, and a two-way scoped-or-global choice.
     test: (l) => /default to scoped|Default for new functionality: scoped app|\bdefaults? to (?:an? )?(?:new )?scoped\b|chose (?:a )?new scoped app|scoped \(with prefix\) vs global/i.test(l),
     why: 'a new scoped app is a §1.1 object, and the baseline scope is the default' },
+  // ARC-09-C115 took the web tools off every sub-agent, and AG-03 refuses one on a `tools:` line. An agent's
+  // BODY must not name one either: "fetch it with WebFetch" is an instruction the agent cannot follow, and
+  // the edit that makes it work again puts the tool back. No exemption: no agent has a reason to name one.
+  { id: 'agent-web-tool', scope: ['.claude/agents/'],
+    test: (l) => /\bweb ?(?:fetch|search)\b/i.test(l),
+    why: 'no sub-agent has a web tool since ARC-09-C115: a document arrives as a file or as pasted text' },
 ];
 
 /**
@@ -884,6 +890,14 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
         + `say so instead of recalling it. ${EXEMPT.context}`,
     ].join('\n'));
     plant('.claude/agents/story-writer.md', EXEMPT.context);
+    // A web tool named in an agent's prose, with no corpus in sight: the line a control found every test
+    // passing on, the other tool, the spaced spelling, and a line that asks for the document instead.
+    plant('.claude/agents/hld-lld-writer.md', [
+      'Given only a URL, fetch it with WebFetch.',
+      'If the vendor page is missing, run a WebSearch for it.',
+      'A web fetch of the page will do.',
+      'Ask for the document, as a file or as pasted text.',
+    ].join('\n'));
     // The fetch the wrap split over two lines is one hit, on its first line; two sentences on adjacent
     // lines, two list items, and a frontmatter key under `tools:` are not a sentence and stay quiet.
     plant('.claude/skills/integration-specialist/SKILL.md', [
@@ -900,7 +914,7 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     const files = ['.claude/agents/atf-author.md', 'governance/governance-rules.md', '.claude/agents/developer.md',
       '.claude/skills/story-writer/SKILL.md', 'CLAUDE.md', '.claude/skills/diagramming-specialist/SKILL.md',
       '.claude/agents/technical-designer.md', 'docs/USER-GUIDE.md', '.claude/agents/flow-designer-specialist.md',
-      '.claude/agents/integration-specialist.md', '.claude/agents/story-writer.md',
+      '.claude/agents/integration-specialist.md', '.claude/agents/story-writer.md', '.claude/agents/hld-lld-writer.md',
       '.claude/skills/diagramming-specialist/EXAMPLES.md', 'governance/taxonomy.md', '.claude/skills/hld-lld-writer/SKILL.md',
       '.claude/skills/technical-designer/SKILL.md', '.claude/skills/technical-designer/EXAMPLES.md',
       '.claude/skills/now-assist-specialist/EXAMPLES.md', '.claude/skills/hld-lld-writer/EXAMPLES.md',
@@ -909,6 +923,7 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     const readAt = (f) => readFileSync(join(dir, f), 'utf8');
     const hits = findAuditRegressions({ files, read: readAt, allow: [EXEMPT] });
     const at = (rel, id) => hits.filter((h) => h.startsWith(`${rel}:`) && h.includes(`[${id}]`)).length;
+    const linesOf = (rel, id) => hits.filter((h) => h.startsWith(`${rel}:`) && h.includes(`[${id}]`)).map((h) => h.split(':')[1]);
 
     for (const p of AUDIT_PATTERNS) {
       assert.ok(hits.some((h) => h.includes(`[${p.id}]`)), `the planted ${p.id} line was not found`);
@@ -942,8 +957,14 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     assert.equal(at('.claude/skills/hld-lld-writer/EXAMPLES.md', 'phase-label'), 1, '"Phase 2.2/2.1" was not seen');
     assert.equal(hits.some((h) => h.startsWith('governance/') && h.includes('[phase-label]')), false,
       'the phase-label rule reached outside .claude/');
-    assert.deepEqual(hits.filter((h) => h.startsWith('.claude/agents/integration-specialist.md:')).map((h) => h.split(':')[1]),
+    assert.deepEqual(linesOf('.claude/agents/integration-specialist.md', 'corpus-webfetch'),
       ['2', '3'], 'the exemption must pass line 1 only — line 3 carries the old fetch beside the exempted sentence');
+    assert.deepEqual(linesOf('.claude/agents/integration-specialist.md', 'agent-web-tool'), ['1', '2', '3'],
+      'an exemption for corpus-webfetch excused a web tool named in an agent');
+    assert.deepEqual(linesOf('.claude/agents/hld-lld-writer.md', 'agent-web-tool'), ['1', '2', '3'],
+      'a web tool named in an agent\'s prose was not seen, or the line asking for the document was flagged');
+    assert.equal(hits.some((h) => h.includes('[agent-web-tool]') && !h.startsWith('.claude/agents/')), false,
+      'the agent-web-tool rule reached outside .claude/agents/');
     assert.equal(at('.claude/agents/story-writer.md', 'corpus-webfetch'), 1, 'an exemption anchored to one file excused another');
     assert.deepEqual(hits.filter((h) => h.startsWith('.claude/skills/integration-specialist/SKILL.md:')).map((h) => h.split(':')[1]),
       ['1'], 'a fetch split over two lines was not seen once, or two sentences on adjacent lines were read as one');
