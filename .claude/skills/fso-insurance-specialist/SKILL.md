@@ -169,7 +169,7 @@ For each process named in the request:
 
 ## Part 2 — Data Model Alignment
 
-[Ground an Envelope directly: read the gateway skill, then the corpus pages for the constructs in play — eight by default; past that, say which construct is still unverified and what you will open, then continue. Parallel readers for grounding only when the user has enabled Ultracode or max effort for the session, said so in the answer; never otherwise. A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.]
+[Ground an Envelope directly: read the gateway skill, then the corpus pages for the constructs in play — eight by default; past that, say which construct is still unverified and what you will open, then continue. Parallel readers for grounding only when the user has enabled Ultracode or max effort for the session, said so in the answer; never otherwise. Under that opt-in, before the first workflow say how many workflows you will run and roughly how long, print one line as each completes, and run a second review round only when the first returned a material finding — one that changed a verdict, a table, a citation or an OPEN QUESTION; otherwise finalize and say so: "review round 1: no material finding, finalizing". A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.]
 
 [Authoritative list of baseline tables and fields involved.
 
