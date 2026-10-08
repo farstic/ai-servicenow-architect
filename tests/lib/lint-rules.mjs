@@ -151,6 +151,7 @@ export function lintAgents({ root, agentsRoot = join(root, '.claude/agents'),
       for (const t of tools) {
         if (t.startsWith('mcp__')) fail.push(`AG-03 ${rel}: MCP tool "${t}" — sub-agents must not carry instance access (principle 8, DR-13)`);
         if (['Agent', 'Task'].includes(t)) fail.push(`AG-03 ${rel}: "${t}" would let a sub-agent dispatch sub-agents`);
+        if (['WebFetch', 'WebSearch'].includes(t)) fail.push(`AG-03 ${rel}: "${t}" would let a sub-agent read the web — agents ground in vendor/ServiceNowDocs (ARC-09-C115)`);
       }
     }
     if (enforceS04) {

@@ -174,7 +174,11 @@ test('AG-02 rejects an unquoted ": " in an agent description', () => {
   assert.ok(!has(agentFails({ doer: 'name: doer\ndescription: "Builds things: flows and actions."\ntools: Read' }), 'AG-02'));
 });
 
-test('AG-03 rejects a missing tools key, an MCP tool, and a nested dispatcher', () => {
+test('AG-03 rejects a missing tools key, an MCP tool, a nested dispatcher, and a web tool', () => {
+  // ARC-09-C115: a sub-agent grounds in the bundled corpus; a web tool is an outbound call nobody sees.
+  for (const web of ['WebFetch', 'WebSearch']) {
+    assert.ok(has(agentFails({ doer: fm({ ...AGENT_OK, tools: `Read, ${web}` }) }), 'AG-03'), `${web} on a sub-agent must fail`);
+  }
   assert.ok(has(agentFails({ doer: fm({ name: 'doer', description: 'd' }) }), 'AG-03'), 'no tools key must fail');
   assert.ok(has(agentFails({ doer: fm({ ...AGENT_OK, tools: 'Read, mcp__example__do_thing' }) }), 'AG-03'),
     'an MCP tool on a sub-agent must fail (principle 8) — the server name is a placeholder on purpose: a real one would trip the legacy-name ratchet, and AG-03 keys on the mcp__ prefix, not the server');
