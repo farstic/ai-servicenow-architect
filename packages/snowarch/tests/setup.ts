@@ -13,7 +13,7 @@ beforeAll(() => {
  *
  * ARC-04-S03 needed the env-view because seven dispatcher suites set `process.env
  * .WRITE_ENABLED` in their own hooks to reach a write path. ARC-04-S06 removed those
- * assertions: `tests/contract.test.ts` (a) now asserts the same property for all 397 tools
+ * assertions: `tests/contract.test.ts` (a) now asserts the same property for every tool
  * with explicit runtimes, instead of nine hand-picked ones through the environment.
  *
  * So the glue is gone, and with it the last place a test could make a gate answer to an

@@ -145,6 +145,23 @@ describe('ARC-09-C97 — a value longer than its column is refused before the wr
     expect(details(error)).toMatchObject({ field: 'name', column_limit: 255, defined_on: 'cmdb_ci' });
   });
 
+  it('a sys_db_object row of another table is not taken for the parent: the limit stays unknown, the write goes ahead', async () => {
+    // The instance answers the walk's read for `name=incident` with another table's row, the shape of a
+    // condition it ignored. That row's super_class leads to u_base, whose short_description holds 5.
+    const db = cicd.db!;
+    db.rows.sys_db_object.push(
+      { sys_id: id('a', 7), name: 'u_base', super_class: '' },
+      { sys_id: id('a', 8), name: 'u_other', super_class: id('a', 7) });
+    db.rows.sys_dictionary.push(dict('u_base', 'short_description', '5'));
+    db.answer = (table) => (table === 'sys_db_object' ? db.rows.sys_db_object.filter((r) => r.name === 'u_other') : undefined);
+
+    const { error } = await add('incident', { short_description: 'x'.repeat(20) });
+
+    expect(error).toBeUndefined();
+    expect(posts('incident')).toHaveLength(1);
+    expect(cicd.calls.filter((c) => c.path === '/api/now/table/sys_dictionary' && c.query.sysparm_query?.startsWith('name=u_base'))).toEqual([]);
+  });
+
   it.each([['u_blank'], ['u_zero']])('a %s max_length is unknown: never refused', async (field) => {
     const { error } = await add('incident', { [field]: 'y'.repeat(5000) });
 
