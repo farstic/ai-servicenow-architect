@@ -151,9 +151,20 @@ bodies are checked against the documentation page, not yet against an instance. 
   Ultracode the Architect says how many workflows it will run and reports each one (below).
 - **The sub-agents have no web tool.** They ground in the bundled documentation, and a counterparty's API
   documentation is supplied as a file or as pasted text (below).
-- No real Claude session has yet been observed following the new lines in `CLAUDE.md`, the agents or the rule
-  file; the tests pin the wording and the places that state it, not what a session does. The live case of
-  T-25 needs an instance and has not been run, and T-26 and T-27 wait for a sitting.
+- **What real sessions were seen doing.** On rc.1 the owner ran real sessions on Claude Sonnet 5.5, and they
+  followed the new lines:
+  - the §1.1 halt, with no field list and no design;
+  - the declaration that parallel readers read the corpus;
+  - `OQ-EV` ids;
+  - design work filed under `clients/_unfiled/`;
+  - two co-firing gateways reconciled in one Envelope;
+  - in the live sitting, the engagement question before the first write.
+
+  On the same prompts an Envelope took about a minute in normal mode, where 2.0.9 took 47 minutes to an hour.
+  Under Ultracode one Envelope took 3 h 14 min, nearly all of it model generation. Not yet seen in a real
+  session: the up-front workflow count and the Envelopes saved under `clients/<engagement>/envelopes/` (T-26),
+  the sub-agents without a web tool (T-27), and the live case of T-25. The numbers are in
+  `docs/validation/2.0.11-rc.1-grounding-sitting.md`.
 
 ### Fixed
 
