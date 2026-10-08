@@ -20,6 +20,8 @@ export interface CicdCall {
   /** The path, without the query string. */
   path: string;
   query: Record<string, string>;
+  /** `Date.now()` when it was sent — the fake clock's time in a test that fakes timers. */
+  at: number;
 }
 
 export interface CicdAnswer {
@@ -77,7 +79,7 @@ export function fakeCicdModule(state: CicdState): Record<string, unknown> {
     snFetch: async (url: string | URL, init: { method?: string } = {}) => {
       const u = new URL(String(url));
       const method = (init.method ?? 'GET').toUpperCase();
-      state.calls.push({ method, path: u.pathname, query: Object.fromEntries(u.searchParams) });
+      state.calls.push({ method, path: u.pathname, query: Object.fromEntries(u.searchParams), at: Date.now() });
       const answer = answerFor(state, method, u.pathname);
       const text = JSON.stringify(answer.body);
       return {

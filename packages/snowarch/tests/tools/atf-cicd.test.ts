@@ -75,6 +75,11 @@ async function call(name: string, args: Record<string, unknown>) {
 const sent = () => cicd.calls.map((c) => `${c.method} ${c.path}`);
 const posts = () => cicd.calls.filter((c) => c.method === 'POST');
 const progressReads = () => cicd.calls.filter((c) => c.path.startsWith('/api/sn_cicd/progress/')).length;
+const resultsRead = () => sent().some((s) => s.includes('/testsuite/results/'));
+/** When each progress read was sent, in ms after the run's POST. */
+const progressReadTimes = () => cicd.calls
+  .filter((c) => c.path.startsWith('/api/sn_cicd/progress/'))
+  .map((c) => c.at - posts()[0].at);
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -156,6 +161,63 @@ describe('ARC-09-C94 — snow_atf_atf_suite_exec runs the suite through the CI/C
 
     expect(waitedMs).toBe(300_000);
     expect(value).toMatchObject({ outcome: 'running', budget_seconds: 300 });
+  });
+
+  it('a budget that is not a multiple of the interval: the last read is at the budget, not past it', async () => {
+    cicd.run = accepted;
+    cicd.progress.push(progressIs('1', 'Running', 40));
+
+    const { value, waitedMs } = await call('snow_atf_atf_suite_exec', { sys_id: SUITE, budget_seconds: 12 });
+
+    expect(waitedMs).toBe(12_000);
+    // The third wait is cut to what is left of the budget: reads at 5, 10 and 12 seconds, not at 15.
+    expect(progressReadTimes()).toEqual([5_000, 10_000, 12_000]);
+    expect(value).toMatchObject({ outcome: 'running', budget_seconds: 12 });
+  });
+
+  it('a run that ends Canceled stops the polling, and reports no counts', async () => {
+    cicd.run = accepted;
+    cicd.progress.push(progressIs('1', 'Running', 50), progressIs('4', 'Canceled', 50));
+
+    const { value, error, waitedMs } = await call('snow_atf_atf_suite_exec', { sys_id: SUITE });
+
+    expect(error).toBeUndefined();
+    // "4: Canceled" ends a run: two reads in ten seconds and no results request, not polling on to the budget.
+    expect(progressReads()).toBe(2);
+    expect(waitedMs).toBe(10_000);
+    expect(resultsRead()).toBe(false);
+    expect(value).toMatchObject({ outcome: 'canceled', status_label: 'Canceled', progress_id: PROGRESS });
+    expect(value.counts).toBeUndefined();
+    expect(value.result_record).toBeUndefined();
+  });
+
+  it('a run that ends Failed with no results link is refused with the platform\'s reason, and no results are read', async () => {
+    cicd.run = accepted;
+    cicd.progress.push(ok({
+      links: { progress: progressLink }, status: '3', status_label: 'Failed',
+      status_message: '', status_detail: '', error: 'the suite could not be run', percent_complete: 0,
+    }));
+
+    const { error } = await call('snow_atf_atf_suite_exec', { sys_id: SUITE });
+
+    expect(error?.code).toBe('REQUEST_FAILED');
+    expect(error?.message).toContain('the suite could not be run');
+    expect(error?.message).toContain(PROGRESS);
+    expect(resultsRead()).toBe(false);
+  });
+
+  it('a run that ends Successful with no results link says so, with no counts and no record', async () => {
+    cicd.run = accepted;
+    cicd.progress.push(progressIs('2', 'Successful', 100));
+
+    const { value, error } = await call('snow_atf_atf_suite_exec', { sys_id: SUITE });
+
+    expect(error).toBeUndefined();
+    expect(resultsRead()).toBe(false);
+    expect(value).toMatchObject({ outcome: 'successful', status_label: 'Successful', progress_id: PROGRESS });
+    expect(value.counts).toBeUndefined();
+    expect(value.result_record).toBeUndefined();
+    expect(value.summary).toMatch(/no results link/);
   });
 
   it.each([0, -5, 1801, '60'])('budget_seconds %j is refused before anything is sent', async (budget) => {
@@ -309,6 +371,21 @@ describe('ARC-09-C94 — snow_atf_atf_test_exec runs the test through the one su
     // the invalid part". Rows for other tests coming back must not count.
     cicd.tables.sys_atf_test = testRecord;
     cicd.tables.sys_atf_test_suite_test = ok([membership(OTHER_TEST, SUITE_2), membership(TEST, SUITE)]);
+    cicd.run = accepted;
+    cicd.progress.push(finished('2', 'Successful', 'Suite passed'));
+    cicd.results = resultsOf('success', [3, 0, 0, 0]);
+
+    const { value, error } = await call('snow_atf_atf_test_exec', { sys_id: TEST });
+
+    expect(error).toBeUndefined();
+    expect(posts()).toHaveLength(1);
+    expect(posts()[0].query).toEqual({ test_suite_sys_id: SUITE });
+    expect(value).toMatchObject({ ran_through_suite: { sys_id: SUITE } });
+  });
+
+  it('two rows for the same suite and test are one suite: the test runs', async () => {
+    cicd.tables.sys_atf_test = testRecord;
+    cicd.tables.sys_atf_test_suite_test = ok([membership(TEST, SUITE), membership(TEST, SUITE)]);
     cicd.run = accepted;
     cicd.progress.push(finished('2', 'Successful', 'Suite passed'));
     cicd.results = resultsOf('success', [3, 0, 0, 0]);
