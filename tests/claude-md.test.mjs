@@ -80,6 +80,22 @@ test('criterion 3 — the two blocks that are copied, not paraphrased', () => {
   assert.equal(rows.length, gateways.length, 'the gateway table must have exactly one row per gateway');
 });
 
+// ARC-09-C114 — an Envelope is the engagement's standing context: saved with the engagement, listed in
+// its state file, and read back by every later session there, so a downstream specialist starts from it
+// rather than re-reading the corpus. In every mode, not only under Ultracode (the architect's ruling).
+test('ARC-09-C114 — Step 2: an Envelope for a named engagement is saved, listed and read back', () => {
+  const step2 = lines.find((l) => l.startsWith('2. **Read engagement context**'));
+  assert.ok(step2, 'Phase 1 Step 2 is gone');
+  for (const phrase of [
+    'A gateway Envelope for a named engagement is saved under `clients/<name>/envelopes/`',
+    'listed in the state file\'s `## Envelopes` section (date · gateway · verdict · path)',
+    'reading engagement context means the state file and every Envelope it lists',
+    'a later prompt in that engagement starts from them instead of re-reading the corpus',
+    'An Envelope under `clients/_unfiled/` is loaded by nothing until an engagement is named.',
+  ]) assert.ok(step2.includes(phrase), `Step 2 lacks: ${phrase}`);
+  assert.doesNotMatch(step2, /Ultracode|max effort/, 'registering an Envelope is not an Ultracode-only rule');
+});
+
 test('criterion 7 — every repository path it names resolves', () => {
   const skipped = [];
   const dead = [];

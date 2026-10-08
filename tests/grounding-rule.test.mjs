@@ -42,6 +42,25 @@ test('ARC-09-C112 — the grounding rule is one sentence, in the same words in C
   }
 });
 
+// ARC-09-C114 — the owner's ruling (2026-10-08): Ultracode is the scoping mode, and it is NOT capped.
+// Its 3 h 14 min F1 Envelope carried 89 citations (0 dead), 0 invented names and a blocking risk the
+// one-minute run did not see. What was missing was knowing whether it was still working, and a second
+// review round run whether or not the first changed anything. So the one sentence after the opt-in
+// declares the plan, reports each workflow, and makes round 2 conditional — with the progress line
+// verbatim, so a session prints exactly that.
+test('ARC-09-C114 — under the opt-in: the plan is declared, and round 2 runs only on a material finding', () => {
+  const [{ words }] = groundingRules(real);
+  for (const phrase of [
+    'Under that opt-in, before the first workflow say how many workflows you will run and roughly how long',
+    'print one line as each completes',
+    'run a second review round only when the first returned a material finding — one that changed a verdict, a table, a citation or an OPEN QUESTION',
+    '"review round 1: no material finding, finalizing"',
+  ]) assert.ok(words.includes(phrase), `the grounding rule lacks: ${phrase}`);
+  // It qualifies the opt-in, so it comes after it; and the opt-in's own bound is unchanged.
+  assert.ok(words.indexOf('never otherwise.') < words.indexOf('Under that opt-in'), 'the sentence is not after the opt-in');
+  assert.doesNotMatch(words, /ceiling|at most \w+ readers|minutes/, 'a cap is back: the owner ruled C114 uncapped');
+});
+
 test('ARC-09-C112 — a copy that drifts is found', () => {
   const drifted = (f) => (f.includes('hrsd-specialist') ? real(f).replace('eight by default', 'six by default') : real(f));
   const rules = groundingRules(drifted);
