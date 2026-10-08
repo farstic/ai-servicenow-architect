@@ -1,5 +1,6 @@
 import { ServiceNowError } from '../utils/errors.js';
-import { requireAtf } from '../utils/permissions.js';
+import { requireAtf, requireWrite } from '../utils/permissions.js';
+import { addStep, addTest } from './atf-author.js';
 import { CICD_PAGE, DEFAULT_BUDGET_SECONDS, MAX_BUDGET_SECONDS, budgetArg, listSuiteTests, runSuite, suiteNames, suitesHolding, sysIdArg, } from './atf-cicd.js';
 const BUDGET_PROPERTY = {
     type: 'number',
@@ -98,6 +99,45 @@ export function atfToolManifest() {
             },
             gate: 'atf',
             mutates: true,
+        },
+        {
+            name: 'snow_atf_atf_test_add',
+            description: 'Create an ATF test (sys_atf_test) and read it back: every field sent is compared with what the instance '
+                + 'stored, and a difference comes back in warnings[]. (requires ATF_ENABLED and WRITE_ENABLED)',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    name: { type: 'string', description: 'Test name' },
+                    description: { type: 'string', description: 'Test description' },
+                    active: { type: 'boolean', description: 'Whether the test is active (default: true)' },
+                },
+                required: ['name'],
+            },
+            gate: 'atf',
+            mutates: true,
+            alsoRequires: 'write',
+        },
+        {
+            name: 'snow_atf_atf_step_add',
+            description: 'Add a step to an ATF test (sys_atf_step) with its input values, and read each record back: the step, each '
+                + 'input row, and, from the step\'s side, that each input is attached to it once. Refuses before any write: a test or '
+                + 'step config that does not exist, an inactive config, a config name two configs share, an order the test already '
+                + 'uses, an input the config does not have. A step of the baseline Run Server Side Script config also needs '
+                + 'SCRIPTING_ENABLED (other script-bearing configs are not recognised). (requires ATF_ENABLED and WRITE_ENABLED)',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    test: { type: 'string', description: 'System ID of the test' },
+                    step_config: { type: 'string', description: 'System ID of the step config, or its exact name (for example "Run Server Side Script")' },
+                    order: { type: 'number', description: 'Execution order; leave it out and the instance assigns the next-highest' },
+                    active: { type: 'boolean', description: 'Whether the step is active (default: true)' },
+                    inputs: { type: 'object', description: 'Input values by input name, as the step config\'s Input Variables name them' },
+                },
+                required: ['test', 'step_config'],
+            },
+            gate: 'atf',
+            mutates: true,
+            alsoRequires: 'write',
         },
         {
             name: 'snow_atf_atf_suite_result_read',
@@ -211,6 +251,16 @@ export async function dispatchAtfAction(client, name, args) {
                     + 'platform documents no single-test run, so the whole suite was run through the CI/CD API: its other tests ran '
                     + `too. ${run.summary}`,
             };
+        }
+        case 'snow_atf_atf_test_add': {
+            requireAtf();
+            requireWrite();
+            return await addTest(client, args);
+        }
+        case 'snow_atf_atf_step_add': {
+            requireAtf();
+            requireWrite();
+            return await addStep(client, args);
         }
         case 'snow_atf_atf_suite_result_read': {
             if (!args.result_sys_id)

@@ -175,6 +175,17 @@ export function render(ctx) {
   // that already happened is none of those. They get their own heading, and only when the contract
   // has any (the fixtures that render a synthetic contract have none, and must not grow an empty one).
   const warningCodes = contract.errorCodes.filter((e) => e.showInRule && e.warning);
+  // ARC-09-C95: the file stands on its line cap, so a warning may share another's line
+  // (`ruleLineWith`), rendered after that code's remedy instead of on a line of its own. A join whose
+  // host has no line here would vanish from the page, so it stops the render instead.
+  const warningHosts = warningCodes.filter((e) => !e.ruleLineWith);
+  for (const e of warningCodes.filter((x) => x.ruleLineWith)) {
+    if (!warningHosts.some((h) => h.code === e.ruleLineWith)) {
+      throw new Error(`rule-file: ${e.code} joins ${e.ruleLineWith}, which has no warning line`);
+    }
+  }
+  const joined = (e) => `\`${e.code}\` → ${fill(e.remedy)}${e.command ? ` — \`${fill(e.command)}\`` : ''}.`;
+  const warningLine = (host) => [line(host), ...warningCodes.filter((e) => e.ruleLineWith === host.code).map(joined)].join(' ');
   // The wildcard line borrows one flag's remedy, and which flag is derived rather than named: the
   // base flag is the one the others `require`, which is what makes its remedy the right one for the
   // whole family. Naming WRITE here would be a literal the loader exists to remove.
@@ -248,7 +259,7 @@ A remedy printed with \`<label>\`, \`<host>\` or \`<proxy>\` still in it: substi
 ${warningCodes.length === 0 ? '' : `
 ## Warnings — a write that succeeded, with something to report first
 ${WARNINGS_RULE}
-${warningCodes.map(line).join('\n')}
+${warningHosts.map(warningLine).join('\n')}
 `}
 Long form: \`governance/mcp-protocols.md\` · every code: \`docs/TROUBLESHOOTING.md\`
 `;

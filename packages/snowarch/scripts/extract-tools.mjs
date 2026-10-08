@@ -37,10 +37,10 @@ console.log(`Extracted ${manifest.length} tools → dist/tools-manifest.json`);
 // The catalogue's expected size lives in `tests/helpers/contract.ts`; `toolCount` below is
 // DERIVED from the catalogue and never from a literal, so the contract cannot disagree with
 // the code even when that constant lags a change.
-const EXPECTED = 397;
+const EXPECTED = 399;
 // S07 adds snow_us_capture_target_set (+1) and S08 removes snow_rpt_report_generate (−1)
 // while keeping the two retired script-exec tools as [Unsupported] stubs; each bumps this
-// constant in its own PR. `contract.toolCount` is DERIVED from the catalogue, never a
+// constant in its own PR. ARC-09-C95 adds snow_atf_atf_test_add and snow_atf_atf_step_add (+2). `contract.toolCount` is DERIVED from the catalogue, never a
 // literal, so the contract cannot disagree with the code even when this constant lags.
 const unique = new Set(manifest.map(t => t.name));
 if (manifest.length !== EXPECTED || unique.size !== EXPECTED) {

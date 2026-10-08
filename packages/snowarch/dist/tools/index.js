@@ -177,7 +177,7 @@ export const ROLE_BUNDLE_MAP = {
         'snow_scr_ui_actions_index', 'snow_scr_ui_action_read', 'snow_scr_ui_action_add', 'snow_scr_ui_action_modify',
         'snow_scr_acls_index', 'snow_scr_acl_read', 'snow_scr_acl_add', 'snow_scr_acl_modify',
         'snow_scr_changesets_index', 'snow_scr_changeset_read', 'snow_scr_changeset_commit', 'snow_scr_changeset_publish',
-        'snow_atf_atf_suites_index', 'snow_atf_atf_suite_read', 'snow_atf_atf_suite_exec', 'snow_atf_atf_tests_index', 'snow_atf_atf_test_read', 'snow_atf_atf_test_exec', 'snow_atf_atf_suite_result_read', 'snow_atf_atf_test_results_index', 'snow_atf_atf_failure_insight_read',
+        'snow_atf_atf_suites_index', 'snow_atf_atf_suite_read', 'snow_atf_atf_suite_exec', 'snow_atf_atf_tests_index', 'snow_atf_atf_test_read', 'snow_atf_atf_test_exec', 'snow_atf_atf_test_add', 'snow_atf_atf_step_add', 'snow_atf_atf_suite_result_read', 'snow_atf_atf_test_results_index', 'snow_atf_atf_failure_insight_read',
         'snow_fluent_query', 'snow_fluent_request_batch', 'snow_fluent_script_exec',
         // v4.0 Fluent SDK + discovery
         'snow_fluent_explain', 'snow_fluent_init', 'snow_fluent_build', 'snow_fluent_validate',

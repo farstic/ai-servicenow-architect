@@ -59,6 +59,12 @@ export interface ErrorCode {
    * of those (ARC-09-C101).
    */
   warning?: true;
+  /**
+   * A warning rendered on another warning's line in the rule file, after that code's remedy, rather
+   * than on a line of its own (ARC-09-C95): the file stands on its line cap, and a remedy that belongs
+   * beside another's costs no line there.
+   */
+  ruleLineWith?: string;
   /** The HTTP status the instance returned, where this code maps to one. */
   httpStatus?: number;
 }
@@ -546,10 +552,18 @@ export const ERROR_CODES = [
   },
   {
     code: 'FIELD_NOT_STORED',
-    meaning: "A WARNING on a write that succeeded, not an error: a field the tool sent is not shown as set in the platform's response (for `snow_scr_business_rule_add`: `filter_condition` or `advanced`). The record exists without it — a Business Rule without its filter runs on every matching operation. It arrives as `warnings[].code` on the tool's result.",
+    meaning: "A WARNING on a write that succeeded, not an error: a field the tool sent is not shown as set in the platform's response (for `snow_scr_business_rule_add`: `filter_condition` or `advanced`), or, for the ATF authoring tools, in the record read back after the write — a step input that no row attaches to the step included. The record exists without it — a Business Rule without its filter runs on every matching operation. It arrives as `warnings[].code` on the tool's result.",
     remedy: "read the record back; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance",
     showInRule: true,
     warning: true,
+  },
+  {
+    code: 'VALUE_NOT_AS_SENT',
+    meaning: "A WARNING on a write that succeeded, not an error: a field the tool sent reads back with a different value — neither missing nor a cut prefix — once line endings are normalised (the ATF authoring tools, ARC-09-C95). It names the field, the first differing offset and both lengths, never the values. Also raised when more than one row holds a step input that should be held once.",
+    remedy: "the record exists with the stored value: read it back and, if that value is wrong, correct it with a modify — do not add it again, which would make a second record",
+    showInRule: true,
+    warning: true,
+    ruleLineWith: 'VALUE_TRUNCATED',
   },
 ] as const satisfies readonly ErrorCode[];
 

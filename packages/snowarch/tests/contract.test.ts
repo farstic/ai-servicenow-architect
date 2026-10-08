@@ -220,12 +220,13 @@ describe('(b) a preset that satisfies a gate lets the tool through', () => {
 
 describe('composite gates — an outer gate plus a second requirement', () => {
   it('every alsoRequires names a real gate, and differs from the outer one', () => {
-    // Six tools sit behind a module-wide gate AND a case-level one (now_assist then write,
-    // fluent then write). `gate` is the outer one because it refuses first; without
-    // `alsoRequires` the write requirement would be missing from the contract entirely, and
-    // §2.1's ask list would under-report what those tools need.
+    // Eight tools sit behind a module-wide gate AND a case-level one (now_assist then write,
+    // fluent then write, and atf then write for the two ATF authoring tools of ARC-09-C95). `gate`
+    // is the outer one because it refuses first; without `alsoRequires` the write requirement
+    // would be missing from the contract entirely, and §2.1's ask list would under-report what
+    // those tools need.
     const composite = catalogue.filter((t) => t.alsoRequires);
-    expect(composite.length).toBe(6);
+    expect(composite.length).toBe(8);
     for (const t of composite) {
       expect(t.alsoRequires).not.toBe(t.gate);
       expect(Object.keys(CONTRACT.gates)).toContain(t.alsoRequires as string);
@@ -275,7 +276,7 @@ describe('(e) manifest, contract and catalogue agree', () => {
     expect(MANIFEST.map((t: { name: string }) => t.name).sort()).toEqual(cat);
     expect(CONTRACT.tools.map((t: { name: string }) => t.name).sort()).toEqual(cat);
     expect(CONTRACT.toolCount).toBe(cat.length);
-    expect(cat.length).toBe(397);
+    expect(cat.length).toBe(399);
   });
 
   it('every contract entry carries gate and mutates', () => {
