@@ -38,6 +38,11 @@ A test in no suite, or in several, is refused and nothing is created. The accoun
   past that it says which construct is still unverified and what it will open, then continues. Parallel
   readers ground an Envelope only in a session where the user has enabled Ultracode or max effort, and the
   answer says so.
+- Under Ultracode or max effort, the Architect says up front how many workflows it will run and roughly how
+  long, and prints a line as each one completes. It runs a second review round only when the first changed a
+  verdict, a table, a citation or an open question. The run itself is not capped. A gateway Envelope for a
+  named engagement, in any mode, is saved under `clients/<engagement>/envelopes/` and listed in the
+  engagement's state file, and every later session in that engagement starts from it.
 
 ### Added
 
