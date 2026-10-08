@@ -115,6 +115,21 @@ describe('ARC-09-C97 — a value longer than its column is refused before the wr
     expect(posts('incident')).toHaveLength(1);
   });
 
+  it('an update is checked the same way: VALUE_TOO_LONG, and no PATCH is sent', async () => {
+    const sysId = id('e', 1);
+    cicd.db!.rows.incident.push({ sys_id: sysId, u_code: 'OLD' });
+
+    const settled = (routeToolInvocation(client(), 'snow_core_record_modify', { table: 'incident', sys_id: sysId, fields: { u_code: 'ABCDEFGHIJK' } }) as Promise<unknown>)
+      .then(() => undefined, (e: ServiceNowError) => e);
+    await vi.runAllTimersAsync();
+    const error = await settled;
+
+    expect(error?.code).toBe('VALUE_TOO_LONG');
+    expect(details(error)).toMatchObject({ table: 'incident', field: 'u_code', sent_length: 11, column_limit: 10 });
+    expect(cicd.calls.filter((c) => c.method === 'PATCH')).toEqual([]);
+    expect(cicd.db!.rows.incident[0]).toMatchObject({ u_code: 'OLD' });
+  });
+
   it('an inherited column is read on the table that defines it', async () => {
     const { error } = await add('incident', { short_description: 'x'.repeat(161) });
 
