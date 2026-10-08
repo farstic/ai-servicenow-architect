@@ -67,6 +67,11 @@ export interface FakeDb {
   echo?: 'stored' | 'sent';
   afterInsert?: (table: string, row: Record<string, unknown>, db: FakeDb) => void;
   hide?: (table: string, query: Record<string, string>) => boolean;
+  /**
+   * Rows the instance answers a query with, whatever the query says — a condition it ignored, or rows
+   * that match it on paper and are not the ones asked for. Undefined lets the query run.
+   */
+  answer?: (table: string, query: Record<string, string>) => Array<Record<string, unknown>> | undefined;
   /** A write the instance refuses: return the refusal to answer with. */
   refuse?: (method: string, table: string) => CicdAnswer | undefined;
   /** The last sys_id handed out; the next is this plus one, as 32 hexadecimal characters. */
@@ -158,7 +163,8 @@ function dbAnswer(db: FakeDb, method: string, table: string, id: string | undefi
   }
   if (method === 'GET') {
     if (db.hide?.(table, query)) return ok([]);
-    return ok(matching(rows, query).map((r) => shown(db, table, r, query.sysparm_fields)));
+    const forced = db.answer?.(table, query);
+    return ok((forced ?? matching(rows, query)).map((r) => shown(db, table, r, query.sysparm_fields)));
   }
   const sent = body ?? {};
   const refusal = db.refuse?.(method, table);

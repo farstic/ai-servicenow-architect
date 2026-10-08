@@ -166,6 +166,13 @@ describe('ARC-09-C95 — snow_atf_atf_test_add writes the test and reads it back
     expect(error?.code).toBe('INVALID_REQUEST');
     expect(cicd.calls).toEqual([]);
   });
+
+  it('a name of only spaces is no name: refused before anything is sent', async () => {
+    const { error } = await call('snow_atf_atf_test_add', { name: '   ' });
+
+    expect(error?.code).toBe('INVALID_REQUEST');
+    expect(cicd.calls).toEqual([]);
+  });
 });
 
 describe('ARC-09-C95 — snow_atf_atf_step_add writes the step and its inputs, and proves them attached', () => {
@@ -223,6 +230,19 @@ describe('ARC-09-C95 — snow_atf_atf_step_add writes the step and its inputs, a
   it('the script proof: no row attached to the step is FIELD_NOT_STORED, even when the row read by its sys_id is right', async () => {
     // The row exists and reads back as sent; asked for from the step's side, the instance has none.
     cicd.db!.hide = (table, q) => table === 'sys_variable_value' && (q.sysparm_query ?? '').includes('^variable=');
+
+    const { value } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(warningsOf(value)).toHaveLength(1);
+    expect(warningFor(value, 'inputs.script')).toMatchObject({ code: 'FIELD_NOT_STORED', table: 'sys_variable_value' });
+    expect(String(warningFor(value, 'inputs.script')?.message)).toMatch(/not attached/);
+  });
+
+  it('a proof row that belongs to another step is not proof: the input is not attached', async () => {
+    // The instance answers the proof query with a row keyed to a different step.
+    cicd.db!.answer = (table, q) => (table === 'sys_variable_value' && (q.sysparm_query ?? '').includes('^variable=')
+      ? [{ sys_id: id('9', 8), document: 'sys_atf_step', document_key: id('e', 9), variable: V_SCRIPT, value: SCRIPT }]
+      : undefined);
 
     const { value } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
 
@@ -340,6 +360,18 @@ describe('ARC-09-C95 — snow_atf_atf_step_add writes the step and its inputs, a
     expect(writes()).toEqual([]);
   });
 
+  it('an input of another config is refused even when the instance returns that config\'s variables too', async () => {
+    // An ignored condition: the instance answers the input-variable read with every config's rows.
+    const db = cicd.db!;
+    db.answer = (table) => (table === 'atf_input_variable' ? db.rows.atf_input_variable : undefined);
+
+    const { error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { log: 'from the Log config' } });
+
+    expect(error?.code).toBe('INVALID_REQUEST');
+    expect(error?.message).toMatch(/"log"/);
+    expect(writes()).toEqual([]);
+  });
+
   it('an input the config does not have is refused, naming the inputs it has', async () => {
     const { error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { scrpt: SCRIPT } });
 
@@ -368,6 +400,23 @@ describe('ARC-09-C95 — snow_atf_atf_step_add writes the step and its inputs, a
     const cuts = warningsOf(value).filter((w) => w.code === 'VALUE_TRUNCATED');
     expect(cuts).toEqual([expect.objectContaining({ table: 'sys_variable_value', field: 'value', stored_length: 20 })]);
     expect(warningsOf(value).some((w) => w.code === 'VALUE_NOT_AS_SENT')).toBe(false);
+  });
+
+  it('a shorter stored value the dictionary says the column could hold is VALUE_NOT_AS_SENT, not silence', async () => {
+    // Not a cut by length: the column holds 4000, more than was sent. So it differs, and says so.
+    const db = cicd.db!;
+    const plain = db.store!;
+    db.echo = 'sent';
+    db.rows.sys_dictionary = [{ sys_id: id('7', 1), name: 'sys_variable_value', element: 'value', max_length: '4000' }];
+    db.store = (table, sent, existing) => (table === 'sys_variable_value' && typeof sent.value === 'string'
+      ? plain(table, { ...sent, value: sent.value.slice(0, 20) }, existing) : plain(table, sent, existing));
+
+    const { value } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(warningsOf(value).filter((w) => w.field === 'value')).toEqual([
+      expect.objectContaining({ code: 'VALUE_NOT_AS_SENT', first_difference_at: 20, stored_length: 20 }),
+    ]);
+    expect(warningsOf(value).some((w) => w.code === 'VALUE_TRUNCATED')).toBe(false);
   });
 
   it('a cut the write\'s answer already shows is reported once', async () => {
