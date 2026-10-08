@@ -23,6 +23,8 @@ export interface CicdCall {
   query: Record<string, string>;
   /** `Date.now()` when it was sent — the fake clock's time in a test that fakes timers. */
   at: number;
+  /** The JSON body of a write, parsed. */
+  body?: Record<string, unknown>;
 }
 
 export interface CicdAnswer {
@@ -44,9 +46,40 @@ export interface CicdState {
    * (`tableOf`), for a table that has to filter.
    */
   tables: Record<string, CicdAnswer | TableAnswer>;
+  /** A stateful Table API (ARC-09-C95). When set, it answers every `/api/now/table` request. */
+  db?: FakeDb;
 }
 
 export type TableAnswer = (query: Record<string, string>) => CicdAnswer;
+
+/**
+ * ARC-09-C95 — a Table API that keeps what was written, for tools that write and then read back.
+ *
+ * Rows hold a reference as the plain sys_id; the columns in `refs` are answered as `{ link, value }`,
+ * the shape the Table API gives a reference when no display value is asked for. The hooks are the
+ * instance's behaviour under test: what it stores of a write, whether a write's answer echoes what was
+ * sent or shows what was stored, the rows it adds itself after an insert, and queries it answers empty.
+ */
+export interface FakeDb {
+  rows: Record<string, Array<Record<string, unknown>>>;
+  refs: Record<string, string[]>;
+  store?: (table: string, sent: Record<string, unknown>, existing?: Record<string, unknown>) => Record<string, unknown>;
+  echo?: 'stored' | 'sent';
+  afterInsert?: (table: string, row: Record<string, unknown>, db: FakeDb) => void;
+  hide?: (table: string, query: Record<string, string>) => boolean;
+  /** A write the instance refuses: return the refusal to answer with. */
+  refuse?: (method: string, table: string) => CicdAnswer | undefined;
+  /** The last sys_id handed out; the next is this plus one, as 32 hexadecimal characters. */
+  seq: number;
+}
+
+export const newDb = (rows: FakeDb['rows'] = {}, refs: FakeDb['refs'] = {}): FakeDb => ({ rows, refs, seq: 0 });
+
+/** The next sys_id the fake hands out. */
+export function nextId(db: FakeDb): string {
+  db.seq += 1;
+  return `${'f'.repeat(24)}${db.seq.toString(16).padStart(8, '0')}`;
+}
 
 export const ABSENT_MESSAGE = 'Requested URI does not represent any resource';
 export const absentBody = { error: { message: ABSENT_MESSAGE, detail: null }, status: 'failure' };
@@ -59,6 +92,7 @@ export function resetCicd(state: CicdState): void {
   state.run = undefined;
   state.results = undefined;
   for (const k of Object.keys(state.tables)) delete state.tables[k];
+  state.db = undefined;
 }
 
 /** `{ result: ... }`, the envelope every one of these endpoints answers in. */
@@ -78,27 +112,76 @@ export const refused = (status: number, message: string): CicdAnswer =>
  * test-authoring error, not a row that silently matches.
  */
 export function tableOf(rows: Array<Record<string, unknown>>): TableAnswer {
+  return (query) => ok(matching(rows, query));
+}
+
+/** The rows `query` selects, as `tableOf` describes, up to `sysparm_limit`. */
+export function matching(rows: Array<Record<string, unknown>>, query: Record<string, string>): Array<Record<string, unknown>> {
   const columns = new Set(rows.flatMap((row) => Object.keys(row)));
   const valueOf = (row: Record<string, unknown>, field: string): unknown => {
     const v = row[field];
     return v !== null && typeof v === 'object' ? (v as { value?: unknown }).value : v;
   };
-  return (query) => {
-    const conditions = (query.sysparm_query ?? '').split('^').filter(Boolean).flatMap((term) => {
-      const m = /^([a-z_]+)(=|IN)(.*)$/.exec(term);
-      if (!m) throw new Error(`tableOf: the fake does not evaluate "${term}"`);
-      const [, field, op, raw] = m;
-      if (!columns.has(field)) return [];
-      return [op === 'IN'
-        ? (row: Record<string, unknown>) => raw.split(',').includes(String(valueOf(row, field)))
-        : (row: Record<string, unknown>) => String(valueOf(row, field)) === raw];
-    });
-    const limit = Number(query.sysparm_limit) || rows.length;
-    return ok(rows.filter((row) => conditions.every((c) => c(row))).slice(0, limit));
-  };
+  const conditions = (query.sysparm_query ?? '').split('^').filter(Boolean).flatMap((term) => {
+    const m = /^([a-z_]+)(=|IN)(.*)$/.exec(term);
+    if (!m) throw new Error(`tableOf: the fake does not evaluate "${term}"`);
+    const [, field, op, raw] = m;
+    if (!columns.has(field)) return [];
+    return [op === 'IN'
+      ? (row: Record<string, unknown>) => raw.split(',').includes(String(valueOf(row, field)))
+      : (row: Record<string, unknown>) => String(valueOf(row, field)) === raw];
+  });
+  const limit = Number(query.sysparm_limit) || rows.length;
+  return rows.filter((row) => conditions.every((c) => c(row))).slice(0, limit);
 }
 
-function answerFor(state: CicdState, method: string, path: string, query: Record<string, string>): CicdAnswer {
+/** A row as the Table API answers it: only `sysparm_fields` when asked, references as `{ link, value }`. */
+function shown(db: FakeDb, table: string, row: Record<string, unknown>, fields?: string): Record<string, unknown> {
+  const wanted = fields ? fields.split(',').map((f) => f.trim()) : Object.keys(row);
+  const out: Record<string, unknown> = {};
+  for (const f of wanted) {
+    if (!(f in row)) continue;
+    const v = row[f];
+    out[f] = (db.refs[table] ?? []).includes(f) && typeof v === 'string' && v !== ''
+      ? { link: `https://test.service-now.com/api/now/table/${f}/${v}`, value: v }
+      : v;
+  }
+  return out;
+}
+
+function dbAnswer(db: FakeDb, method: string, table: string, id: string | undefined,
+  query: Record<string, string>, body: Record<string, unknown> | undefined): CicdAnswer {
+  const rows = (db.rows[table] ??= []);
+  const at = id === undefined ? -1 : rows.findIndex((r) => r.sys_id === id);
+  if (method === 'GET' && id !== undefined) {
+    return at === -1 ? refused(404, 'No Record found') : ok(shown(db, table, rows[at], query.sysparm_fields));
+  }
+  if (method === 'GET') {
+    if (db.hide?.(table, query)) return ok([]);
+    return ok(matching(rows, query).map((r) => shown(db, table, r, query.sysparm_fields)));
+  }
+  const sent = body ?? {};
+  const refusal = db.refuse?.(method, table);
+  if (refusal) return refusal;
+  if (method === 'POST' && id === undefined) {
+    const stored = { ...(db.store ? db.store(table, sent) : sent), sys_id: nextId(db) };
+    rows.push(stored);
+    db.afterInsert?.(table, stored, db);
+    return ok(db.echo === 'sent' ? { ...sent, sys_id: stored.sys_id } : shown(db, table, stored));
+  }
+  if (method === 'PATCH' && at !== -1) {
+    const before = rows[at];
+    const stored = { ...(db.store ? db.store(table, sent, before) : { ...before, ...sent }), sys_id: before.sys_id };
+    rows[at] = stored;
+    return ok(db.echo === 'sent' ? { ...before, ...sent } : shown(db, table, stored));
+  }
+  return refused(at === -1 ? 404 : 400, 'No Record found');
+}
+
+function answerFor(state: CicdState, method: string, path: string, query: Record<string, string>,
+  body?: Record<string, unknown>): CicdAnswer {
+  const record = /^\/api\/now\/table\/([A-Za-z0-9_]+)(?:\/([0-9a-f]{32}))?$/.exec(path);
+  if (state.db && record) return dbAnswer(state.db, method, record[1], record[2], query, body);
   if (method === 'POST' && path === '/api/sn_cicd/testsuite/run') return state.run ?? refused(400, ABSENT_MESSAGE);
   if (method === 'GET' && path.startsWith('/api/sn_cicd/progress/')) {
     const next = state.progress.length > 1 ? state.progress.shift() : state.progress[0];
@@ -114,12 +197,13 @@ function answerFor(state: CicdState, method: string, path: string, query: Record
 /** The module shape `src/servicenow/http.ts` exports, backed by `state`. */
 export function fakeCicdModule(state: CicdState): Record<string, unknown> {
   return {
-    snFetch: async (url: string | URL, init: { method?: string } = {}) => {
+    snFetch: async (url: string | URL, init: { method?: string; body?: unknown } = {}) => {
       const u = new URL(String(url));
       const method = (init.method ?? 'GET').toUpperCase();
       const query = Object.fromEntries(u.searchParams);
-      state.calls.push({ method, path: u.pathname, query, at: Date.now() });
-      const answer = answerFor(state, method, u.pathname, query);
+      const body = typeof init.body === 'string' && init.body !== '' ? JSON.parse(init.body) as Record<string, unknown> : undefined;
+      state.calls.push({ method, path: u.pathname, query, at: Date.now(), ...(body ? { body } : {}) });
+      const answer = answerFor(state, method, u.pathname, query, body);
       const text = JSON.stringify(answer.body);
       return {
         ok: answer.status >= 200 && answer.status < 300,
