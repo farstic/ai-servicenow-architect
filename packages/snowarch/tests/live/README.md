@@ -480,3 +480,117 @@ ARC-02-S10 section above) and discard the update set.
 Record in `docs/validation/` under the sitting's file, as **ARC-09-C92 live: CONFIRMED / FAILED** and
 **ARC-09-C93 live: CONFIRMED / FAILED**, saying which of the failure shapes above it was, for the POST
 and for the PATCH separately.
+
+## ARC-09-C94 — running an ATF test by REST
+
+**Build under test:** `develop` @ the sha on the PR that adds this section, or the release candidate the
+owner has installed from it.
+
+**The finding (the owner's R1):** `snow_atf_atf_test_exec` returned `INVALID_REQUEST` on the PDI, and the
+instance said the URI is not a resource.
+
+**What the tool sends** (measured at `eb84cb8`): `POST {instance}/api/now/atf/runner/run_test` with the JSON
+body `{"sys_id": "<test sys_id>"}`, through `client.callNowAssist` (`src/tools/atf.ts`, the
+`snow_atf_atf_test_exec` case; `src/servicenow/client.ts`, `callNowAssist`). `snow_atf_atf_suite_exec`
+sends `POST /api/now/atf/runner/run_suite` the same way. The client maps an HTTP 400 to `INVALID_REQUEST`
+(`client.ts`, the status mapping), so the owner's error was a 400 whose message said there is no such
+resource.
+
+**What the bundled corpus documents** (`68c0d11`):
+
+- **No `atf/runner` path anywhere** — 0 files name it.
+- **The CI/CD API runs a SUITE, not a test:** `POST /api/sn_cicd/testsuite/run` "starts a specified
+  automated test suite. The test suite runs on the instance from which the endpoint was called." It takes
+  `test_suite_sys_id` or `test_suite_name` as a query parameter, and needs the `sn_cicd.sys_ci_automation`
+  or `admin` role. It answers asynchronously: poll `GET /api/sn_cicd/progress/{progress_id}` with
+  `links.progress.id`, then read `GET /api/sn_cicd/testsuite/results/{result_id}`. A suite that contains UI
+  tests needs a scheduled Client Test Runner open, or a headless runner *(citation:
+  `markdown/api-reference/rest-apis/cicd-api.md`)*. The corpus documents no REST call that runs a single
+  test.
+- **The runner property:** `sn_atf.runner.enabled` — "If checked, enables running tests and test suites on
+  this instance. This setting is unchecked by default to prevent users from unintentionally running tests
+  on production instances" *(citation: `markdown/application-development/automated-test-framework-atf/atf-admin-properties.md`)*.
+- **The tables:** Test [`sys_atf_test`], Test Suite [`sys_atf_test_suite`], `sys_atf_test_suite_result` and
+  `sys_atf_test_result` are in the corpus. `sys_atf_result` and `sys_atf_failure_insight`, which
+  `snow_atf_atf_test_results_index` and `snow_atf_atf_failure_insight_read` query, are not.
+
+**So by the corpus, the tool calls a path the corpus does not document,** and no documented call runs one
+test. No code changes until the live run says which of the shapes below this instance shows.
+
+### Setup
+
+An instance on the `pdi-developer` preset (`ATF_ENABLED` on), and an account with `admin` or
+`sn_cicd.sys_ci_automation`. Before the run, in the UI: one test whose steps are all server-side (no UI
+step, so no client runner is needed) and one suite that holds only that test. Record both sys_ids; neither
+is written by a tool.
+
+### The run
+
+```
+read-only — no approval needed
+1  snow_core_capabilities_read                         the preset and ATF_ENABLED, as the server reads them
+2  snow_core_records_query { table: "sys_properties",
+     query: "name=sn_atf.runner.enabled^ORname=sn_atf.schedule.enabled", fields: "name,value" }
+3  snow_core_records_query { table: "v_plugin",
+     query: "idSTARTSWITHcom.glide.automated_testing", fields: "id,name,active" }
+4  snow_atf_atf_test_read { sys_id: <test> }            the test exists and is active
+5  snow_atf_atf_suite_read { sys_id_or_name: <suite> }  the suite exists and is active
+6  in the REST API Explorer, GET /api/now/atf/runner/run_test
+     — does this instance have a resource at the tool's path at all? (a GET, so nothing runs)
+7  in the REST API Explorer, GET /api/sn_cicd/progress/<any 32-character hex>
+     — is the documented API present? (an unknown progress id runs nothing)
+
+the one write — its own "write approved"
+8  snow_atf_atf_test_exec { sys_id: <test> }           About to start ATF test <test> on instance
+                                                       "<label>" — write approved?
+```
+
+If step 2 shows `sn_atf.runner.enabled` false, stop before step 8 and ask the owner whether to check it for
+the sitting. It is a setting he changes in the UI, and the default is off on purpose.
+
+### Pass condition — the exact state to see
+
+Step 8 returns without an error, and a `sys_atf_test_result` record for the test appears, created in the
+minute of the call. That means the tool's path works on this instance although the corpus does not document
+it. The tool keeps its path, and the run becomes a PN entry with `Grounding: observed behaviour`.
+
+### The failure shapes, and what each means for the fix
+
+- **A — the path is absent, and the documented API is present.** Steps 6 and 8 say there is no such
+  resource, while step 7 answers as the CI/CD API (an error about the progress id, not about the URI). The
+  corpus is right and the tool is wrong. The fix moves `snow_atf_atf_suite_exec` onto
+  `POST /api/sn_cicd/testsuite/run` with progress and results. `snow_atf_atf_test_exec` either runs its test
+  through a suite or refuses with a remedy that names the suite call, since no documented call runs one
+  test.
+- **B — both are absent.** Steps 6, 7 and 8 all say there is no such resource: the CI/CD API is not
+  available on this instance either. The fix is shape A's, and the remedy also says the CI/CD API must be
+  present.
+- **C — a 403.** The path exists and the account lacks the role. The fix is a remedy line naming
+  `sn_cicd.sys_ci_automation` or `admin`, under `INSUFFICIENT_PRIVILEGES`.
+- **D — the runner is off.** Step 2 shows `sn_atf.runner.enabled` false, and step 8 returns an ATF refusal
+  rather than a URI error. The fix is a remedy that names the property and its production default.
+- **E — a 400 that is not about the URI.** The body shape is wrong. Record the message; the fix is the body.
+
+### The evidence to record
+
+- step 1's preset and flags line; step 2's two property values; step 3's plugin ids and `active` values;
+  steps 4 and 5's `active`;
+- steps 6 and 7: the HTTP status and the message of each answer, word for word;
+- step 8: the error code, the HTTP status and the instance's message, word for word, and the server log
+  line `Calling Now Assist endpoint: /api/now/atf/runner/run_test`, which proves the path the tool called;
+- whether a `sys_atf_test_result` or `sys_atf_test_suite_result` record appeared — a
+  `snow_core_records_query` on each, with `sys_created_on` in the minute of step 8;
+- **the negative control:** step 4 again after step 8 — the test's record unchanged, so a refusal wrote
+  nothing.
+
+None of these is a secret, and none names the instance.
+
+### Teardown
+
+Delete the probe test and suite in the UI. If `sn_atf.runner.enabled` was checked for the sitting, uncheck
+it again. Nothing else was written.
+
+### Verdict
+
+Record in `docs/validation/` under the sitting's file, as **ARC-09-C94 live: WORKS / PATH ABSENT /
+API ABSENT / ROLE / RUNNER OFF / BODY**, with the step 6–8 answers and the fix the shape implies.
