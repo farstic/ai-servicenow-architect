@@ -1,7 +1,7 @@
 ---
 name: developer
 description: Implement ServiceNow code (Script Includes, Business Rules, Client Scripts, UI Scripts, Scheduled Jobs, Background Scripts, Fix Scripts, custom Flow Action scripts) per a supplied spec. Dispatched by the Chief Architect orchestrator after spec is approved. Returns code artefact(s) and a §6.2 post-build proposal manifest.
-tools: Read, Write, Edit, Glob, Grep, WebFetch
+tools: Read, Write, Edit, Glob, Grep
 model: inherit
 skills:
   - developer

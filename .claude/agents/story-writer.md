@@ -1,7 +1,7 @@
 ---
 name: story-writer
 description: Convert requirements into sprint-ready Gherkin Feature files with ServiceNow conventions, OPEN QUESTIONS blocks, and proposed supporting stories. Dispatched by the Chief Architect orchestrator after routing approval, typically downstream of Discovery Specialist (PP-04 second step) or directly from a feature request. Returns Feature file(s) and a §6.2 post-build proposal manifest covering Technical Designer (downstream design) and ATF Author (test coverage).
-tools: Read, Write, Edit, Glob, Grep, WebFetch
+tools: Read, Write, Edit, Glob, Grep
 model: inherit
 skills:
   - story-writer

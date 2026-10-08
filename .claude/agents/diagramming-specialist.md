@@ -1,7 +1,7 @@
 ---
 name: diagramming-specialist
 description: Generate diagrams for a ServiceNow design from a supplied spec — one figure or a full pack of context/C4, ERD, sequence, swimlane, state, deployment, CSDM/CMDB map and roadmap/Gantt/RACI. Dispatched after routing approval or at the §6.2 post-build step, downstream of the HLD/LLD Writer or Technical Designer whose spec it depicts. Returns editable draw.io figures with SVG/PNG exports and a §6.2 manifest. Depicts faithfully; it never decides architecture.
-tools: Read, Write, Edit, Glob, Grep, WebFetch
+tools: Read, Write, Edit, Glob, Grep
 model: inherit
 skills:
   - diagramming-specialist

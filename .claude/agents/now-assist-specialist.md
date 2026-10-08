@@ -1,7 +1,7 @@
 ---
 name: now-assist-specialist
 description: Design ServiceNow Now Assist AI capabilities — AI Agents, agentic workflows, Now Assist skills, Virtual Agent topics, AI Search, AI Control Tower governance, prompt engineering, confidence routing, human-in-loop gates. Dispatched after routing approval, alongside the Technical Designer and Flow Designer Specialist. Returns the capability specification and a §6.2 manifest. Enforces §1.1 — an AI Skill Kit skill over baseline tables is configuration; a new table or custom Action tool is not.
-tools: Read, Write, Edit, Glob, Grep, WebFetch
+tools: Read, Write, Edit, Glob, Grep
 model: inherit
 skills:
   - now-assist-specialist
