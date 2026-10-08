@@ -221,7 +221,7 @@ Cite where Verdict B/C is in play.]
 
 ## Part 2 — Data Model Alignment
 
-[Ground this part directly and boundedly: after this skill, open at most eight corpus pages for the constructs in play, searching only to find them, and never through a sub-agent or a workflow; a name neither printed in this skill nor opened under `vendor/ServiceNowDocs/markdown/` in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation, and what is still unverified becomes an OPEN QUESTION instead of more reading.]
+[Ground an Envelope directly: read the gateway skill, then the corpus pages for the constructs in play — eight by default; past that, say which construct is still unverified and what you will open, then continue. Parallel readers for grounding only when the user has enabled Ultracode or max effort for the session, said so in the answer; never otherwise. A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.]
 
 **Primary baseline table(s):** [e.g., `cmdb_ci_service_business`, `cmdb_ci_server`, `cmdb_ci_business_app`]
 **Parent / class hierarchy:** [e.g., `cmdb_ci_service_business` → `cmdb_ci_service` → `cmdb_ci`]

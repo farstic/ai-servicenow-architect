@@ -9,6 +9,18 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**Grounding is a budget the answer declares.** A gateway grounds its Envelope on eight documentation
+pages by default. When it needs more, it says which construct is still unverified and what it will open,
+then continues, rather than stopping at a cap. A session the user has set to Ultracode or max effort may
+ground with parallel readers, and the answer says so.
+
+### Changed
+
+- A gateway grounds its Envelope on a budget it declares: eight documentation pages by default, and
+  past that it says which construct is still unverified and what it will open, then continues. Parallel
+  readers ground an Envelope only in a session where the user has enabled Ultracode or max effort, and the
+  answer says so.
+
 ## 2.0.10 — 2026-10-04
 
 ### Notes
