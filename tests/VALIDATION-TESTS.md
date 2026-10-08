@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 25 tests, T-01 through T-25, no number reserved. The count is asserted by
+> **How many.** 26 tests, T-01 through T-26, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -1391,6 +1391,90 @@ write approved
 - The engagement is asked for a second time in the same session.
 - The instance change is recorded under `clients/_unfiled/`, in a scratchpad, or nowhere.
 - The engagement question is taken as the write approval, or the write is made straight after it.
+
+---
+
+## T-26 — Ultracode is the scoping mode: the plan is declared, round 2 is conditional, and the Envelope is the engagement's context
+
+**Covers:** `CLAUDE.md` §1 (the grounding rule's ARC-09-C114 sentence, the same words in the six gateways' Part 2); Phase 1 Step 2 (an Envelope for a named engagement is saved under `clients/<name>/envelopes/`, listed in the state file's `## Envelopes` section, and read back by a later session)
+**Modes:** design-only ✅ · live ✅ (no instance call; the mode does not change what is expected)
+
+**Run by hand in the owner's sitting.** Turn 1 needs Ultracode or max effort, which only the user can enable
+for a session, and turn 2 needs a NEW session in the same checkout. The scripted runner runs one session at its
+own effort and does not run this case as specified. For a cheaper check of the save and the registration
+alone, turn 1 may run in normal mode; expectations 1 and 2 then do not apply.
+
+The prompt is F1 with the engagement named. F1, the prompt behind the timings in plan row C114 (1 min 07 s
+normal, 3 h 14 min under Ultracode, on v2.0.11-rc.1), ends "No engagement is loaded; treat this as a
+design-only question grounded in the docs."; here that sentence is "Engagement: acme. Design-only, grounded
+in the docs."
+
+### Setup
+
+```sh
+mkdir -p clients/acme
+printf '%s\n' \
+  '# acme — engagement state' \
+  'Release family: Zurich. Delivery model: agile. Sign-off: product owner.' \
+  '' \
+  '## Roles' \
+  '- "L1 Agent" is the baseline `itil` role.' \
+  '' \
+  '## Open questions' \
+  'OQ-ES-1. Is Service Operations Workspace licensed? (Proposed default: yes.)' \
+  > clients/acme/acme-engagement-state.md
+```
+
+### Prompt
+
+Turn 1 — session 1, with Ultracode or max effort enabled by the user:
+
+```
+A P&C insurer needs first notice of loss (FNOL) intake for auto claims: the intake creates a claim from the caller's policy, assigns an adjuster by territory and sets an initial reserve. Design it. Engagement: acme. Design-only, grounded in the docs.
+```
+
+Turn 2 — a NEW session in the same checkout, normal effort:
+
+```
+For acme: the technical design for the FNOL intake — the claim created from the caller's policy, the adjuster assigned by territory, the initial reserve.
+```
+
+### Expected behaviour
+
+1. **Turn 1, before the first workflow:** the reply says how many workflows it will run and roughly how
+   long; then one line is printed as each workflow completes.
+2. **After the first review round:** either a second round runs, after a line naming the material finding (a
+   verdict, a table, a citation or an OPEN QUESTION that changed), or the reply prints
+   `review round 1: no material finding, finalizing` and finalizes.
+3. **The Envelope is saved and listed:** it has its five parts, with the gateways that fire on F1 reconciled.
+   It is saved under `clients/acme/envelopes/`, and `clients/acme/acme-engagement-state.md` gains a
+   `## Envelopes` section with one line for it: date · gateway · verdict · path. Nothing is written under
+   `clients/_unfiled/`.
+4. **Turn 2, a new session:** the reply says it read `clients/acme/acme-engagement-state.md` and the
+   Envelope listed there. It cites that Envelope's path and its `OQ-EV-<n>` ids, and starts from its verdict.
+
+### Pass criteria
+
+- **Turn 1:**
+  - the plan line comes before the first workflow, with one completion line per workflow;
+  - round 2 runs only after a stated material finding, or the exact line
+    `review round 1: no material finding, finalizing` appears.
+- **The files:**
+  - `clients/acme/envelopes/` holds the Envelope;
+  - the state file's `## Envelopes` line names its date, gateway, verdict and path.
+- **Turn 2's transcript:**
+  - the state file and the Envelope are read;
+  - the Envelope's path and at least one `OQ-EV-<n>` are cited;
+  - no corpus page the Envelope already cites is opened again (`scripts/validation/turn-report.mjs` lists a
+    turn's corpus reads).
+
+### Fail signals
+
+- Workflows start with no plan stated, or run with no completion lines.
+- A second review round after a first that changed nothing material, or none after one that did.
+- The Envelope is saved under `clients/_unfiled/` or a scratchpad, or is not listed in the state file.
+- Turn 2 re-grounds the same constructs from the corpus, or does not mention the Envelope.
+- A cap appears (a reader or page limit, or a time ceiling): the owner ruled C114 uncapped.
 
 ---
 
