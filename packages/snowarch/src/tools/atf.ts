@@ -8,7 +8,8 @@ import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireAtf } from '../utils/permissions.js';
 import {
-  CICD_PAGE, DEFAULT_BUDGET_SECONDS, MAX_BUDGET_SECONDS, budgetArg, runSuite, suiteNames, suitesHolding, sysIdArg,
+  CICD_PAGE, DEFAULT_BUDGET_SECONDS, MAX_BUDGET_SECONDS, budgetArg, listSuiteTests, runSuite, suiteNames, suitesHolding,
+  sysIdArg,
 } from './atf-cicd.js';
 import type { ToolDefinition } from './types.js';
 
@@ -67,11 +68,12 @@ export function atfToolManifest(): ToolDefinition[] {
     },
     {
       name: 'snow_atf_atf_tests_index',
-      description: 'List ATF test cases, optionally filtered by suite',
+      description: 'List ATF test cases. With suite_sys_id, lists the tests that suite holds, read from its Test Suite '
+        + 'Tests rows (sys_atf_test_suite_test); a suite with none lists nothing.',
       inputSchema: {
         type: 'object',
         properties: {
-          suite_sys_id: { type: 'string', description: 'Filter by test suite sys_id' },
+          suite_sys_id: { type: 'string', description: 'System ID of a test suite: list only the tests it holds' },
           active: { type: 'boolean', description: 'Filter to active tests only' },
           limit: { type: 'number', description: 'Max results (default: 20)' },
         },
@@ -180,9 +182,11 @@ export async function dispatchAtfAction(
       return await runSuite(client, sysIdArg(args.sys_id), budgetArg(args.budget_seconds));
     }
     case 'snow_atf_atf_tests_index': {
-      let query = args.active !== false ? 'active=true' : '';
-      if (args.suite_sys_id) query = query ? `${query}^test_suite=${args.suite_sys_id}` : `test_suite=${args.suite_sys_id}`;
-      const resp = await client.queryRecords({ table: 'sys_atf_test', query: query || undefined, limit: args.limit || 20 });
+      const activeOnly = args.active !== false;
+      const limit = args.limit || 20;
+      // ARC-09-C113: a suite's tests are its sys_atf_test_suite_test rows, not a column on sys_atf_test.
+      if (args.suite_sys_id) return await listSuiteTests(client, sysIdArg(args.suite_sys_id, 'suite_sys_id'), activeOnly, limit);
+      const resp = await client.queryRecords({ table: 'sys_atf_test', query: activeOnly ? 'active=true' : undefined, limit });
       return { count: resp.count, tests: resp.records };
     }
     case 'snow_atf_atf_test_read': {

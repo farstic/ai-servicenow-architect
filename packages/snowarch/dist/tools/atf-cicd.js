@@ -21,10 +21,10 @@ const SYS_ID = /^[0-9a-f]{32}$/i;
 /** The page's status numbers that end a run. */
 const FINISHED = new Set(['2', '3', '4']);
 const STATUS_LABEL = { 0: 'Pending', 1: 'Running', 2: 'Successful', 3: 'Failed', 4: 'Canceled' };
-/** `sys_id`, checked: a sys_id is 32 hexadecimal characters, and anything else is not sent anywhere. */
-export function sysIdArg(value) {
+/** A sys_id argument, checked: 32 hexadecimal characters, and anything else is not sent anywhere. */
+export function sysIdArg(value, argument = 'sys_id') {
     if (typeof value !== 'string' || !SYS_ID.test(value)) {
-        throw new ServiceNowError(`sys_id must be a sys_id, 32 hexadecimal characters; got ${JSON.stringify(value)}`, 'VALIDATION_ERROR');
+        throw new ServiceNowError(`${argument} must be a sys_id, 32 hexadecimal characters; got ${JSON.stringify(value)}`, 'VALIDATION_ERROR');
     }
     return value;
 }
@@ -204,6 +204,58 @@ export async function suitesHolding(client, test) {
         .map((row) => refValue(row.test_suite))
         .filter((s) => typeof s === 'string' && s !== '');
     return [...new Set(suites)];
+}
+/** The most membership rows read for one suite: the client's largest page. */
+const SUITE_ROWS = 1000;
+/**
+ * Test ids per `sys_atf_test` query: `sys_idIN` and a hundred sys_ids come to about 3,300 characters,
+ * inside the 4,096 the client allows a query (`validateQuery` in client.ts).
+ */
+const IDS_PER_QUERY = 100;
+/**
+ * The tests a suite holds, read from its `sys_atf_test_suite_test` rows (ARC-09-C113), in the order the
+ * rows came and each test once. A row counts only when the suite it carries IS this suite — the guard
+ * `suitesHolding` has, for the same reason. `capped` says the read stopped at SUITE_ROWS rows.
+ */
+export async function testsOfSuite(client, suite) {
+    const resp = await client.queryRecords({
+        table: 'sys_atf_test_suite_test', query: `test_suite=${suite}`, fields: 'test,test_suite', limit: SUITE_ROWS,
+    });
+    const tests = resp.records
+        .filter((row) => refValue(row.test_suite) === suite)
+        .map((row) => refValue(row.test))
+        .filter((t) => typeof t === 'string' && t !== '');
+    return { tests: [...new Set(tests)], capped: resp.records.length >= SUITE_ROWS };
+}
+/**
+ * `snow_atf_atf_tests_index` for one suite (ARC-09-C113). It used to query `sys_atf_test` on
+ * `test_suite`, a column the corpus does not put there, and a condition on a column that does not
+ * exist is ignored rather than refused (c_TableAPI.md), so the suite filter could drop out and list
+ * every active test as the suite's. Now: the suite's tests from its membership rows, then those
+ * tests from `sys_atf_test` by `sys_idIN` — "fieldINvalue1,value2,value3"
+ * (vendor/ServiceNowDocs/markdown/platform-user-interface/c_EncodedQueryStrings.md) — IDS_PER_QUERY at
+ * a time, with the `active` filter the tool always had, up to `limit`. A suite with no rows lists
+ * nothing; it never falls back to every test.
+ */
+export async function listSuiteTests(client, suite, activeOnly, limit) {
+    const { tests: ids, capped } = await testsOfSuite(client, suite);
+    if (ids.length === 0) {
+        return { count: 0, tests: [], summary: `Test suite ${suite} holds no tests: no sys_atf_test_suite_test row names it.` };
+    }
+    const tests = [];
+    for (let i = 0; i < ids.length && tests.length < limit; i += IDS_PER_QUERY) {
+        const batch = ids.slice(i, i + IDS_PER_QUERY);
+        const query = `${activeOnly ? 'active=true^' : ''}sys_idIN${batch.join(',')}`;
+        const resp = await client.queryRecords({ table: 'sys_atf_test', query, limit: limit - tests.length });
+        tests.push(...resp.records);
+    }
+    return {
+        count: tests.length,
+        tests,
+        summary: `Test suite ${suite} holds ${ids.length} test(s)${capped ? ` in its first ${SUITE_ROWS} rows` : ''}, read from `
+            + `its sys_atf_test_suite_test rows; ${tests.length} listed${activeOnly ? ', active only' : ''}`
+            + `${tests.length >= limit ? `, up to the limit of ${limit}` : ''}.`,
+    };
 }
 /** Names for a list of suites, for a refusal that asks the caller to pick one. */
 export async function suiteNames(client, suites) {

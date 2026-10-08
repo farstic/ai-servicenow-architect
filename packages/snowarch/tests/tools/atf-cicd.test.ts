@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ABSENT_MESSAGE, ok, refused, resetCicd, type CicdState,
 } from '../helpers/fake-cicd.js';
@@ -80,6 +80,14 @@ const resultsRead = () => sent().some((s) => s.includes('/testsuite/results/'));
 const progressReadTimes = () => cicd.calls
   .filter((c) => c.path.startsWith('/api/sn_cicd/progress/'))
   .map((c) => c.at - posts()[0].at);
+
+// The client logs every request at INFO; these tests read the requests from the fake instead.
+const logLevel = process.env.LOG_LEVEL;
+beforeAll(() => { process.env.LOG_LEVEL = 'error'; });
+afterAll(() => {
+  if (logLevel === undefined) delete process.env.LOG_LEVEL;
+  else process.env.LOG_LEVEL = logLevel;
+});
 
 beforeEach(() => {
   vi.useFakeTimers();

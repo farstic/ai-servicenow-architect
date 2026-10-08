@@ -28,6 +28,9 @@ A test in no suite, or in several, is refused and nothing is created. The accoun
   platform does not serve. They now run through the CI/CD API the documentation describes. A refusal
   names its cause: the role, an API this instance does not serve, a suite that does not exist, or the
   platform's own reason for not starting the run.
+- `snow_atf_atf_tests_index` with `suite_sys_id` lists the tests the suite holds, read from its Test Suite
+  Tests rows. Before, it filtered tests on a column the documentation does not show, so a suite could
+  list every active test as its own.
 
 ### Changed
 
