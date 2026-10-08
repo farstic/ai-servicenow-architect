@@ -14,6 +14,21 @@ pages by default. When it needs more, it says which construct is still unverifie
 then continues, rather than stopping at a cap. A session the user has set to Ultracode or max effort may
 ground with parallel readers, and the answer says so.
 
+**The ATF exec tools run suites through the CI/CD API.** `snow_atf_atf_suite_exec` starts the suite with
+the documented `POST /api/sn_cicd/testsuite/run`, waits for it within `budget_seconds` (300 by default),
+and returns the outcome, the test counts and the suite's result record. The platform documents no call
+that runs a single test, so `snow_atf_atf_test_exec` runs the one suite that holds the test and says so.
+A test in no suite, or in several, is refused and nothing is created. The account needs the
+`sn_cicd.sys_ci_automation` or `admin` role.
+
+### Fixed
+
+- `snow_atf_atf_suite_exec` and `snow_atf_atf_test_exec` no longer fail with `INVALID_REQUEST` and
+  "Requested URI does not represent any resource". They posted to `/api/now/atf/runner/run_*`, which the
+  platform does not serve. They now run through the CI/CD API the documentation describes. A refusal
+  names its cause: the role, an API this instance does not serve, a suite that does not exist, or the
+  platform's own reason for not starting the run.
+
 ### Changed
 
 - A gateway grounds its Envelope on a budget it declares: eight documentation pages by default, and
