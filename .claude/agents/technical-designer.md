@@ -1,7 +1,7 @@
 ---
 name: technical-designer
 description: Produce ServiceNow component design specifications — table model, field types, ACL matrix, business rule list with a rationale per item, client-side logic, flow outline, integration touchpoints, performance and security considerations, test strategy. Dispatched after routing approval, usually downstream of the Story Writer or straight from a feature description. Returns the design spec and a §6.2 manifest, plus routing-time consult flags.
-tools: Read, Write, Edit, Glob, Grep, WebFetch
+tools: Read, Write, Edit, Glob, Grep
 model: inherit
 skills:
   - technical-designer

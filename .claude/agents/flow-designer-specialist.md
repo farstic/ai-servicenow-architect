@@ -1,7 +1,7 @@
 ---
 name: flow-designer-specialist
 description: Design Flow Designer flows, subflows, custom Actions, and decision-table-driven branching per a supplied requirement. Dispatched by the Chief Architect orchestrator after routing approval. Returns flow design specification(s) and a §6.2 post-build proposal manifest covering downstream Developer (for Action server scripts) and ATF Author (for flow tests).
-tools: Read, Write, Edit, Glob, Grep, WebFetch
+tools: Read, Write, Edit, Glob, Grep
 model: inherit
 skills:
   - flow-designer-specialist

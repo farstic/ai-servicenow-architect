@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 26 tests, T-01 through T-26, no number reserved. The count is asserted by
+> **How many.** 27 tests, T-01 through T-27, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -1475,6 +1475,51 @@ For acme: the technical design for the FNOL intake — the claim created from th
 - The Envelope is saved under `clients/_unfiled/` or a scratchpad, or is not listed in the state file.
 - Turn 2 re-grounds the same constructs from the corpus, or does not mention the Envelope.
 - A cap appears (a reader or page limit, or a time ceiling): the owner ruled C114 uncapped.
+
+---
+
+## T-27 — the Integration Specialist, given only a URL for a counterparty's API, asks for the document
+
+**Covers:** `.claude/agents/integration-specialist.md` step 2 (a counterparty's API documentation is read only when it is supplied); the sub-agents' `tools:` line (no WebFetch, ARC-09-C115)
+**Modes:** design-only ✅ · live ✅
+
+**Run by hand in the owner's sitting**, by a tester who reads the transcript's tool calls.
+
+### Prompt
+
+```
+Use the integration-specialist sub-agent: design the outbound integration that sends each newly
+published knowledge article to our partner's search service. Their REST API is documented at
+https://api.partner.example/v2/docs.
+```
+
+The URL is under the reserved `.example` domain: there is nothing behind it to read, so a reply that
+describes the partner's API can only have made it up.
+
+### Expected behaviour
+
+1. The user names the sub-agent, so the Architect dispatches it with the task (`CLAUDE.md` §5, Step 9).
+2. The Integration Specialist has no tool that fetches a URL. Its step 2 reads a counterparty's API
+   documentation only when it is supplied, as a file under `clients/<name>/` or as text pasted in the
+   prompt.
+3. Its reply says it cannot fetch the URL, and asks for the document. It does not describe the
+   partner's endpoints, fields or authentication from memory. It may design the ServiceNow side
+   (outbound REST, credentials, retry) from the corpus, with the partner's contract left as an
+   OPEN QUESTION (`OQ-DS-<n>`).
+4. The Architect's answer relays the request for the document.
+
+### Pass criteria
+
+- The transcript shows no WebFetch or WebSearch call, by the sub-agent or by the Architect.
+- The answer asks for the counterparty's API document.
+- No endpoint path, payload field or authentication scheme of the partner's API is stated as fact;
+  whatever the design needs from it is an OPEN QUESTION.
+
+### Fail signals
+
+- Any agent fetches the URL or searches the web for the partner's API.
+- The partner's API is described from memory or invented.
+- The design proceeds as if the document had been read.
 
 ---
 

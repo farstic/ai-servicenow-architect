@@ -711,8 +711,8 @@ export const AUDIT_PATTERNS = [
     test: (l) => /Master Project|satellite project/i.test(l),
     why: 'the claude.ai project model; in Claude Code the firewall is folder discipline (CLAUDE.md §10)' },
   // The fetch with the corpus named on its line, in any of the ways it has been named. A `tools:` line
-  // names no corpus, so the agents' tool lists pass: integration-specialist needs WebFetch for a
-  // counterparty's API documentation, which is not the corpus. `window: 2` also reads a sentence the
+  // names no corpus, so a tool list never matches, and since ARC-09-C115 no agent lists WebFetch at all
+  // (a counterparty's API documentation arrives as a file or as pasted text). `window: 2` also reads a sentence the
   // wrap split over two lines ("Use WebFetch to read" / "the ServiceNowDocs page") — see `oneSentence`.
   { id: 'corpus-webfetch', scope: ['.claude/', ...ALWAYS_READ], window: 2,
     test: (l) => /github\.com\/ServiceNow\/ServiceNowDocs/i.test(l)
@@ -750,15 +750,12 @@ export const AUDIT_PATTERNS = [
  * The exemptions, anchored to a file, a pattern AND a substring of the line — the vocabulary
  * allow-list's shape, so naming the file once does not excuse every future line in it.
  *
- * The one entry is the sentence that keeps WebFetch away from the corpus, which cannot do its job
- * without naming both. A rule precise enough to pass it unexempted would have to parse "not for the
- * corpus", and a rule that parses negation is one a rewording walks past.
+ * Empty since ARC-09-C115. Its one entry was the integration specialist's sentence keeping WebFetch away
+ * from the corpus, and with WebFetch gone from every agent the sentence went too, so the staleness check
+ * below would have failed on it. The mechanism stays, and the planted test exercises it with an entry of
+ * its own.
  */
-export const AUDIT_ALLOW = [
-  { file: '.claude/agents/integration-specialist.md', id: 'corpus-webfetch',
-    context: "`WebFetch` is for the counterparty's own API documentation (step 2), not for the corpus.",
-    reason: 'the instruction that WebFetch is NOT for the corpus has to name both' },
-];
+export const AUDIT_ALLOW = [];
 
 const inAuditScope = (file, scope) => scope.some((s) => (s.endsWith('/') ? file.startsWith(s) : file === s));
 
@@ -770,6 +767,11 @@ const oneSentence = (a, b) => b.trim() !== '' && !/[.!?]\s*$/.test(a.trim())
   && !/^\s*(?:[-*+]\s|\d+\.\s|#|\||```|>|[A-Za-z][\w-]*:\s)/.test(b);
 
 /** The sweep, as a function over a file list and a reader, so the planted fixture runs THIS code. */
+/** An exemption for the planted test, the shape AUDIT_ALLOW's entries take. */
+const EXEMPT = { file: '.claude/agents/integration-specialist.md', id: 'corpus-webfetch',
+  context: "`WebFetch` is for the counterparty's own API documentation (step 2), not for the corpus.",
+  reason: 'the instruction that WebFetch is NOT for the corpus has to name both' };
+
 export function findAuditRegressions({ files, read: readFile, patterns = AUDIT_PATTERNS, allow = AUDIT_ALLOW }) {
   const hits = [];
   for (const f of files) {
@@ -871,16 +873,17 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     plant('docs/CONTRIBUTING.md', 'the same prompts work in the Master Project chat; Mermaid by default; Phase 2.2 disciplines');
     plant('.claude/agents/flow-designer-specialist.md', 'If unknown, default to scoped with prefix `x_<vendor>_<app>`.');
     // The exemption: its own sentence passes; an old-style corpus fetch in the SAME file still fails,
-    // and the same sentence in ANOTHER file is not excused by an entry anchored to this one.
+    // and the same sentence in ANOTHER file is not excused by an entry anchored to this one. The entry is
+    // the fixture's own: the real list is empty since ARC-09-C115.
     plant('.claude/agents/integration-specialist.md', [
-      `say so instead of recalling it. ${AUDIT_ALLOW[0].context}`,
+      `say so instead of recalling it. ${EXEMPT.context}`,
       '4. Verify against `ServiceNowDocs/` using `WebFetch` for MID Server behaviour.',
       // The regression written exactly where it would be: the old fetch inside the same step, on the
       // SAME line as the exempted sentence. The sentence does not excuse its neighbour.
       '4. Verify using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown`; '
-        + `say so instead of recalling it. ${AUDIT_ALLOW[0].context}`,
+        + `say so instead of recalling it. ${EXEMPT.context}`,
     ].join('\n'));
-    plant('.claude/agents/story-writer.md', AUDIT_ALLOW[0].context);
+    plant('.claude/agents/story-writer.md', EXEMPT.context);
     // The fetch the wrap split over two lines is one hit, on its first line; two sentences on adjacent
     // lines, two list items, and a frontmatter key under `tools:` are not a sentence and stay quiet.
     plant('.claude/skills/integration-specialist/SKILL.md', [
@@ -904,7 +907,7 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
       '.claude/rules/00-mode-and-mcp-gate.md', 'templates/hld-template.md', 'tests/VALIDATION-TESTS.md',
       '.claude/skills/developer/SKILL.md', 'docs/CONTRIBUTING.md', '.claude/skills/integration-specialist/SKILL.md'];
     const readAt = (f) => readFileSync(join(dir, f), 'utf8');
-    const hits = findAuditRegressions({ files, read: readAt });
+    const hits = findAuditRegressions({ files, read: readAt, allow: [EXEMPT] });
     const at = (rel, id) => hits.filter((h) => h.startsWith(`${rel}:`) && h.includes(`[${id}]`)).length;
 
     for (const p of AUDIT_PATTERNS) {

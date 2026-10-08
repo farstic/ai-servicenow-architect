@@ -1,7 +1,7 @@
 ---
 name: atf-author
 description: Generate a batch ATF (Automated Test Framework) test suite across an entire scoped ServiceNow app per a supplied app scope and spec. Dispatched by the Chief Architect orchestrator after a build is release-path bound and full-app coverage (not single-component) is chosen at the §6.2 post-build step. Returns a suite design (suite map + per-test step definitions + coverage matrix + deployment notes) and a §6.2 post-build proposal manifest covering Code Reviewer (for any custom step config scripts).
-tools: Read, Write, Edit, Glob, Grep, WebFetch
+tools: Read, Write, Edit, Glob, Grep
 model: inherit
 skills:
   - atf-author
