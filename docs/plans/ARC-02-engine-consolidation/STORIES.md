@@ -471,7 +471,7 @@ No "Tier", no old server key, no price or licence claims beyond "NOW_ASSIST need
   3. `snow_intg_event_register` leaves `event_name` empty → "event_register sets event_name" (ARC-04-S09).
   4. `snow_scr_business_rule_add` does not set `action_insert` / `action_update` → "business_rule_add sets action flags" (ARC-04-S09).
   5. `snow_flow_flow_add` / `snow_flow_flow_action_add` create empty shells → documented limitation in the README/CHANGELOG (ARC-04-S14); no fix in 2.0.0.
-  6. `snow_core_record_remove` on scripting tables returns `NOT_FOUND` but succeeds (§9a, marked fixed in the notes) → "record_remove on sys_script_include reports success" (ARC-04-S09, verify-only).
+  6. `snow_core_record_remove` on scripting tables returns `NOT_FOUND` but succeeds (§9a, marked fixed in the notes) → "record_remove on sys_script_include reports success" (ARC-04-S09, verify-only). **Answered for `sys_script`, 2026-10-08, live on `v2.0.11-rc.1`** (the teardown of the C92/C93 sitting): `snow_core_record_remove` on a `sys_script` row returned `action: "deleted"`, a read-back returned `NOT_FOUND`, and the update-set entry showed `DELETE`. The response told the truth (`docs/validation/2.0.11-rc.1-live-sitting.md`). The Script Include procedure in `packages/snowarch/tests/live/README.md`, on `sys_script_include`, was not run.
   7. `sysevent_register` deletion via MCP unverified (§9b) → left as a note in the CHANGELOG limitations list.
 - `docs/nowaikit-field-notes.md` and the `MCP-OPERATIONS-GUIDE.md` platform facts (S05 handover note) are deleted/absorbed in this story; `docs/LIVE-ARTEFACTS-CATALOGUE.md` is already gone (ARC-01-S10).
 **Acceptance criteria.**
