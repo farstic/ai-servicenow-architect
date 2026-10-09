@@ -16,6 +16,10 @@ withPreset('pdi-developer');
  * `silent-truncation.test.ts` proves the logic against a fake client. This file proves the one thing
  * a fake cannot: that the value the check reads is the one the real client hands back, and that the
  * dictionary lookup is a real GET with the query a real instance would be asked.
+ *
+ * Since ARC-09-C97 every write is preceded by a dictionary read that would REFUSE this name before it is
+ * sent. Each test here fails that read, which lets the write go ahead unchecked: the case C93 is still
+ * the backstop for.
  */
 const http = vi.hoisted<SnFetchState>(() => ({ calls: [], queue: [] }));
 vi.mock('../../src/servicenow/http.js', async () => snFetchMockModule(http));
@@ -33,6 +37,14 @@ const ok = (status: number, body: unknown) => ({
   headers: { get: () => null },
   text: async () => JSON.stringify(body),
 });
+
+const failed = (status: number, statusText: string, message: string) => ({
+  ok: false, status, statusText, headers: { get: () => null },
+  text: async () => JSON.stringify({ error: { message } }),
+});
+
+/** The length pre-check's read (ARC-09-C97) fails: a 5xx is not remembered, and the write goes ahead. */
+const precheckUnavailable = () => respond(http, failed(503, 'Service Unavailable', 'Service Unavailable'));
 
 function runtime(): InstanceRuntime {
   const flags: Flags = expandPreset('pdi-developer');
@@ -57,6 +69,7 @@ describe('ARC-09-C93 - over the real client', () => {
   it('a cut name comes back as a confirmed warning, and the dictionary is read with a real GET', async () => {
     const { instanceManager } = await import('../../src/servicenow/instances.js');
     const { routeToolInvocation } = await import('../../src/tools/index.js');
+    precheckUnavailable();                                                                            // the pre-check
     respond(http, ok(201, { result: { sys_id: SYS_ID, name: CUT, advanced: 'true' } }));           // the POST
     respond(http, ok(200, { result: [{ element: 'name', max_length: '40' }] }));   // the dictionary
 
@@ -64,16 +77,22 @@ describe('ARC-09-C93 - over the real client', () => {
     const result = await runWithInstance(runtime(), () => routeToolInvocation(client,
       'snow_scr_business_rule_add', { name: SENT, table: 'incident', when: 'before', script: 'gs.info(1);' }));
 
-    expect(http.calls).toHaveLength(2);
-    expect(String(http.calls[0]!.init.method)).toBe('POST');
-    expect(http.calls[0]!.url).toContain('/api/now/table/sys_script');
+    expect(http.calls).toHaveLength(3);
+    const params = (i: number) => new URL(http.calls[i]!.url).searchParams;
+    // The pre-check asked first, once (a 503 is not retried on this read), for the column's type as well.
+    expect(http.calls[0]!.url).toContain('/api/now/table/sys_dictionary');
+    expect(params(0).get('sysparm_query')).toMatch(/^name=sys_script\^elementINname,/);
+    expect(params(0).get('sysparm_fields')).toBe('element,max_length,internal_type');
+
+    expect(String(http.calls[1]!.init.method)).toBe('POST');
+    expect(http.calls[1]!.url).toContain('/api/now/table/sys_script');
     // The body that went out is the whole rule — C92 and C93 meet here.
-    const posted = JSON.parse(String(http.calls[0]!.init.body));
+    const posted = JSON.parse(String(http.calls[1]!.init.body));
     expect(posted).toMatchObject({ name: SENT, collection: 'incident', advanced: true, active: true });
 
-    expect(http.calls[1]!.url).toContain('/api/now/table/sys_dictionary');
-    expect(decodeURIComponent(http.calls[1]!.url)).toContain('name=sys_script^elementINname');
-    expect(decodeURIComponent(http.calls[1]!.url)).toContain('sysparm_fields=element,max_length');
+    expect(http.calls[2]!.url).toContain('/api/now/table/sys_dictionary');
+    expect(params(2).get('sysparm_query')).toBe('name=sys_script^elementINname');
+    expect(params(2).get('sysparm_fields')).toBe('element,max_length');
 
     expect((result as Result).warnings).toHaveLength(1);
     expect((result as Result).warnings![0]).toMatchObject({
@@ -84,27 +103,29 @@ describe('ARC-09-C93 - over the real client', () => {
     expect((result as Result).summary).not.toContain(SENT);
   });
 
-  it('a platform that stores the name whole produces one request and no warnings', async () => {
+  it('a platform that stores the name whole is asked nothing by C93 after the write, and no warnings', async () => {
     const { instanceManager } = await import('../../src/servicenow/instances.js');
     const { routeToolInvocation } = await import('../../src/tools/index.js');
+    precheckUnavailable();
     respond(http, ok(201, { result: { sys_id: SYS_ID, name: 'Close open tasks', advanced: 'true' } }));
 
     const client = instanceManager.getClient();
     const result = await runWithInstance(runtime(), () => routeToolInvocation(client,
       'snow_scr_business_rule_add', { name: 'Close open tasks', table: 'incident', when: 'before', script: 'gs.info(1);' }));
 
-    expect(http.calls).toHaveLength(1);
+    // The pre-check's read and the write; nothing after it.
+    expect(http.calls).toHaveLength(2);
+    expect(String(http.calls[1]!.init.method)).toBe('POST');
     expect(Object.prototype.hasOwnProperty.call(result, 'warnings')).toBe(false);
   });
 
   it('a dictionary lookup that FAILS does not fail the write: the warning arrives, unconfirmed', async () => {
     const { instanceManager } = await import('../../src/servicenow/instances.js');
     const { routeToolInvocation } = await import('../../src/tools/index.js');
+    // This account cannot read the dictionary: the pre-check's read is refused too, and remembered.
+    respond(http, failed(403, 'Forbidden', 'User Not Authorized'));
     respond(http, ok(201, { result: { sys_id: SYS_ID, name: CUT, advanced: 'true' } }));
-    respond(http, {
-      ok: false, status: 403, statusText: 'Forbidden', headers: { get: () => null },
-      text: async () => JSON.stringify({ error: { message: 'User Not Authorized' } }),
-    });
+    respond(http, failed(403, 'Forbidden', 'User Not Authorized'));
 
     const client = instanceManager.getClient();
     const result = await runWithInstance(runtime(), () => routeToolInvocation(client,
@@ -113,8 +134,8 @@ describe('ARC-09-C93 - over the real client', () => {
     expect((result as Result).sys_id).toBe(SYS_ID);                     // the write still succeeded
     expect((result as Result).warnings).toHaveLength(1);
     expect((result as Result).warnings![0]).toMatchObject({ column_limit: 40, confirmed: false });
-    // The write and ONE lookup. A 403 is never retried (ARC-09-C99), and the lookup is also made with
-    // `retries: 0` so that a 5xx on it does not cost the caller 1s + 2s + 4s either.
-    expect(http.calls).toHaveLength(2);
+    // The pre-check's read, the write and ONE lookup. A 403 is never retried (ARC-09-C99), and the lookup
+    // is also made with `retries: 0` so that a 5xx on it does not cost the caller 1s + 2s + 4s either.
+    expect(http.calls).toHaveLength(3);
   });
 });
