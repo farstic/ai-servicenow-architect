@@ -95,29 +95,33 @@ afterEach(async () => {
 });
 
 describe('criterion 4 - a per-call `instance` argument does not route', () => {
-  it('the call goes to the CURRENT instance even when another is named', async () => {
+  it('a call that names another instance is refused, naming this instance and the switch tool', async () => {
     const client = await connect();
     try {
       const r = text(await client.callTool({
         name: 'snow_core_records_query',
         arguments: { table: 'incident', instance: 'other' },
       }));
-      expect(r).toContain('pdi-host.test-only');
-      expect(r).not.toContain('other-host');
+      expect(r).toContain('No tool takes `instance`');
+      expect(r).toContain('"pdi"');
+      expect(r).toContain('snow_core_instance_switch');
+      expect(r).toContain('(Code: INVALID_REQUEST)');
     } finally { await client.close(); }
   }, 40_000);
 
-  it('and the argument is ignored silently, not refused', async () => {
-    // It was never in any inputSchema, so refusing it would break a caller for using something
-    // the server never offered. The failure below is DNS, not a rejected argument.
+  it('and it reaches neither host: the refusal comes before any request', async () => {
+    // ARC-04-S08 ignored the argument silently, because it was never in any inputSchema; this asserted the DNS
+    // failure that proved the call went on to the current instance. ARC-09-C121 refuses it instead: a write the
+    // caller believes goes to another instance would land on this one, which is worse than a refusal.
     const client = await connect();
     try {
       const r = text(await client.callTool({
         name: 'snow_core_records_query',
         arguments: { table: 'incident', instance: 'other' },
       }));
-      expect(r).not.toMatch(/unknown argument|unexpected|instance is not allowed/i);
-      expect(r).toContain('ENOTFOUND');
+      expect(r).not.toContain('ENOTFOUND');
+      expect(r).not.toContain('pdi-host.test-only');
+      expect(r).not.toContain('other-host');
     } finally { await client.close(); }
   }, 40_000);
 

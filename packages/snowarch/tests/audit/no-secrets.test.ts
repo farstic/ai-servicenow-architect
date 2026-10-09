@@ -339,9 +339,9 @@ describe('criterion 4 - no credential in the audit file or on stderr', () => {
     const { client, stderr } = await connect();
     try {
       for (const name of ['snow_fluent_build', 'snow_fluent_validate']) {   // build mutates, validate does not
-        await client.callTool({
-          name, arguments: { table: 'incident', fields: { x: MARKER }, name: MARKER, script: MARKER },
-        }).catch(() => undefined);
+        // The marker goes in `directory`, the one argument both declare. The bag the sweep above sends is refused
+        // before the gate since ARC-09-C121 (none of it is declared here), and this case is about the gate.
+        await client.callTool({ name, arguments: { directory: MARKER } }).catch(() => undefined);
       }
       // One line, not two: `snow_fluent_validate` is `mutates: false` (it validates a local
       // source tree and changes nothing), so it appends nothing — which is criterion 2's rule

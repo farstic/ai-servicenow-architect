@@ -9,6 +9,7 @@
  */
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
+import { closeTool, refuseUndeclared } from './arguments.js';
 
 // Core (existing 15 tools)
 import { coreToolManifest, dispatchCoreAction } from './core.js';
@@ -304,7 +305,11 @@ export function selectPackage(all: ToolDefinition[], packageName: string): ToolD
   return all.filter((t) => allowedSet.has(t.name));
 }
 
-const CATALOGUE: ToolDefinition[] = selectPackage(ALL_TOOLS, process.env.MCP_TOOL_PACKAGE || 'full');
+// ARC-09-C121: every schema is advertised closed, and the router refuses what one does not declare.
+const CLOSED_TOOLS: ToolDefinition[] = ALL_TOOLS.map(closeTool);
+const TOOLS_BY_NAME = new Map(CLOSED_TOOLS.map((t) => [t.name, t]));
+
+const CATALOGUE: ToolDefinition[] = selectPackage(CLOSED_TOOLS, process.env.MCP_TOOL_PACKAGE || 'full');
 
 export function collectToolCatalog(): ToolDefinition[] {
   return CATALOGUE;
@@ -382,6 +387,9 @@ export async function routeToolInvocation(
   name: string,
   args: Record<string, unknown>
 ): Promise<any> {
+  // ARC-09-C121: before anything else, so an instance-free tool and a playbook's step are checked too.
+  const tool = TOOLS_BY_NAME.get(name);
+  if (tool) refuseUndeclared(tool, args);
   if (!client) return dispatchTool(client, name, args);
   const verified = withWriteVerification(client);
   // A check on a write that succeeded must never replace the result, or the real error, with its own.
