@@ -322,10 +322,39 @@ with HTTP 400, which the client reports as `INVALID_REQUEST`. The status follows
 does not. A path that does exist answered differently: `GET /api/sn_cicd/progress/{progress_id}` from the
 Explorer answered "User is not authenticated".
 **Grounding:** none in ServiceNowDocs (`markdown/api-reference/rest-apis/cicd-api.md` lists 404 for its own endpoints as "Not found. The requested item wasn't found." and gives no message for a path that is not served); observed behaviour.
-**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, § ARC-09-C94, steps 6 to 8.
+**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, § ARC-09-C94, steps 6 to 8. After the fix, on
+`v2.0.11-rc.3` (2026-10-09), the CI/CD path ran a one-test suite to `outcome: "success"`
+(`docs/validation/2.0.11-rc.3-live-sitting.md`, § ARC-09-C94).
 **Engine consequence:** the ATF exec tools use this message, not the status, to tell "the CI/CD API is not
 served here" from "the suite was not found" (`src/tools/atf-cicd.ts`, ARC-09-C94). A 400 that carries it
 means a missing path, not a malformed body.
+
+## PN-16 — A Test Step's input rows are created by its insert and removed with it
+
+**Applies to:** `sys_atf_step` and `sys_variable_value` · release family not recorded by the sitting · observed in
+the 2.0.11-rc.3 live sitting (ARC-09-C95)
+**Behaviour:**
+- **Created by the insert.** A "Run Server Side Script" step was inserted over the REST Table API, and the insert
+  created both of its `sys_variable_value` rows at once:
+  - `jasmine_version` = "3.1", at order 100, from the input variable's default expression
+    `GlidePropertiesDB.get('sn_atf.jasmine.versions','3.1').split(',').pop()`;
+  - `script`, from its default `getDefaultServerSideScript()`, at order 200.
+
+  A mandatory input the caller did not send is therefore set by the instance, without a word.
+- **Not deletable on their own here.** Deleting one of those rows directly was refused for this account with
+  `DELETE_CONSTRAINT` ("ACL Exception Delete Failed due to security constraints"); whether an ACL or a
+  reference constraint caused it is not established.
+- **Removed with the step.** Deleting the step removed both rows.
+
+**Grounding:** `markdown/application-development/automated-test-framework-atf/test-steps-server-category.md`
+names the step's Jasmine version and Test script fields by their labels. The rest is not documented in the
+bundled corpus — that an insert creates the input rows from defaults, the default expressions, the refused
+delete and the cascade: observed behaviour.
+**Evidence:** `docs/validation/2.0.11-rc.3-live-sitting.md`, § ARC-09-C95: W2, the follow-up read and the
+teardown.
+**Engine consequence:** `snow_atf_atf_step_add` updates a row the insert created rather than adding a second
+(ARC-09-C95). Its output lists only the inputs it sent, so the rows the instance defaulted are invisible to the
+caller (ARC-09-C122). A teardown removes the step, not its input rows.
 
 ## Windows notes — this repository, not ServiceNow
 
