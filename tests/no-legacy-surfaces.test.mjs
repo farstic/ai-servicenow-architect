@@ -744,12 +744,13 @@ export const AUDIT_PATTERNS = [
     // app offered as a decision the designer resolves alone, and a two-way scoped-or-global choice.
     test: (l) => /default to scoped|Default for new functionality: scoped app|\bdefaults? to (?:an? )?(?:new )?scoped\b|chose (?:a )?new scoped app|scoped \(with prefix\) vs global/i.test(l),
     why: 'a new scoped app is a §1.1 object, and the baseline scope is the default' },
-  // ARC-09-C115 took the web tools off every sub-agent, and AG-03 refuses one on a `tools:` line. An agent's
-  // BODY must not name one either: "fetch it with WebFetch" is an instruction the agent cannot follow, and
-  // the edit that makes it work again puts the tool back. No exemption: no agent has a reason to name one.
+  // ARC-09-C115 took the web tools off every sub-agent, and AG-03 refuses one on a `tools:` line; ARC-09-C123
+  // denies them to the main thread, which is where a skill runs. So neither an agent's body nor a skill may name
+  // one: "fetch it with WebFetch" is an instruction nothing can follow, and the edit that makes it work again
+  // puts the tool back. No exemption: no agent or skill has a reason to name one.
   { id: 'agent-web-tool', scope: ['.claude/agents/'],
     test: (l) => /\bweb ?(?:fetch|search)\b/i.test(l),
-    why: 'no sub-agent has a web tool since ARC-09-C115: a document arrives as a file or as pasted text' },
+    why: 'no session has a web tool (ARC-09-C115, C123): a document arrives as a file or as pasted text' },
 ];
 
 /**
@@ -824,7 +825,11 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     const plant = (rel, text) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), `${text}\n`); };
     // One planted line per pattern, each in a file its scope covers — the old wording, as it stood.
     plant('.claude/agents/atf-author.md', 'Sub-agents run in satellite projects, not the Master.');
-    plant('governance/governance-rules.md', 'CLAUDE.md, Master Project Instructions, individual SKILL.md anti-patterns (Phase 2.2)');
+    plant('governance/governance-rules.md', [
+      'CLAUDE.md, Master Project Instructions, individual SKILL.md anti-patterns (Phase 2.2)',
+      // Outside the agent-web-tool scope: governance may say the tools are denied.
+      'The main thread has no WebFetch or WebSearch (ARC-09-C123).',
+    ].join('\n'));
     plant('.claude/agents/developer.md',
       '4. Verify against `ServiceNowDocs/` using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown`.');
     plant('.claude/skills/story-writer/SKILL.md', 'This rule overrides any prior "default to scoped app" language elsewhere in this SKILL.');
@@ -898,6 +903,9 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
       'A web fetch of the page will do.',
       'Ask for the document, as a file or as pasted text.',
     ].join('\n'));
+    // ARC-09-C123: a skill runs in the main thread, which is denied the web tools too; a docs page is not in scope.
+    plant('.claude/skills/now-assist-specialist/SKILL.md', 'If the corpus is silent, run a WebSearch for the release notes.');
+    plant('docs/TROUBLESHOOTING.md', 'WebFetch and WebSearch are denied to every session in this checkout.');
     // The fetch the wrap split over two lines is one hit, on its first line; two sentences on adjacent
     // lines, two list items, and a frontmatter key under `tools:` are not a sentence and stay quiet.
     plant('.claude/skills/integration-specialist/SKILL.md', [
@@ -915,6 +923,7 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
       '.claude/skills/story-writer/SKILL.md', 'CLAUDE.md', '.claude/skills/diagramming-specialist/SKILL.md',
       '.claude/agents/technical-designer.md', 'docs/USER-GUIDE.md', '.claude/agents/flow-designer-specialist.md',
       '.claude/agents/integration-specialist.md', '.claude/agents/story-writer.md', '.claude/agents/hld-lld-writer.md',
+      '.claude/skills/now-assist-specialist/SKILL.md', 'docs/TROUBLESHOOTING.md',
       '.claude/skills/diagramming-specialist/EXAMPLES.md', 'governance/taxonomy.md', '.claude/skills/hld-lld-writer/SKILL.md',
       '.claude/skills/technical-designer/SKILL.md', '.claude/skills/technical-designer/EXAMPLES.md',
       '.claude/skills/now-assist-specialist/EXAMPLES.md', '.claude/skills/hld-lld-writer/EXAMPLES.md',
@@ -941,7 +950,8 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
       'a pattern other than master-project reached the user guide');
     assert.equal(hits.some((h) => h.startsWith('docs/CONTRIBUTING.md:')), false, 'a scope reached outside itself');
     assert.equal(at('.claude/skills/developer/SKILL.md', 'corpus-webfetch'), 5, 'a widened fetch shape was not seen');
-    assert.equal(hits.some((h) => h.startsWith('.claude/skills/developer/SKILL.md:6:')), false, 'a tools: line was flagged');
+    assert.equal(hits.some((h) => h.startsWith('.claude/skills/developer/SKILL.md:6:') && h.includes('[corpus-webfetch]')), false,
+      'a tools: line was flagged as a corpus fetch');
     assert.equal(at('.claude/skills/diagramming-specialist/EXAMPLES.md', 'mermaid-delivered'), 5,
       'a Mermaid delivery shape was not seen, or a draft was taken for one');
     assert.equal(hits.some((h) => h.startsWith('.claude/agents/flow-designer-specialist.md:')), false,
@@ -963,10 +973,13 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
       'an exemption for corpus-webfetch excused a web tool named in an agent');
     assert.deepEqual(linesOf('.claude/agents/hld-lld-writer.md', 'agent-web-tool'), ['1', '2', '3'],
       'a web tool named in an agent\'s prose was not seen, or the line asking for the document was flagged');
-    assert.equal(hits.some((h) => h.includes('[agent-web-tool]') && !h.startsWith('.claude/agents/')), false,
-      'the agent-web-tool rule reached outside .claude/agents/');
+    assert.deepEqual(linesOf('.claude/skills/now-assist-specialist/SKILL.md', 'agent-web-tool'), ['1'],
+      'a web tool named in a skill was not seen');
+    assert.equal(hits.some((h) => h.includes('[agent-web-tool]')
+      && !(h.startsWith('.claude/agents/') || h.startsWith('.claude/skills/'))), false,
+      'the agent-web-tool rule reached outside agents and skills: governance/ and docs/ are not its scope');
     assert.equal(at('.claude/agents/story-writer.md', 'corpus-webfetch'), 1, 'an exemption anchored to one file excused another');
-    assert.deepEqual(hits.filter((h) => h.startsWith('.claude/skills/integration-specialist/SKILL.md:')).map((h) => h.split(':')[1]),
+    assert.deepEqual(linesOf('.claude/skills/integration-specialist/SKILL.md', 'corpus-webfetch'),
       ['1'], 'a fetch split over two lines was not seen once, or two sentences on adjacent lines were read as one');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
