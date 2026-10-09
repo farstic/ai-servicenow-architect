@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AddressInfo } from 'node:net';
 import selfsigned from 'selfsigned';
+import { isPrecheckRead } from '../helpers/fake-rest.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/server.js');
@@ -22,7 +23,9 @@ const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/serv
  * unit test of the summariser would pass just as happily if the handler never called it.
  *
  * The fixture is a platform that cuts `name` at 40 characters, answers 201 with the cut value, and
- * states `max_length` 40 in the dictionary. The certificate is generated here (as in tls.test.ts),
+ * states `max_length` 40 in the dictionary — with no `internal_type`, so the length check before the write
+ * (ARC-09-C97) cannot judge the column and lets the write go ahead to be cut: what is under test is what
+ * the audit records of that cut. The certificate is generated here (as in tls.test.ts),
  * never committed, and trusted by the child through NODE_EXTRA_CA_CERTS, which Node reads once at
  * process start — which is why the server is a child process at all.
  */
@@ -39,8 +42,8 @@ let checkout: string;
 let home: string;
 let auditFile: string;
 
-/** Every request the fixture saw: `METHOD /path`. */
-let seen: string[] = [];
+/** Every request the fixture saw, `METHOD /path`, and whether it was ARC-09-C97's read before a write. */
+let seen: Array<{ request: string; precheck: boolean }> = [];
 /** What the fixture answers for a POST to a table; a test sets it. */
 let postAnswer: (table: string, body: Record<string, unknown>) => { status: number; body: unknown };
 
@@ -67,7 +70,10 @@ beforeAll(async () => {
   server = createServer({ key: pems.private, cert: pems.cert }, (req, res) => {
     const url = new URL(req.url ?? '/', 'https://127.0.0.1');
     const table = url.pathname.split('/').pop() ?? '';
-    seen.push(`${req.method} ${url.pathname}`);
+    seen.push({
+      request: `${req.method} ${url.pathname}`,
+      precheck: isPrecheckRead({ table, fields: url.searchParams.get('sysparm_fields') ?? undefined }),
+    });
     let raw = '';
     req.on('data', (c) => { raw += c; });
     req.on('end', () => {
@@ -199,8 +205,9 @@ describe('ARC-09-C101 (b) - the audit line carries the warning, not just `ok`', 
     const [line] = auditLines();
     expect(line).toMatchObject({ tool: 'snow_scr_business_rule_add', result: 'ok' });
     expect(Object.prototype.hasOwnProperty.call(line, 'warnings')).toBe(false);
-    // and the dictionary was never read: nothing was cut, so nothing was asked
-    expect(seen.filter((s) => s.includes('sys_dictionary'))).toEqual([]);
+    // and C93 never read the dictionary: nothing was cut, so it asked nothing (the read before the write
+    // is ARC-09-C97's)
+    expect(seen.filter((s) => s.request.includes('sys_dictionary') && !s.precheck)).toEqual([]);
   });
 
   it('a tool that wrote a cut value and then FAILED: the line carries the error code AND the warning', async () => {

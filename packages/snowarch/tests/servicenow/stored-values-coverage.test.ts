@@ -5,6 +5,7 @@ import {
 import { summariseWarnings } from '../../src/audit/warnings.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
 import { routeToolInvocation } from '../../src/tools/index.js';
+import { isPrecheckRead } from '../helpers/fake-rest.js';
 import { withPreset } from '../helpers/preset.js';
 import { runWithInstance, type Flags, type InstanceRuntime } from '../../src/servicenow/context.js';
 import { expandPreset } from '../../src/utils/permissions.js';
@@ -40,12 +41,17 @@ interface BatchAnswer { batch_id: string; total: number; results: Array<{ id: st
 /** A client with the five write methods; every write stores strings cut to 5 characters. */
 class Wide {
   lookups: unknown[] = [];
+  /** ARC-09-C97's reads before each write (`isPrecheckRead`), kept apart from C93's and answered with no rows. */
+  prechecks: unknown[] = [];
   as: unknown;
   /** Per operation id: a status code other than the one the method would give. */
   statusOf: Record<string, number> = {};
   async createRecord(_t: string, data: Record<string, unknown>) { return { sys_id: 'n1', ...cutAll(data) }; }
   async updateRecord(_t: string, sysId: string, data: Record<string, unknown>) { return { sys_id: sysId, ...cutAll(data) }; }
-  async queryRecords(p: unknown) { this.lookups.push(p); return { count: 0, records: [] }; }
+  async queryRecords(p: { table?: string; fields?: string }) {
+    (isPrecheckRead(p) ? this.prechecks : this.lookups).push(p);
+    return { count: 0, records: [] };
+  }
   async createChangeRequest(params: Record<string, unknown>) { return { sys_id: 'cr1', ...cutAll(params) }; }
   async uploadAttachment(table: string, sysId: string, fileName: string, _contentType?: string, _contentBase64?: string) {
     return { sys_id: 'at1', file_name: cut(fileName), table_name: table, table_sys_id: sysId };

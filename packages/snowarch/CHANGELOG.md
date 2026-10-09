@@ -13,7 +13,9 @@ and a client copy made with `withUser` (ARC-09-C100). Not checked, so an absent 
 nothing: the Now Assist and catalogue POSTs, which answer with the result of running something and not
 the record they wrote, fields the response does not echo, and values that are not strings. The list is
 capped at ten entries with a roll-up. In a playbook each step carries its own warnings and `on_error:
-'stop'` halts after a step that stored a cut value. A write is still not refused before it is made.
+'stop'` halts after a step that stored a cut value. Since ARC-09-C97, `createRecord` and `updateRecord`
+refuse a string longer than its column's `max_length` before the write (`VALUE_TOO_LONG`) when the
+account can read `sys_dictionary`; the other writes above are not checked before they are made.
 That the response to a write on `sys_script`, and to a PATCH, carries the stored value is assumed (one
 POST on `sys_script_fix` was observed); `packages/snowarch/tests/live/README.md` has the run that
 settles it. The long form is `docs/PLATFORM-NOTES.md` PN-10, and the rows are ARC-09-C97 to C101 in

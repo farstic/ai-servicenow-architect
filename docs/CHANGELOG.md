@@ -31,6 +31,11 @@ A test in no suite, or in several, is refused and nothing is created. The accoun
 - `snow_atf_atf_tests_index` with `suite_sys_id` lists the tests the suite holds, read from its Test Suite
   Tests rows. Before, it filtered tests on a column the documentation does not show, so a suite could
   list every active test as its own.
+- A write no longer sends a string longer than its column. Before a record is created or updated, the
+  server reads the column's `max_length` from the dictionary, on the table that defines it, and refuses a
+  longer value with the new `VALUE_TOO_LONG`: nothing is written. Lengths are counted in code points. When
+  it cannot read the limit (the account lacks `personalize_dictionary`, or the read fails or is slow), the
+  write goes ahead and a cut is still reported as `VALUE_TRUNCATED`.
 
 ### Changed
 
