@@ -153,8 +153,9 @@ documentation page, not yet against an instance. The live procedures are in
 - **An Envelope is the engagement's context.** A gateway Envelope for a named engagement is saved under
   `clients/<engagement>/envelopes/`, and every later session in that engagement starts from it. Under
   Ultracode the Architect says how many workflows it will run and reports each one (below).
-- **The sub-agents have no web tool.** They ground in the bundled documentation, and a counterparty's API
-  documentation is supplied as a file or as pasted text (below).
+- **No session has a web tool.** The sub-agents lost theirs, and the main thread is denied them; they ground in
+  the bundled documentation, and a counterparty's API documentation is supplied as a file or as pasted text
+  (below).
 - **What real sessions were seen doing.** On rc.1 the owner ran real sessions on Claude Sonnet 5.5, and they
   followed the new lines:
   - the §1.1 halt, with no field list and no design;
@@ -266,6 +267,9 @@ documentation page, not yet against an instance. The live procedures are in
 - The nine specialist sub-agents no longer have a web fetch tool: they ground in the bundled ServiceNow
   documentation. The Integration Specialist reads a counterparty's API documentation only when it is
   supplied, as a file or as pasted text; given only a URL, it asks for the document.
+- WebFetch and WebSearch are denied to every session in a checkout, through the generated
+  `.claude/settings.json`: the main Architect thread, and the skills it loads, have no web tool either. A deny
+  entry of your own is kept.
 
 ### Added
 
