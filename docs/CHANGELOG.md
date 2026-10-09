@@ -20,13 +20,16 @@ errors, and `VALUE_TOO_LONG` refuses a write before it is sent. The roster is su
 a more capable model; smaller models are not supported. One command can stop a script that used to finish:
 `./snowarch upgrade` without `--yes` now stops when its input is closed (below).
 
-**The release candidates, and what a live instance has confirmed.** `v2.0.11-rc.1` (`b661cf4`) and
-`v2.0.11-rc.2` (`d331001`) were cut before this release. On rc.1, a Business Rule was created in one write
-with its filter, the Advanced switch and `active` read back as sent, and a 41-character name came back as 40
-with `VALUE_TRUNCATED`, `column_limit: 40` and `confirmed: true`, on the POST and on the PATCH. The ATF exec
-fix shipped in rc.2; its live confirmation is pending. ATF test and step authoring and the refusal of a
-too-long value before the write are built, and their live runs are planned for rc.3. The Batch API's Base64
-bodies are checked against the documentation page, not yet against an instance. The live procedures are in
+**The release candidates, and what a live instance has confirmed.** `v2.0.11-rc.1` (`b661cf4`),
+`v2.0.11-rc.2` (`d331001`) and `v2.0.11-rc.3` (`19d01ed`) were cut before this release. On rc.1, a Business
+Rule was created in one write with its filter, the Advanced switch and `active` read back as sent, and a
+41-character name came back as 40 with `VALUE_TRUNCATED`, `column_limit: 40` and `confirmed: true`, on the
+POST and on the PATCH. The ATF exec fix shipped in rc.2 and was confirmed on rc.3: a suite ran through the
+CI/CD API to a successful result. ATF test and step authoring was confirmed on rc.3: a test, and a step
+with its script, were written and read back as sent. The refusal of a too-long value before the write was
+confirmed on rc.3: an inherited column's limit was read on the table that defines it, and a value one
+character over it was refused, with nothing written. The Batch API's Base64 bodies are checked against the
+documentation page, not yet against an instance. The live procedures are in
 `packages/snowarch/tests/live/README.md`.
 
 **What a user of the MCP tools sees.**
@@ -62,15 +65,16 @@ bodies are checked against the documentation page, not yet against an instance. 
   `advanced` for the `sys_script` columns are not printed in the bundled corpus; on rc.1 a read-back showed
   both set, and `FIELD_NOT_STORED` is what catches it where they are not.
 - **A string longer than its column is refused before it is sent.** Before a record is created or updated,
-  the server reads each string's column from `sys_dictionary`, on the record's table and then up the tables it
-  extends to the one that defines the column, and refuses a longer value with `VALUE_TOO_LONG`: nothing is
-  written, so no record and no update-set entry is left to correct. Lengths are counted in code points, and
-  only a String column with a stated `max_length` is judged. When the account cannot read the dictionary (it
-  needs `personalize_dictionary`), or the read fails or takes more than three seconds, the write goes ahead
-  and a cut is still reported as `VALUE_TRUNCATED`. A refusal after an earlier write of the same call names
-  the records the call already wrote. The Batch API, attachments and change requests are not checked before
-  the write. The `super_class` column the walk reads is not printed in the bundled corpus, and the refusal
-  has not yet been run against an instance.
+  the server reads each string's column from `sys_dictionary`, on the record's table and then up the tables
+  it extends to the one that defines the column, and refuses a longer value with `VALUE_TOO_LONG`: nothing
+  is written, so no record and no update-set entry is left to correct. Lengths are counted in code points,
+  and only a String column with a stated `max_length` is judged. When the account cannot read the dictionary
+  (it needs `personalize_dictionary`), or the read fails or takes more than three seconds, the write goes
+  ahead and a cut is still reported as `VALUE_TRUNCATED`. A refusal after an earlier write of the same call
+  names the records the call already wrote. The Batch API, attachments and change requests are not checked
+  before the write. The `super_class` column the walk reads is not printed in the bundled corpus, and on
+  rc.3 the refusal held against an instance: a 161-character short description was refused against `task`'s
+  160, and nothing was written.
 - **A 403 is not retried.** A 403 now fails at once from one request, with `INSUFFICIENT_PRIVILEGES`
   (`DELETE_ACL_DENIED` on a delete). Before, under the default policy, the same request went out four times
   with 1 s, 2 s and 4 s between them, about 7 s, to be refused each time. A 429, a 5xx, a request that never
@@ -161,10 +165,15 @@ bodies are checked against the documentation page, not yet against an instance. 
   - in the live sitting, the engagement question before the first write.
 
   On the same prompts an Envelope took about a minute in normal mode, where 2.0.9 took 47 minutes to an hour.
-  Under Ultracode one Envelope took 3 h 14 min, nearly all of it model generation. Not yet seen in a real
-  session: the up-front workflow count and the Envelopes saved under `clients/<engagement>/envelopes/` (T-26),
-  the sub-agents without a web tool (T-27), and the live case of T-25. The numbers are in
+  Under Ultracode one Envelope took 3 h 14 min, nearly all of it model generation. The numbers are in
   `docs/validation/2.0.11-rc.1-grounding-sitting.md`.
+
+  On rc.3, in the live sitting, the write gate refused an approval that named no action (twice), the write
+  question carried the suite's name, its sys_id and the budget, the capabilities were re-read before the write,
+  and the session listed its extra read-only calls afterwards.
+
+  Not yet seen in a real session: the up-front workflow count and the Envelopes saved under
+  `clients/<engagement>/envelopes/` (T-26), the sub-agents without a web tool (T-27), and the live case of T-25.
 
 ### Fixed
 
@@ -261,12 +270,13 @@ bodies are checked against the documentation page, not yet against an instance. 
   `VALUE_TOO_LONG`, an error raised before a write that would not fit; `unserviced`, and a `note` when it is
   not empty, on `snow_fluent_request_batch`; a `note` on a `snow_disco_table_discover` answer that lacks
   inherited columns or stops at 5,000 dictionary rows.
-- Six platform notes in `docs/PLATFORM-NOTES.md`: PN-10, a Business Rule's name cut at 40 characters without
-  an error, and what a write's answer carries (confirmed on rc.1); PN-11, the Batch API's Base64 bodies and
-  `unserviced_requests` list (on the documentation page, not yet seen on an instance); PN-12 to PN-14, what
-  rc.1 showed of an update set's entries and of a stored `filter_condition`; and PN-15, what an instance
-  answers for a path it does not serve. PN-07 no longer says the Developer skill keeps a name to 40
-  characters, which it never did.
+- Seven platform notes in `docs/PLATFORM-NOTES.md`: PN-10, a Business Rule's name cut at 40 characters
+  without an error, and what a write's answer carries (confirmed on rc.1); PN-11, the Batch API's Base64
+  bodies and `unserviced_requests` list (on the documentation page, not yet seen on an instance); PN-12 to
+  PN-14, what rc.1 showed of an update set's entries and of a stored `filter_condition`; PN-15, what an
+  instance answers for a path it does not serve (the fix confirmed on rc.3); and PN-16, the input rows of a
+  Test Step, which its insert creates from the step config's defaults and which go with the step (seen on
+  rc.3). PN-07 no longer says the Developer skill keeps a name to 40 characters, which it never did.
 - The live procedures for the cut-value premise, the ATF exec and authoring tools and the refusal before the
   write, in `packages/snowarch/tests/live/README.md`.
 - A test that fails, naming the file and line, when a test file in the three test trees calls `mkdtemp` or
