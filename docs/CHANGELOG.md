@@ -182,6 +182,11 @@ documentation page, not yet against an instance. The live procedures are in
   through the client's create and update calls, the batch tool on Table API paths and an attachment's file
   name; on rc.1 it was seen for a POST and a PATCH on `sys_script`. The Now Assist and catalogue calls are
   not compared.
+- An argument a tool does not declare is refused with `INVALID_REQUEST`, naming it and the arguments the tool
+  takes, before anything is sent. It used to be dropped silently, so a caller could believe it had filtered or
+  acted: an undeclared `active: false` on a create tool made a live record. Every tool's schema now says
+  `additionalProperties: false`. A per-call `instance`, which was ignored, is refused with its own message: a
+  write meant for another instance would have landed on the current one.
 - A write no longer sends a string longer than its column when the dictionary can be read: it is refused
   with `VALUE_TOO_LONG` before anything is written.
 - `snow_scr_business_rule_add` no longer creates a live rule from `active: "false"` (it refuses that and any
