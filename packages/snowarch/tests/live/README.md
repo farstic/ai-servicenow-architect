@@ -658,8 +658,8 @@ the one write — its own "write approved"
 
 **Teardown:** none. The run's own result records are the evidence.
 
-**Verdict:** record **ARC-09-C94 after the fix: CONFIRMED / FAILED** in `docs/validation/`, under the rc.2
-sitting's file, naming the failure shape.
+**Verdict:** record **ARC-09-C94 after the fix: CONFIRMED / FAILED** in `docs/validation/`, under the
+sitting's record for the rc it ran on, naming the failure shape.
 
 ## ARC-09-C95 — authoring an ATF test and step, each record read back
 
@@ -783,6 +783,8 @@ second one. That is not a failure, but record it.
 - R3's column names and the script input's name.
 - R4's column names, without the values.
 - W1's and W2's `warnings` (or their absence), W2's `inputs[].written` and `order`, and both audit lines.
+- Every `sys_variable_value` row of the new step, read by `document_key`, including the rows the insert
+  created from the config's defaults (PN-16): each row's input name, `order` and whether the tool wrote it.
 - The preview's entries, by table.
 
 None of these is a secret, and the ids stay out of the record.
@@ -790,13 +792,11 @@ None of these is a secret, and the ids stay out of the record.
 ### Teardown
 
 In this order, each with its own "write approved":
-1. `snow_core_record_remove` on the input row(s);
-2. on the step;
-3. on the test;
-4. then discard the update set.
-
-Whether removing a record removes what hangs off it is not in the corpus. A later remove that answers
-`NOT_FOUND` is that finding, the cascade, so record which one did.
+1. `snow_core_record_remove` on the step. Its input rows go with it (PN-16); a direct remove of one was refused
+   with `DELETE_CONSTRAINT` on rc.3. Confirm it with a read of `sys_variable_value` by `document_key`, which
+   counts 0.
+2. `snow_core_record_remove` on the test.
+3. Point capture back at the previous update set, and set this one to Ignore in the UI.
 
 ### Verdict
 
