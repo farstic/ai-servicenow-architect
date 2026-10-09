@@ -165,8 +165,9 @@ export function createServer() {
             // no tool's inputSchema declares one — so it was an undocumented side channel that could
             // send a write to a different instance than the session believed it was addressing.
             // `snow_core_instance_switch` is the only way to change instance, and it is visible.
-            // An `instance` argument is now ignored silently: it was never advertised, so refusing
-            // it would break a caller for using something we never offered.
+            // ARC-04-S08 ignored an `instance` argument silently, because it was never advertised.
+            // ARC-09-C121 refuses it in the router, with its own message: a write the caller believes
+            // goes to another instance would land on this one, which is worse than a refusal.
             const runtime = instanceManager.current();
             const client = instanceManager.getClient();
             const result = await runWithInstance(runtime, () => routeToolInvocation(client, name, args || {}));

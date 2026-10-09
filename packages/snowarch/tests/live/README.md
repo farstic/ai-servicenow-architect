@@ -919,3 +919,33 @@ None when R4 is refused. If it was not, and an incident with L+1 characters was 
 
 Record **ARC-09-C97 live: CONFIRMED / FAILED** in `docs/validation/`, under the sitting's file, naming the
 failure shape and what R1 to R3 showed.
+
+## ARC-09-C121 — an argument a tool does not declare is refused
+
+**Build under test:** the release candidate cut after the PR that adds this section.
+
+**What the server does** (`src/tools/arguments.ts`, called first in the router): an argument the tool's schema
+does not declare is refused with `INVALID_REQUEST`, naming it and the declared ones, before any request. Every
+schema is advertised with `additionalProperties: false`. A per-call `instance` gets its own message.
+
+### The run
+
+```
+read-only — no approval needed
+R1 snow_atf_atf_tests_index { query: "name=x" }
+```
+
+### Pass condition — the exact state to see
+
+R1 answers exactly:
+
+```
+Error: snow_atf_atf_tests_index takes no `query`; it takes suite_sys_id, active, limit. Nothing was sent. (Code: INVALID_REQUEST)
+```
+
+**A failure looks like:** a list of tests, which is the old silent drop, or any other code.
+
+### Verdict
+
+Record **ARC-09-C121 live: CONFIRMED / FAILED** in `docs/validation/`, under the sitting's record for the rc it
+ran on.

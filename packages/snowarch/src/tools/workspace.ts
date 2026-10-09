@@ -42,7 +42,7 @@ export function workspaceToolManifest(): ToolDefinition[] {
     {
       name: 'snow_ws_uib_page_modify',
       description: 'Update an existing UI Builder page. **[Write]**',
-      inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'UIB page sys_id' }, title: { type: 'string' }, path: { type: 'string' }, layout: { type: 'string' } }, required: ['sys_id'] },
+      inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'UIB page sys_id' }, title: { type: 'string', description: 'Page title. The column is not documented in the bundled corpus — verify on the instance.' }, path: { type: 'string', description: 'Page path. The column is not documented in the bundled corpus — verify on the instance.' }, layout: { type: 'string', description: 'Page layout. The column is not documented in the bundled corpus — verify on the instance.' } }, required: ['sys_id'] },
       gate: 'write',
       mutates: true,
     },
@@ -71,7 +71,7 @@ export function workspaceToolManifest(): ToolDefinition[] {
     {
       name: 'snow_ws_uib_component_modify',
       description: 'Update a UI Builder component. **[Scripting]**',
-      inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'Component sys_id' }, label: { type: 'string' }, description: { type: 'string' } }, required: ['sys_id'] },
+      inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'Component sys_id' }, label: { type: 'string', description: 'Display label. The column is not documented in the bundled corpus — verify on the instance.' }, description: { type: 'string', description: 'Description. The column is not documented in the bundled corpus — verify on the instance.' } }, required: ['sys_id'] },
       gate: 'scripting',
       mutates: true,
     },
@@ -137,6 +137,11 @@ export function workspaceToolManifest(): ToolDefinition[] {
   ];
 }
 
+/** The given fields that were sent, and no others (ARC-09-C121). */
+function declaredOnly(args: Record<string, unknown>, fields: string[]): Record<string, unknown> {
+  return Object.fromEntries(fields.filter((f) => args[f] !== undefined).map((f) => [f, args[f]]));
+}
+
 export async function dispatchWorkspaceAction(
   client: ServiceNowClient,
   name: string,
@@ -162,8 +167,9 @@ export async function dispatchWorkspaceAction(
     case 'snow_ws_uib_page_modify': {
       requireWrite();
       if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
-      const { sys_id, ...fields } = args;
-      const result = await client.updateRecord('sys_ux_page', sys_id, fields);
+      // ARC-09-C121: the declared fields and nothing else. This spread every other argument into the PATCH, so an
+      // undeclared one was written to the page; the router now refuses one, and this writes only these.
+      const result = await client.updateRecord('sys_ux_page', args.sys_id, declaredOnly(args, ['title', 'path', 'layout']));
       return { action: 'updated', ...result };
     }
     case 'snow_ws_uib_page_remove': {
@@ -185,8 +191,7 @@ export async function dispatchWorkspaceAction(
     case 'snow_ws_uib_component_modify': {
       requireScripting();
       if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
-      const { sys_id, ...fields } = args;
-      const result = await client.updateRecord('sys_ux_macroponent', sys_id, fields);
+      const result = await client.updateRecord('sys_ux_macroponent', args.sys_id, declaredOnly(args, ['label', 'description']));
       return { action: 'updated', ...result };
     }
     case 'snow_ws_uib_data_brokers_index': {
