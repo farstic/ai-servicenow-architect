@@ -748,7 +748,7 @@ export const AUDIT_PATTERNS = [
   // denies them to the main thread, which is where a skill runs. So neither an agent's body nor a skill may name
   // one: "fetch it with WebFetch" is an instruction nothing can follow, and the edit that makes it work again
   // puts the tool back. No exemption: no agent or skill has a reason to name one.
-  { id: 'agent-web-tool', scope: ['.claude/agents/'],
+  { id: 'agent-web-tool', scope: ['.claude/agents/', '.claude/skills/'],
     test: (l) => /\bweb ?(?:fetch|search)\b/i.test(l),
     why: 'no session has a web tool (ARC-09-C115, C123): a document arrives as a file or as pasted text' },
 ];

@@ -31,6 +31,9 @@ function entries(tools, prefix, style) {
 
 export const target = '.claude/settings.json';
 
+/** The Claude Code tools denied to every session in this checkout (ARC-09-C123). */
+export const WEB_TOOLS = ['WebFetch', 'WebSearch'];
+
 export function render(ctx) {
   const { contract, serverKey, config, current, retired } = ctx;
   const prefix = `mcp__${serverKey}__`;
@@ -76,6 +79,10 @@ export function render(ctx) {
 
   settings.permissions.allow = [...keep(settings.permissions.allow), ...entries(reads, prefix, style.allowStyle)];
   settings.permissions.ask = [...keep(settings.permissions.ask), ...entries(writes, prefix, style.askStyle)];
+  // ARC-09-C123: the main thread is denied the web tools, as ARC-09-C115 took them from the sub-agents. A user's own
+  // deny entries keep their place at the head; these two are written once, after them.
+  const own = Array.isArray(settings.permissions.deny) ? settings.permissions.deny : [];
+  settings.permissions.deny = [...own.filter((e) => !WEB_TOOLS.includes(e)), ...WEB_TOOLS];
 
   // Two spaces and a trailing newline, like every other JSON in the repository.
   return `${JSON.stringify(settings, null, 2)}\n`;
