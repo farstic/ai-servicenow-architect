@@ -5,21 +5,24 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased (2.0.11-dev)
 
-**Known gaps, raised not closed: the cut-value check (ARC-09-C93) does not see every write, and its
-premise is not yet confirmed live.** `snow_*` tools now return `warnings[].code = VALUE_TRUNCATED` when
-the platform's answer to a write holds a shorter prefix of a string that was sent: `createRecord` and
-`updateRecord`, the Batch API (`snow_fluent_request_batch`), attachment file names, `createChangeRequest`
-and a client copy made with `withUser` (ARC-09-C100). Not checked, so an absent `warnings` key proves
-nothing: the Now Assist and catalogue POSTs, which answer with the result of running something and not
-the record they wrote, fields the response does not echo, and values that are not strings. The list is
-capped at ten entries with a roll-up. In a playbook each step carries its own warnings and `on_error:
-'stop'` halts after a step that stored a cut value. Since ARC-09-C97, `createRecord` and `updateRecord`
-refuse a string longer than its column's `max_length` before the write (`VALUE_TOO_LONG`) when the
-account can read `sys_dictionary`; the other writes above are not checked before they are made.
-That the response to a write on `sys_script`, and to a PATCH, carries the stored value is assumed (one
-POST on `sys_script_fix` was observed); `packages/snowarch/tests/live/README.md` has the run that
-settles it. The long form is `docs/PLATFORM-NOTES.md` PN-10, and the rows are ARC-09-C97 to C101 in
-the ARC-09 plan.
+**Known gaps, raised not closed: the cut-value check (ARC-09-C93) does not see every write, and the
+refusal before the write (ARC-09-C97) sees two methods.** `snow_*` tools return `warnings[].code =
+VALUE_TRUNCATED` when the platform's answer to a write holds a shorter prefix of a string that was sent:
+`createRecord` and `updateRecord`, the Batch API (`snow_fluent_request_batch`), attachment file names,
+`createChangeRequest` and a client copy made with `withUser` (ARC-09-C100). Not checked, so an absent
+`warnings` key proves nothing: the Now Assist and catalogue POSTs, which answer with the result of
+running something and not the record they wrote, fields the response does not echo, and values that are
+not strings. The list is capped at ten entries with a roll-up. In a playbook each step carries its own
+warnings and `on_error: 'stop'` halts after a step that stored a cut value. That the answer to a POST and
+to a PATCH on `sys_script` carries the stored value was confirmed live on `v2.0.11-rc.1`. Since
+ARC-09-C97, `createRecord` and `updateRecord` refuse a string longer than its column's `max_length`
+before the write (`VALUE_TOO_LONG`) when the account can read `sys_dictionary`; the other writes above
+are not checked before they are made. The long form is `docs/PLATFORM-NOTES.md` PN-10, and the rows are
+ARC-09-C97 to C101 in the ARC-09 plan.
+
+**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
+then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
+with credentials the instance has just refused.
 
 ## 2.0.0 — 2026-09-24
 
