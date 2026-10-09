@@ -76,6 +76,21 @@ describe('ARC-09-C121 — the router refuses an undeclared argument before any r
     expect(client.calls).toEqual([]);
   });
 
+  it('the refusal carries its parts in details, exactly: the tool, the undeclared and the declared arguments', async () => {
+    const { error } = await attempt('snow_atf_atf_tests_index', { query: 'name=x' });
+
+    expect(error?.details).toEqual(
+      { tool: 'snow_atf_atf_tests_index', undeclared: ['query'], declared: ['suite_sys_id', 'active', 'limit'] });
+  });
+
+  it('keys are exact: an argument that differs only in case from a declared one is refused, even beside it', async () => {
+    const { error, client } = await attempt('snow_atf_atf_test_read', { sys_id: SYS, Sys_id: SYS });
+
+    expect(error?.code).toBe('INVALID_REQUEST');
+    expect(error?.message).toContain('takes no `Sys_id`');
+    expect(client.calls).toEqual([]);
+  });
+
   it('declared arguments still pass', async () => {
     const { error, client } = await attempt('snow_atf_atf_tests_index', { active: true, limit: 5 });
 
