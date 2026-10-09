@@ -167,6 +167,13 @@ export interface Pending {
  * explain away a cut under a counting unit it might not share with the platform.
  */
 export declare function reconcile(p: Pending, cut: CutField, limit: number | null): CutValueWarning | null;
+/**
+ * The pre-check's own budget, the same size as `SETTLE_BUDGET_MS` but never shared with it: a slow read
+ * before the write must not eat the time C93 has to confirm a cut after it (the architect's ruling).
+ */
+export declare const PRECHECK_BUDGET_MS = 3000;
+/** Forget every instance's columns. For tests; the server never needs it. */
+export declare function resetColumnLimits(): void;
 /** How long `settle` may spend on dictionary lookups in total, before the warnings go out unconfirmed. */
 export declare const SETTLE_BUDGET_MS = 3000;
 export interface Verified {

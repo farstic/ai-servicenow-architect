@@ -146,7 +146,7 @@ describe('ARC-09-C100 - a cut write in a playbook step', () => {
     const result = await runWithInstance(runtime(), () => routeToolInvocation(fake.asClient(), 'snow_orch_playbook_exec',
       { playbook: { name: 'p', steps: [add('u_cut', LONG)] }, dry_run: true })) as Record<string, any>;
     expect(result.steps[0].status).toBe('dry_run');
-    expect(fake.sequence).toEqual([]);
+    expect(fake.sequenceWithoutPrecheck).toEqual([]);
   });
 });
 
@@ -158,7 +158,7 @@ describe('ARC-09-C100 - the bulk path (`snow_deploy_cmdb_data_import` writes up 
     expect(result.processed).toBe(50);
     expect(result.warnings).toHaveLength(10);
     expect(result.warnings[9]).toMatchObject({ rollup: true, count: 41, table: 'u_bulk', fields: ['name'] });
-    expect(fake.sequence.filter((x) => x.startsWith('query sys_dictionary'))).toHaveLength(1);
+    expect(fake.sequenceWithoutPrecheck.filter((x) => x.startsWith('query sys_dictionary'))).toHaveLength(1);
     // the records the caller asked for are still there, after the warnings
     expect(result.results).toHaveLength(50);
     expect(JSON.stringify(result).length - JSON.stringify(result.results).length).toBeLessThan(12000);

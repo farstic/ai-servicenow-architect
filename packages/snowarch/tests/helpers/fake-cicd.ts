@@ -72,8 +72,10 @@ export interface FakeDb {
    * that match it on paper and are not the ones asked for. Undefined lets the query run.
    */
   answer?: (table: string, query: Record<string, string>) => Array<Record<string, unknown>> | undefined;
-  /** A write the instance refuses: return the refusal to answer with. */
+  /** A request the instance refuses, a read or a write: return the refusal to answer with. */
   refuse?: (method: string, table: string) => CicdAnswer | undefined;
+  /** How long the instance takes to answer a request, in ms of the test's clock (fake timers). */
+  delayMs?: (method: string, table: string) => number;
   /** The last sys_id handed out; the next is this plus one, as 32 hexadecimal characters. */
   seq: number;
 }
@@ -158,6 +160,8 @@ function dbAnswer(db: FakeDb, method: string, table: string, id: string | undefi
   query: Record<string, string>, body: Record<string, unknown> | undefined): CicdAnswer {
   const rows = (db.rows[table] ??= []);
   const at = id === undefined ? -1 : rows.findIndex((r) => r.sys_id === id);
+  const refusal = db.refuse?.(method, table);
+  if (refusal) return refusal;
   if (method === 'GET' && id !== undefined) {
     return at === -1 ? refused(404, 'No Record found') : ok(shown(db, table, rows[at], query.sysparm_fields));
   }
@@ -167,8 +171,6 @@ function dbAnswer(db: FakeDb, method: string, table: string, id: string | undefi
     return ok((forced ?? matching(rows, query)).map((r) => shown(db, table, r, query.sysparm_fields)));
   }
   const sent = body ?? {};
-  const refusal = db.refuse?.(method, table);
-  if (refusal) return refusal;
   if (method === 'POST' && id === undefined) {
     const stored = { ...(db.store ? db.store(table, sent) : sent), sys_id: nextId(db) };
     rows.push(stored);
@@ -209,6 +211,9 @@ export function fakeCicdModule(state: CicdState): Record<string, unknown> {
       const query = Object.fromEntries(u.searchParams);
       const body = typeof init.body === 'string' && init.body !== '' ? JSON.parse(init.body) as Record<string, unknown> : undefined;
       state.calls.push({ method, path: u.pathname, query, at: Date.now(), ...(body ? { body } : {}) });
+      const delayTable = /^\/api\/now\/table\/([A-Za-z0-9_]+)/.exec(u.pathname)?.[1];
+      const delay = delayTable ? state.db?.delayMs?.(method, delayTable) ?? 0 : 0;
+      if (delay > 0) await new Promise((resolve) => { setTimeout(resolve, delay); });
       const answer = answerFor(state, method, u.pathname, query, body);
       const text = JSON.stringify(answer.body);
       return {

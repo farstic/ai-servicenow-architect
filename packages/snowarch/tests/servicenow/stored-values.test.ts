@@ -7,7 +7,7 @@ import {
 import { routeToolInvocation } from '../../src/tools/index.js';
 import { capResult } from '../../src/utils/result-size.js';
 import { ServiceNowError } from '../../src/utils/errors.js';
-import { FakeRestClient } from '../helpers/fake-rest.js';
+import { FakeRestClient, isPrecheckRead } from '../helpers/fake-rest.js';
 import { withPreset } from '../helpers/preset.js';
 import { runWithInstance, type Flags, type InstanceRuntime } from '../../src/servicenow/context.js';
 import { expandPreset } from '../../src/utils/permissions.js';
@@ -336,8 +336,10 @@ describe('withWriteVerification - a Proxy that must not change what it wraps', (
     #secret = 'token';
     calls = 0;
     lookups: unknown[] = [];
+    /** ARC-09-C97's reads before each write (`isPrecheckRead`), kept apart from C93's and answered with no rows. */
+    prechecks: unknown[] = [];
     created: Array<[string, unknown]> = [];
-    /** What the dictionary answers; a function so a test can fail it. */
+    /** What the dictionary answers C93; a function so a test can fail it. */
     dictionary: (p: { query: string }) => Promise<unknown> | unknown = () => ({ count: 0, records: [] });
     async createRecord(table: string, data: Record<string, unknown>) {
       this.created.push([table, data]);
@@ -345,7 +347,11 @@ describe('withWriteVerification - a Proxy that must not change what it wraps', (
       return { sys_id: 's1', ...Object.fromEntries(Object.entries(data).map(([k, v]) => [k, cutTo(v)])) };
     }
     async updateRecord(_t: string, sysId: string, data: Record<string, unknown>) { return { sys_id: sysId, ...data }; }
-    async queryRecords(p: { query: string }) { this.lookups.push(p); return this.dictionary(p); }
+    async queryRecords(p: { table?: string; query: string; fields?: string }) {
+      if (isPrecheckRead(p)) { this.prechecks.push(p); return { count: 0, records: [] }; }
+      this.lookups.push(p);
+      return this.dictionary(p);
+    }
     bump() { this.calls += 1; return this.#secret; }   // would throw if `this` were the Proxy
   }
   const asClient = (c: unknown) => c as ServiceNowClient;
@@ -366,13 +372,15 @@ describe('withWriteVerification - a Proxy that must not change what it wraps', (
     expect(() => withWriteVerification(asClient(trap))).not.toThrow();
   });
 
-  it('returns the stored record untouched and does NO I/O inside the write', async () => {
+  it('returns the stored record untouched, and C93 asks nothing until the tool has finished', async () => {
     const real = new Strict();
     const v = withWriteVerification(asClient(real));
     const stored = await v.client.createRecord('u_t', { name: LONG });
     expect(stored).toMatchObject({ sys_id: 's1', name: 'abcde' });
-    // Nothing has been asked of the instance yet: the write's own latency is the write's latency.
+    // C93 has asked nothing yet: its lookup waits for settle. What was asked BEFORE the write is the length
+    // pre-check's (ARC-09-C97), under a budget of its own.
     expect(real.lookups).toHaveLength(0);
+    expect(real.prechecks.length).toBeGreaterThan(0);
     const warnings = await v.settle();
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatchObject({ table: 'u_t', field: 'name', stored_length: 5, sent_length: 10, confirmed: false });

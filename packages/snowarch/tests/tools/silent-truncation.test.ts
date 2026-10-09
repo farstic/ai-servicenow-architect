@@ -76,7 +76,7 @@ describe('ARC-09-C93 - a Business Rule name cut by the platform is reported with
     expect(result.warnings![0]!.message).toContain(String(LIMIT));
     expect(result.warnings![0]!.message).toContain(String(SENT.length));
     // Exactly one extra request, and only because a cut was seen.
-    expect(client.sequence).toEqual([
+    expect(client.sequenceWithoutPrecheck).toEqual([
       'create sys_script', `query sys_dictionary:name=sys_script^elementINname`,
     ]);
   });
@@ -136,7 +136,7 @@ describe('ARC-09-C93 - the normal path costs nothing and says nothing', () => {
     const { result, client } = await call('snow_scr_business_rule_add', { ...BR, name: fits },
       { created: { sys_script: { sys_id: 'b1', name: fits, advanced: 'true' } } });
     expect(Object.prototype.hasOwnProperty.call(result, 'warnings')).toBe(false);
-    expect(client.sequence).toEqual(['create sys_script']);
+    expect(client.sequenceWithoutPrecheck).toEqual(['create sys_script']);
     expect(result.summary).toContain(fits);
   });
 });
@@ -207,6 +207,6 @@ describe('ARC-09-C93 - what the platform changes without cutting is not a warnin
     const { result, client } = await fields(sent, stored);
     expect(Object.prototype.hasOwnProperty.call(result, 'warnings')).toBe(false);
     // and none of them cost a dictionary lookup
-    expect(client.sequence).toEqual(['create u_thing']);
+    expect(client.sequenceWithoutPrecheck).toEqual(['create u_thing']);
   });
 });

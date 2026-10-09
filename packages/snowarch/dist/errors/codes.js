@@ -487,6 +487,12 @@ export const ERROR_CODES = [
         warning: true,
     },
     {
+        code: 'VALUE_TOO_LONG',
+        meaning: "A write refused BEFORE it was sent (ARC-09-C97): a string is longer than its column's `max_length`, read fresh from `sys_dictionary` for this write — on the table that defines the column, which for an inherited one is a table it extends. Nothing was written by this write. Lengths are counted in code points, as VALUE_TRUNCATED counts them. When the same call wrote other records first, the error lists them (`details.written`).",
+        remedy: "shorten the value to at most the stated length and send the write again; records the call already wrote (named in the error) exist, so do not add them again",
+        showInRule: false,
+    },
+    {
         code: 'VALUE_NOT_AS_SENT',
         meaning: "A WARNING on a write that succeeded, not an error: a field the tool sent reads back with a different value — neither missing nor a cut prefix — once line endings are normalised (the ATF authoring tools, ARC-09-C95). It names the field, the first differing offset and both lengths, never the values. Also raised when more than one row holds a step input that should be held once.",
         remedy: "the record exists with the stored value: read it back and, if that value is wrong, correct it with a modify — do not add it again, which would make a second record",

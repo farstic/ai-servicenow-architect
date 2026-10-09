@@ -68,7 +68,9 @@
  * them out; `tests/servicenow/stored-values.test.ts` names the ones it knows.
  */
 import type { ServiceNowClient } from './client.js';
+import { currentInstanceOrNull } from './context.js';
 import { logger } from '../utils/logging.js';
+import { ServiceNowError } from '../utils/errors.js';
 
 export interface CutValueWarning {
   code: 'VALUE_TRUNCATED';
@@ -284,12 +286,203 @@ export function reconcile(p: Pending, cut: CutField, limit: number | null): CutV
   };
 }
 
+// ─── ARC-09-C97: refuse a too-long value before the write ───────────────────────────────────
+//
+// C93 reports a cut after the write, when the record and its update-set entry already exist. This reads
+// the column's `max_length` first and refuses a longer string with VALUE_TOO_LONG, so nothing is sent.
+// `max_length` is "a logical limit for the size of string fields", and only a String field's can be
+// changed (vendor/ServiceNowDocs/markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md);
+// rc.1 cut `sys_script.name` at exactly that limit (docs/PLATFORM-NOTES.md PN-10). A column a table
+// inherits is the extended table's ("incorporates all the fields of the original table", t_CreateATable.md),
+// and an override cannot change its length (c_DictionaryOverrides.md), so the limit is read on the table
+// that defines it, walking up `sys_db_object.super_class` — a column the corpus does not name; the live run
+// reads it. C93's check stays the backstop for every limit this cannot read.
+
+/**
+ * The pre-check's own budget, the same size as `SETTLE_BUDGET_MS` but never shared with it: a slow read
+ * before the write must not eat the time C93 has to confirm a cut after it (the architect's ruling).
+ */
+export const PRECHECK_BUDGET_MS = 3000;
+
+/** A column's limit as read for one instance. `definedOn` is null when no table up the chain defines it. */
+interface Column { limit: number | null; type: string | null; definedOn: string | null }
+
+/**
+ * What one instance's dictionary has said: its columns, its tables' parents, and whether this account can
+ * read it at all. A 403 (reading `sys_dictionary` needs `personalize_dictionary`, PN-10) is remembered, so
+ * later writes ask nothing; a 5xx or a timeout is not, so the next write asks again.
+ */
+interface InstanceColumns { unreadable: boolean; columns: Map<string, Column>; parents: Map<string, string | null> }
+
+/** Keyed by instance — its label and URL — and never shared between instances. */
+const instanceColumns = new Map<string, InstanceColumns>();
+
+/** Forget every instance's columns. For tests; the server never needs it. */
+export function resetColumnLimits(): void { instanceColumns.clear(); }
+
+interface Budget { closed: boolean }
+
+/** A transport-shaped value as its string: a reference's `value`, a scalar as itself. */
+const plainValue = (v: unknown): string | undefined => {
+  if (v === null || v === undefined) return undefined;
+  if (typeof v === 'object') return plainValue((v as { value?: unknown }).value);
+  return String(v);
+};
+
+/** The table `table` extends, by name, or null at the root. Read once per instance. */
+async function parentOf(client: ServiceNowClient, dict: InstanceColumns, table: string, budget: Budget): Promise<string | null> {
+  if (dict.parents.has(table)) return dict.parents.get(table) ?? null;
+  const res = await client.queryRecords({
+    table: 'sys_db_object', query: `name=${table}`, fields: 'sys_id,name,super_class', limit: 1, retries: 0,
+  });
+  if (budget.closed) return null;
+  const row = (res.records ?? []).find((r) => plainValue(r.name) === table);
+  const superId = plainValue(row?.super_class);
+  let parent: string | null = null;
+  if (superId) {
+    const up = await client.getRecord('sys_db_object', superId, 'name');
+    if (budget.closed) return null;
+    parent = plainValue(up?.name) ?? null;
+  }
+  dict.parents.set(table, parent);
+  return parent;
+}
+
+/**
+ * Read `fields` of `table` from `sys_dictionary`, on the table and then up its chain until each is found or
+ * the root is reached, and cache what was read. A field found nowhere is cached as unknown.
+ */
+async function readColumns(client: ServiceNowClient, dict: InstanceColumns, table: string, fields: string[], budget: Budget):
+Promise<void> {
+  let missing = [...fields];
+  let at: string | null = table;
+  const seen = new Set<string>();
+  while (missing.length > 0 && at && !seen.has(at)) {
+    seen.add(at);
+    const res = await client.queryRecords({
+      table: 'sys_dictionary', query: `name=${at}^elementIN${missing.join(',')}`,
+      fields: 'element,max_length,internal_type', limit: missing.length, retries: 0,
+    });
+    if (budget.closed) return;
+    for (const row of res.records ?? []) {
+      const element = plainValue(row.element);
+      if (!element || !missing.includes(element) || dict.columns.has(key(table, element))) continue;
+      dict.columns.set(key(table, element), {
+        limit: parseLimit(row.max_length), type: plainValue(row.internal_type) ?? null, definedOn: at,
+      });
+    }
+    missing = missing.filter((f) => !dict.columns.has(key(table, f)));
+    if (missing.length > 0) at = await parentOf(client, dict, at, budget);
+    if (budget.closed) return;
+  }
+  for (const f of missing) dict.columns.set(key(table, f), { limit: null, type: null, definedOn: null });
+}
+
+/** One column read again, fresh, on the table that defines it: the only read a refusal may rest on. */
+async function rereadColumn(client: ServiceNowClient, dict: InstanceColumns, table: string, field: string, definedOn: string,
+  budget: Budget): Promise<void> {
+  const res = await client.queryRecords({
+    table: 'sys_dictionary', query: `name=${definedOn}^elementIN${field}`,
+    fields: 'element,max_length,internal_type', limit: 1, retries: 0,
+  });
+  if (budget.closed) return;
+  const row = (res.records ?? []).find((r) => plainValue(r.element) === field);
+  dict.columns.set(key(table, field), row
+    ? { limit: parseLimit(row.max_length), type: plainValue(row.internal_type) ?? null, definedOn }
+    : { limit: null, type: null, definedOn: null });
+}
+
+interface Refusal { table: string; field: string; sentLength: number; limit: number; definedOn: string }
+
+/**
+ * Which string, if any, this write must not send. A cached "fits" passes without a request; a cached "too
+ * long" is read again first, and only a limit read for this write refuses. A read that fails leaves the
+ * write to go ahead, with C93 watching it — except AUTHENTICATION_FAILED, which is rethrown: the write would
+ * carry the same credentials, and a second failed login on one call is a step towards a locked account.
+ */
+async function decide(client: ServiceNowClient, dict: InstanceColumns, table: string, strings: Array<[string, string]>,
+  budget: Budget): Promise<Refusal | null> {
+  try {
+    const fresh = new Set(strings.map(([f]) => f).filter((f) => !dict.columns.has(key(table, f))));
+    if (fresh.size > 0) await readColumns(client, dict, table, [...fresh], budget);
+    for (const [field, value] of strings) {
+      if (budget.closed) return null;
+      let column = dict.columns.get(key(table, field));
+      if (!column || column.type !== 'string' || column.limit === null) continue;
+      const sentLength = lengthOf(value);
+      if (sentLength <= column.limit) continue;
+      if (!fresh.has(field) && column.definedOn) {
+        await rereadColumn(client, dict, table, field, column.definedOn, budget);
+        column = dict.columns.get(key(table, field));
+        if (!column || column.type !== 'string' || column.limit === null || sentLength <= column.limit) continue;
+      }
+      if (budget.closed || !column.definedOn) return null;
+      return { table, field, sentLength, limit: column.limit, definedOn: column.definedOn };
+    }
+    return null;
+  } catch (e) {
+    if (e instanceof ServiceNowError && e.code === 'AUTHENTICATION_FAILED') throw e;
+    if (e instanceof ServiceNowError && e.code === 'INSUFFICIENT_PRIVILEGES') dict.unreadable = true;
+    logger.warn(`length pre-check skipped for ${table}: ${e instanceof Error ? e.message : String(e)}`);
+    return null;
+  }
+}
+
+/**
+ * ARC-09-C97: before `table` is written with `data`, refuse a string longer than its column. Throws
+ * VALUE_TOO_LONG, naming the writes this call already made (`written`), or the AUTHENTICATION_FAILED its own
+ * read got within the budget; otherwise returns, having spent at most PRECHECK_BUDGET_MS. Outside an instance
+ * context there is no instance to key a cache by: it returns.
+ */
+async function precheck(client: ServiceNowClient, table: string, data: unknown, written: Written[]): Promise<void> {
+  const rt = currentInstanceOrNull();
+  if (!rt || !isObject(data) || !IDENT.test(table)) return;
+  const instance = `${rt.label}\u0000${rt.url}`;
+  let dict = instanceColumns.get(instance);
+  if (!dict) {
+    dict = { unreadable: false, columns: new Map(), parents: new Map() };
+    instanceColumns.set(instance, dict);
+  }
+  if (dict.unreadable) return;
+  const strings = Object.entries(data)
+    .filter((e): e is [string, string] => typeof e[1] === 'string' && e[1] !== '' && IDENT.test(e[0]));
+  if (strings.length === 0) return;
+
+  const budget: Budget = { closed: false };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), PRECHECK_BUDGET_MS); });
+  let refusal: Refusal | null;
+  try {
+    refusal = await Promise.race([decide(client, dict, table, strings, budget), deadline]);
+  } finally {
+    budget.closed = true;
+    if (timer !== undefined) clearTimeout(timer);
+  }
+  if (!refusal) return;
+
+  const earlier = written.length === 0 ? ''
+    : ` This call already wrote ${written.map((w) => `${w.table} ${w.sys_id ?? '(no sys_id)'}`).join(', ')}: those records exist, `
+      + 'so do not add them again.';
+  throw new ServiceNowError(
+    `${refusal.table}.${refusal.field}: ${refusal.sentLength} characters (code points) were about to be sent, and the column `
+    + `holds at most ${refusal.limit} (max_length on ${refusal.definedOn}, read from sys_dictionary for this write). Nothing `
+    + `was sent for this write. Shorten it to at most ${refusal.limit} characters and send it again.${earlier}`,
+    'VALUE_TOO_LONG',
+    {
+      table: refusal.table, field: refusal.field, sent_length: refusal.sentLength, column_limit: refusal.limit,
+      defined_on: refusal.definedOn, written: written.map((w) => ({ ...w })),
+    });
+}
+
 // ─── The per-invocation wrapper ──────────────────────────────────────────────────────────────
 
 /** How long `settle` may spend on dictionary lookups in total, before the warnings go out unconfirmed. */
 export const SETTLE_BUDGET_MS = 3000;
 
-interface State { pending: Pending[]; warnings: CutValueWarning[] }
+/** A write this call made: its table, the record's sys_id and whether it created or updated it. */
+interface Written { table: string; sys_id?: string; operation: 'create' | 'update' }
+
+interface State { pending: Pending[]; warnings: CutValueWarning[]; written: Written[] }
 
 /** Every client this module has wrapped, mapped to the state its invocation shares. */
 const wrapped = new WeakMap<object, State>();
@@ -379,7 +572,7 @@ export function withWriteVerification(client: ServiceNowClient): Verified {
   const existing = wrapped.get(client as unknown as object);
   if (existing) return { client, owner: false, settle: async () => [] };
 
-  const state: State = { pending: [], warnings: [] };
+  const state: State = { pending: [], warnings: [], written: [] };
   const proxy = wrapClient(client, state);
 
   const settle = async (budgetMs: number = SETTLE_BUDGET_MS): Promise<CutValueWarning[]> => {
@@ -415,6 +608,12 @@ function record(
     // A check on a write that SUCCEEDED must never turn it into a failure.
     logger.warn(`write verification skipped for ${table}: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+/** Note a write this call made, so a later refusal in the same call can name it (ARC-09-C97). Never throws. */
+function remember(state: State, operation: 'create' | 'update', table: string, sysId: string | undefined, stored: unknown): void {
+  const id = sysId ?? (isObject(stored) && typeof stored.sys_id === 'string' ? stored.sys_id : undefined);
+  state.written.push({ table, ...(id ? { sys_id: id } : {}), operation });
 }
 
 /** `/api/now/table/<table>` or `/api/now/table/<table>/<sys_id>`, with an optional version and query. */
@@ -468,6 +667,7 @@ function recordBatch(state: State, operations: unknown, answer: unknown): void {
       if (!operation) continue;
       const stored = batchBody(r.body)?.result;
       record(state, operation, target.table, target.sysId, op.body, stored);
+      remember(state, operation, target.table, target.sysId, stored);
     }
   } catch (e) {
     logger.warn(`batch write verification skipped: ${e instanceof Error ? e.message : String(e)}`);
@@ -484,15 +684,19 @@ function wrapClient(client: ServiceNowClient, state: State): ServiceNowClient {
       const real = target as ServiceNowClient;
       if (prop === 'createRecord') {
         return async (table: string, data: Record<string, unknown>) => {
+          await precheck(real, table, data, state.written);
           const stored = await real.createRecord(table, data);
           record(state, 'create', table, undefined, data, stored);
+          remember(state, 'create', table, undefined, stored);
           return stored;
         };
       }
       if (prop === 'updateRecord') {
         return async (table: string, sysId: string, data: Record<string, unknown>) => {
+          await precheck(real, table, data, state.written);
           const stored = await real.updateRecord(table, sysId, data);
           record(state, 'update', table, sysId, data, stored);
+          remember(state, 'update', table, sysId, stored);
           return stored;
         };
       }
@@ -509,6 +713,7 @@ function wrapClient(client: ServiceNowClient, state: State): ServiceNowClient {
         return async (...args: unknown[]) => {
           const stored = await (value as (...a: unknown[]) => Promise<unknown>).apply(target, args);
           record(state, 'create', 'sys_attachment', undefined, { file_name: args[2] }, stored);
+          remember(state, 'create', 'sys_attachment', undefined, stored);
           return stored;
         };
       }
@@ -516,6 +721,7 @@ function wrapClient(client: ServiceNowClient, state: State): ServiceNowClient {
         return async (params: unknown) => {
           const stored = await (value as (p: unknown) => Promise<unknown>).call(target, params);
           record(state, 'create', 'change_request', undefined, params, stored);
+          remember(state, 'create', 'change_request', undefined, stored);
           return stored;
         };
       }

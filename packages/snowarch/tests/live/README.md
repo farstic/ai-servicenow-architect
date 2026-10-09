@@ -417,6 +417,13 @@ fake returns what it was told to:
 3. that `sys_dictionary` states `sys_script.name`'s `max_length` to this account (reading the dictionary
    needs an elevated role).
 
+**Since ARC-09-C97** (its section below), a write is checked against `sys_dictionary` before it is sent. On a
+build with C97, and an account that can read the dictionary, steps 1 and 4 are refused with `VALUE_TOO_LONG`
+and nothing is written. This run therefore reproduces C93 only on a build before C97, as the 2.0.11-rc.1
+sitting did, or with an account that cannot read the dictionary, where `confirmed` is false. The negative
+control's log half changes with it: a `Querying ServiceNow table: sys_dictionary` line BEFORE a write is
+C97's read, not C93's lookup.
+
 ### Setup
 
 An instance on the `pdi-developer` preset, and the §2.2 chain (`snow_us_active_update_set_ensure`,
@@ -795,3 +802,120 @@ Whether removing a record removes what hangs off it is not in the corpus. A late
 
 Record **ARC-09-C95 live: CONFIRMED / FAILED** in `docs/validation/`, under the sitting's file, naming the
 failure shape and what R3/R4 showed.
+
+## ARC-09-C97 — a value longer than its column is refused before the write
+
+**Build under test:** the release candidate cut after the PR that adds this section.
+
+**The finding:** C93 reports a cut AFTER the write, when the record, and with capture on its update-set
+entry, already exists (PN-10).
+
+**What the server does** (`src/servicenow/stored-values.ts`):
+- Before `createRecord` or `updateRecord` sends, it reads each string's column from `sys_dictionary`
+  (`element,max_length,internal_type`): first on the record's table, then up `sys_db_object.super_class`
+  until the column is found.
+- A column whose `internal_type` is `string`, with a stated `max_length`, refuses a longer value with
+  `VALUE_TOO_LONG`, and nothing is sent. Lengths are counted in code points.
+- It remembers what it read, per instance:
+  - a column the value fits passes without a request;
+  - a "too long" is read again before it refuses;
+  - a 403 means it stops asking;
+  - a 5xx does not.
+- It has a budget of its own (3 s). A read that runs out or fails lets the write go ahead, and C93 watches
+  it. The exception is a 401: that ends the call.
+- Not pre-checked: the Batch API, attachments and `createChangeRequest`. C93 still reports their cuts.
+
+**What the bundled corpus documents** (`68c0d11`):
+- **The limit.** Max length "Provides a logical limit for the size of string fields", and "You can only change
+  this value for a **String** field". The physical type it maps to may hold more: "entering a length of 50
+  maps to the closest physical data type of VARCHAR(100)" *(citation:
+  `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*.
+- **Inheritance.** Extending a base table "incorporates all the fields of the original table" *(citation:
+  `markdown/platform-administration/table-administration-and-data-management/t_CreateATable.md`)*.
+- **Overrides.** Max length is not among the aspects a dictionary override can change *(citation:
+  `markdown/platform-administration/table-administration-and-data-management/c_DictionaryOverrides.md`)*.
+- **Not documented, and assumed by the server:**
+  - the column names `super_class` (on `sys_db_object`) and `internal_type` (on `sys_dictionary`);
+  - `string` as a String field's `internal_type`;
+  - that the platform cuts at the logical `max_length` and not at the physical one. PN-10 saw that for
+    `sys_script.name` only.
+
+  R1 to R3 read the first two before anything is written.
+
+**What this run cannot prove:** when R4 is refused, as it should be, nothing was sent. So the run cannot show
+that this column would have been cut at L. If the platform would have stored L+1 whole, the refusal is
+stricter than the platform; PN-10 stays the only observation of the cut.
+
+### Setup
+
+An instance on the `pdi-developer` preset. The account must be able to read `sys_dictionary`
+(`personalize_dictionary`, PN-10) and create an incident. No update set is needed: R4 writes no
+configuration, and when it passes it writes nothing at all.
+
+### The run
+
+```
+read-only — no approval needed
+R1 snow_core_records_query { table: "sys_db_object", query: "name=incident", fields: "sys_id,name,super_class" }
+                                                       one row; super_class a sys_id
+   then snow_core_record_read { table: "sys_db_object", sys_id: <that super_class>, fields: "name" }
+                                                       task
+R2 snow_core_records_query { table: "sys_dictionary", query: "name=incident^element=short_description",
+     fields: "element,max_length,internal_type" }      no row: the column is task's
+R3 snow_core_records_query { table: "sys_dictionary", query: "name=task^element=short_description",
+     fields: "element,max_length,internal_type" }      one row: L is its max_length; internal_type string
+
+the one write — its own "write approved"
+R4 About to add an incident whose short description is L+1 characters on instance "<label>" — write approved?
+   snow_core_record_add { table: "incident", fields: { short_description: <the value below> } }
+then a read
+R5 snow_core_records_query { table: "incident", query: "short_descriptionSTARTSWITHc97-live-probe-",
+     fields: "sys_id,short_description" }              no row
+```
+
+The value for R4 is `c97-live-probe-` followed by `x` until it is exactly L+1 characters long: 146 `x` for an L
+of 160. It is ASCII, so its code points and its characters are the same count and the boundary is exact.
+`STARTSWITH` is the corpus's own example (`short_descriptionSTARTSWITHSAP`, *citation:
+`markdown/platform-user-interface/r_OpAvailableFiltersQueries.md`*).
+
+**Stop before R4** if R1 does not name `task`, or R3 shows no row, a type other than `string`, or a blank
+`max_length`. The server would read that shape too, and R4 would then show C93's behaviour, not a refusal.
+If R2 shows a row, L is that row's `max_length` and the walk is not exercised; record it, and go on.
+
+### Pass condition — the exact state to see
+
+- R4 is refused with `(Code: VALUE_TOO_LONG)`. The message reads `incident.short_description: L+1 characters
+  (code points) were about to be sent, and the column holds at most L (max_length on task, …)`, and says
+  nothing was sent.
+- R5 returns no row.
+- The audit line for R4 carries the code.
+
+### The failure shapes, and what each means for the fix
+
+- **R4 creates the incident with no warning:** the server did not read L, or did not judge the type as
+  `string`. A read that failed leaves a `length pre-check skipped for incident` line in the server's log; a
+  type or a limit it could not use leaves none, and R1 to R3 show which.
+- **R4 creates it with a `VALUE_TRUNCATED` warning:** the same, and the platform cut it; C93 was the backstop.
+- **R4 is refused with a limit or a `defined_on` other than R3's:** the walk read the wrong row.
+- **R4 is refused with another code** (`AUTHENTICATION_FAILED`, `INSUFFICIENT_PRIVILEGES`): record the message.
+
+### The evidence to record
+
+- R1's `super_class` (the name it resolves to, without the sys_id).
+- R2's row count.
+- R3's `max_length` and `internal_type`.
+- R4's message and its audit line.
+- R5's row count.
+
+None of these is a secret, and the ids stay out of the record.
+
+### Teardown
+
+None when R4 is refused. If it was not, and an incident with L+1 characters was created:
+1. record the stored length of its `short_description`. That length is the finding.
+2. remove the record with `snow_core_record_remove`, under its own "write approved".
+
+### Verdict
+
+Record **ARC-09-C97 live: CONFIRMED / FAILED** in `docs/validation/`, under the sitting's file, naming the
+failure shape and what R1 to R3 showed.

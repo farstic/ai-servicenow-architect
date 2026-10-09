@@ -21,6 +21,16 @@ export interface RecordedCall {
   data?: Record<string, unknown>;
 }
 
+/**
+ * Whether a query is one of ARC-09-C97's reads before a write: it asks `sys_dictionary` for `internal_type`,
+ * which C93's lookup after the write never does, and it walks `sys_db_object` up to the table that defines a
+ * column. A suite about C93 keeps these apart, so what it asserts stays C93's own requests.
+ */
+export function isPrecheckRead(p: { table?: string; fields?: string }): boolean {
+  return p.table === 'sys_db_object'
+    || (p.table === 'sys_dictionary' && (p.fields ?? '').split(',').includes('internal_type'));
+}
+
 export interface FakeRestOptions {
   /** `get` fixtures keyed `<table>/<sys_id>`. */
   records?: Record<string, Record<string, unknown> | null>;
@@ -49,6 +59,13 @@ export class FakeRestClient {
   /** The calls, as `op table[:arg]` — the shape an assertion reads most clearly. */
   get sequence(): string[] {
     return this.calls.map((c) => `${c.op} ${c.table}${c.arg ? `:${c.arg}` : ''}`);
+  }
+
+  /** The sequence without ARC-09-C97's reads before each write (`isPrecheckRead`), for a test about the rest. */
+  get sequenceWithoutPrecheck(): string[] {
+    return this.calls
+      .filter((c) => !isPrecheckRead(c))
+      .map((c) => `${c.op} ${c.table}${c.arg ? `:${c.arg}` : ''}`);
   }
 
   getAuthUsername(): string | undefined {
