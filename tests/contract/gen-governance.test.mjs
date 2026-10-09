@@ -442,7 +442,8 @@ test('ARC-05-S07 criterion 2 — everything that is not ours survives byte for b
     const after = settingsOf(dir);
     assert.deepEqual(after.env, { SNOW_STORE: '' });
     assert.deepEqual(after.hooks, { SessionStart: [{ matcher: '*', hooks: [] }] });
-    assert.deepEqual(after.permissions.deny, ['Bash(curl *)']);
+    // A user's own deny entry keeps its place at the head; ARC-09-C123's web tools follow it.
+    assert.deepEqual(after.permissions.deny, ['Bash(curl *)', 'WebFetch', 'WebSearch']);
     // Non-MCP rules and another server's rules keep their place at the head of each list.
     assert.equal(after.permissions.allow[0], 'Bash(./snowarch doctor*)');
     assert.equal(after.permissions.allow[1], 'mcp__other__thing');
@@ -452,6 +453,29 @@ test('ARC-05-S07 criterion 2 — everything that is not ours survives byte for b
     assert.ok(!after.permissions.ask.includes('mcp__servicenow__add_comment'));
     assert.ok(after.permissions.allow.includes('mcp__servicenow__not_a_tool_of_ours'));
   } finally { cleanup(dir); }
+});
+
+test('ARC-09-C123 — the web tools are denied to every session, once, after a user\'s own deny entries', () => {
+  // C115 took WebFetch off the sub-agents; the main thread could still fetch, because nothing denied it. The
+  // generator writes the deny beside the ask list, so it cannot be dropped by a regeneration.
+  const fresh = tree();
+  try {
+    run(fresh, ['--only', 'permissions']);
+    assert.deepEqual(settingsOf(fresh).permissions.deny, ['WebFetch', 'WebSearch']);
+  } finally { cleanup(fresh); }
+
+  const owned = tree(({ write }) => {
+    write(SETTINGS, `${JSON.stringify({ permissions: { allow: [], ask: [], deny: ['WebSearch', 'Bash(curl *)', 'WebFetch'] } }, null, 2)}\n`);
+  });
+  try {
+    run(owned, ['--only', 'permissions']);
+    assert.deepEqual(settingsOf(owned).permissions.deny, ['Bash(curl *)', 'WebFetch', 'WebSearch'],
+      'a user\'s entry kept at the head, the web tools written once, after it');
+  } finally { cleanup(owned); }
+
+  // And the committed file says so, so a session in this checkout has no web tool at all.
+  const committed = JSON.parse(readFileSync(join(root, SETTINGS), 'utf8'));
+  assert.deepEqual(committed.permissions.deny, ['WebFetch', 'WebSearch']);
 });
 
 test('ARC-05-S07 criterion 3 — a flipped `mutates` names the entry that moved', () => {

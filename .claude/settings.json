@@ -402,6 +402,10 @@
       "mcp__servicenow__snow_ws_ux_experience_add",
       "mcp__servicenow__snow_ws_workspace_add",
       "mcp__servicenow__snow_ws_workspace_list_configure"
+    ],
+    "deny": [
+      "WebFetch",
+      "WebSearch"
     ]
   },
   "env": {
