@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.11 — 2026-10-10
+
+### Notes
+
 **This release makes a write report a value the platform cut and refuse one longer than its column before it
 is sent, runs and authors ATF tests through the interfaces the documentation describes, and tells the
 Architect to ask, when no engagement is named, which engagement a first write to an instance is for.** There
@@ -292,6 +296,128 @@ documentation page, not yet against an instance. The live procedures are in
   `tmpdir()` instead of `tempDir()`; the helper's own test file is exempt.
 - A test that fails when a sub-agent's tool list, or its instructions, name a web tool.
 - The engagement question, `clients/_unfiled/` and the `OQ-<kind>-<n>` scheme (above).
+
+### Added
+
+- snowarch: ATF test and step authoring, each record read back (ARC-09-C95) (c4d1797)
+- docs: the identifier guard reads dotted names and CamelCase claims (ARC-09-C104) (0c448e0)
+- contract: the rule file tells a session to read a write's warnings (ARC-09-C101) (5975fb5)
+
+### Fixed
+
+- contract: deny WebFetch and WebSearch to every session, beside the ask list (ARC-09-C123) (af2335a)
+- snowarch: refuse an argument a tool does not declare, before any request (ARC-09-C121) (5d69465)
+- snowarch: refuse a value longer than its column before the write (ARC-09-C97) (db0d5cf)
+- engine: the sub-agents ground in the corpus, with no web fetch tool (ARC-09-C115) (d98c7f8)
+- snowarch: the tests index reads a suite's tests from sys_atf_test_suite_test (ARC-09-C113) (6198421)
+- snowarch: the ATF exec tools run suites through the CI/CD API (ARC-09-C94) (3b55da6)
+- engine: grounding is a declared budget, with parallel readers only on request (ARC-09-C112) (9e73d92)
+- docs: act on the C105 review - live write cases, user guide, long form (ARC-09-C105) (dc54313)
+- contract: ask for the engagement before a session's first instance write (ARC-09-C105) (5eebd3e)
+- tests: resolve links in the docs check with POSIX rules (ARC-09-C107) (51abd34)
+- server: batchRequest follows the Batch API's Base64 bodies and unserviced list (ARC-09-C108) (5abadad)
+- tests: the validation runner runs a case's design-only Setup (ARC-09-C106) (7876123)
+- docs: the decision and spike records link at the right depth (ARC-09-C107) (90fa2d2)
+- engine: upgrade refuses when stdin is closed instead of proceeding (ARC-09-C109) (a3b9324)
+- tests: type the batch fake's answer and the attachment fake's arguments (ARC-09-C100) (0d76a94)
+- tests: the discovery fake types its dictionary rows (ARC-09-C98) (53c5372)
+- server: the cut check sees batch writes; a playbook step owns its warnings (ARC-09-C100) (04be300)
+- server: table discover reads inherited columns and states what it does not know (ARC-09-C98) (63ef53d)
+- docs: the user guide links only documents that exist (ARC-09-C102) (da558ac)
+- server: the client does not retry a 403 (ARC-09-C99) (e6aeca6)
+- server: business rule add refuses an order or a when it cannot send (ARC-09-C103) (b10b4e2)
+- tests: the launcher audit finds its pinned site by text, not by line number (ARC-09-C96) (d64c9c0)
+- tests: the other two test trees make their temp directories through the helper (ARC-09-C96) (f28e647)
+- tests: the validation harness reads every case, isolates its sessions and reports (ARC-09-C87) (36a63dd)
+- tests: the sweeps read whole files; only the changelog has a history boundary (ARC-09-C79) (0b4b70a)
+- cmdb-csdm-specialist: cluster classes in the baseline class map, ITOM points to it (ARC-09-C88) (10dac02)
+- fso-insurance-specialist: the personal-auto claim roles are named, with their page (ARC-09-C88) (a6862ea)
+- hrsd-specialist: HR notification names marked undocumented, the corpus's own cited (ARC-09-C88) (f506f76)
+- server: the audit line carries a write's warnings: code, table, fields, count (ARC-09-C101) (8f7eded)
+- server: bounded post-tool cut check; C92 refuses non-booleans (ARC-09-C92, C93) (a87fd7a)
+- server: warnings is the first key, so the result-size cap cannot cut it (ARC-09-C93) (4353657)
+- server: report a cut createRecord/updateRecord value with its limit (ARC-09-C93) (3012b05)
+- server: a Business Rule is one write: filter_condition and advanced on the add (ARC-09-C92) (28ab47c)
+- tests: win32-remedies builds its fixture through tempDir, so a run leaves nothing (ARC-09-C80) (cc023a9)
+
+### Changed
+
+- snowarch: drop two not-found guards a 404 makes dead (ARC-09-C95) (cebf0d2)
+- server: build the tool error text in one tested place (ARC-09-C93) (5e5afd7)
+
+### Internal
+
+- plan: C123 fixed — no session has a web tool; C115's pointer and the changelog (ARC-09-C123) (8697ad7)
+- tests: web tools denied to every session; the audit covers skills; failing first (ARC-09-C123) (d77a0d3)
+- snowarch: a near-miss in case is refused, and a refusal's details are exact (ARC-09-C121) (f5d0bc9)
+- plan: C121 fixed, pending the rc.4 read; its live check and changelog line (ARC-09-C121) (bbb5179)
+- snowarch: an undeclared argument is refused before any request, failing first (ARC-09-C121) (dbfc8ad)
+- tests: T-27 in two turns — the FSO halt, then the Integration Specialist (ARC-09-C115) (0667ea8)
+- plan: C94, C95 and C97 confirmed on rc.3; C120 to C122 opened; the changelog (ARC-09) (3c78c05)
+- docs: the 2.0.11-rc.3 live sitting, PN-16, and PN-15's confirmation (ARC-09) (0f8674d)
+- docs: F2's gateway in the grounding sitting, the FSO specialist alone (ARC-09) (fd60f16)
+- docs: the grounding sitting's F2 and F3 counts, measured against the pinned corpus (ARC-09) (cd8eda5)
+- docs: the rc.1 grounding sitting, and what rc.1's sessions were seen doing (ARC-09) (b8baa9f)
+- changelog: the 2.0.11 block, the 10-05 draft brought up to C97, C115 and the rcs (b65cb3e)
+- plan: C119 opened, a second failed login after a cut write and a 401 (ARC-09-C97) (b338a9a)
+- snowarch: the walk takes only its own table's sys_db_object row (ARC-09-C97) (e84ad89)
+- plan: C115's agent prose is guarded too, by the agent-web-tool pattern (ARC-09-C115) (29c15ec)
+- tests: the audit refuses a web tool named in an agent's prose (ARC-09-C115) (35e91c5)
+- contract: the C97 contract sha on the rules-file header — pending the owner (ARC-09-C97) (5bf6952)
+- snowarch: an update is checked before it is sent, as a create is (ARC-09-C97) (4a5fc38)
+- plan: C97 built, pending rc.3; its live run, the C93 note and the changelogs (ARC-09-C97) (c3b3b2d)
+- snowarch: refuse a value longer than its column before the write, failing first (ARC-09-C97) (4f4d4dd)
+- tests: AG-03 refuses a web tool on a sub-agent (ARC-09-C115) (293451e)
+- plan: C115 fixed, pending the owner's sitting; T-27 and the changelog (ARC-09-C115) (2d34589)
+- plan: C114 delivered, pending the owner's sitting; T-26 and the changelog (ARC-09-C114) (c15ffbe)
+- engine: Ultracode is the scoping mode, and an Envelope the engagement's context (ARC-09-C114) (edb0f92)
+- tests: Ultracode as the scoping mode, failing first (ARC-09-C114) (814e52d)
+- snowarch: four authoring decisions no case guarded (ARC-09-C95) (09fd250)
+- contract: the C95 lines in instruction and permission files — pending the owner (ARC-09-C95) (f2491fb)
+- tests: the status fixture and its quoted copies count 399 tools (ARC-09-C95) (1df3e9b)
+- plan: C95 built, pending live; its live run and changelog line (ARC-09-C95) (dc996eb)
+- snowarch: ATF authoring with a read-back, failing first (ARC-09-C95) (8b84afc)
+- snowarch: three decisions in the suite listing that no case guarded (ARC-09-C113) (0ce8ca6)
+- plan: C113 fixed, and its changelog line (ARC-09-C113) (e52064e)
+- snowarch: the tests index reads a suite's membership rows, failing first (ARC-09-C113) (c9fa070)
+- snowarch: four decisions in the CI/CD run that no case guarded (ARC-09-C94) (ef9cb6a)
+- plan: C94 fixed, pending the rc.2 confirmation; C113 for the index filter (ARC-09-C94) (12b8d97)
+- docs: PN-15, the C94 after-the-fix run, and the changelog (ARC-09-C94) (f9c78f9)
+- snowarch: the ATF exec tools against a fake of the CI/CD API, failing first (ARC-09-C94) (16b1caa)
+- plan: C94 measured live — FAILED, shape A — and the fix as ruled (ARC-09-C94) (7b5eb5b)
+- docs: the C94 live probes, ported from the 2.0.11-rc.1 sitting (ARC-09-C94) (ed30adf)
+- plan: C92 and C93 confirmed live, C97's gate met, ARC-02-S10's question answered (ARC-09-C93) (7be91d8)
+- docs: the 2.0.11-rc.1 live sitting, and three platform notes from it (ARC-09-C93) (5e8adf9)
+- plan: C94 records what the code sends, what the corpus documents, and the probes (ARC-09-C94) (3e15627)
+- tests: the live probes for running an ATF test by REST (ARC-09-C94) (2cba839)
+- plan: C64 and C66 read FIXED, as the tree and the tags say (5919792)
+- plan: the C112 row and its changelog lines (ARC-09-C112) (6e8091c)
+- plan: C107 opened — dead relative links outside the checked pages (ARC-09-C102) (a9c4142)
+- plan: C103 fixed (ARC-09-C103) (8a1c976)
+- plan: C96 fixed, with the counts (ARC-09-C96) (4d3d4c0)
+- plan: C87 fixed, C106 opened (ARC-09-C87) (a7437c3)
+- engine: the gateways' citation format asks for the full path (ARC-09-C87) (2d868ab)
+- plan: C79 fixed, with the counts (ARC-09-C79) (f698806)
+- plan: C104 fixed, with the counts (ARC-09-C104) (25baaed)
+- tests: both guard arms planted with their near-misses (ARC-09-C104) (48a9081)
+- engine: eight dotted names reworded in the corpus's own words (ARC-09-C104) (796b718)
+- plan: C89, C90 and C91 fixed; C104 and C105 opened (ARC-09-C91) (4177166)
+- tests: the engagement file, the unfiled home and the id scheme are asserted (ARC-09-C90) (c6f333e)
+- engine: one engagement-state file, an unfiled home, coded OPEN QUESTION ids (ARC-09-C89) (1851019)
+- plan: C88 fixed for the three facts; the guard's arm waits for a ruling (ARC-09-C88) (5ab49b4)
+- tests: skill-body attribution names ARC-09-C88 for the bodies it changed (ARC-09-C88) (bb11fa7)
+- server: a nested `result.warnings` is not read as the server's warnings (ARC-09-C101) (496b2df)
+- plan: C101 fixed, both halves (ARC-09-C101) (9bd9cfd)
+- server: failing tests first for C101 (b) - the audit line carries a write's warnings (c1c9163)
+- plan: PN-10 grounding uses the wording the platform-notes format test requires (ARC-09-C93) (262799a)
+- plan: C92 and C93 recorded, PN-07 corrected, PN-10 scoped, C97 to C103 opened (4418997)
+- server: pin the live procedure (41-char probe, update path, false-alarm step) (ARC-09-C93) (d598692)
+- server: failing tests first for C92 and C93 - a rule is one write, a cut value is reported (c52a817)
+- plan: C80 and its test say only what was measured about how the other sites cleaned up (b111d48)
+- plan: ARC-09-C80 fixed, and the two workspace test trees opened as C96 (27d6043)
+- tests: every temp dir under tests/ goes through tempDir, and a scan keeps it so (ARC-09-C80) (9970b45)
+
+Tag v2.0.11 · contract 53e4f56cd3cc · docs-pin 68c0d11
 
 ## 2.0.10 — 2026-10-04
 
