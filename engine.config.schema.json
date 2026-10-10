@@ -168,6 +168,39 @@
           "uniqueItems": true
         }
       }
+    },
+    "licence": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ARC-11-C1. Where the signed revocation list is fetched from: by git, from this explicit address, never from origin, so a fork cannot substitute its own list.",
+      "properties": {
+        "revocations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repo",
+            "ref",
+            "path"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "minLength": 1,
+              "description": "owner/name on GitHub, fetched over HTTPS, or a full URL"
+            },
+            "ref": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._/-]+$",
+              "description": "the branch that carries the list"
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._/-]+\\.json$",
+              "description": "the list's file on that branch"
+            }
+          }
+        }
+      }
     }
   }
 }

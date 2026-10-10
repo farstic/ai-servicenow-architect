@@ -12,11 +12,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { STEPS, runSteps } from '../scripts/ci/test-all.mjs';
+import { runAll, STEPS, runSteps } from '../scripts/ci/test-all.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
@@ -200,4 +200,49 @@ test('ARC-09-C64 — the two real halves are the two that were chained, and the 
   assert.equal(typeof ws.scripts?.test, 'string',
     'packages/snowarch has no test script — the workspaces half would report ok over nothing');
   assert.match(ws.scripts.test, /vitest/);
+});
+
+// ─── ARC-11-C1 — a fixture left in the run's TMPDIR fails the run ──────────────────────────────────────
+
+test('ARC-11-C1 — both halves run in one private TMPDIR, as TMPDIR, TMP and TEMP, and it is removed after', () => {
+  const { calls, run } = fakeRun({});
+  const out = collect();
+  const removed = [];
+  const r = runAll({ steps: TWO, run, write: out.write, platform: 'linux', makeTemp: () => '/fixture/run-tmp',
+    read: () => [], remove: (dir) => removed.push(dir) });
+  assert.equal(r.ok, true);
+  assert.equal(calls.length, 2);
+  for (const c of calls) {
+    for (const key of ['TMPDIR', 'TMP', 'TEMP']) assert.equal(c.options.env[key], '/fixture/run-tmp', `${c.args[0]}: ${key}`);
+  }
+  assert.deepEqual(removed, ['/fixture/run-tmp']);
+  assert.ok(out.lines.join('').includes('fixture leftovers: 0'));
+});
+
+test('ARC-11-C1 — a fixture left behind fails the run and is named, even when both halves passed', () => {
+  const { run } = fakeRun({});
+  const out = collect();
+  const r = runAll({ steps: TWO, run, write: out.write, platform: 'linux', makeTemp: () => '/fixture/run-tmp',
+    read: () => ['snowarch-licence-AbC123', 'node-compile-cache', 'snowarch-gone-x1y2z3'], remove: () => {} });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.leftovers, ['snowarch-gone-x1y2z3', 'snowarch-licence-AbC123']);
+  const text = out.lines.join('');
+  assert.match(text, /FAIL: fixture leftovers: 2 in this run's TMPDIR/);
+  assert.ok(text.includes('  snowarch-licence-AbC123\n'));
+  assert.equal(text.includes('node-compile-cache'), false, 'only this product\'s fixtures are counted');
+});
+
+test('ARC-11-C1 — measured on a real directory: a planted leftover fails, and the run directory is gone after', () => {
+  let seen = null;
+  // A "half" that leaks the way #403's licence fixtures did: it makes a fixture and never removes it.
+  const run = (file, args, options) => {
+    seen = options.env.TMPDIR;
+    mkdirSync(join(options.env.TMPDIR, 'snowarch-planted-1'));
+    return { status: 0 };
+  };
+  const r = runAll({ steps: TWO.slice(0, 1), run, write: () => {}, platform: 'linux' });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.leftovers, ['snowarch-planted-1']);
+  assert.ok(seen, 'the half was given a TMPDIR');
+  assert.equal(existsSync(seen), false, 'the run directory outlived the run');
 });

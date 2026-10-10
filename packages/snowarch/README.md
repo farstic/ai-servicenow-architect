@@ -349,7 +349,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (72), with what to do about it.
+Every code the server can throw (73), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -385,6 +385,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `LABEL_NOT_FOUND` | run `instance list` to see the labels this checkout has, or `instance add <label>` to add one |
 | `LEGACY_STORE_NOT_FOUND` | check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `<cli> doctor` reports where it looked |
 | `LEGACY_STORE_UNREADABLE` | open it and check it is a complete JSON object; a half-written file from an interrupted 1.x session cannot be migrated and its instances are re-added with `instance add` |
+| `LICENCE_NOT_VALID` | Run <cli> licence check to see why, then install a valid licence as .local/licence.json or unset SNOW_LICENCE_ENFORCE. A running Claude Code session keeps what it read at start, so restart it afterwards |
 | `NETWORK_ERROR` | the message carries the underlying cause |
 | `NO_INSTANCE_CONFIGURED` | add an instance, then call the reload tool — Claude Code does not need restarting, the server re-advertises its catalogue in the same session |
 | `NOT_FOUND` | check the sys_id and the table name |

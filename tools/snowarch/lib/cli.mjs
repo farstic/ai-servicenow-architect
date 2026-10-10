@@ -4,7 +4,7 @@
 // and this CLI will grow sub-commands written months apart by different people. Everything a user
 // can get wrong — an unknown command, an unknown flag, a missing value — ends in EXIT_USAGE with
 // the usage block for what they were actually trying to do, never a stack trace.
-import { EXIT_OK, EXIT_USAGE } from './exit.mjs';
+import { EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from './exit.mjs';
 import { spellings } from './text.mjs';
 import { cwdNote, loadConfig, root } from './config.mjs';
 import { renderVersion, versionInfo } from './version-info.mjs';
@@ -15,6 +15,8 @@ import { USAGE as INSTANCE_USAGE } from './instance.mjs';
 import { USAGE as STORE_USAGE } from './store.mjs';
 import { USAGE as UPGRADE_USAGE } from './commands/upgrade.mjs';
 import { USAGE as STATUS_USAGE } from './commands/status.mjs';
+import { USAGE as LICENCE_USAGE } from './commands/licence.mjs';
+import { CLI_ALLOWED, isEnforced, licenceStatus, refusalLines, refusesCommand } from './licence/state.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
@@ -146,6 +148,11 @@ async function upgradeCommand(args) {
   return run(args);
 }
 
+async function licenceCommand(args) {
+  const { licenceCommand: run } = await import('./commands/licence.mjs');
+  return run(args);
+}
+
 export const COMMANDS = {
   // `readOnly`: it reads three files and prints. ARC-07-C33 — it used to leave `.local/logs/version-*.log`.
   version: { summary: 'print the version, the release tag, the commit, the contract sha and the floors',
@@ -187,6 +194,10 @@ export const COMMANDS = {
   upgrade: { summary: 'move this checkout to a release, re-run only what changed, and check it',
     run: upgradeCommand, usage: UPGRADE_USAGE,
     booleans: ['check', 'yes', 'pre', 'force-floor'] },
+  // ARC-11-C1 — `readOnly`: no log file for any sub-command. The owner's four name licensees and key paths,
+  // and a per-run log under `.local/logs/` is a copy of both that nobody asked to keep.
+  licence: { summary: 'show, verify and check this checkout\'s licence; the owner issues and revokes them',
+    run: licenceCommand, usage: LICENCE_USAGE, booleans: ['refresh', 'perpetual'], readOnly: true },
 };
 
 /**
@@ -249,6 +260,20 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
   }
 
   /*
+   * ARC-11-C1 — UNDER SNOW_LICENCE_ENFORCE="true", NO VALID LICENCE, NO COMMAND (ruling R1) — except the five
+   * a person needs to see and repair the state: licence, doctor, status, version and upgrade. Here, after the
+   * help and the usage errors and before the logger, so a refused command has written nothing — not even a
+   * log — when it says so. Off, which is the default, this is one string comparison.
+   */
+  if (isEnforced(env) && !CLI_ALLOWED.includes(name)) {
+    const licence = licenceStatus(root, { env });
+    if (refusesCommand(name, licence)) {
+      for (const line of refusalLines(name, licence, spellings(where).cli)) err.write(`${line}\n`);
+      return EXIT_PREREQ;
+    }
+  }
+
+  /*
    * ARC-07-C33's residual — A RUN THAT WRITES NOTHING LEAVES NO LOG.
    *
    * `readOnly` is a FUNCTION where the answer depends on the arguments, which it does for `mode`: bare it
@@ -269,7 +294,8 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
   // opinion about `--`.
   // `home` comes from the ENTRY POINT: nothing under `lib/` reads the home directory itself
   // (the repo-wide rule), and the doctor needs it only to shorten a path to `~` in a report.
-  const code = await command.run({ flags, positional, argv: rest, log, root, out, err, home });
+  // `env` since ARC-11-C1: the licence command reports enforcement from the environment `main` was given.
+  const code = await command.run({ flags, positional, argv: rest, log, root, out, err, home, env });
   log.commit();          // a deferred logger that was never committed still gets its lines on disk
   return code;
 }

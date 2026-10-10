@@ -32,6 +32,12 @@ export interface AuditEntry {
      * happened. Absent means none, not "not checked" for the two write paths the check covers.
      */
     warnings?: AuditWarning[];
+    /**
+     * ARC-11-C1 — the licence the call was made under, by id. Present only when the licence's signature
+     * holds (revoked and expired included: the id is still authentic), and LAST, so a checkout without a
+     * licence writes exactly the line it always wrote.
+     */
+    licence?: string;
 }
 /**
  * A line written by the CLI rather than by a tool call (ARC-07-S06).

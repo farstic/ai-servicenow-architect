@@ -9,6 +9,46 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A licence, checked by the product itself, and warn only by default (ARC-11-C1).** With no licence and
+`SNOW_LICENCE_ENFORCE` unset, which is every checkout today, exactly three things change:
+- doctor check E-31 warns;
+- the session banner gains a `Licence:` line after the `Mode:` line;
+- a session's first tool answer carries one extra block, after the first one, which is unchanged.
+
+The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72 to 73), which only
+`SNOW_LICENCE_ENFORCE="true"` can raise.
+
+### Added
+
+- `./snowarch licence`:
+  - `show`, `verify <file>` and `check [--refresh]` for whoever installs a licence, as
+    `.local/licence.json`;
+  - `keygen`, `issue`, `init-list` and `revoke` for the owner. The owner's private keys are written and read
+    only outside the checkout.
+- A licence is signed with Ed25519 by one of the two public keys the product ships, primary and recovery. A
+  licence with no end date is perpetual, and only those keys can sign one.
+- A signed revocation list in the public repository `farstic/snowarch-licences` (`engine.config.json` →
+  `licence.revocations`):
+  - fetched by git from that address, never from `origin`;
+  - its version only goes up, and a lower one is ignored;
+  - refreshed by `upgrade` and `upgrade --check` when a licence is installed;
+  - refreshed in the background at every live server start with a licence installed;
+  - `licence show` and `licence check` say when the held list is more than a day old.
+- Under `SNOW_LICENCE_ENFORCE="true"`, a missing, invalid, expired or revoked licence refuses every MCP tool
+  with `LICENCE_NOT_VALID`, the instance-free ones included. It also refuses every CLI command except
+  `licence`, `doctor`, `status`, `version` and `upgrade`. A design-only licence refuses every tool of a live
+  server.
+- An audit line names the licence it was written under, only when that licence's signature holds.
+
+### Changed
+
+- `CLAUDE.md` gains one rule. With `enforced` and a licence state of `missing`, `invalid`, `expired` or
+  `revoked`, the Architect produces no deliverable: it names the state and points to
+  `./snowarch licence check`. Without enforcement, the `Licence:` line is information. In design-only this
+  is a rule, not a lock.
+- The doctor, `./snowarch status` and the `/snowarch` skill's sample count E-31's warning, which every
+  checkout without a licence carries.
+
 ## 2.0.11 — 2026-10-10
 
 ### Notes
