@@ -15,6 +15,7 @@ import { USAGE as INSTANCE_USAGE } from './instance.mjs';
 import { USAGE as STORE_USAGE } from './store.mjs';
 import { USAGE as UPGRADE_USAGE } from './commands/upgrade.mjs';
 import { USAGE as STATUS_USAGE } from './commands/status.mjs';
+import { USAGE as LICENCE_USAGE } from './commands/licence.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
@@ -146,6 +147,11 @@ async function upgradeCommand(args) {
   return run(args);
 }
 
+async function licenceCommand(args) {
+  const { licenceCommand: run } = await import('./commands/licence.mjs');
+  return run(args);
+}
+
 export const COMMANDS = {
   // `readOnly`: it reads three files and prints. ARC-07-C33 — it used to leave `.local/logs/version-*.log`.
   version: { summary: 'print the version, the release tag, the commit, the contract sha and the floors',
@@ -187,6 +193,10 @@ export const COMMANDS = {
   upgrade: { summary: 'move this checkout to a release, re-run only what changed, and check it',
     run: upgradeCommand, usage: UPGRADE_USAGE,
     booleans: ['check', 'yes', 'pre', 'force-floor'] },
+  // ARC-11-C1 — `readOnly`: no log file for any sub-command. The owner's four name licensees and key paths,
+  // and a per-run log under `.local/logs/` is a copy of both that nobody asked to keep.
+  licence: { summary: 'show, verify and check this checkout\'s licence; the owner issues and revokes them',
+    run: licenceCommand, usage: LICENCE_USAGE, booleans: ['refresh', 'perpetual'], readOnly: true },
 };
 
 /**

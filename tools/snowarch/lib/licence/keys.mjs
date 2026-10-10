@@ -11,8 +11,8 @@
  * code commit. Until then every licence is `invalid` or `missing` and the default is warn-only, so
  * nothing is refused anywhere.
  *
- * PUBLIC KEYS ONLY. A private key never enters this repository; `tests/licence-keys-guard.test.mjs`
+ * PUBLIC KEYS ONLY. A private key never enters this repository; `tools/snowarch/tests/licence-keys-guard.test.mjs`
  * fails on any private-key armour here and holds the count to the two keys. The server's copy is
- * `packages/snowarch/src/licence/keys.ts`, held equal to this one by `tests/licence-parity.test.mjs`.
+ * `packages/snowarch/src/licence/keys.ts`, held equal to this one by `tools/snowarch/tests/licence-parity.test.mjs`.
  */
 export const PRODUCT_KEYS = Object.freeze([]);

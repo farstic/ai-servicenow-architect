@@ -23,7 +23,7 @@
  * held is ignored, which is what stops an old list being served to un-revoke a licence.
  *
  * `packages/snowarch/src/licence/core.ts` is the server's copy of this file, and
- * `tests/licence-parity.test.mjs` holds the two to the same verdict on every case.
+ * `tools/snowarch/tests/licence-parity.test.mjs` holds the two to the same verdict on every case.
  */
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
 

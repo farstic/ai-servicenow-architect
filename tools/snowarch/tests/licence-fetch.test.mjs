@@ -8,11 +8,12 @@
 // And one rule over all of them: a list no newer than the one held never replaces it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { fetchList, listSource, refreshList, repoUrl } from '../lib/licence/fetch.mjs';
+import { fetchList, listSource, refreshList, refreshWithUpgrade, repoUrl } from '../lib/licence/fetch.mjs';
+import { licencePath } from '../lib/local-paths.mjs';
 import { readListCache, writeListCache } from '../lib/licence/state.mjs';
 import { keyPair, listDoc, listRepo, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
@@ -123,4 +124,20 @@ test('ARC-11-C1 — no configured list is no fetch at all', (t) => {
   const out = refreshList(root, { config: {}, keys: KEYS, now: NOW, fetch: () => { ran = true; } });
   assert.equal(out.outcome, 'unconfigured');
   assert.equal(ran, false);
+});
+
+test('ARC-11-C1 — upgrade refreshes the list only when a licence is installed, so its default run is unchanged', (t) => {
+  const root = checkout(t);
+  const lines = [];
+  const log = { step: (m) => lines.push(m) };
+  let fetched = 0;
+  const fetch = () => { fetched += 1; return { status: 'none' }; };
+  const cfg = config('farstic/snowarch-licences');
+  assert.equal(refreshWithUpgrade(root, { config: cfg, keys: KEYS, now: NOW, log, fetch }), null);
+  assert.deepEqual([fetched, lines], [0, []], 'no licence: no fetch and no line');
+  writeFileSync(licencePath(root), '{"format":"snowarch-licence/1"}');
+  const r = refreshWithUpgrade(root, { config: cfg, keys: KEYS, now: NOW, log, fetch });
+  assert.equal(r.outcome, 'none');
+  assert.equal(fetched, 1);
+  assert.deepEqual(lines, ['revocation list: no revocation list is published yet']);
 });
