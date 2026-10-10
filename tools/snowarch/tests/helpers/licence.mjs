@@ -34,7 +34,7 @@ export const licence = (over = {}) => ({
   licensee: 'Test Licensee',
   org: 'Test Org',
   scope: 'live',
-  issued: '2026-10-10',
+  issued: '2026-01-15',
   valid_until: '2027-10-10',
   issuer: 'Test Issuer',
   notes: '',

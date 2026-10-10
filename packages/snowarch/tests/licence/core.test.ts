@@ -34,7 +34,7 @@ const KEYS: ProductKey[] = [
 const NOW = new Date('2026-10-10T12:00:00Z');
 
 const payload = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  id: 'LIC-2026-0002', licensee: 'Test Licensee', org: 'Test Org', scope: 'live', issued: '2026-10-10',
+  id: 'LIC-2026-0002', licensee: 'Test Licensee', org: 'Test Org', scope: 'live', issued: '2026-01-15',
   valid_until: '2027-10-10', issuer: 'Test Issuer', notes: '', ...over,
 });
 

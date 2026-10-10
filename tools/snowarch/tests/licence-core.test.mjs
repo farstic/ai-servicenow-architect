@@ -114,7 +114,8 @@ test('ARC-11-C1 — no file is missing; a file that is not a licence is invalid'
   // Shape is checked even under a good signature: a product key that signed a malformed licence
   // has still not issued a licence.
   for (const bad of [licence({ id: 'LIC-26-1' }), licence({ scope: 'enterprise' }),
-    licence({ valid_until: '2026-10-09' }), licence({ issued: '10/10/2026' }), licence({ licensee: '' })]) {
+    licence({ issued: '2026-10-10', valid_until: '2026-10-09' }), licence({ issued: '10/10/2026' }),
+    licence({ licensee: '' })]) {
     assert.equal(check(fileText(bad)).state, 'invalid', JSON.stringify(bad));
   }
 });
