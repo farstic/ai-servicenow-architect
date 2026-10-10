@@ -6,7 +6,7 @@ import {
 } from '../../src/licence/session.js';
 import { ServiceNowError } from '../../src/utils/errors.js';
 import { remedyFor } from '../../src/errors/codes.js';
-import { checkout, fromToday, keysOf, licence, licenceText, listText, pair } from './fixtures.js';
+import { checkout, fromToday, keysOf, licence, licenceText, listText, pair, removeFixtureDirs } from './fixtures.js';
 
 /**
  * ARC-11-C1 — the server's licence session: computed once at start, refusing under enforcement,
@@ -28,7 +28,7 @@ const refusal = (): ServiceNowError | null => {
   try { assertLicensed(); return null; } catch (e) { return e as ServiceNowError; }
 };
 
-afterEach(() => resetLicenceForTests());
+afterEach(() => { resetLicenceForTests(); removeFixtureDirs(); });
 
 describe('ARC-11-C1 — the server\'s licence session', () => {
   it('is warn only by default: nothing refused, one notice on the first answer, no audit key', () => {

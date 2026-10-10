@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { canonicalJson, fingerprint, LICENCE_FORMAT, LIST_FORMAT, type ProductKey } from '../../src/licence/core.js';
-import { trackTempDir } from '../helpers/server-child.js';
+import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-11-C1 — keys, licences and lists made by the test that uses them. None is ever committed: the
@@ -44,16 +44,38 @@ export const licenceText = (body: Record<string, unknown>, key: Pair): string =>
 export const listText = (version: number, revoked: unknown[], key: Pair): string =>
   signed(LIST_FORMAT, 'list', { version, revoked }, key);
 
+/**
+ * Every directory these fixtures make, until `removeFixtureDirs` removes it.
+ *
+ * `trackTempDir`'s exit handler is a backstop that a vitest worker does not reliably reach: the architect's
+ * gate on #403 found 26 `snowarch-licence-*`, `snowarch-licence-repo-*` and `snowarch-gone-*` directories
+ * left in the run's TMPDIR, where every PR since ARC-07-C43 had measured 0. So each suite that uses these
+ * fixtures removes them in its own `afterEach`, which runs whether the case passed or failed.
+ */
+const made: string[] = [];
+
+/** A temp directory with this product's prefix, removed by the next `removeFixtureDirs`. */
+export function fixtureDir(prefix: string): string {
+  const dir = trackTempDir(mkdtempSync(join(tmpdir(), prefix)));
+  made.push(dir);
+  return dir;
+}
+
+/** Remove every directory made since the last call. For `afterEach`. */
+export function removeFixtureDirs(): void {
+  for (const dir of made.splice(0)) removeTempDir(dir);
+}
+
 /** A checkout: a project directory with a `.local/`. */
 export function checkout(prefix = 'snowarch-licence-'): string {
-  const root = trackTempDir(mkdtempSync(join(tmpdir(), prefix)));
+  const root = fixtureDir(prefix);
   mkdirSync(join(root, '.local'), { recursive: true });
   return root;
 }
 
 /** A bare repository standing in for the list repository; `files` null is a repository with no branch. */
 export function listRepo(files: Record<string, string> | null): string {
-  const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-licence-repo-')));
+  const base = fixtureDir('snowarch-licence-repo-');
   const bare = join(base, 'list.git');
   const env = { ...process.env, GIT_AUTHOR_NAME: 'fixture', GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
     GIT_COMMITTER_NAME: 'fixture', GIT_COMMITTER_EMAIL: 'fixture@example.invalid' };

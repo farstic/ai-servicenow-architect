@@ -1,16 +1,14 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fetchListAsync, LIVE_BUDGET_MS } from '../../src/licence/refresh.js';
 import {
   currentLicence, initLicence, refreshLicenceList, resetLicenceForTests, startLicence,
 } from '../../src/licence/session.js';
-import { trackTempDir } from '../helpers/server-child.js';
-import { checkout, keysOf, licence, licenceText, listRepo, listText, pair } from './fixtures.js';
+import { checkout, fixtureDir, keysOf, licence, licenceText, listRepo, listText, pair, removeFixtureDirs } from './fixtures.js';
 
 /**
  * ARC-11-C1 — the live server's refresh (the architect's ruling (b)): at a live start with the list
@@ -35,7 +33,7 @@ afterAll(async () => {
   silent.closeAllConnections();
   await new Promise<void>((resolve) => silent.close(() => resolve()));
 });
-afterEach(() => resetLicenceForTests());
+afterEach(() => { resetLicenceForTests(); removeFixtureDirs(); });
 
 /** No proxy: the silent server is local, and a proxy in the environment would answer for it. */
 const quietEnv = (extra: Record<string, string> = {}): Record<string, string> => {
@@ -64,7 +62,7 @@ describe('ARC-11-C1 — the server fetches the list as the CLI does', () => {
       .toEqual({ status: 'fetched', text });
     expect((await fetchListAsync({ url: listRepo(null), ref: 'main', path: 'revocations.json', budgetMs: 10_000, env: quietEnv() })).status).toBe('none');
     expect((await fetchListAsync({ url: listRepo({ 'README.md': 'x\n' }), ref: 'main', path: 'revocations.json', budgetMs: 10_000, env: quietEnv() })).status).toBe('none');
-    const gone = pathToFileURL(join(trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-gone-'))), 'nothing.git')).href;
+    const gone = pathToFileURL(join(fixtureDir('snowarch-gone-'), 'nothing.git')).href;
     expect((await fetchListAsync({ url: gone, ref: 'main', path: 'revocations.json', budgetMs: 10_000, env: quietEnv() })).status).toBe('unreachable');
   });
 

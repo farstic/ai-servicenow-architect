@@ -30,8 +30,9 @@
  * FIRST half is `process.execPath` on a JS entry point and takes no shell at all.
  */
 import { spawnSync } from 'node:child_process';
-import { writeSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, readdirSync, rmSync, writeSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 
@@ -82,7 +83,7 @@ const outcome = (r) => {
  * spawning, so they pin the platform and one case pins `win32` to assert the wrapping on purpose.
  */
 export function runSteps({ steps = STEPS, run = spawnSync, write = (s) => writeSync(1, s),
-  platform = process.platform } = {}) {
+  platform = process.platform, env = undefined } = {}) {
   const results = [];
   for (const [i, step] of steps.entries()) {
     write(`\n=== npm test [${i + 1}/${steps.length}] ${step.id}: ${step.label}`
@@ -92,7 +93,7 @@ export function runSteps({ steps = STEPS, run = spawnSync, write = (s) => writeS
     // Node 24 with an args array, and this script printed one of the three warnings that survived
     // C67 — after both halves had finished, which is where a reader least expects a deprecation.
     const call = spawnFor(step.command, step.args, { platform });
-    const r = run(call.file, call.args, { cwd: root, stdio: 'inherit', ...call.options });
+    const r = run(call.file, call.args, { cwd: root, stdio: 'inherit', ...call.options, ...(env ? { env } : {}) });
     results.push({ ...step, status: r?.status ?? null, signal: r?.signal ?? null, error: r?.error ?? null,
       outcome: outcome(r ?? {}) });
   }
@@ -108,6 +109,48 @@ export function runSteps({ steps = STEPS, run = spawnSync, write = (s) => writeS
   return { results, ok: failed.length === 0 };
 }
 
+/**
+ * ARC-11-C1 — A SUITE THAT LITTERS FAILS, AND THIS IS WHERE IT IS MEASURED.
+ *
+ * The architect's gate on #403 counted 26 `snowarch-*` fixture directories left in the run's TMPDIR, where
+ * every PR since ARC-07-C43 had measured 0: the server's licence fixtures relied on an exit handler that a
+ * vitest worker does not reliably reach. A leftover fails no assertion, so nothing in `npm test` could have
+ * said so, and the gate's count was the only instrument.
+ *
+ * So `npm test` measures it too. Both halves run with TMPDIR, TMP and TEMP pointed at one directory made for
+ * this run — all three, because `os.tmpdir()` reads the first on POSIX and the others on Windows — and
+ * afterwards every entry named like this product's fixtures is a leftover: counted, named, and a failure,
+ * even when every half passed. The directory itself is removed whatever was in it, so the measurement leaves
+ * nothing of its own.
+ */
+export const FIXTURE_PREFIX = 'snowarch-';
+
+/** The fixtures a run left in `dir`, by name, sorted. */
+export const leftovers = (dir, read = readdirSync) =>
+  read(dir).filter((name) => String(name).startsWith(FIXTURE_PREFIX)).sort();
+
+/** The caller's environment, with every temp-directory variable pointed at `dir`. */
+export const tempEnv = (dir, env = process.env) => ({ ...env, TMPDIR: dir, TMP: dir, TEMP: dir });
+
+/** Both halves in a private TMPDIR, then the count of what they left there. */
+export function runAll({ steps = STEPS, run = spawnSync, write = (s) => writeSync(1, s), platform = process.platform,
+  makeTemp = () => mkdtempSync(join(tmpdir(), 'npm-test-')), read = readdirSync,
+  remove = (dir) => rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }) } = {}) {
+  const dir = makeTemp();
+  try {
+    const result = runSteps({ steps, run, write, platform, env: tempEnv(dir) });
+    const left = leftovers(dir, read);
+    write(left.length === 0
+      ? 'fixture leftovers: 0\n'
+      : `FAIL: fixture leftovers: ${left.length} in this run's TMPDIR — a test removes what it makes, on failure too:\n`
+        + left.slice(0, 20).map((name) => `  ${name}\n`).join('')
+        + (left.length > 20 ? `  … and ${left.length - 20} more\n` : ''));
+    return { ...result, leftovers: left, ok: result.ok && left.length === 0 };
+  } finally {
+    remove(dir);
+  }
+}
+
 /*
  * The CLI half. `import.meta.main` is not available on Node 20, which is this repository's floor.
  *
@@ -120,5 +163,5 @@ export function runSteps({ steps = STEPS, run = spawnSync, write = (s) => writeS
  * throw EAGAIN instead of waiting.
  */
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  process.exitCode = runSteps().ok ? 0 : 1;
+  process.exitCode = runAll().ok ? 0 : 1;
 }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { routeToolInvocation } from '../../src/tools/index.js';
 import { initLicence, resetLicenceForTests } from '../../src/licence/session.js';
 import { CORE_TOOLS_UNCONFIGURED } from '../../src/tools/status.js';
-import { checkout, keysOf, pair } from './fixtures.js';
+import { checkout, keysOf, pair, removeFixtureDirs } from './fixtures.js';
 
 /**
  * ARC-11-C1, ruling R1 — "no licence = no access at all": under enforcement the refusal sits at the
@@ -11,7 +11,7 @@ import { checkout, keysOf, pair } from './fixtures.js';
  */
 const KEYS = keysOf(pair(), pair());
 
-afterEach(() => resetLicenceForTests());
+afterEach(() => { resetLicenceForTests(); removeFixtureDirs(); });
 
 const route = (name: string, args: Record<string, unknown> = {}) =>
   routeToolInvocation(null as never, name, args);

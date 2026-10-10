@@ -672,6 +672,20 @@ full runs, in a file that story never touched. Copy the artefact and run against
 has to live **inside** the package, because Node resolves dependencies by walking up from the module
 and a copy in `os.tmpdir()` dies with `ERR_MODULE_NOT_FOUND`.
 
+### A test removes every temp directory it makes — `npm test` counts what is left
+
+`npm test` runs both halves with `TMPDIR`, `TMP` and `TEMP` pointed at one directory made for the run. When
+the halves are done, it fails if anything named `snowarch-*` is left in that directory, and it names each
+entry (`scripts/ci/test-all.mjs`, ARC-11-C1). The directory itself is removed afterwards.
+
+The test that made a fixture removes it:
+- in the engine suites, with `tempDir(prefix, t)`, whose `t.after` runs on failure too;
+- in vitest, explicitly, in `afterEach`.
+
+`trackTempDir`'s exit handler is only a backstop, and a vitest worker does not reliably reach it. On #403 the
+licence fixtures relied on it and left 26 directories behind, where every PR since ARC-07-C43 had measured
+none.
+
 ### `SNOWARCH_STATE_ROOT` — where `.local/` goes, for a test that runs the real CLI
 
 Everything the product writes lives under `.local/`: the bootstrap state, the instance store, B07's
