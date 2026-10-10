@@ -36,7 +36,7 @@ import {
 import { PRODUCT_KEYS } from '../licence/keys.mjs';
 import { listSource, refreshList, refreshSays } from '../licence/fetch.mjs';
 import {
-  bannerLine, heldList, isEnforced, licenceStatus, readListCache, REFUSED,
+  bannerLine, heldList, isEnforced, licenceStatus, listStale, readListCache, REFUSED,
 } from '../licence/state.mjs';
 
 export const USAGE = (where) => {
@@ -158,8 +158,15 @@ function enforcementLines(log, s) {
   }
 }
 
-const listLine = (s) => (s.list ? `  revocation list: version ${s.list.version}, checked ${s.list.checkedAt}`
-  : '  revocation list: none held');
+/**
+ * The list's line. One checked more than a day ago says so: a live server start refreshes it, but a
+ * design-only checkout fetches it only when somebody asks.
+ */
+const listLine = (s, now) => {
+  if (!s.list) return '  revocation list: none held';
+  const stale = listStale({ checkedAt: s.list.checkedAt }, now) ? ' — more than a day old; --refresh fetches it now' : '';
+  return `  revocation list: version ${s.list.version}, checked ${s.list.checkedAt}${stale}`;
+};
 
 const inForce = (s) => (s.state === 'ok' || s.state === 'expiring' ? EXIT_OK : EXIT_FAIL);
 
@@ -172,7 +179,7 @@ function show({ log, root, keys, now, env, flags }) {
   log.step(bannerLine(s, { enforced: s.enforced }));
   if (s.state === 'missing') log.step(`  no licence is installed at ${licencePath(root)}`);
   describe(log, s);
-  log.step(listLine(s));
+  log.step(listLine(s, now()));
   enforcementLines(log, s);
   log.step('');
   if (keys.length === 0) {
@@ -210,7 +217,7 @@ function check({ flags, log, root, keys, now, env, config }) {
   }
   log.step(bannerLine(s, { enforced: s.enforced }));
   if (s.reason && s.state !== 'ok' && s.state !== 'expiring') log.step(`  why: ${s.reason}`);
-  log.step(listLine(s));
+  log.step(listLine(s, now()));
   enforcementLines(log, s);
   return inForce(s);
 }
@@ -387,8 +394,8 @@ function revoke({ positional, flags, log, root, keys, now, config, where }) {
   pushCommands(log, dir, source, { first: !held });
   const cli = spellings(where).cli;
   log.step('');
-  log.step('A machine with that licence reads it as revoked at its next refresh: a live server start with a list '
-    + `older than 24 hours, ${cli} upgrade, ${cli} upgrade --check, or ${cli} licence check --refresh.`);
+  log.step('A machine with that licence reads it as revoked at its next refresh: its next live server start, '
+    + `${cli} upgrade, ${cli} upgrade --check, or ${cli} licence check --refresh.`);
   return EXIT_OK;
 }
 

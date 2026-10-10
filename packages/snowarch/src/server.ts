@@ -340,9 +340,9 @@ function logStartup(): void {
 async function main() {
   logStartup();
 
-  // ARC-11-C1 — the licence, read once for this process. A LIVE server with a licence installed and a
-  // revocation list missing or a day old refreshes it in the background, on a 3-second budget: never
-  // awaited here, never failing, and the state it lands applies from the next call.
+  // ARC-11-C1 — the licence, read once for this process. A LIVE server with a licence installed refreshes
+  // the revocation list at every start, in the background, on a 3-second budget: never awaited here, never
+  // failing, and the state it lands applies from the next call. Without a licence it fetches nothing.
   const refresh = startLicence({ live: instanceManager.loadedCount() > 0 });
   const licence = currentLicence();
   logger.info(`licence: ${licenceLine(licence, { enforced: licence.enforced })}`);

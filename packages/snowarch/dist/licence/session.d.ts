@@ -32,9 +32,13 @@ export declare function refreshLicenceList({ budgetMs }?: {
     budgetMs?: number;
 }): Promise<RefreshResult>;
 /**
- * `main()`'s call: read the licence, and — for a LIVE server with a licence installed and a list missing
- * or a day old — start the refresh in the background. Returns that refresh's promise, or `null` when
- * there is none; `main()` does not wait for it.
+ * `main()`'s call: read the licence, and — for a LIVE server with a licence installed — start the refresh
+ * of the revocation list in the background, EVERY start, whatever the cached list's age (the architect's
+ * ruling (a), for the owner's "revoke → it stops at the next start"). Returns that refresh's promise, or
+ * `null` when there is none; `main()` does not wait for it.
+ *
+ * No licence, no fetch: there is nothing a list could revoke, and a checkout without a licence starts
+ * exactly as it did before ARC-11 — the owner's first requirement.
  */
 export declare function startLicence({ live, ...options }: Options & {
     live: boolean;

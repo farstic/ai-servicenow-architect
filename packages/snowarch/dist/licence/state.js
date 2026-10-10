@@ -14,8 +14,6 @@ import { PRODUCT_KEYS } from './keys.js';
 export const ENFORCE_VAR = 'SNOW_LICENCE_ENFORCE';
 /** The states enforcement refuses. `expiring` is not one: a licence in its last month is in force. */
 export const REFUSED = Object.freeze(['missing', 'invalid', 'expired', 'revoked']);
-/** A list older than this is refreshed at a live server start. */
-export const LIST_REFRESH_MS = 24 * 60 * 60 * 1000;
 export const isEnforced = (env = process.env) => env?.[ENFORCE_VAR] === 'true';
 export const licencePath = (root) => join(root, '.local', 'licence.json');
 export const revocationsPath = (root) => join(root, '.local', 'revocations.json');
@@ -54,14 +52,6 @@ export function heldList(cache, keys = PRODUCT_KEYS) {
         return null;
     const list = readList(cache.list, { keys });
     return list.ok ? list : null;
-}
-/** Is the cached list due a refresh? No cache, an unreadable date or one from the future all are. */
-export function listStale(cache, now = new Date(), afterMs = LIST_REFRESH_MS) {
-    const at = Date.parse(cache?.checkedAt ?? '');
-    if (Number.isNaN(at))
-        return true;
-    const age = now.getTime() - at;
-    return age < 0 || age >= afterMs;
 }
 export function licenceStatus(root, { keys = PRODUCT_KEYS, now = new Date(), env = process.env } = {}) {
     const cache = readListCache(root);

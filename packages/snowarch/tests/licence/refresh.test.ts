@@ -106,18 +106,27 @@ describe('ARC-11-C1 — the live start\'s background refresh', () => {
     expect(currentLicence().state).toBe('revoked');
   });
 
-  it('starts only for a live server with a licence installed and a list missing or a day old', async () => {
+  it('starts for every live server with a licence installed, and for nothing else (the architect\'s ruling (a))', async () => {
     const repo = listRepo({ 'revocations.json': listText(1, [], primary) });
     const opts = { env: quietEnv(), keys: KEYS };
     expect(startLicence({ ...opts, root: project(repo), live: false })).toBeNull();
     resetLicenceForTests();
+    // No licence, nothing to revoke: a checkout without one makes no fetch at all, the class case.
     expect(startLicence({ ...opts, root: project(repo, { licenceFile: null }), live: true })).toBeNull();
-    resetLicenceForTests();
-    const fresh = JSON.stringify({ checkedAt: new Date().toISOString(), source: 'fixture', list: null });
-    expect(startLicence({ ...opts, root: project(repo, { cache: fresh }), live: true })).toBeNull();
     resetLicenceForTests();
     const started = startLicence({ ...opts, root: project(repo), live: true });
     expect(started).not.toBeNull();
     expect((await started)?.outcome).toBe('updated');
+  });
+
+  it('"revoke → it stops at the next start": a FRESH cache and a list that now revokes → revoked after the start\'s refresh', async () => {
+    const fresh = JSON.stringify({ checkedAt: new Date().toISOString(), source: 'fixture',
+      list: JSON.parse(listText(1, [], primary)) });
+    const root = project(listRepo({ 'revocations.json': listText(2, [revocation], primary) }), { cache: fresh });
+    const started = startLicence({ root, env: quietEnv(ENFORCED), keys: KEYS, live: true });
+    expect(currentLicence().state).toBe('ok');
+    expect(started).not.toBeNull();
+    expect((await started)?.outcome).toBe('updated');
+    expect(currentLicence().state).toBe('revoked');
   });
 });

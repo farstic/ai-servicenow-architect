@@ -2,8 +2,8 @@
  * ARC-11-C1 — the licence for this server process: computed once at start, and what follows from it.
  *
  * ONE STATE PER PROCESS. The server serves one session over stdio, so the licence is read once at
- * start (`startLicence`, from `main()`), recomputed only when a background refresh of the revocation
- * list lands, and applies from the next call. Installing or removing a licence, or changing
+ * start (`startLicence`, from `main()`), recomputed only when the start's background refresh of the
+ * revocation list lands, and applies from the next call. Installing or removing a licence, or changing
  * SNOW_LICENCE_ENFORCE, takes a restart — as every other start-up setting of this server does.
  *
  * WHAT FOLLOWS FROM IT:
@@ -23,7 +23,7 @@ import { cliSpelling, bootstrapSpelling } from '../cli/tty.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { PRODUCT_KEYS } from './keys.js';
 import { refreshList, LIVE_BUDGET_MS } from './refresh.js';
-import { licenceLine, licenceStatus, listStale, readLicenceText, readListCache, REFUSED } from './state.js';
+import { licenceLine, licenceStatus, readLicenceText, REFUSED } from './state.js';
 let session = null;
 /** The project directory: Claude Code's `CLAUDE_PROJECT_DIR`, else the working directory — as the store's. */
 const projectRoot = () => {
@@ -114,14 +114,18 @@ export async function refreshLicenceList({ budgetMs = LIVE_BUDGET_MS } = {}) {
     }
 }
 /**
- * `main()`'s call: read the licence, and — for a LIVE server with a licence installed and a list missing
- * or a day old — start the refresh in the background. Returns that refresh's promise, or `null` when
- * there is none; `main()` does not wait for it.
+ * `main()`'s call: read the licence, and — for a LIVE server with a licence installed — start the refresh
+ * of the revocation list in the background, EVERY start, whatever the cached list's age (the architect's
+ * ruling (a), for the owner's "revoke → it stops at the next start"). Returns that refresh's promise, or
+ * `null` when there is none; `main()` does not wait for it.
+ *
+ * No licence, no fetch: there is nothing a list could revoke, and a checkout without a licence starts
+ * exactly as it did before ARC-11 — the owner's first requirement.
  */
 export function startLicence({ live, ...options }) {
     initLicence(options);
     const s = session;
-    if (!live || readLicenceText(s.root) === null || !listStale(readListCache(s.root), s.now()))
+    if (!live || readLicenceText(s.root) === null)
         return null;
     return refreshLicenceList();
 }

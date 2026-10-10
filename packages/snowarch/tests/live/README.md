@@ -960,8 +960,7 @@ licence. The public list repository `farstic/snowarch-licences` exists; empty is
 the build ships. The revocation list is `revocations.json` on `main` of the list repository, signed the same
 way, fetched by git and cached as `.local/revocations.json`. The cache is refreshed by
 `./snowarch licence check --refresh`, by `upgrade` and `upgrade --check` when a licence is installed, and,
-in the background, by a live server start when it is missing or more than 24 hours old. By default nothing
-is refused. Under `SNOW_LICENCE_ENFORCE="true"`, a missing, invalid, expired or revoked licence refuses
+in the background, by every live server start with a licence installed. By default nothing is refused. Under `SNOW_LICENCE_ENFORCE="true"`, a missing, invalid, expired or revoked licence refuses
 every MCP tool with `LICENCE_NOT_VALID`, and every CLI command except `licence`, `doctor`, `status`, `version`
 and `upgrade`.
 
@@ -994,17 +993,16 @@ the server reads the variable once, at start, so setting it and unsetting it eac
 | 3 | B | Run `./snowarch doctor`, then `./snowarch status`. | E-31 ok, and no E-31 warning on the `Doctor:` line. |
 | 4 | B | Add `"env": { "SNOW_LICENCE_ENFORCE": "true" }` to `.claude/settings.local.json`, merged into what is there, or start `SNOW_LICENCE_ENFORCE=true claude`. Restart Claude Code, then call `snow_core_capabilities_read`. | The banner's second line is `Licence: ok · LIC-<year>-NNNN · until <date>`. The tool answers; there is no licence block. |
 | 5 | A | `./snowarch licence revoke LIC-<year>-NNNN --reason ended --key <keys>/primary.pem --list <list>`, then the printed git commands. | `… is now version 2`, pushed to `main`. |
-| 6 | B | Run `./snowarch licence check --refresh`. | `revocation list: version 2 fetched (it was version 1)`, then `Licence: revoked · enforced`. |
-| 7 | B | Restart Claude Code. Call `snow_core_capabilities_read`, run `./snowarch mode`, and run `./snowarch version`. | The banner reads `Licence: revoked · enforced`. The tool answers `Error: licence revoked (LIC-<year>-NNNN) — SNOW_LICENCE_ENFORCE is "true", so no tool runs without a valid licence. …`. `mode` is refused with exit 3 and the same remedy. `version` answers. |
-| 8 | B | Remove the `env` entry, or start `claude` without the variable. Restart Claude Code, then call the tool again. | The banner reads `Licence: revoked · warn only`. The tool answers, and the first answer carries a second block: `Licence: revoked · warn only — revoked on <date> (ended). …`. |
+| 6 | B | Restart Claude Code. Wait three seconds, then call `snow_core_capabilities_read`. | The banner still reads `Licence: ok · LIC-<year>-NNNN · until <date>`. The tool answers `Error: licence revoked (LIC-<year>-NNNN) — SNOW_LICENCE_ENFORCE is "true", so no tool runs without a valid licence. …`. |
+| 7 | B | Run `./snowarch mode`, `./snowarch version` and `./snowarch licence check`. | `mode` is refused with exit 3 and the same remedy. `version` answers. `check` shows `revocation list: version 2` and `Licence: revoked · enforced`. |
+| 8 | B | Restart Claude Code. | The banner reads `Licence: revoked · enforced`. |
+| 9 | B | Remove the `env` entry, or start `claude` without the variable. Restart Claude Code, then call the tool again. | The banner reads `Licence: revoked · warn only`. The tool answers, and the first answer carries a second block: `Licence: revoked · warn only — revoked on <date> (ended). …`. |
 
-Step 6 is there because the live start refreshes only a list missing or more than 24 hours old, and step 2's
-list is minutes old.
-
-To watch the background refresh itself instead, run step 7 this way:
-1. Delete `.local/revocations.json`.
-2. Restart Claude Code, then make one call.
-3. Wait three seconds. The next call is refused: the state applies from the next call.
+The restart at step 6 is the revocation's whole path to B. Every live start with a licence installed
+fetches the list in the background, within three seconds, and the state applies from the next call. The
+banner is printed before that refresh and the hook never fetches, so the banner says `ok` in the first
+session after the revocation and `revoked` from the next. A call made in those first three seconds may
+still be served.
 
 ### Pass condition — the exact state to see
 
@@ -1017,9 +1015,9 @@ The audit trail on B, in `.local/audit.jsonl`:
 - reads write no line at all, so a write or a `snow_core_instance_switch` is what to look at.
 
 **A failure looks like:**
-- a tool answering at step 7;
+- a tool answering at step 6, three seconds after the restart;
 - `mode` running at step 7;
-- the banner saying `ok` after step 6;
+- the banner saying `ok` at step 8;
 - any private key in a terminal, a file inside either checkout, or a message.
 
 ### Teardown

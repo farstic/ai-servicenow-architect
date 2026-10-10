@@ -32,7 +32,8 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   - fetched by git from that address, never from `origin`;
   - its version only goes up, and a lower one is ignored;
   - refreshed by `upgrade` and `upgrade --check` when a licence is installed;
-  - refreshed in the background, at a live server start, when it is missing or a day old.
+  - refreshed in the background at every live server start with a licence installed;
+  - `licence show` and `licence check` say when the held list is more than a day old.
 - Under `SNOW_LICENCE_ENFORCE="true"`, a missing, invalid, expired or revoked licence refuses every MCP tool
   with `LICENCE_NOT_VALID`, the instance-free ones included. It also refuses every CLI command except
   `licence`, `doctor`, `status`, `version` and `upgrade`. A design-only licence refuses every tool of a live

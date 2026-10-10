@@ -30,7 +30,11 @@ export const REFUSED = Object.freeze(['missing', 'invalid', 'expired', 'revoked'
 /** The commands a person needs to see and repair the state, which enforcement never refuses (R1). */
 export const CLI_ALLOWED = Object.freeze(['licence', 'doctor', 'status', 'version', 'upgrade']);
 
-/** A list older than this is refreshed at a live server start. */
+/**
+ * A list checked longer ago than this is STALE: `licence show` and `licence check` say so. A live server
+ * start refreshes the list every time; a design-only checkout, where no server starts, fetches it only
+ * when somebody asks.
+ */
 export const LIST_REFRESH_MS = 24 * 60 * 60 * 1000;
 
 /** On only for the exact string "true", like every flag. */
@@ -78,7 +82,7 @@ export function heldList(cache, keys = PRODUCT_KEYS) {
   return list.ok ? list : null;
 }
 
-/** Is the cached list due a refresh? No cache, an unreadable date or a date from the future all are. */
+/** Is the cached list stale? No cache, an unreadable date or a date from the future all are. */
 export function listStale(cache, now = new Date(), afterMs = LIST_REFRESH_MS) {
   const at = Date.parse(cache?.checkedAt ?? '');
   if (Number.isNaN(at)) return true;

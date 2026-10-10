@@ -12,9 +12,9 @@ import { dirname, join } from 'node:path';
 import { licenceCommand } from '../lib/commands/licence.mjs';
 import { readList } from '../lib/licence/core.mjs';
 import { readListCache } from '../lib/licence/state.mjs';
-import { licencePath } from '../lib/local-paths.mjs';
+import { licencePath, revocationsPath } from '../lib/local-paths.mjs';
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
-import { keyPair, licence, licenceText, listRepo, productKeys } from './helpers/licence.mjs';
+import { keyPair, licence, licenceText, listDoc, listRepo, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
 const NOW = new Date('2026-10-10T12:00:00Z');
@@ -261,4 +261,20 @@ test('ARC-11-C1 — an unknown sub-command, or none, is a usage error', async (t
   const w = world(t);
   assert.equal((await run(w, [])).code, EXIT_USAGE);
   assert.equal((await run(w, ['sign'])).code, EXIT_USAGE);
+});
+
+test('ARC-11-C1 — check says when the held list is more than a day old, and only then', async (t) => {
+  const w = world(t);
+  const key = keyPair();
+  const keys = productKeys(key, keyPair());
+  const hold = (checkedAt) => writeFileSync(revocationsPath(w.root),
+    JSON.stringify({ checkedAt, source: 'fixture', list: listDoc({ version: 2, revoked: [] }, key) }));
+  hold('2026-10-09T11:00:00.000Z');
+  const stale = await run(w, ['check'], {}, { keys });
+  assert.match(stale.text,
+    /revocation list: version 2, checked 2026-10-09T11:00:00\.000Z — more than a day old; --refresh fetches it now/);
+  hold('2026-10-10T11:00:00.000Z');
+  const fresh = await run(w, ['check'], {}, { keys });
+  assert.match(fresh.text, /revocation list: version 2, checked 2026-10-10T11:00:00\.000Z$/m);
+  assert.equal(fresh.text.includes('more than a day old'), false);
 });

@@ -7,8 +7,8 @@
  * repository. Never `origin`: a fork's own remote must not be able to substitute its list.
  *
  * WHEN. Only when somebody asked: `licence check --refresh`, `upgrade` and `upgrade --check` (with a
- * licence installed), and a live server start whose list is missing or a day old. The SessionStart
- * hook never fetches.
+ * licence installed), and every live server start with a licence installed (the architect's ruling
+ * (a): "revoke → it stops at the next start"). The SessionStart hook never fetches.
  *
  * THREE OUTCOMES, kept apart:
  *   fetched     — the branch and the file are there. The text is returned UNVERIFIED; `refreshList`

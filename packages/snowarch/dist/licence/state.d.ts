@@ -2,8 +2,6 @@ import { type LicenceStatus, type ProductKey, type VerifiedList } from './core.j
 export declare const ENFORCE_VAR = "SNOW_LICENCE_ENFORCE";
 /** The states enforcement refuses. `expiring` is not one: a licence in its last month is in force. */
 export declare const REFUSED: readonly string[];
-/** A list older than this is refreshed at a live server start. */
-export declare const LIST_REFRESH_MS: number;
 export declare const isEnforced: (env?: NodeJS.ProcessEnv | Record<string, string | undefined>) => boolean;
 export declare const licencePath: (root: string) => string;
 export declare const revocationsPath: (root: string) => string;
@@ -35,8 +33,6 @@ export declare function writeListCache(root: string, { list, checkedAt, source }
 }): void;
 /** The cached list, verified — or `null`, which is what an unverifiable one is. */
 export declare function heldList(cache: ListCache | null, keys?: readonly ProductKey[]): VerifiedList | null;
-/** Is the cached list due a refresh? No cache, an unreadable date or one from the future all are. */
-export declare function listStale(cache: ListCache | null, now?: Date, afterMs?: number): boolean;
 export declare function licenceStatus(root: string, { keys, now, env }?: {
     keys?: readonly ProductKey[];
     now?: Date;
