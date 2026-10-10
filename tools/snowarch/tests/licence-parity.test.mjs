@@ -101,7 +101,7 @@ test('ARC-11-C1 — the banner line and the server\'s notice say the state in th
 });
 
 test('ARC-11-C1 — the CLI refuses with the remedy the server\'s error code carries', () => {
-  const spell = { cli: './snowarch', bootstrap: './bootstrap.sh' };
+  const spell = { cli: '<cli>', bootstrap: '<bootstrap>' };
   assert.equal(CLI_REMEDY(spell.cli), remedyFor('LICENCE_NOT_VALID', spell).remedy);
 });
 

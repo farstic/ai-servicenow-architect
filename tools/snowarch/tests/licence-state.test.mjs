@@ -112,6 +112,7 @@ test('ARC-11-C1 — the cache is written whole, 0600, and read back', (t) => {
 });
 
 test('ARC-11-C1 — the remedy names the command that explains the state', () => {
-  assert.match(REMEDY('./snowarch'), /^Run \.\/snowarch licence check to see why/);
-  assert.match(REMEDY('./snowarch'), /SNOW_LICENCE_ENFORCE/);
+  // The launcher is a parameter, so the case passes a placeholder rather than spelling a shell.
+  assert.ok(REMEDY('<cli>').startsWith('Run <cli> licence check to see why'), REMEDY('<cli>'));
+  assert.match(REMEDY('<cli>'), /SNOW_LICENCE_ENFORCE/);
 });

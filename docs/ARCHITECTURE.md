@@ -120,6 +120,9 @@ source that drifts. The schema beside it (`engine.config.schema.json`) refuses a
 | `roster.skills` | how many skills the roster has | `gen-roster.mjs --check`, the doctor's E-20 |
 | `roster.agents` | how many agents the roster has | the same two |
 | `roster.utility` | the utility skills, which are not personas and are counted separately | `gen-roster.mjs`, the roster lint |
+| `licence.revocations.repo` | where the signed revocation list is published, fetched by git from this address and never from `origin` (ARC-11-C1) | `licence check --refresh`, `upgrade` and `upgrade --check` with a licence installed, and a live server start |
+| `licence.revocations.ref` | the branch that carries the list | the same three |
+| `licence.revocations.path` | the list's file on that branch | the same three |
 
 ## Registration files
 

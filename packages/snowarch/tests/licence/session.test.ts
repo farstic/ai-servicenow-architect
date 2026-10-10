@@ -86,9 +86,10 @@ describe('ARC-11-C1 — the server\'s licence session', () => {
   });
 
   it('carries the remedy the CLI prints, and keeps the code out of the always-loaded rule file', () => {
-    const entry = remedyFor('LICENCE_NOT_VALID', { cli: './snowarch', bootstrap: './bootstrap.sh' });
-    expect(entry.remedy).toMatch(/^Run \.\/snowarch licence check to see why/);
-    expect(entry.command).toBe('./snowarch licence check');
+    // Placeholders, not a shell: what is under test is the sentence, and the launcher is filled in by the caller.
+    const entry = remedyFor('LICENCE_NOT_VALID', { cli: '<cli>', bootstrap: '<bootstrap>' });
+    expect(entry.remedy.startsWith('Run <cli> licence check to see why')).toBe(true);
+    expect(entry.command).toBe('<cli> licence check');
     expect(entry.showInRule).toBe(false);
   });
 });
