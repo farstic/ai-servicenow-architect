@@ -31,6 +31,8 @@ import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
 import { capResult, resolveCap } from './utils/result-size.js';
 import { appendAudit, auditDisabled, resolveAuditPath, type AuditWarning } from './audit/writer.js';
+import { currentLicence, licenceAuditField, startLicence, takeLicenceNotice } from './licence/session.js';
+import { licenceLine } from './licence/state.js';
 import type { ToolDefinition } from './tools/types.js';
 
 // dotenv ONLY when asked, and only for a file that exists. A bare `dotenv.config()` reads
@@ -83,6 +85,16 @@ export function createServer(): Server {
     setAdvertisedCount(advertised.length);
     return { tools: advertised };
   });
+
+  /**
+   * ARC-11-C1 — the session's first answer carries the licence notice as a SECOND block, once, whatever
+   * the answer is; `content[0]` is never touched, so a caller that parses it reads what it always read.
+   * Nothing is added when a live licence is in force.
+   */
+  const withNotice = (content: Array<{ type: 'text'; text: string }>): Array<{ type: 'text'; text: string }> => {
+    const notice = takeLicenceNotice();
+    return notice ? [...content, { type: 'text' as const, text: notice }] : content;
+  };
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
@@ -151,6 +163,9 @@ export function createServer(): Server {
             ? `switch → ${instanceManager.loadedCount() > 0 ? instanceManager.current().label : '(none)'}`
             : 'switch refused' }
           : {}),
+        // ARC-11-C1 — the licence id, LAST and only from a licence whose signature holds, so a checkout
+        // without one writes exactly the line it always wrote.
+        ...licenceAuditField(),
       });
     };
 
@@ -187,7 +202,7 @@ export function createServer(): Server {
       if ((CORE_TOOLS_UNCONFIGURED as readonly string[]).includes(name)) {
         const result = await routeToolInvocation(null as never, name, args || {});
         writeAudit();
-        return { content: [{ type: 'text' as const, text: capResult(result, cap).text }] };
+        return { content: withNotice([{ type: 'text' as const, text: capResult(result, cap).text }]) };
       }
 
       // The CURRENT instance, always. A per-call `instance` argument used to route here, and
@@ -217,7 +232,7 @@ export function createServer(): Server {
         logger.warn(`${name}: result truncated to ${cap} chars (${capped.strategy})`);
       }
 
-      return { content: [{ type: 'text' as const, text: capped.text }] };
+      return { content: withNotice([{ type: 'text' as const, text: capped.text }]) };
     } catch (error) {
       logger.error(`Tool execution error: ${name}`, error);
 
@@ -229,7 +244,7 @@ export function createServer(): Server {
       // Includes a sentence about cut values when the tool had already written some before it threw
       // (ARC-09-C93); the text itself is built, and tested, in utils/tool-error.ts.
       return {
-        content: [{ type: 'text' as const, text: toolErrorText(error) }],
+        content: withNotice([{ type: 'text' as const, text: toolErrorText(error) }]),
         isError: true,
       };
     }
@@ -324,6 +339,15 @@ function logStartup(): void {
 
 async function main() {
   logStartup();
+
+  // ARC-11-C1 — the licence, read once for this process. A LIVE server with a licence installed and a
+  // revocation list missing or a day old refreshes it in the background, on a 3-second budget: never
+  // awaited here, never failing, and the state it lands applies from the next call.
+  const refresh = startLicence({ live: instanceManager.loadedCount() > 0 });
+  const licence = currentLicence();
+  logger.info(`licence: ${licenceLine(licence, { enforced: licence.enforced })}`);
+  if (refresh) void refresh.then((r) => logger.info(`licence: revocation list ${r.outcome}`));
+
   const server = createServer();
 
   // The reload tool re-advertises the tool set through the server it is running in; giving

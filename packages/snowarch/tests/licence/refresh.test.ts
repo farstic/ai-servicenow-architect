@@ -44,7 +44,8 @@ const quietEnv = (extra: Record<string, string> = {}): Record<string, string> =>
   return { ...env, ...extra };
 };
 
-function project(repo: string, { cache = null as string | null, licenceFile = licenceText(licence(), primary) } = {}): string {
+function project(repo: string, { cache = null, licenceFile = licenceText(licence(), primary) }:
+  { cache?: string | null; licenceFile?: string | null } = {}): string {
   const root = checkout();
   writeFileSync(join(root, 'engine.config.json'),
     JSON.stringify({ licence: { revocations: { repo, ref: 'main', path: 'revocations.json' } } }));
