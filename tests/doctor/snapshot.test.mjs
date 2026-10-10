@@ -112,8 +112,12 @@ test('the snapshots are design-only, and fail only where the runner explains it'
     assert.deepEqual(failing, [...EXPECTED_FAIL_ON_RUNNERS],
       `${platform}: the snapshot records failures the runner does not explain`);
     assert.equal(s.summary.fail, EXPECTED_FAIL_ON_RUNNERS.length);
-    assert.equal(s.summary.warn, 0,
-      `${platform}: a WARN in the snapshot — a design-only install should have nothing to warn about`);
+    // ARC-11-C1 — with ONE exception: E-31 warns on every install that has no licence, which is every
+    // runner. It is the only warning the owner's first requirement allows ("everything keeps working
+    // exactly as now", apart from one warning), and the only one a design-only install may carry.
+    assert.deepEqual(s.checks.filter((c) => c.status === 'warn').map((c) => c.id), ['E-31'],
+      `${platform}: a WARN in the snapshot — a design-only install should have nothing else to warn about`);
+    assert.equal(s.summary.warn, 1);
   }
 });
 

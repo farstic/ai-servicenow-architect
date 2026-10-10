@@ -279,6 +279,28 @@
       "data": {}
     },
     {
+      "id": "E-31",
+      "section": "repo",
+      "title": "the licence for this checkout",
+      "status": "warn",
+      "severity": "warn",
+      "detail": "Licence: missing · warn only",
+      "remedy": "information only while SNOW_LICENCE_ENFORCE is off; to install a licence, copy the file you were given to .local/licence.json",
+      "command": "./snowarch licence check",
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "state": "missing",
+        "id": null,
+        "scope": null,
+        "validUntil": null,
+        "enforced": false,
+        "listVersion": null
+      }
+    },
+    {
       "id": "E-12",
       "section": "docs",
       "title": "docs corpus present",
@@ -712,7 +734,7 @@
   },
   "summary": {
     "ok": 15,
-    "warn": 0,
+    "warn": 1,
     "fail": 0,
     "skip": 26,
     "fixable": 0,

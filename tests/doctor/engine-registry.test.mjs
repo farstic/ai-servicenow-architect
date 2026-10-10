@@ -18,8 +18,8 @@ import { REAL_ROOT } from './helpers/tree.mjs';
 const checks = engineChecks();
 const ids = checks.map((c) => c.id);
 
-test('E-00 … E-30 and SV-00 … SV-09, once each, in section order', () => {
-  assert.equal(checks.length, 41);
+test('E-00 … E-31 and SV-00 … SV-09, once each, in section order', () => {
+  assert.equal(checks.length, 42);
   // ARC-08-C30 — THE SET, NOT THE ORDER, and the difference is a decision worth stating.
   //
   // This asserted `deepEqual` against an ASCENDING list, which held because every check until now
@@ -37,7 +37,7 @@ test('E-00 … E-30 and SV-00 … SV-09, once each, in section order', () => {
   // below. What is no longer asserted is that definition order happens to be numeric — which was
   // never a property anyone relied on, only one that had not yet been contradicted.
   assert.deepEqual([...ids.filter((id) => id.startsWith('E-'))].sort(),
-    Array.from({ length: 31 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
+    Array.from({ length: 32 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
   assert.deepEqual(ids.filter((id) => id.startsWith('SV-')),
     Array.from({ length: 10 }, (_, i) => `SV-${String(i).padStart(2, '0')}`));
   assert.equal(new Set(ids).size, ids.length);
@@ -48,7 +48,7 @@ test('E-00 … E-30 and SV-00 … SV-09, once each, in section order', () => {
 });
 
 // S02's AC 8, extended by S03's detectors — the subset, still read from the flags.
-test('--quick is fifteen checks: the ones that cost nothing to run (ARC-09-C8)', () => {
+test('--quick is sixteen checks: the ones that cost nothing to run (ARC-09-C8, ARC-11-C1)', () => {
   const { selected } = planRun(checks, { quick: true });
   // ARC-09-C8 moved three GROUPS out — the docs checks that share `docsStatus`, the whole server
   // section (one in-process run of the server's own doctor), and the lint checks that share
@@ -62,6 +62,9 @@ test('--quick is fifteen checks: the ones that cost nothing to run (ARC-09-C8)',
     // here because the list is in DEFINITION order and E-29 is defined at the end of the repo
     // block, next to the sibling it extends.
     'E-29',
+    // ARC-11-C1 — E-31 reads `.local/licence.json` and the cached list and checks one signature: no
+    // spawn, no network. Quick because the banner and `status` are where the licence state is read.
+    'E-31',
     'E-17', 'E-18',
     'E-23', 'E-24', 'E-25', 'E-26',
   ]);
@@ -111,8 +114,11 @@ test('the detectors warn and the capability packs inform — only the engine\'s 
   // doctor that FAILED over an available upgrade would be this tool deciding when a user upgrades.
   // E-30 joins them (ARC-08-C34): a registration under a folder that is gone is a leftover the
   // USER chose to leave, exactly like the other detectors — and this check only NAMES it.
+  // E-31 joins them (ARC-11-C1): nobody had a licence before 2.0.12, and the owner's first requirement
+  // is that everything keeps working exactly as now — a FAIL would fail every install. It is first
+  // because it is defined with the repo section, before the detectors.
   assert.deepEqual(checks.filter((c) => c.severity === 'warn').map((c) => c.id),
-    ['E-23', 'E-24', 'E-30', 'E-25', 'E-26', 'E-27', 'E-28', 'SV-04']);
+    ['E-31', 'E-23', 'E-24', 'E-30', 'E-25', 'E-26', 'E-27', 'E-28', 'SV-04']);
   assert.deepEqual(checks.filter((c) => c.severity === 'info').map((c) => c.id), ['E-04']);
 });
 
@@ -191,6 +197,9 @@ test('--quick membership is the same set in the registry and in a real run', () 
     // here because the list is in DEFINITION order and E-29 is defined at the end of the repo
     // block, next to the sibling it extends.
     'E-29',
+    // ARC-11-C1 — E-31 reads `.local/licence.json` and the cached list and checks one signature: no
+    // spawn, no network. Quick because the banner and `status` are where the licence state is read.
+    'E-31',
     'E-17', 'E-18',
     'E-23', 'E-24', 'E-25', 'E-26',
   ]);

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // ARC-08-S08 — the SessionStart banner: one truthful `Mode:` line, and at most four nudges.
+// ARC-11-C1 — and, second, the `Licence:` line, from `.local/licence.json` and the cached revocation list.
 //
 // THREE PROMISES, and they are the reason this file is shaped the way it is.
 //
@@ -7,7 +8,8 @@
 //   becomes one honest line. A hook that exits non-zero or writes to stderr is a session that
 //   starts with an error message about the tool that was supposed to help.
 //
-//   IT IS FAST. The fast path reads two small JSON files and prints — it imports no part of the
+//   IT IS FAST. The fast path reads two small JSON files and prints — two more for the licence line,
+//   with one small module and one signature check — and it imports no part of the
 //   doctor, because importing the check registry to decide whether it needs the check registry
 //   would spend the whole budget before the decision. The doctor arrives through a lazy `import()`
 //   on the re-run branch only.
@@ -120,6 +122,23 @@ async function reRun({ config, watchdogMs, run }) {
 }
 
 /**
+ * ARC-11-C1 — `Licence: <state> …`, or `null` when it cannot be worked out.
+ *
+ * `null` prints nothing, and that is the honest failure for this line: the hook never fails a session, and a
+ * guessed state is worse than none. The CLAUDE.md sentence reads the line; with no line it has nothing to read.
+ * A small module and two small files, read in-process — no doctor, no child, no network.
+ */
+async function licenceLine({ root, now, env, keys }) {
+  try {
+    const { bannerLine, licenceStatus } = await import('../lib/licence/state.mjs');
+    const s = licenceStatus(root, { now: new Date(now), env, keys });
+    return bannerLine(s, { enforced: s.enforced });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * ARC-09-C5 — where the re-run path's time goes, measured, and OFF unless asked.
  *
  * The Windows cells spend 690–920 ms of the product's own time on this path and nobody knows on
@@ -152,7 +171,7 @@ function phases() {
 }
 
 export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCHDOG_MS,
-  run = null } = {}) {
+  run = null, env = process.env, licenceKeys = undefined } = {}) {
   const phase = phases();
   // The lines belong to THIS call. They were module state once, which is harmless in production —
   // the hook runs once per process — and wrong the moment anything calls it twice, which the tests
@@ -165,6 +184,9 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   // so this one is read from the signature rather than assumed.
   const { BANNER, spellings } = await import('../lib/text.mjs');
   const { cachePath, inputsPath, cacheStale } = await import('../lib/doctor-cache.mjs');
+  // ARC-11-C1 — the licence line, second on every path that prints a Mode line. From the files as they
+  // are: the licence and the cached revocation list. The hook never fetches, however old the list is.
+  const licence = await licenceLine({ root, now, env, keys: licenceKeys });
 
   const cache = readJson(cachePath(root));
   const inputs = readJson(inputsPath(root));
@@ -175,6 +197,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   phase.mark('cache-read+decision');
   if (cache && inputs && !staleness.stale && cache.modeLine) {
     say(cache.modeLine);
+    say(licence);
     for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade, now, spell: spellings() })) say(line);
     phase.mark('render');
     phase.done('cache');
@@ -187,6 +210,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
     // The hook renders for the person in front of it, so the PROCESS is the right shell here.
     const { MODE_VARIANTS, modeLine } = await import('../lib/text.mjs');
     say(modeLine({ mode: 'unknown', qualifier: MODE_VARIANTS.notBootstrapped(spellings()) }));
+    say(licence);
     return { path: 'unbootstrapped', lines: out };
   }
 
@@ -206,10 +230,12 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
     say(cache?.modeLine
       ? `${cache.modeLine}${BANNER.staleSuffix(spellings())}`
       : BANNER.timedOut(spellings()));
+    say(licence);
     return { path: 'timeout', lines: out };
   }
 
   say(report.modeLine);
+  say(licence);
   for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade, now, spell: spellings() })) say(line);
   phase.mark('render');
   phase.done('rerun');

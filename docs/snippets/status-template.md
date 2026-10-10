@@ -18,7 +18,7 @@ Engine: snowarch 9.9.9 · contract deadbeefdead
 Docs: vendor/ServiceNowDocs @ 68c0d1123adf (australia) · sparse
 Roster: 29 skills / 9 agents
 Instances: pdi (pdi, custom)
-Doctor: 15 ok, 0 warn, 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
+Doctor: 15 ok, 1 warn (E-31), 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
 Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
 Instances are the store's own records; nothing was probed.
 ```

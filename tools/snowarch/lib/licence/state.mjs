@@ -112,5 +112,12 @@ export function bannerLine(s, { enforced }) {
   return parts.join(' · ');
 }
 
+/** What a refused command prints: the state, why it was refused, and the remedy. */
+export const refusalLines = (name, s, cli) => [
+  `snowarch ${name}: licence ${s.state}${s.signatureValid ? ` (${s.id})` : ''} — SNOW_LICENCE_ENFORCE is "true", `
+    + 'so this command does not run without a valid licence',
+  REMEDY(cli),
+];
+
 /** Is this command refused? Only under enforcement, only for a refused state, never for the five. */
 export const refusesCommand = (name, s) => s.enforced && REFUSED.includes(s.state) && !CLI_ALLOWED.includes(name);
