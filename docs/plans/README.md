@@ -51,6 +51,7 @@ ARCs are numbered `ARC-NN` in dependency order; `ARC-00` is the pre-implementati
 | 08 | `ARC-08-doctor-and-self-heal/` | Unified doctor (engine E-xx + server SV-xx checks), leftover detectors, `--fix` whitelist, SessionStart Mode banner, `/snowarch status`, runtime error mapping. | 11 | 22–30 |
 | 09 | `ARC-09-release-upgrade-and-cross-platform/` | Release script and tag, changelog, release workflow, `version` / `upgrade`, store migrations, CI matrix on macOS/Linux/Windows × Node 20/22/24 incl. Windows without Git Bash, optional npm publish. | 11 | 15–25 |
 | 10 | `ARC-10-migration-and-cutover/` | `docs/MIGRATION.md`, legacy scaffolding retired, author's cutover, clean-machine validation runs, deprecation notices, two-week review and archive. | 10 | 10.5–14 (+14 calendar days) |
+| 11 | `ARC-11-licensing-and-access-control/` | Added 2026-10-10, after the cutover: a signed licence and `./snowarch licence`, a signed revocation list, a warn-only start-up check with an enforcement switch, the licence id in the audit trail, the licensing documents. | 4 rows | not sized |
 
 ## Status legend
 
