@@ -39,6 +39,15 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   server.
 - An audit line names the licence it was written under, only when that licence's signature holds.
 
+### Changed
+
+- `CLAUDE.md` gains one rule. With `enforced` and a licence state of `missing`, `invalid`, `expired` or
+  `revoked`, the Architect produces no deliverable: it names the state and points to
+  `./snowarch licence check`. Without enforcement, the `Licence:` line is information. In design-only this
+  is a rule, not a lock.
+- The doctor, `./snowarch status` and the `/snowarch` skill's sample count E-31's warning, which every
+  checkout without a licence carries.
+
 ## 2.0.11 — 2026-10-10
 
 ### Notes
