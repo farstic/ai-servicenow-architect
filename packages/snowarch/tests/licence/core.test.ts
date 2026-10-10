@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import {
-  canonicalJson, checkLicence, fingerprint, LICENCE_FORMAT, LIST_FORMAT, newerList, readList,
+  canonicalJson, checkLicence, EXPIRING_DAYS, fingerprint, LICENCE_FORMAT, LIST_FORMAT, newerList, readList,
   type ProductKey,
 } from '../../src/licence/core.js';
 import { PRODUCT_KEYS } from '../../src/licence/keys.js';
@@ -63,7 +63,14 @@ describe('ARC-11-C1 — the server\'s licence core', () => {
   it('reads expiry in UTC days: the last day is expiring, the next is expired', () => {
     expect(check(signed(LICENCE_FORMAT, 'licence', payload({ valid_until: '2026-10-10' }))).state).toBe('expiring');
     expect(check(signed(LICENCE_FORMAT, 'licence', payload({ valid_until: '2026-10-09' }))).state).toBe('expired');
-    expect(check(signed(LICENCE_FORMAT, 'licence', payload({ valid_until: '2026-11-10' }))).state).toBe('ok');
+  });
+
+  it('is expiring with 30 days left and ok with 31: the window is exactly EXPIRING_DAYS', () => {
+    expect(EXPIRING_DAYS).toBe(30);
+    const thirty = check(signed(LICENCE_FORMAT, 'licence', payload({ valid_until: '2026-11-09' })));
+    expect([thirty.state, thirty.daysLeft]).toEqual(['expiring', 30]);
+    const thirtyOne = check(signed(LICENCE_FORMAT, 'licence', payload({ valid_until: '2026-11-10' })));
+    expect([thirtyOne.state, thirtyOne.daysLeft]).toEqual(['ok', 31]);
   });
 
   it('applies a list only when a product key signed it, and never one with a lower version', () => {

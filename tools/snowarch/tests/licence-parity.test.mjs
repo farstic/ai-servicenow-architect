@@ -57,6 +57,9 @@ function cases() {
     ['perpetual', licenceText(forever, primary), {}],
     ['perpetual stranger', licenceText(forever, stranger), {}],
     ['expiring', licenceText(licence({ valid_until: '2026-10-20' }), primary), {}],
+    // The window's two edges, so a copy whose EXPIRING_DAYS drifted from the other's cannot agree here.
+    ['day 30', licenceText(licence({ valid_until: '2026-11-09' }), primary), {}],
+    ['day 31', licenceText(licence({ valid_until: '2026-11-10' }), primary), {}],
     ['last day', licenceText(licence({ valid_until: '2026-10-10' }), primary), {}],
     ['expired', licenceText(licence({ valid_until: '2026-10-09' }), primary), {}],
     ['design-only', licenceText(licence({ scope: 'design-only' }), primary), {}],
