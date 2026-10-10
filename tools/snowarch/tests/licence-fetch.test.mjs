@@ -121,7 +121,7 @@ test('ARC-11-C1 — a published list no product key signed is refused, and the h
 test('ARC-11-C1 — no configured list is no fetch at all', (t) => {
   const root = checkout(t);
   let ran = false;
-  const out = refreshList(root, { config: {}, keys: KEYS, now: NOW, fetch: () => { ran = true; } });
+  const out = refreshList(root, { config: {}, keys: KEYS, now: NOW, fetcher: () => { ran = true; } });
   assert.equal(out.outcome, 'unconfigured');
   assert.equal(ran, false);
 });
@@ -131,12 +131,12 @@ test('ARC-11-C1 — upgrade refreshes the list only when a licence is installed,
   const lines = [];
   const log = { step: (m) => lines.push(m) };
   let fetched = 0;
-  const fetch = () => { fetched += 1; return { status: 'none' }; };
+  const fetcher = () => { fetched += 1; return { status: 'none' }; };
   const cfg = config('farstic/snowarch-licences');
-  assert.equal(refreshWithUpgrade(root, { config: cfg, keys: KEYS, now: NOW, log, fetch }), null);
+  assert.equal(refreshWithUpgrade(root, { config: cfg, keys: KEYS, now: NOW, log, fetcher }), null);
   assert.deepEqual([fetched, lines], [0, []], 'no licence: no fetch and no line');
   writeFileSync(licencePath(root), '{"format":"snowarch-licence/1"}');
-  const r = refreshWithUpgrade(root, { config: cfg, keys: KEYS, now: NOW, log, fetch });
+  const r = refreshWithUpgrade(root, { config: cfg, keys: KEYS, now: NOW, log, fetcher });
   assert.equal(r.outcome, 'none');
   assert.equal(fetched, 1);
   assert.deepEqual(lines, ['revocation list: no revocation list is published yet']);

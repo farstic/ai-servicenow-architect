@@ -100,12 +100,12 @@ export function fetchList({ url, ref = 'main', path = 'revocations.json', timeou
  *   unconfigured — no list in the config; nothing was fetched.
  */
 export function refreshList(root, { config, keys = PRODUCT_KEYS, now = new Date(), env = process.env,
-  timeoutMs = FETCH_BUDGET_MS, fetch = fetchList } = {}) {
+  timeoutMs = FETCH_BUDGET_MS, fetcher = fetchList } = {}) {
   const source = listSource(config);
   if (!source) return { outcome: 'unconfigured', version: null };
   const cache = readListCache(root);
   const held = heldList(cache, keys);
-  const result = fetch({ ...source, timeoutMs, env });
+  const result = fetcher({ ...source, timeoutMs, env });
   const write = (list) => writeListCache(root, { list, checkedAt: now.toISOString(),
     source: `${source.url} ${source.ref}:${source.path}` });
 
@@ -148,9 +148,9 @@ export const refreshSays = (r) => SAYS[r.outcome](r);
  * upgrade: every outcome is one line.
  */
 export function refreshWithUpgrade(root, { config, env = process.env, now = new Date(), log, keys = PRODUCT_KEYS,
-  fetch = fetchList } = {}) {
+  fetcher = fetchList } = {}) {
   if (readLicenceText(root) === null) return null;
-  const r = refreshList(root, { config, keys, now, env, fetch });
+  const r = refreshList(root, { config, keys, now, env, fetcher });
   if (r.outcome !== 'unconfigured') log.step(refreshSays(r));
   return r;
 }

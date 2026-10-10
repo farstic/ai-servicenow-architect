@@ -28,11 +28,11 @@ export interface RefreshResult {
     reason?: string;
 }
 /** Fetch, verify and cache, as the CLI's `refreshList` does. Never rejects. */
-export declare function refreshList(root: string, { config, keys, now, env, budgetMs, fetch }: {
+export declare function refreshList(root: string, { config, keys, now, env, budgetMs, fetcher }: {
     config: unknown;
     keys?: readonly ProductKey[];
     now?: Date;
     env?: NodeJS.ProcessEnv;
     budgetMs?: number;
-    fetch?: typeof fetchListAsync;
+    fetcher?: typeof fetchListAsync;
 }): Promise<RefreshResult>;

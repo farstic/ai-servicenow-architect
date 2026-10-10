@@ -83,9 +83,9 @@ export interface RefreshResult {
 
 /** Fetch, verify and cache, as the CLI's `refreshList` does. Never rejects. */
 export async function refreshList(root: string, { config, keys = PRODUCT_KEYS, now = new Date(), env = process.env,
-  budgetMs = LIVE_BUDGET_MS, fetch = fetchListAsync }: {
+  budgetMs = LIVE_BUDGET_MS, fetcher = fetchListAsync }: {
   config: unknown; keys?: readonly ProductKey[]; now?: Date; env?: NodeJS.ProcessEnv; budgetMs?: number;
-  fetch?: typeof fetchListAsync;
+  fetcher?: typeof fetchListAsync;
 }): Promise<RefreshResult> {
   const source = listSource(config);
   if (!source) return { outcome: 'unconfigured', version: null };
@@ -93,7 +93,7 @@ export async function refreshList(root: string, { config, keys = PRODUCT_KEYS, n
   const held = heldList(cache, keys);
   let result: FetchResult;
   try {
-    result = await fetch({ ...source, budgetMs, env });
+    result = await fetcher({ ...source, budgetMs, env });
   } catch (e) {
     result = { status: 'unreachable', detail: e instanceof Error ? e.message : 'the fetch failed' };
   }

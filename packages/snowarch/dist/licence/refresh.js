@@ -64,7 +64,7 @@ export async function fetchListAsync({ url, ref = 'main', path = 'revocations.js
     }
 }
 /** Fetch, verify and cache, as the CLI's `refreshList` does. Never rejects. */
-export async function refreshList(root, { config, keys = PRODUCT_KEYS, now = new Date(), env = process.env, budgetMs = LIVE_BUDGET_MS, fetch = fetchListAsync }) {
+export async function refreshList(root, { config, keys = PRODUCT_KEYS, now = new Date(), env = process.env, budgetMs = LIVE_BUDGET_MS, fetcher = fetchListAsync }) {
     const source = listSource(config);
     if (!source)
         return { outcome: 'unconfigured', version: null };
@@ -72,7 +72,7 @@ export async function refreshList(root, { config, keys = PRODUCT_KEYS, now = new
     const held = heldList(cache, keys);
     let result;
     try {
-        result = await fetch({ ...source, budgetMs, env });
+        result = await fetcher({ ...source, budgetMs, env });
     }
     catch (e) {
         result = { status: 'unreachable', detail: e instanceof Error ? e.message : 'the fetch failed' };
