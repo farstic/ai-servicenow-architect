@@ -9,9 +9,14 @@
  * A helper rather than exports from a test file: `node --test` runs every test a file registers, so
  * a test file that another test imports runs its own cases twice.
  */
+import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { fingerprint, signLicence, signList } from '../../lib/licence/core.mjs';
+import { tempDir } from './temp.mjs';
 
 /** A fresh Ed25519 pair, as PEM, the shape `licence keygen` writes. */
 export function keyPair() {
@@ -46,3 +51,28 @@ export const licenceText = (payload, key) => `${JSON.stringify(signLicence(paylo
 
 /** A signed revocation list document. */
 export const listDoc = (list, key) => signList(list, key.privateKey);
+
+/**
+ * A bare repository standing in for the public list repository, as a `file://` URL.
+ *
+ * `files` is what `main` holds — `null` for a repository with no branch at all, which is the state
+ * the owner's freshly created repository is in until the first push. The commit identity is a
+ * fixture's and lives only in a temp directory.
+ */
+export function listRepo(t, files) {
+  const base = tempDir('snowarch-licence-repo-', t);
+  const bare = join(base, 'list.git');
+  const env = { ...process.env, GIT_AUTHOR_NAME: 'fixture', GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
+    GIT_COMMITTER_NAME: 'fixture', GIT_COMMITTER_EMAIL: 'fixture@example.invalid' };
+  const git = (args) => execFileSync('git', args, { env, stdio: 'pipe' });
+  git(['init', '-q', '--bare', '--initial-branch=main', bare]);
+  if (files) {
+    const work = join(base, 'work');
+    git(['init', '-q', '--initial-branch=main', work]);
+    for (const [path, content] of Object.entries(files)) writeFileSync(join(work, path), content);
+    git(['-C', work, 'add', '-A']);
+    git(['-C', work, 'commit', '-q', '--allow-empty', '-m', 'list']);
+    git(['-C', work, 'push', '-q', bare, 'main']);
+  }
+  return pathToFileURL(bare).href;
+}
