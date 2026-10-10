@@ -11,6 +11,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
+import { statusCommand } from '../../tools/snowarch/lib/commands/status.mjs';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+import { greenTree } from './helpers/tree.mjs';
 import { licencePath } from '../../tools/snowarch/lib/local-paths.mjs';
 import { keyPair, licence, licenceText, productKeys } from '../../tools/snowarch/tests/helpers/licence.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -65,4 +68,19 @@ test('ARC-11-C1 — E-31\'s data names the state and the id, never the licensee 
   const r = await E31.run(ctxFor(t, { file: licenceText(licence(), primary) }));
   assert.deepEqual(Object.keys(r.data).sort(), ['enforced', 'id', 'listVersion', 'scope', 'state', 'validUntil']);
   assert.equal(JSON.stringify(r).includes('Test Licensee'), false);
+});
+
+test('ARC-11-C1 — a report spells E-31\'s command for the shell the run was TOLD about, not the machine\'s', async (t) => {
+  // The Windows cells' failure, driven from any machine: the status fixtures are captured with the shell
+  // pinned to `linux`, and E-31 spelled its command for the machine instead — `.\snowarch.cmd` into a POSIX
+  // fixture. ARC-07-W17's rule, that the doctor renders for the shell it was told about, now reaches the
+  // checks as it already reached the Mode line. The expectation is derived from the product's own speller.
+  const root = greenTree(t);
+  for (const platform of ['win32', 'linux']) {
+    const chunks = [];
+    await statusCommand({ out: { write: (s) => chunks.push(s) }, cwd: root, flags: { json: true }, home: root,
+      env: {}, platform });
+    const e31 = JSON.parse(chunks.join('')).checks.find((c) => c.id === 'E-31');
+    assert.equal(e31.command, `${spellings({ platform, env: {} }).cli} licence check`, platform);
+  }
 });
