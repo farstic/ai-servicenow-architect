@@ -24,6 +24,12 @@ ARC-09-C97 to C101 in the ARC-09 plan.
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
 
+**Known gap, raised not closed: `snow_us_current_update_set_read` does not read the session's update set
+(ARC-09-C128).** Its description promises the session's current update set, but it lists up to five update
+sets in progress on the instance, whoever opened them. The session's capture target is the authenticated
+user's `sys_update_set` preference. Read it with `snow_core_records_query` on `sys_user_preference`, with
+`name=sys_update_set^user=javascript:gs.getUserID()`, as R0 does in the live procedures.
+
 ## 2.0.0 — 2026-09-24
 
 Supersedes `snow-mcp` 1.0.0. Relicensed to Apache-2.0 and renamed to `@farstic/snowarch`; the old
