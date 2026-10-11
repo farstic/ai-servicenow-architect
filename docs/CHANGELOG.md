@@ -24,7 +24,8 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   - `show`, `verify <file>` and `check [--refresh]` for whoever installs a licence, as
     `.local/licence.json`;
   - `keygen`, `issue`, `init-list` and `revoke` for the owner. The owner's private keys are written and read
-    only outside the checkout.
+    only outside the checkout;
+  - `keygen` and `issue` refuse a placeholder such as `<your name>`, pasted as it stands, as `--to` or `--org`.
 - A licence is signed with Ed25519 by one of the two public keys the product ships, primary and recovery. A
   licence with no end date is perpetual, and only those keys can sign one.
 - A signed revocation list in the public repository `farstic/snowarch-licences` (`engine.config.json` →
