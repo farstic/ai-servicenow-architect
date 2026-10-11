@@ -32,8 +32,10 @@ export function licenceChecks() {
       run: async (ctx) => {
         // `licenceKeys` is a test seam: a suite injects the keys it generated. Nothing in the product sets it.
         const s = licenceStatus(ctx.root, { keys: ctx.licenceKeys ?? PRODUCT_KEYS, now: new Date(ctx.now()), env: ctx.env ?? {} });
-        const data = { state: s.state, id: s.id, scope: s.scope, validUntil: s.validUntil, enforced: s.enforced,
-          listVersion: s.list?.version ?? null };
+        // `perpetual` because the status panel renders its Licence line from this data with the banner's
+        // function, and a perpetual licence has no `validUntil` to print.
+        const data = { state: s.state, id: s.id, scope: s.scope, validUntil: s.validUntil, perpetual: s.perpetual,
+          enforced: s.enforced, listVersion: s.list?.version ?? null };
         const line = bannerLine(s, { enforced: s.enforced });
         if (s.state === 'ok') return ok(line, data);
         const why = s.state === 'expiring' ? `${s.daysLeft} days left` : (s.state === 'missing' ? null : s.reason);

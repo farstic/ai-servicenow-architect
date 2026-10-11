@@ -14,6 +14,7 @@
 
 ```
 Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
+Licence: missing · warn only
 Engine: snowarch 9.9.9 · contract deadbeefdead
 Docs: vendor/ServiceNowDocs @ 68c0d1123adf (australia) · sparse
 Roster: 29 skills / 9 agents
@@ -27,12 +28,18 @@ Rendered from the quick doctor's own report. Line 1 is `modeLineDetailed` **verb
 `doctor/mode.mjs` has the only definition of that sentence, and the panel quotes it rather than
 re-deriving it, so no two surfaces can disagree about whether the checkout is live.
 
+Line 2 is the session-start banner's `Licence:` line, in every state, `ok` included (ARC-11-C1). It is
+rendered from E-31's data by the banner's own `bannerLine` (`tools/snowarch/lib/licence/line.mjs`),
+so the banner and the panel cannot word it differently. Enforcement is named — `warn only` or
+`enforced` — with every state except `ok`: a licence in force needs no such word.
+
 Where each line comes from, all of it schema-v1 JSON (`./snowarch status --json` prints that report
 unchanged — it is the same object `doctor --quick --json` prints, not a shape of its own):
 
 | line | report key |
 |---|---|
 | `Mode:` | `modeLineDetailed` |
+| `Licence:` | `checks` — E-31's data, worded by the session-start banner's own function |
 | `Engine:` | `engine.version`, `engine.tag`, `engine.contractSha` |
 | `Docs:` | `engine.docs` |
 | `Roster:` | `engine.roster` |

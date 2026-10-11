@@ -345,6 +345,7 @@ Create an incident on the live instance for the outage.
 
    ```
    Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
+   Licence: missing · warn only
    Engine: snowarch 9.9.9 · contract deadbeefdead
    Docs: vendor/ServiceNowDocs @ 68c0d1123adf (australia) · sparse
    Roster: 29 skills / 9 agents
@@ -359,6 +360,10 @@ Create an incident on the live instance for the outage.
    names whichever is missing. `Instances:` is absent in design-only and on any quick run, where
    the server section does not run at all; the Mode line's own `+1 instance (uat)` is what names
    the rest. The Mode is never inferred from which tools appear in the tool list.
+
+   The `Licence:` line is there in every state, second, worded exactly as the session-start banner
+   words it (ARC-11-C1): `Licence: missing · warn only` on a checkout with no licence, and
+   `Licence: ok · LIC-… · until <date>` or `· perpetual` with one in force.
 
    **What a tester marks FAILED here:** a reply whose seven lines were assembled by the session
    rather than printed — the tell is any line the command did not emit, a local-time stamp where

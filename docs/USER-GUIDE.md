@@ -34,11 +34,12 @@ they walk you through connecting a ServiceNow instance.
 
 ### What `/snowarch status` prints
 
-Seven lines, in this order, each filled from one key of the doctor's JSON — the same report the
+Eight lines, in this order, each filled from one key of the doctor's JSON — the same report the
 terminal prints, formatted for reading:
 
 ```
 Mode: live — pdi (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 398 tools (contract)   [modeLineDetailed]
+Licence: ok · LIC-2026-0002 · until 2027-10-31                                               [checks: E-31's data]
 Engine: snowarch 2.0.0 · tag v2.0.0 · contract a1b2c3d                                       [engine.version, engine.tag, engine.contractSha]
 Docs: vendor/ServiceNowDocs @ ba513f2 (australia) · sparse · citations checked: 181 | dead: 0 [engine.docs]
 Roster: 29 skills / 9 agents                                                                 [engine.roster]
@@ -54,6 +55,10 @@ them. `Instances:` is absent in design-only, and when anything failed, one line 
 with its remedy. A warning is **named but not listed** — its id appears in the count, as `1 warn
 (E-23)` above, and its remedy stays in `./snowarch doctor`, because a panel that printed every
 warning's remedy would be a report rather than a panel.
+
+The `Licence:` line is the session banner's, in every state: `Licence: missing · warn only` on a
+checkout with no licence, and `· enforced` in place of `· warn only` when `SNOW_LICENCE_ENFORCE` is
+`"true"`. A licence in force names no enforcement, because there is nothing for it to refuse.
 
 ### Reading the Mode line
 

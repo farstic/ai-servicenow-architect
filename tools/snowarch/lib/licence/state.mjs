@@ -14,8 +14,9 @@
  * `revoked` refuse every CLI command except the five a person needs to repair the state, and every
  * MCP tool (ruling R1). `expiring` is never refused.
  *
- * THE LINE (`bannerLine`) is the one wording the banner, the doctor and the server's notice print; the
- * server renders it identically, and the parity test holds the two.
+ * THE LINE (`bannerLine`) is the one wording the banner, the doctor, the status panel and the server's
+ * notice print. It lives in `line.mjs`, a leaf the pure status panel can import, and is re-exported
+ * here for every caller that already reads the state.
  */
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -23,6 +24,8 @@ import { dirname } from 'node:path';
 import { checkLicence, readList } from './core.mjs';
 import { PRODUCT_KEYS } from './keys.mjs';
 import { licencePath, revocationsPath } from '../local-paths.mjs';
+
+export { bannerLine } from './line.mjs';
 
 export const ENFORCE_VAR = 'SNOW_LICENCE_ENFORCE';
 
@@ -101,21 +104,6 @@ export function licenceStatus(root, { keys = PRODUCT_KEYS, now = new Date(), env
   const list = heldList(cache, keys);
   const status = checkLicence(readLicenceText(root), { keys, list, now });
   return { ...status, enforced: isEnforced(env), list: list ? { version: list.version, checkedAt: cache.checkedAt } : null };
-}
-
-/**
- * The line. `ok` and `expiring` name the licence and its term; every state but `ok` says whether it
- * is enforced, because that word is what decides whether the session may go on.
- */
-export function bannerLine(s, { enforced }) {
-  const parts = [`Licence: ${s.state}`];
-  if (s.state === 'ok' || s.state === 'expiring') {
-    parts.push(s.id);
-    if (s.scope === 'design-only') parts.push('design-only');
-    parts.push(s.perpetual ? 'perpetual' : `until ${s.validUntil}`);
-  }
-  if (s.state !== 'ok') parts.push(enforced ? 'enforced' : 'warn only');
-  return parts.join(' · ');
 }
 
 /** What a refused command prints: the state, why it was refused, and the remedy. */

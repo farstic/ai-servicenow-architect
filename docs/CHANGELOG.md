@@ -12,7 +12,7 @@ All notable changes to this project are documented in this file. Everything hand
 **A licence, checked by the product itself, and warn only by default (ARC-11-C1).** With no licence and
 `SNOW_LICENCE_ENFORCE` unset, which is every checkout today, exactly three things change:
 - doctor check E-31 warns;
-- the session banner gains a `Licence:` line after the `Mode:` line;
+- the session banner and `./snowarch status` gain a `Licence:` line after the `Mode:` line;
 - a session's first tool answer carries one extra block, after the first one, which is unchanged.
 
 The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72 to 73), which only
@@ -55,6 +55,9 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   is a rule, not a lock.
 - The doctor, `./snowarch status` and the `/snowarch` skill's sample count E-31's warning, which every
   checkout without a licence carries.
+- `./snowarch status` prints the banner's `Licence:` line second, in every state, `ok` included (ARC-11-C1).
+  The owner's rc.1 sitting found the panel silent with a licence in force. The `/snowarch` skill's sample,
+  the status template and T-07 carry the line.
 
 ## 2.0.11 — 2026-10-10
 
