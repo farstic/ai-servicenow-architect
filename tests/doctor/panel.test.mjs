@@ -30,6 +30,7 @@ const CLI = spellings().cli;
 import {
   docsLine, doctorLine, engineLine, instancesLine, notProbedLine, ranAtLine, renderPanel, SHA_PREFIX,
 } from '../../tools/snowarch/lib/doctor/panel.mjs';
+import { bannerLine } from '../../tools/snowarch/lib/licence/state.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
 
 const fixture = (which) => JSON.parse(
@@ -50,6 +51,9 @@ test('the live fixture renders to exactly these bytes', () => {
   // is still spelled out in full, which is what this assertion is for.
   assert.equal(renderPanel(LIVE, CLI), [
     LIVE.modeLineDetailed,
+    // ARC-11-C1 — the licence, second, exactly as the session-start banner prints it. The fixture's
+    // checkout has none, and enforcement is off.
+    'Licence: missing · warn only',
     `Engine: snowarch ${LIVE.engine.version} · contract ${LIVE.engine.contractSha.slice(0, 12)}`,
     `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · sparse`,
     // The roster moves when a skill is added, the way the tally moves when a check is — fso-insurance-
@@ -75,6 +79,48 @@ test('the Mode line is first, and is the report\'s own', () => {
     assert.equal(renderPanel(report, CLI).split('\n')[0], report.modeLineDetailed);
   }
   assert.match(LIVE.modeLineDetailed, /^Mode: /);
+});
+
+/** The live fixture with E-31's data replaced — the one input the Licence line reads. */
+const withLicence = (data) => ({
+  ...LIVE, checks: LIVE.checks.map((c) => (c.id === 'E-31' ? { ...c, data } : c)),
+});
+const licenceData = (over = {}) => ({ state: 'ok', id: 'LIC-2026-0002', scope: 'live', validUntil: null,
+  perpetual: true, enforced: false, listVersion: null, ...over });
+
+test('ARC-11-C1 — the Licence line is second, in the banner\'s own words, for every state', () => {
+  // The owner's rc.1 sitting found the panel silent with a licence in force: E-31 is ok then, and the
+  // panel lists no check that is ok. The line is now always there, rendered from E-31's data by the
+  // function the session-start banner uses, so the two cannot disagree. A state other than `ok` names
+  // enforcement; `ok` does not, under enforcement too — the banner's shape, kept.
+  const cases = [
+    [licenceData(), 'Licence: ok · LIC-2026-0002 · perpetual'],
+    [licenceData({ id: 'LIC-2026-0003', validUntil: '2027-04-11', perpetual: false, enforced: true }),
+      'Licence: ok · LIC-2026-0003 · until 2027-04-11'],
+    [licenceData({ scope: 'design-only', validUntil: '2027-04-11', perpetual: false }),
+      'Licence: ok · LIC-2026-0002 · design-only · until 2027-04-11'],
+    [licenceData({ state: 'expiring', validUntil: '2026-10-25', perpetual: false }),
+      'Licence: expiring · LIC-2026-0002 · until 2026-10-25 · warn only'],
+    [licenceData({ state: 'revoked', id: 'LIC-2026-0003', enforced: true }), 'Licence: revoked · enforced'],
+    [licenceData({ state: 'missing', id: null, scope: null, perpetual: false, enforced: true }),
+      'Licence: missing · enforced'],
+  ];
+  for (const [data, line] of cases) {
+    const lines = renderPanel(withLicence(data), CLI).split('\n');
+    assert.equal(lines[1], line, data.state);
+    assert.equal(lines[1], bannerLine(data, { enforced: data.enforced }), 'the panel and the banner disagree');
+    assert.equal(lines.filter((l) => l.startsWith('Licence:')).length, 1, 'the licence is said once');
+  }
+  // The design fixture too: design-only is not a reason to say nothing.
+  assert.equal(renderPanel(DESIGN, CLI).split('\n')[1], 'Licence: missing · warn only');
+});
+
+test('ARC-11-C1 — no E-31 data in the report is no Licence line, never a guessed one', () => {
+  const without = { ...LIVE, checks: LIVE.checks.filter((c) => c.id !== 'E-31') };
+  assert.equal(renderPanel(without, CLI).includes('Licence:'), false);
+  const { data: _, ...bare } = LIVE.checks.find((c) => c.id === 'E-31');
+  const errored = { ...LIVE, checks: LIVE.checks.map((c) => (c.id === 'E-31' ? { ...bare, status: 'error' } : c)) };
+  assert.equal(renderPanel(errored, CLI).includes('Licence:'), false);
 });
 
 test('a line whose key is null is omitted, never guessed', () => {
