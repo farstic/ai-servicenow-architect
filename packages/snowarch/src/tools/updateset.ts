@@ -24,7 +24,10 @@ export function updateSetToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_us_current_update_set_read',
-      description: 'Get the currently active Update Set for the session',
+      description: 'Get the update set THIS session\'s REST writes are captured in: the authenticated user\'s '
+        + 'sys_user_preference name=sys_update_set, which snow_us_capture_target_set sets, with that set\'s name '
+        + 'and state. Also lists up to five update sets in progress on the instance, separately: those are '
+        + 'anyone\'s, not the session\'s.',
       inputSchema: { type: 'object', properties: {}, required: [] },
       gate: 'none',
       mutates: false,
@@ -165,13 +168,46 @@ export async function dispatchUpdateSetAction(
   const cli = cliSpelling();
   switch (name) {
     case 'snow_us_current_update_set_read': {
-      const resp = await client.queryRecords({
+      // ARC-09-C128 — the session's update set is the authenticated user's sys_user_preference
+      // name=sys_update_set: what snow_us_capture_target_set writes and REST capture honours.
+      // `gs.getUserID()` is the session's own user, and the client's allowlist admits it. The
+      // in-progress sets are listed separately, because they are anybody's: the first of them is
+      // not this session's.
+      const prefs = await client.queryRecords({
+        table: 'sys_user_preference',
+        query: 'user=javascript:gs.getUserID()^name=sys_update_set',
+        limit: 1,
+        fields: 'sys_id,value',
+      });
+      const pref = prefs.records[0] as Record<string, any> | undefined;
+      const targetId = pref?.value ? String(pref.value) : null;
+      let sessionSet: Record<string, unknown> | null = null;
+      if (targetId) {
+        let set: Record<string, any> = {};
+        if (/^[0-9a-f]{32}$/i.test(targetId)) {
+          try {
+            set = await client.getRecord('sys_update_set', targetId, 'sys_id,name,state,application') as Record<string, any>;
+          } catch (e) {
+            if (!(e instanceof ServiceNowError) || e.code !== 'NOT_FOUND') throw e;
+          }
+        }
+        sessionSet = set && set.sys_id
+          ? { sys_id: String(set.sys_id), name: set.name ?? null, state: set.state ?? null,
+            application: set.application ?? null, found: true }
+          : { sys_id: targetId, found: false };
+      }
+      const inProgress = await client.queryRecords({
         table: 'sys_update_set',
         query: 'state=in progress',
         limit: 5,
         fields: 'sys_id,name,description,state,is_default,release,sys_updated_on,sys_updated_by',
       });
-      return { count: resp.count, active_update_sets: resp.records };
+      return {
+        session_update_set: sessionSet,
+        preference_sys_id: pref ? String(pref.sys_id) : null,
+        in_progress_update_sets: inProgress.records,
+        in_progress_count: inProgress.count,
+      };
     }
 
     case 'snow_us_update_sets_index': {
