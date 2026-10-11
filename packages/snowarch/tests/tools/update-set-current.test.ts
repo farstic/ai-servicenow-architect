@@ -86,4 +86,16 @@ describe('ARC-09-C128 - current_update_set_read reads the session\'s preference,
     expect((await read(new Answers('NOT_FOUND'))).session_update_set).toEqual({ sys_id: OTHER_SET, found: false });
     await expect(read(new Answers('INSUFFICIENT_PRIVILEGES'))).rejects.toMatchObject({ code: 'INSUFFICIENT_PRIVILEGES' });
   });
+
+  it('a preference that names no sys_id, such as a hand-set "Default", reads as found: false, with no request for it', async () => {
+    const client = new FakeRestClient({ queries: { [PREF_QUERY]: [{ sys_id: PREF_SYS_ID, value: 'Default' }] } });
+    const r = await read(client);
+    expect(r.session_update_set).toEqual({ sys_id: 'Default', found: false });
+    // The real client's getRecord refuses a value that is not a sys_id with VALIDATION_ERROR, which is not NOT_FOUND
+    // and would fail the whole read, so the tool must not ask for it at all (the architect's control on #414).
+    expect(client.sequence).toEqual([
+      'query sys_user_preference:user=javascript:gs.getUserID()^name=sys_update_set',
+      'query sys_update_set:state=in progress',
+    ]);
+  });
 });
