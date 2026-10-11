@@ -48,9 +48,15 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   - every source file the author owns opens with a two-line copyright header.
 - T-28 in `tests/VALIDATION-TESTS.md`, the owner's two-machine licence test, run by hand, and its first record,
   `docs/validation/2.0.12-rc.1-licence-sitting.md` (ARC-11-C4).
+- T-29 in `tests/VALIDATION-TESTS.md`, live verification, run by hand on a live instance, with T-29b for a bare PDI
+  (ARC-09-C117).
 
 ### Changed
 
+- `CLAUDE.md` and the six gateway skills gain one paragraph (ARC-09-C117). In live mode, before an Envelope is
+  final, the Architect reads each "verify on the instance" item that is an instance fact, with read-only calls:
+  eight per Envelope by default, with no cap under the opt-in. It cites each one "measured on instance <label>, <date>".
+  Design-only is unchanged.
 - `CLAUDE.md` gains one rule. With `enforced` and a licence state of `missing`, `invalid`, `expired` or
   `revoked`, the Architect produces no deliverable: it names the state and points to
   `./snowarch licence check`. Without enforcement, the `Licence:` line is information. In design-only this
