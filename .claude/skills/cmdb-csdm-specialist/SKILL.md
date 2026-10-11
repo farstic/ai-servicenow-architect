@@ -30,7 +30,7 @@ This skill and `itom-discovery-specialist` overlap on CMDB and must not double-f
 - **ITOM/Discovery Specialist owns *population*** — how CIs get *into* the CMDB: MID Server, Discovery schedules, patterns, ECC queue, Service Mapping execution, Event Management, Service Graph Connectors, Cloud Discovery.
 - **CMDB & CSDM Specialist (this skill) owns *the model*** — what the CMDB *is*: CI class selection and hierarchy, CSDM domain/service-type placement, CSDM-to-CMDB mapping, implementation-stage alignment, IRE rule *design* (not Discovery execution), CMDB Health policy, and the service/CI layer consumed by ITSM and CSM.
 
-**When both apply** (e.g., "discover Linux servers and place them correctly in CSDM"), both gateways fire — ITOM for the population pipeline, this skill for model placement. Reconcile the two envelopes before any builder dispatch. If the request is pure data-model/CSDM design with no Discovery involvement, this skill leads and ITOM is at most a consult flag.
+**When both apply** (e.g., "discover Linux servers and place them correctly in CSDM"), both gateways fire in the same turn — ITOM for the population pipeline, this skill for model placement — and both Envelopes are written and reconciled before the turn ends (Part 4). If the request is pure data-model/CSDM design with no Discovery involvement, this skill leads and ITOM is at most a consult flag.
 
 ---
 
@@ -254,6 +254,7 @@ Cite where Verdict B/C is in play.]
 ## Part 4 — Routing Recommendation
 
 [PROCEED — baseline configuration only / PROCEED — dispatch to Technical Designer with constraints / HALT — §1.1 proposal]
+- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire.
 
 [Consult flags:
 - ITOM/Discovery Specialist (if CIs must be populated via Discovery)
@@ -469,7 +470,7 @@ Reject if:
 - **Security & GRC** — regulated CI data, customer CI data crossing the CSM boundary.
 - **Integration Specialist** — cross-instance CMDB synchronisation (IRE-via-import, Service Graph).
 - **DevOps** — CMDB scope / CI class deployment and update-set strategy.
-- **CSM / ITSM Specialist** — co-fire for the cross-domain integration so the shared service layer is consistent in both envelopes.
+- **CSM / ITSM Specialist** — co-fire for the cross-domain integration, in the same turn, so the shared service layer is consistent in both Envelopes.
 
 ### Discovery handoff contract (upstream)
 

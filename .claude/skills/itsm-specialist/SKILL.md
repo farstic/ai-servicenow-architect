@@ -180,6 +180,7 @@ One of three recommendations to the orchestrator:
 - **PROCEED — baseline configuration only.** No Technical Designer needed. The user request is satisfied by configuration (assignment rule edits, Data Lookup Definitions, dictionary changes, ACL rule edits, baseline notification record edits). Recommend dispatch to Developer for any minor configuration scripts, or skip dispatch entirely and instruct the user on the baseline configuration steps.
 - **PROCEED — dispatch to Technical Designer with constraints.** Technical Designer receives this envelope as the dispatch input. Parts 1–3 become hard constraints on the design.
 - **HALT — §1.1 custom-object proposal required.** Wait for user decision on the Verdict C proposal before dispatching anyone.
+- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire.
 
 ## Part 5 — Anti-Patterns to Block
 

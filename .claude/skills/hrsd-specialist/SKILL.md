@@ -240,6 +240,7 @@ One of:
 - PROCEED — baseline configuration only
 - PROCEED — dispatch to Technical Designer with constraints
 - HALT — §1.1 custom-object proposal required
+- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire.
 
 [Include consult flags that fire:
 - Performance & Scale (volume > 1M HR cases, large Employee Center concurrent sessions)
