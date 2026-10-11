@@ -1045,3 +1045,121 @@ On A, the list stays at version 2. A revocation is not undone; a new licence is 
 
 Record **ARC-11-C1 live: CONFIRMED / FAILED** in `docs/validation/`, under the sitting's record for the build it
 ran on, and keep a copy of every banner line and refusal as it appeared.
+
+## ARC-09-C117 — T-29: in live mode, the Architect reads what the corpus cannot settle
+
+**Build under test:** v2.0.12-rc.2, the first release candidate that carries ARC-09-C117.
+
+**The rule** is in `CLAUDE.md` Phase 1 Step 5 and in each gateway's Part 2. In live mode, before an Envelope is
+final, the Architect reads each "verify on the instance" item that is an instance fact. It uses
+`snow_core_records_query` and `snow_disco_table_discover` only, eight reads per Envelope by default. A resolved
+item is cited "measured on instance <label>, <date>", and its raw read goes in `<envelope>-readings.md` beside the
+Envelope. The case is T-29 in `tests/VALIDATION-TESTS.md`; this is how to run it against a real instance.
+
+### Setup
+
+- A checkout on rc.2 whose `Mode:` line says `live`. Any preset will do: reads need no write flag.
+- No engagement named, so the Envelope and its readings file go under `clients/_unfiled/`, which git ignores.
+- The audit file's length before the run: `wc -l .local/audit.jsonl`. If there is no file, there is nothing to
+  count.
+
+### The run
+
+1. Start a fresh Claude Code session at the checkout root.
+2. Paste T-29's prompt verbatim: F3, the claim-status prompt. Let the turn finish.
+3. On an instance without the FSO apps, run T-29b's prompt too, in its own fresh session.
+
+### Pass condition — the exact state to see
+
+- **T-29:** at least four items are cited "measured on instance <label>, <date>", and each is matched by a read
+  in the readings file. "None found on <label>" counts. **T-29b:** one such item.
+- The readings file sits beside the Envelope under `clients/_unfiled/`. It names the instance by its label and the
+  day, and holds no URL and no account name.
+- The customer-safe status wording is still an OPEN QUESTION.
+- `.local/audit.jsonl` has the same number of lines as before, because reads write none.
+- There are no more than eight reads, or the answer names the items it left unread.
+
+**A failure looks like:**
+- any write, or the write question asked;
+- a value cited as measured with no read behind it;
+- "absent" for an empty read;
+- a URL or an account name in the readings file;
+- a read retried with another tool after a privileges refusal.
+
+### Teardown
+
+Nothing on the instance. Keep the Envelope and its readings file until the verdict is recorded. They live under
+`clients/_unfiled/`, which git ignores, and are never committed.
+
+### Verdict
+
+Record **ARC-09-C117 live (T-29): CONFIRMED / FAILED** in `docs/validation/`, under rc.2's sitting record. Give
+the count of measured items, the count of reads, and whether the audit file moved. Quote no instance name, account
+or URL.
+
+## ARC-09-C122 — the ATF step tool's input limits and its full listing
+
+**Build under test:** v2.0.12-rc.2, the first release candidate that carries ARC-09-C122.
+
+**The finding (rc.3, PN-16).** Run Server Side Script had `script` (max_length 2000) and `jasmine_version`
+(mandatory), and the step insert created both input rows itself. `snow_atf_atf_step_add` read neither limit nor
+mandatory, and listed only the input it sent.
+
+**What the tool does now** (`src/tools/atf-author.ts`):
+- It reads `max_length` and `mandatory` for each input variable of the config.
+- It refuses a value longer than its input variable's max_length before any write: `VALUE_TOO_LONG`, naming the
+  variable and both lengths.
+- After the write, it lists every input row of the step, each with `written`: `created`, `updated` or
+  `defaulted by the instance`.
+- A mandatory input left without a value is `FIELD_NOT_STORED` on `inputs.<name>`.
+
+### Setup
+
+As C95's: an instance on the `pdi-developer` preset, and an account with `atf_test_admin` or
+`atf_test_designer`.
+
+### The run
+
+```
+read-only — no approval needed
+R1 snow_core_records_query { table: "sys_atf_step_config", query: "name=Run Server Side Script",
+     fields: "sys_id,name,active" }                    exactly one row, active
+R2 snow_core_records_query { table: "atf_input_variable", query: "model=<R1 sys_id>",
+     fields: "element,max_length,mandatory", limit: 10 }
+                                                       script with its max_length; jasmine_version mandatory
+
+the writes — each its own "write approved"
+W1 About to add ATF test "c122-live-probe" on instance "<label>", after ensuring update set
+   <engagement>-c122 and pointing capture at it — write approved?
+   snow_us_active_update_set_ensure { name: "<engagement>-c122" }, snow_us_capture_target_set,
+   then snow_atf_atf_test_add { name: "c122-live-probe", description: "ARC-09-C122 live probe" }
+W2 About to add a Run Server Side Script step to ATF test c122-live-probe on instance "<label>" — write approved?
+   snow_atf_atf_step_add { test: <W1 sys_id>, step_config: "Run Server Side Script",
+     inputs: { script: <a script longer than R2's max_length, such as one comment line repeated> } }
+W3 About to add a Run Server Side Script step to ATF test c122-live-probe on instance "<label>" — write approved?
+   snow_atf_atf_step_add { test: <W1 sys_id>, step_config: "Run Server Side Script",
+     inputs: { script: "gs.info('c122 live probe');" } }
+```
+
+### Pass condition — the exact state to see
+
+- **W2 is refused before any write.** It returns `VALUE_TOO_LONG`, with "inputs.script is N characters; its input
+  variable's max_length is M. Nothing was written.", where M is R2's max_length. A read of `sys_atf_step` by
+  `test=<W1 sys_id>` afterwards returns 0 rows.
+- **W3 returns no `warnings`.** Its `inputs` lists every input row of the step: the script as `updated` or
+  `created`, and `jasmine_version` as `defaulted by the instance`.
+- **If `jasmine_version` comes back without a value,** W3 carries `FIELD_NOT_STORED` on `inputs.jasmine_version`.
+  Record it: that is the tool reporting, not failing.
+
+### Teardown
+
+In this order, each with its own "write approved":
+1. `snow_core_record_remove` on W3's step. Its input rows go with it (PN-16). Confirm with a read of
+   `sys_variable_value` by `document_key`, which counts 0.
+2. `snow_core_record_remove` on the test.
+3. Point capture back at the previous update set, and set this one to Ignore in the UI.
+
+### Verdict
+
+Record **ARC-09-C122 live: CONFIRMED / FAILED** in `docs/validation/`, under rc.2's sitting record. Give W2's
+message, W3's `inputs` list and its `warnings`, and R2's max_length and mandatory as read.
