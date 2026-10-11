@@ -170,6 +170,58 @@ export const DIRTY =
 export const NOTHING_CHANGED = 'upgrade: nothing changed';
 
 /**
+ * ARC-09-C120 — why an untracked file stops an upgrade, said beside the refusal. The owner's rc.3 upgrade failed at
+ * U5 on exactly this, with no reason on screen.
+ */
+export const UNTRACKED_REASON =
+  'git refuses to overwrite an untracked file the target tracks, even with identical content';
+
+/** A NUL-separated list from git (`-z`), each path as git wrote it: no quoting, nothing trimmed. */
+export const splitZ = (text) => String(text ?? '').split('\0').filter(Boolean);
+
+/**
+ * ARC-09-C120 — the untracked paths the target tracks, each of which would stop `git checkout` at U5.
+ *
+ * Compared as git's own `/`-separated strings on every platform, never joined with `path.sep`. Case-folded when the
+ * checkout's `core.ignorecase` is true: there an untracked `Notes/sitting.txt` blocks the target's `notes/sitting.txt`,
+ * while `git ls-files --others` prints `Notes/sitting.txt` (measured on APFS), so an exact comparison would miss it.
+ */
+export function untrackedBlockers(untracked, tracked, { ignoreCase = false } = {}) {
+  const fold = ignoreCase ? (p) => p.toLowerCase() : (p) => p;
+  const theirs = new Set(tracked.map(fold));
+  return untracked.filter((p) => theirs.has(fold(p)));
+}
+
+/** At most ten paths, then how many more: a refusal is read, not scrolled. */
+export const namePaths = (paths, max = 10) => (paths.length <= max
+  ? paths.join(', ')
+  : `${paths.slice(0, max).join(', ')} and ${paths.length - max} more`);
+
+/**
+ * git's own reason: its first line, and the next one when the first ends with a colon, because git's refusals put
+ * what they refuse on the second line ("… would be overwritten by checkout:", then the path). `null` when git said
+ * nothing.
+ */
+export function gitReason(stderr) {
+  const lines = String(stderr ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+  return lines[0].endsWith(':') && lines[1] ? `${lines[0]} ${lines[1]}` : lines[0];
+}
+
+/**
+ * ARC-09-C120 — the pull's failure line. "Diverged" only when git refused the fast-forward. Anything else — a lock, a
+ * permission, a missing ref — is git's reason, quoted: calling every failure a divergence sent the reader to resolve
+ * a history that was fine.
+ */
+export function pullFailureLine(stderr, { branch, remote, target }) {
+  if (/Not possible to fast-forward|diverg/i.test(String(stderr ?? ''))) {
+    return `upgrade: ${branch} has diverged from ${remote}/${branch} — resolve `
+      + `with git, or use --to ${target} to check out the release tag`;
+  }
+  return `upgrade: git pull --ff-only failed — ${gitReason(stderr) ?? 'git gave no reason'}; nothing else was changed`;
+}
+
+/**
  * What git's failure was, in the words of a remedy.
  *
  * Git's own stderr is printed too, always and first: it is the truth, and a classifier that
@@ -539,6 +591,12 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   const probe = exec ?? makeExec({ env });
   const config = loadConfig(root);
   const remote = 'origin';
+  // ARC-09-C120 — git's stdout as git wrote it. `git()` trims it, which would cut a leading space off the first path
+  // of a `-z` list. `null` when git failed.
+  const gitRaw = (args) => {
+    const r = run('git', args, { cwd: root, encoding: 'utf8', env: childEnv(root, env), stdio: 'pipe' });
+    return r.status === 0 ? String(r.stdout ?? '') : null;
+  };
 
   // ── U1 preflight ──────────────────────────────────────────────────────────────────────────
   log.step(stepLine(1, 'preflight'));
@@ -552,6 +610,9 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   }
   if (dirty.trim() !== '') {
     log.fail(DIRTY);
+    // ARC-09-C120 — and which files. A refusal that names nothing sends the reader to `git status` to find out.
+    const modified = splitZ(gitRaw(['diff', '--name-only', '-z', 'HEAD']));
+    if (modified.length > 0) log.step(`modified: ${namePaths(modified)}`);
     return EXIT_USAGE;
   }
   const shallow = isShallow(root, opts);
@@ -621,6 +682,19 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
 
   // ── U4 the plan, computed before anything moves ───────────────────────────────────────────
   log.step(stepLine(4, 'plan'));
+  // ARC-09-C120 — an untracked file the target tracks stops `git checkout` at U5, after the plan was accepted and with
+  // no reason on screen: the owner's rc.3 upgrade. So the plan refuses first, by name, before anything moves.
+  const blockers = untrackedBlockers(
+    splitZ(gitRaw(['ls-files', '--others', '--exclude-standard', '-z'])),
+    splitZ(gitRaw(['ls-tree', '-r', '--name-only', '-z', target])),
+    { ignoreCase: git(root, ['config', '--get', '--bool', 'core.ignorecase'], { ...opts, allowFail: true }) === 'true' });
+  if (blockers.length > 0) {
+    const one = blockers.length === 1;
+    log.fail(`upgrade: ${blockers.length} untracked file${one ? ' is' : 's are'} in the way of ${target}: `
+      + `${namePaths(blockers)} — move ${one ? 'it' : 'them'} aside or commit ${one ? 'it' : 'them'}; nothing was changed`);
+    log.step(UNTRACKED_REASON);
+    return EXIT_USAGE;
+  }
   const ctx = { root, config };
   // ARC-08-C29 — ONE COMPUTATION. `planSteps` asks the runner's own question (hash the tag's
   // inputs, compare with the recorded state) and falls back to the file diff only when the tag
@@ -684,8 +758,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     if (pulled.status !== 0) {
       const stderr = String(pulled.stderr ?? '').trim();
       if (stderr) for (const line of stderr.split('\n')) log.step(line);
-      log.fail(`upgrade: ${branch.branch} has diverged from ${remote}/${branch.branch} — resolve `
-        + `with git, or use --to ${target} to check out the release tag`);
+      log.fail(pullFailureLine(stderr, { branch: branch.branch, remote, target }));
       return EXIT_FAIL;
     }
     const past = Number(git(root, ['rev-list', '--count', `${target}..HEAD`], { ...opts, allowFail: true }) ?? '0');
@@ -708,9 +781,13 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
      * actually has, and a remedy that leaves it unanswered invites them to go looking for their credentials.
      */
     const returnTo = returnRef(branch, describe(root, opts));
-    const out = git(root, ['checkout', '--quiet', target], { ...opts, allowFail: true });
-    if (out === null) {
-      log.fail(`upgrade: git could not check out ${target}; nothing else was changed`);
+    // ARC-09-C120 — through `run`, so git's own reason reaches the line that reports the failure: `git()` with
+    // `allowFail` dropped it, and "could not check out" alone left the reader to guess.
+    const checkedOut = run('git', ['checkout', '--quiet', target],
+      { cwd: root, encoding: 'utf8', env: childEnv(root, env), stdio: 'pipe' });
+    if (checkedOut.status !== 0) {
+      const reason = gitReason(checkedOut.stderr ?? checkedOut.error?.message);
+      log.fail(`upgrade: git could not check out ${target}${reason ? ` — ${reason}` : ''}; nothing else was changed`);
       return EXIT_FAIL;
     }
     log.step(`HEAD is detached at ${target} — return with: git checkout ${returnTo}`);
