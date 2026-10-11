@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S11 — the stale-registration finding, through the whole command, on three platforms.
 //
 // `legacy.test.mjs` proves E-23 by calling the check. This runs the REAL `doctorCommand` against a

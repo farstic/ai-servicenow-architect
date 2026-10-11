@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C1 — the licence as this checkout holds it: the files, the enforcement switch, the line.
 //
 // `core.mjs` judges a text; this layer finds the text (`.local/licence.json`), the list it is judged

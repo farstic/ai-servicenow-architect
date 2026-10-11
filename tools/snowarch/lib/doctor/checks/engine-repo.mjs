@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — E-05…E-11: the checkout itself. Is this the tree we shipped, and is it wired up?
 //
 // Everything here answers a question about FILES THIS REPOSITORY COMMITS, which is what makes the

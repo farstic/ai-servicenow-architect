@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S09 — the `/snowarch status` template, held to the schema it claims to read.
 //
 // The template tells a model which JSON key fills each line. A key that no report carries is a

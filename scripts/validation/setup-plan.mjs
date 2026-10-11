@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C106 - a validation case's Setup block, planned and (when it is safe) run.
 //
 // `validation-run.sh` ran every case without its Setup. T-25's second turn asks the session to read

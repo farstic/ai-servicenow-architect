@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S05 — the Mode line, the merged report and the cache.
 //
 // The Mode line is the one sentence the rule file calls authoritative, so the cases here are about

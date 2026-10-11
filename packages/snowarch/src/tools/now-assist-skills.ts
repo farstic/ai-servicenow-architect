@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * Now Assist Skills management tools — create, list, get, and test Now Assist skills.
  * All tools require NOW_ASSIST_ENABLED=true (Tier AI).

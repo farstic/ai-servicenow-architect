@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S08 — the SessionStart banner: what it prints, how fast, and what it never does.
 //
 // Two shapes of case, deliberately. The SUBPROCESS ones spawn the hook exactly as Claude Code

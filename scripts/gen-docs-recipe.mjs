@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06 fix — the launcher recipe is GENERATED, because it embeds a value that moves.
 //
 // The block in `docs/ARCHITECTURE.md` carries the docs pin twice (`fetch`, `checkout --detach`), and

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S07 — the old doctor's 39 checks, and where each of them went.
 //
 // The table is DATA and this test reads the data, not the markdown — a test that parsed the page

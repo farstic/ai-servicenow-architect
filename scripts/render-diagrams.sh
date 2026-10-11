@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+# snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 # render-diagrams.sh — render every *.mmd under a directory to *.svg (or png/pdf), LOCALLY.
 #
 # Wraps @mermaid-js/mermaid-cli (mmdc) via npx (or a global mmdc if present).

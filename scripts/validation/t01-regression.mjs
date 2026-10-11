@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S04 — the T-01 regression harness. Throwaway with the rest of scripts/validation/ (S01).
 //
 // Criterion 4 asks a narrow question: does a dispatched `developer` sub-agent return an artefact with

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — E-12…E-16: the corpus, from `docsStatus()` and from nothing else.
 //
 // ARC-03-S06 exists so that "is the corpus present, pinned, on the right family, correctly sparse

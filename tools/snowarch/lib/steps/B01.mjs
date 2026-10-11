@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // B01 workspace — make `.local/`, and prove the two committed files are still the committed files.
 //
 // The verification is the interesting half. `.mcp.json` and `.claude/settings.json` ARE the

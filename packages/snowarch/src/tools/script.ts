@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * Scripting Management tools — latest release (ES2021/ES12 support).
  * All tools require SCRIPTING_ENABLED=true (Tier 3).

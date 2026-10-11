@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { redact, register, reset } from '../lib/redact.mjs';

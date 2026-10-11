@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C81 — the roster's identifiers against the bundled corpus. Every outcome the check allows
 // is planted here once on each side: the excuse that holds, and the same shape that must fail.
 import { test } from 'node:test';

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S03 — the S-13 acceptance test, measured rather than inferred.
 //
 // The question is "do all 28 skills reach a fresh session WITH a description". Asking a headless

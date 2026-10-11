@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // The owner's sitting page — four sittings a person can run one at a time.
 //
 // Every `> **…**` row on that page is EVIDENCE: it was written by the story that raised it, and the

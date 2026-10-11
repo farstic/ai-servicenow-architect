@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S04 — reading a version out of whatever a tool decided to print.
 //
 // Four tools, four formats, and three of them carry a suffix that is not part of the version:

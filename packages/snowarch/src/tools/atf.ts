@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * ATF (Automated Test Framework) tools — latest release.
  * Read tools: Tier 0. Execution tools require ATF_ENABLED=true, and run suites through the CI/CD API

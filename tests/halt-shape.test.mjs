@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C85 — the §1.1 halt comes before the design, in every example that shows one.
 //
 // governance/governance-rules.md: a specialist "must halt before designing it", and item 2 of the

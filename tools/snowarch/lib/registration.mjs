@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S05 — the rules the two committed registration files must satisfy, as functions.
 //
 // ARC-06-S01 wrote these as assertions inside `tests/registration-files.test.mjs`, which proves the

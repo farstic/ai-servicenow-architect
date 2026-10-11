@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S07 — the operator's path: a live install with no keyboard, from a 0600 file.
 //
 // This exists so a credential never has to pass through argv, a transcript, a CI variable dump or a

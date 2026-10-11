@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S02 — a deliberately small parser for the flat-YAML subset the engine's frontmatter uses.
 // Supports exactly what the roster contains and rejects the rest by name, because a parser that
 // silently accepts more than the engine writes is a parser that stops catching mistakes.

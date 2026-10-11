@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-S06 — the `store` forwarder.
 //
 // The same shape as `instance` (ARC-07-S05) and the same reasons, which is why it is the same

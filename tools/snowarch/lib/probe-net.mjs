@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S04 — can this machine reach github.com, and if not, WHICH wall did it hit?
 //
 // "The clone failed" is not a diagnosis. Behind a corporate proxy the same symptom has four causes

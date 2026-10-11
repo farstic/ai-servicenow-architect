@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S07 — npm's log → the sentence the operator needs.
 //
 // `npm ci` fails in a handful of ways that all look the same from outside ("it didn't install"),

@@ -1,4 +1,6 @@
-﻿# The Windows launcher. Two jobs, the same two as bootstrap.sh: hand over to Node when it is here,
+﻿# Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+# snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
+# The Windows launcher. Two jobs, the same two as bootstrap.sh: hand over to Node when it is here,
 # and finish design-only when it is not.
 #
 # Windows PowerShell 5.1 — what every Windows 10/11 has, and therefore what this targets. No `??`,

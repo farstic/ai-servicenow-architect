@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C87 — what a validation session is allowed to be, as data a test can read.
 //
 // The runner used to hand each session `--allowedTools "Read,Grep,Glob,Skill"`. That is permission, not

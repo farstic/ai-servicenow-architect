@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S11 — the credential never reaches the report. End to end, through the real command.
 //
 // `redact.test.mjs` proves the mask functions. This proves the PATH: a store with a real-shaped

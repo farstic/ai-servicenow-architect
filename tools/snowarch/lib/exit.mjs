@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S02 — the exit codes, in one place, so a story cannot invent a sixth.
 //
 // A caller keys on these: bootstrap on PREREQ, CI on FAIL, a human on USAGE. Numbers scattered

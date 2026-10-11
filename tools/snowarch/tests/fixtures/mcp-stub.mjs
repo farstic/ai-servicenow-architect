@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // A minimal MCP stdio responder, for testing the handshake without the real server.
 //
 // Three behaviours, chosen by `SNOWARCH_STUB_MODE`, and each one exists because a real server can

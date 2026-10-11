@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-S01 — the release script, against a repository that is not this one.
 //
 // Every case runs on a TEMP git repository built here: three manifests, the CLAUDE.md marker, the

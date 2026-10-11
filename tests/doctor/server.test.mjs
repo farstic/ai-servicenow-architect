@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S04 — the engine side of the server section: what is available, and what is adopted.
 //
 // Nothing here re-implements a server check, and nothing here spawns a server: the module is

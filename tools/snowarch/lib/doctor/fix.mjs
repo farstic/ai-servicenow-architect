@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S06 — `--fix`: seven repairs, a closed whitelist, and a plan shown before anything moves.
 //
 // THE WHITELIST IS THE FEATURE. A doctor that repaired whatever it could would eventually repair

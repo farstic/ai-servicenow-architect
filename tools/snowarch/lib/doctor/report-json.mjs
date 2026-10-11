@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S01 — schema v1, and the validator the tests hold it to.
 //
 // EVERY KEY IS PRESENT FROM DAY ONE, `null` where a later story fills it. A consumer written

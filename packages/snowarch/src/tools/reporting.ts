@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * Reporting & Analytics tools — ServiceNow Reporting API + branded report generation.
  * All tools are Tier 0 (read-only) unless noted.

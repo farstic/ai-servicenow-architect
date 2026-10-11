@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // B03 mode — write down the answer the plan screen already collected.
 //
 // No prompt of its own, deliberately: principle 10 says the installation asks once, and a step that

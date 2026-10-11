@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — the engine's twenty-three checks, in the order a report prints them.
 //
 // One list, assembled from five files. The registry sorts by section anyway, so the order here is

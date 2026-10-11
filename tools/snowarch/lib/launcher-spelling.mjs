@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-07-C31 — the engine's launcher spelling, and the ONLY engine file allowed to spell it.
 //
 // These four strings lived in `text.mjs`, which `tests/windows-spellings.test.mjs` exempted as a

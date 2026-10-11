@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * Integration tools — REST Messages, Transform Maps, Import Sets, and Event Registry.
  * Read tools: Tier 0. Write tools: Tier 1 (WRITE_ENABLED=true).

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C87 — what a reviewer used to count by hand, per turn: the skills invoked, the corpus pages
 // read, and the cited pages that do not exist.
 //

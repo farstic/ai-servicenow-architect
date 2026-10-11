@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // B05 tool list — is this checkout internally consistent?
 //
 // Three questions, all about the same worry: a partial pull, an interrupted merge, or a maintainer

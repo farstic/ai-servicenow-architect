@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C1 — under SNOW_LICENCE_ENFORCE="true", the CLI refuses every command but the five a person
 // needs to see and repair the licence (ruling R1): licence, doctor, status, version and upgrade.
 //

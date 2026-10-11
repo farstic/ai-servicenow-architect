@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // FIRST, before anything that constructs the proxy agent. ESM evaluates every import before
 // the importing module's body, so this cannot be a call in main(): `EnvHttpProxyAgent` reads
 // the environment when it is constructed, and by then it would already have been built from

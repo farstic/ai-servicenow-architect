@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // An entry point that prints must not call `process.exit()`.
 //
 // Found by ARC-09-S02's CI: `the two docs entry points are one implementation` failed on one cell

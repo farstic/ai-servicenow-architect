@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C1 — `./snowarch licence`: keygen, issue, show, verify, check, init-list and revoke.
 //
 // The owner's side (keygen, issue, init-list, revoke) works with PRIVATE keys, and the rule for those

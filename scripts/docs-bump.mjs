@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-03-S09 — the weekly bump, as a script the workflow calls and a human can run.
 //
 // Thin on purpose. Everything that decides anything lives in ARC-03-S07's `syncUpstream`: what the

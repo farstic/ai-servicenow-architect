@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * Generate sample PDF reports for the ServiceNow MCP Toolkit website.
  * Produces 6 branded PDFs with realistic ACME Corp demo data.

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S09 — `tools/snowarch/lib/text.json`, generated from `text.mjs`.
 //
 // The Node-free launchers (S10/S11) print the same closing block, and they cannot import a module.

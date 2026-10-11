@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S07 — every check the old engine's `doctor.sh` made, and where it went.
 //
 // `00` §3.9 calls that script the most precise existing specification of a correct install, and it

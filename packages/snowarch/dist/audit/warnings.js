@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { ERROR_CODE_NAMES } from '../errors/codes.js';
 /**
  * What a warning may leave behind in the audit trail (ARC-09-C101, b).

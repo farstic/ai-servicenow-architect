@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-S04 — what `./snowarch version` says about the release it is on.
 //
 // The command is what a person runs when something is already wrong, so every line has to be true

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S13 / ARC-10 acceptance (B02-06) — `tests/VALIDATION-TESTS.md` → the prompts a run needs.
 //
 // THE SPEC IS THE SOURCE. A harness that carried its own copy of eighteen prompts would be a second

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * ARC-07-C35 — the launcher audit, and its three failure modes each driven.
  *
@@ -483,8 +485,10 @@ test('C35b — a `//` inside a template cannot swallow the lines after it (item 
 test('C35b — the real file: b00-checks has no phantom site at :93 (item 1)', () => {
   const file = 'tools/snowarch/tests/b00-checks.test.mjs';
   const lines = assertedLaunchers(file, readFileSync(resolve(root, file), 'utf8')).map((s) => s.line);
-  assert.deepEqual(lines, [102, 111],
-    `the phantom at :93 is back or a real site moved: ${JSON.stringify(lines)}`);
+  // ARC-11-C2 — two lines down, for the copyright header the file now opens with: the phantom that was at
+  // :93 would be at :95, and the two real sites moved from 102 and 111.
+  assert.deepEqual(lines, [104, 113],
+    `the phantom at :95 (once :93) is back or a real site moved: ${JSON.stringify(lines)}`);
 });
 
 test('C35b — an inline pinned spelling call is a PINNED expectation (item 3)', () => {

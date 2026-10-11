@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — E-19…E-22: the contract, and the governing text that has to agree with it.
 //
 // Four checks, four calls into code that already exists: L03 (retired names), L02 (registration

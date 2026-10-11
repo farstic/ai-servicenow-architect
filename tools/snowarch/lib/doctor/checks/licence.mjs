@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C1 — E-31, the licence: what the banner says, as a check, so `status` and the doctor say it too.
 //
 // A WARNING, NEVER A FAILURE, AND IN THE QUICK SET. Nobody had a licence before 2.0.12, so a failure

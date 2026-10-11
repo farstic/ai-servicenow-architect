@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — E-12…E-16 over an INJECTED `docsStatus`.
 //
 // The corpus is a 35,000-file submodule. Building four fixtures of it to exercise four verdicts

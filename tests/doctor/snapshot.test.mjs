@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S11 — the doctor's answer, per check, held to a snapshot.
 //
 // Eleven ARCs name a doctor check as their proof. A check that quietly stops running takes the

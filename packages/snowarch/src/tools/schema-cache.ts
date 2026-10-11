@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * Schema Cache — TTL-based in-memory cache for discovered table schemas.
  * Used by the dynamic schema discovery tool to avoid re-querying on every call.

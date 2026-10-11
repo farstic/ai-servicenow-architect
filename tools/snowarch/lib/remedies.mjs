@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S04 — one remedy per failing check per platform, held as DATA.
 //
 // `remedies.json` rather than a JavaScript table because the Node-free launchers (ARC-06-S10/S11)

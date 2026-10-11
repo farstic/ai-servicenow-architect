@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S10 — the sentences `bootstrap.sh` prints, generated into it.
 //
 // bash cannot read JSON, and the launcher must print the SAME sentences the Node path does — the

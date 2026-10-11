@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S02 — everything the CLI prints goes through here first.
 //
 // P-16: the engine this replaces printed a username in clear and kept six copies of a password.

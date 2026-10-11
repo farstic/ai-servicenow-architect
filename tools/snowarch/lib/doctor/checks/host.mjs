@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S03 — E-25, E-26, E-27: facts about the MACHINE, not about the checkout.
 //
 // Read-only, like `legacy.mjs`, and for the same reason: a cloud-sync folder, a proxy variable and

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C1 — the shipped key modules hold public keys and nothing else.
 //
 // THE PRIVATE KEYS ARE THE OWNER'S, AND ONLY THE OWNER'S. `licence keygen` writes them outside the

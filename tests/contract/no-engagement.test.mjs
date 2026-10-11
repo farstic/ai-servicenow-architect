@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C105 — a session with no engagement named, about to write to an instance.
 //
 // The rule is ONE sentence in an always-loaded file, worded for the owner and approved by them, so it is

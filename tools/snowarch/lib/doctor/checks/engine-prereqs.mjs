@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — E-00…E-04: what has to be on the machine before anything else can be true.
 //
 // Three of the five are the bootstrap's own preflight, re-asked. That is deliberate and it is why

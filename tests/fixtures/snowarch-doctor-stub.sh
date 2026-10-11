@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+# snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 # A stand-in for `./snowarch doctor`, so `.claude/skills/snowarch/SKILL.md` can be exercised in a
 # real session before ARC-07/ARC-08 build the launcher and the doctor. Copy it into a scratch
 # checkout as `./snowarch` (`chmod +x`) and set SNOWARCH_STUB_MODE to the scenario under test:

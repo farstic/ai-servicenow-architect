@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * Flow Designer tools — list, inspect, trigger, and monitor flows and subflows.
  * Read tools: Tier 0. Trigger/create tools: Tier 1 (WRITE_ENABLED=true).

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // PERMANENT. This was written as a throwaway to be deleted with `scripts/maint/` at the end of the
 // ARC; it is executed by `tests/skill-bodies-preserved.test.mjs` now, which is why it moved to
 // `scripts/validation/`. A script a committed test runs is not throwaway (ARC-02-C1).

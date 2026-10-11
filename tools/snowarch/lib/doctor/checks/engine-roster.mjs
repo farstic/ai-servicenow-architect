@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — E-17, E-18: the roster, counted from the directory and linted by ARC-02-S02's rules.
 //
 // Five documents used to disagree about how many skills there are (`00` §3.8, P-12), and every one
