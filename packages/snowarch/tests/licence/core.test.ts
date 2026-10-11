@@ -87,8 +87,8 @@ describe('ARC-11-C1 — the server\'s licence core', () => {
     expect(check(signed(LICENCE_FORMAT, 'licence', payload()), null, []).state).toBe('invalid');
   });
 
-  it('ships a frozen list of 0 or 2 public keys', () => {
-    expect([0, 2]).toContain(PRODUCT_KEYS.length);
+  it('ships a frozen list of the owner\'s two public keys', () => {
+    expect(PRODUCT_KEYS.length).toBe(2);
     expect(Object.isFrozen(PRODUCT_KEYS)).toBe(true);
   });
 });

@@ -278,3 +278,20 @@ test('ARC-11-C1 — check says when the held list is more than a day old, and on
   assert.match(fresh.text, /revocation list: version 2, checked 2026-10-10T11:00:00\.000Z$/m);
   assert.equal(fresh.text.includes('more than a day old'), false);
 });
+
+test('ARC-11-C1 — after keygen, a perpetual live licence issued with the primary key is the next id, and verifies', async (t) => {
+  // The owner's own next step: a corrected creator licence. The keys `keygen` made are the product keys
+  // once committed, which is what injecting them here stands for.
+  const w = world(t);
+  const g = await keygen(t, w);
+  const r = await run(w, ['issue'], { to: 'Test Owner', org: 'Test Org', scope: 'live', perpetual: true, key: g.out },
+    { keys: g.keys });
+  assert.equal(r.code, EXIT_OK, r.text);
+  assert.match(r.text, /licence issue: LIC-2026-0002 for Test Owner \(Test Org\), live, perpetual/);
+  assert.equal(r.text.includes('not one this build ships'), false, 'the primary key is a product key');
+  const v = await run(w, ['verify', join(w.outside, 'LIC-2026-0002.json')], {}, { keys: g.keys });
+  assert.equal(v.code, EXIT_OK, v.text);
+  assert.match(v.text, /Licence: ok · LIC-2026-0002 · perpetual/);
+  const ledger = JSON.parse(readFileSync(join(w.outside, 'issued.json'), 'utf8'));
+  assert.deepEqual(ledger.issued.map((e) => [e.id, e.valid_until]), [['LIC-2026-0001', null], ['LIC-2026-0002', null]]);
+});

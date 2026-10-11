@@ -5,11 +5,10 @@
 // private key material, however it got there. A PEM private key always says so in its armour —
 // `-----BEGIN PRIVATE KEY-----`, or `ENCRYPTED PRIVATE KEY` — so the marker is the test.
 //
-// THE COUNT IS 0 OR 2, AND THEN EXACTLY 2. The branch is built with an empty list: the owner runs
-// keygen on their own machine and relays the two PUBLIC keys, and they are committed as C1's last code
-// commit. Until then every licence is `invalid` or `missing`, and warn-only, so nothing changes for
-// anyone. That final commit narrows `ALLOWED_COUNTS` to [2]: a release with one key has no recovery
-// key, and one with three trusts a key the owner did not make.
+// THE COUNT IS EXACTLY 2. The branch was built with an empty list, which this allowed as 0 or 2. The
+// owner then ran keygen on their own machine and relayed the two PUBLIC keys, and that commit narrowed
+// `ALLOWED_COUNTS` to [2]. A release with one key has no recovery key, and one with three trusts a key
+// the owner did not make.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPublicKey } from 'node:crypto';
@@ -21,7 +20,7 @@ import { fingerprint } from '../lib/licence/core.mjs';
 import { PRODUCT_KEYS } from '../lib/licence/keys.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const ALLOWED_COUNTS = [0, 2];
+const ALLOWED_COUNTS = [2];
 
 /** Every file that carries the key list: the CLI's, the server's source, and the server's committed build. */
 const SITES = [
@@ -46,7 +45,7 @@ test('ARC-11-C1 — the guard sees a private key when there is one', () => {
   assert.equal(privateMaterial('-----BEGIN PUBLIC KEY-----'), false);
 });
 
-test('ARC-11-C1 — the shipped list is empty until the owner\'s keys land, then a primary and a recovery key', () => {
+test('ARC-11-C1 — the shipped list is the owner\'s two keys: a primary and a recovery key', () => {
   assert.ok(ALLOWED_COUNTS.includes(PRODUCT_KEYS.length),
     `${PRODUCT_KEYS.length} product keys — the list holds ${ALLOWED_COUNTS.join(' or ')}`);
   if (PRODUCT_KEYS.length === 0) return;
