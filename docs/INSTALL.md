@@ -270,7 +270,7 @@ Nothing is touched before the plan is printed and accepted: it names the release
 will re-run, whether the store's schema moves (a migration, with a 0600 backup, announced first),
 and `credentials: untouched` — `.local/instances.json` is never read or written by an upgrade.
 Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a specific release and
-prints the way back; a branch that has diverged from `origin` is reported, not guessed at; a failed
+prints the way back; a diverged branch is reported, and a file in the release's way is named; a failed
 fetch prints git's error and a [proxy](TROUBLESHOOTING.md#proxy_unreachable) or [TLS](TROUBLESHOOTING.md#tls_ca_untrusted)
 remedy. The banner mentions a newer release only from a check you already ran — it never fetches.
 Full detail: [CONTRIBUTING.md](CONTRIBUTING.md#upgrading-the-product).

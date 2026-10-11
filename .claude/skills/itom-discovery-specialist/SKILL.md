@@ -233,11 +233,12 @@ Cite where Verdict B/C is in play.]
 ## Part 4 — Routing Recommendation
 
 [PROCEED — baseline configuration only / PROCEED — dispatch to Technical Designer with constraints / HALT — §1.1 proposal]
+- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire.
 
 [Consult flags:
 - Performance & Scale (large CI count, high Discovery throughput)
 - Security & GRC (privileged credentials, network-segmented data)
-- CMDB & CSDM Specialist (gateway — co-fire for CI/CSDM model placement when this task also shapes the data model)
+- CMDB & CSDM Specialist (gateway — co-fires in the same turn for CI/CSDM model placement when this task also shapes the data model)
 - Integration Specialist (for SGC or external data sources)
 - DevOps (for MID Server deployment automation)]
 
@@ -510,7 +511,7 @@ Reject if:
 
 - **Performance & Scale** — large CI counts (>1M), high Discovery throughput, complex query patterns on `cmdb_ci`
 - **Security & GRC** — privileged credentials for Discovery, network-segmented data, regulatory CI data classification
-- **CMDB & CSDM Specialist** — co-fire gateway when the request is CMDB/CSDM-model heavy (class placement, CSDM phase, IRE design); ITOM owns population, CMDB & CSDM owns the model
+- **CMDB & CSDM Specialist** — co-fire gateway, in the same turn, when the request is CMDB/CSDM-model heavy (class placement, CSDM phase, IRE design); ITOM owns population, CMDB & CSDM owns the model
 - **Integration Specialist** — for SGC integration or external data source plumbing
 - **DevOps** — for MID Server deployment automation
 - **Flow Designer Specialist** — for event-management-to-incident orchestration

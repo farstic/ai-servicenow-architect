@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import {
-  existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync,
+  existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,7 +118,63 @@ test('AC 3 — a modified tracked file stops the upgrade before anything moves',
   assert.equal(r.status, 2, r.text);
   assert.match(r.text, /tracked files are modified — commit or stash them first \(git stash\)/);
   assert.match(r.text, /nothing was changed/);
+  // ARC-09-C120: and which ones.
+  assert.match(r.text, /modified: CLAUDE\.md/);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
+}, MINUTES);
+
+// ARC-09-C120 — the owner's rc.3 upgrade stopped at U5 on an untracked file the release tracks, and did not say why.
+// Release B gains one tracked file here, and the user's checkout has that path untracked.
+const EXTRA = { path: 'notes/sitting.txt', content: 'from the release\n' };
+
+test('ARC-09-C120 — an untracked file the release tracks is refused at U4, by name, and nothing moves', async (t) => {
+  const w = await buildWorld(t, { extraFile: EXTRA });
+  bootstrapUser(w.user);
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const refused = (named) => {
+    const status = git(w.user, ['status', '--porcelain']);
+    const r = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+    assert.equal(r.status, 2, r.text);
+    assert.match(r.text, new RegExp(`upgrade: 1 untracked file is in the way of v9\\.2\\.0: ${named} — move it aside or commit it; `
+      + 'nothing was changed'));
+    assert.match(r.text, /git refuses to overwrite an untracked file the target tracks, even with identical content/);
+    assert.doesNotMatch(r.text, /\[U5\/7\]/, 'the refusal came after the tree started to move');
+    assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
+    assert.equal(git(w.user, ['status', '--porcelain']), status, 'the working tree changed after a refusal');
+  };
+  // Different content, then identical: git refuses both, so the plan does too.
+  for (const content of ['mine\n', EXTRA.content]) {
+    mkdirSync(join(w.user, 'notes'), { recursive: true });
+    writeFileSync(join(w.user, EXTRA.path), content);
+    refused('notes/sitting\\.txt');
+    assert.equal(readFileSync(join(w.user, EXTRA.path), 'utf8'), content, 'the untracked file was touched');
+  }
+  rmSync(join(w.user, 'notes'), { recursive: true, force: true });
+  await t.test('the same path in another case, on a case-insensitive checkout', (st) => {
+    if (git(w.user, ['config', '--get', '--bool', 'core.ignorecase'], { allowFail: true }) !== 'true') {
+      st.skip('this checkout is case-sensitive: Notes/ and notes/ are two directories here, and git checks out both');
+      return;
+    }
+    mkdirSync(join(w.user, 'Notes'), { recursive: true });
+    writeFileSync(join(w.user, 'Notes', 'sitting.txt'), 'mine\n');
+    refused('Notes/sitting\\.txt');
+  });
+}, MINUTES);
+
+test('ARC-09-C120 — a U5 failure the plan did not foresee names git\'s own reason', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  // Measured: `git status` exits 0 with a stale index.lock, and `git checkout` exits 128 on it, so the preflight
+  // and the plan pass and the move fails.
+  const lock = join(w.user, '.git', 'index.lock');
+  writeFileSync(lock, '');
+  try {
+    const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+    assert.equal(r.status, 1, r.text);
+    assert.match(r.text, /upgrade: git could not check out v9\.1\.0 — fatal: Unable to create '[^']+index\.lock': File exists\.; nothing else was changed/);
+    assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a failed checkout');
+  } finally { rmSync(lock, { force: true }); }
 }, MINUTES);
 
 test('AC 4 — a dead proxy fails the fetch with git\'s error and the proxy remedy', async (t) => {
