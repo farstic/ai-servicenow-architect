@@ -786,6 +786,24 @@ missing test (owner directive, 2026-09-08). Three places, in the same PR as the 
 Status filled in later is status nobody can trust; the point of the rule is that the plan is never
 describing a state the repository is not in.
 
+### `gh pr edit` can leave a pull request's body unchanged — update it through the API
+
+`gh pr edit 403 --body-file pr-body.md` left the body unchanged on #403 (ARC-11-C1, 2026-10-10). It printed:
+
+```
+GraphQL: Projects (classic) is being deprecated in favor of the new Projects experience … (repository.pullRequest.projectCards)
+```
+
+`gh pr edit` reads the pull request's classic project cards, which GitHub is retiring. Update the body
+through the REST API instead:
+
+```
+gh api -X PATCH repos/farstic/ai-servicenow-architect/pulls/403 -F body=@pr-body.md
+```
+
+Use your pull request's number and body file. Then read the body back with `gh pr view 403 --json body`,
+whichever command you used: only the body read back shows that the update landed.
+
 ### Citing code in a plan row — the expression, not the line
 
 A row in `docs/plans/**` cites code by **identifier or expression**, never as `path/file.ext:NNN`.

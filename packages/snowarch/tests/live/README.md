@@ -975,28 +975,36 @@ the server reads the variable once, at start, so setting it and unsetting it eac
 ### Setup
 
 **A, once:**
-1. Run `./snowarch licence keygen --out <keys>/primary.pem --recovery-out <offline>/recovery.pem --to "<owner>"
-   --org "<org>"`.
-2. Keep the recovery key offline. The creator licence `LIC-<year>-0001.json` is beside the primary key.
+1. Run `./snowarch licence keygen --out ~/snowarch-keys/primary.pem --recovery-out /Volumes/OFFLINE/snowarch-recovery.pem
+   --to "Jane Example" --org "Example Consulting Ltd"`.
+   - `--to` is your name; `--org` is your company, or your name again if there is none.
+   - Type the real values as they are, with no angle brackets: the creator licence records them.
+   - `--recovery-out` is a path on removable or offline storage.
+2. Keep the recovery key offline. The creator licence, `LIC-2026-0001.json` for a key made in 2026, is beside
+   the primary key.
 
 **A, before the first revoke:**
-1. Clone the list repository to `<list>`.
-2. Run `./snowarch licence init-list --list <list> --key <keys>/primary.pem`.
+1. Clone the list repository: `git clone https://github.com/farstic/snowarch-licences.git ~/snowarch-licences`. An
+   empty repository clones with a warning, and that is expected.
+2. Run `./snowarch licence init-list --list ~/snowarch-licences --key ~/snowarch-keys/primary.pem`.
 3. Run the git commands it prints. The product never pushes.
 
 ### The run
 
+The ids and dates below are an example run: `LIC-2026-0002` is the next id when the ledger holds only the
+creator licence, and `2027-10-31` is a date chosen for it. Use your own; the shapes are what to check.
+
 | # | Machine | Do | Expect |
 |---|---|---|---|
-| 1 | A | `./snowarch licence issue --to "<colleague>" --org "<org>" --scope live --valid-until <date> --key <keys>/primary.pem` | `licence issue: LIC-<year>-NNNN …`, and the file beside the key. Send the file outside the repository. |
-| 2 | B | Copy the file to `.local/licence.json`. Run `./snowarch licence check --refresh`. | `revocation list: version 1 fetched`, then `Licence: ok · LIC-<year>-NNNN · until <date>`. |
+| 1 | A | `./snowarch licence issue --to "Sam Example" --org "Example Consulting Ltd" --scope live --valid-until 2027-10-31 --key ~/snowarch-keys/primary.pem` | `licence issue: LIC-2026-0002 for Sam Example (Example Consulting Ltd), live, until 2027-10-31`, and the file beside the key. Send the file outside the repository. |
+| 2 | B | Copy the file to `.local/licence.json`. Run `./snowarch licence check --refresh`. | `revocation list: version 1 fetched`, then `Licence: ok · LIC-2026-0002 · until 2027-10-31`. |
 | 3 | B | Run `./snowarch doctor`, then `./snowarch status`. | E-31 ok, and no E-31 warning on the `Doctor:` line. |
-| 4 | B | Add `"env": { "SNOW_LICENCE_ENFORCE": "true" }` to `.claude/settings.local.json`, merged into what is there, or start `SNOW_LICENCE_ENFORCE=true claude`. Restart Claude Code, then call `snow_core_capabilities_read`. | The banner's second line is `Licence: ok · LIC-<year>-NNNN · until <date>`. The tool answers; there is no licence block. |
-| 5 | A | `./snowarch licence revoke LIC-<year>-NNNN --reason ended --key <keys>/primary.pem --list <list>`, then the printed git commands. | `… is now version 2`, pushed to `main`. |
-| 6 | B | Restart Claude Code. Wait three seconds, then call `snow_core_capabilities_read`. | The banner still reads `Licence: ok · LIC-<year>-NNNN · until <date>`. The tool answers `Error: licence revoked (LIC-<year>-NNNN) — SNOW_LICENCE_ENFORCE is "true", so no tool runs without a valid licence. …`. |
+| 4 | B | Add `"env": { "SNOW_LICENCE_ENFORCE": "true" }` to `.claude/settings.local.json`, merged into what is there, or start `SNOW_LICENCE_ENFORCE=true claude`. Restart Claude Code, then call `snow_core_capabilities_read`. | The banner's second line is `Licence: ok · LIC-2026-0002 · until 2027-10-31`. The tool answers; there is no licence block. |
+| 5 | A | `./snowarch licence revoke LIC-2026-0002 --reason ended --key ~/snowarch-keys/primary.pem --list ~/snowarch-licences`, then the printed git commands. | `… is now version 2`, pushed to `main`. |
+| 6 | B | Restart Claude Code. Wait three seconds, then call `snow_core_capabilities_read`. | The banner still reads `Licence: ok · LIC-2026-0002 · until 2027-10-31`. The tool answers `Error: licence revoked (LIC-2026-0002) — SNOW_LICENCE_ENFORCE is "true", so no tool runs without a valid licence. …`. |
 | 7 | B | Run `./snowarch mode`, `./snowarch version` and `./snowarch licence check`. | `mode` is refused with exit 3 and the same remedy. `version` answers. `check` shows `revocation list: version 2` and `Licence: revoked · enforced`. |
 | 8 | B | Restart Claude Code. | The banner reads `Licence: revoked · enforced`. |
-| 9 | B | Remove the `env` entry, or start `claude` without the variable. Restart Claude Code, then call the tool again. | The banner reads `Licence: revoked · warn only`. The tool answers, and the first answer carries a second block: `Licence: revoked · warn only — revoked on <date> (ended). …`. |
+| 9 | B | Remove the `env` entry, or start `claude` without the variable. Restart Claude Code, then call the tool again. | The banner reads `Licence: revoked · warn only`. The tool answers, and the first answer carries a second block: `Licence: revoked · warn only — revoked on YYYY-MM-DD (ended). …`, with step 5's date. |
 
 The restart at step 6 is the revocation's whole path to B. Every live start with a licence installed
 fetches the list in the background, within three seconds, and the state applies from the next call. The
@@ -1009,7 +1017,7 @@ still be served.
 Every row of the table, as written: the states, the refusal text and the exit code.
 
 The audit trail on B, in `.local/audit.jsonl`:
-- a line written after step 2 carries `"licence": "LIC-<year>-NNNN"`, and so does one written after the
+- a line written after step 2 carries `"licence": "LIC-2026-0002"`, and so does one written after the
   revocation, because the signature still holds;
 - a line written before step 2 carries no `licence` key;
 - reads write no line at all, so a write or a `snow_core_instance_switch` is what to look at.
