@@ -6,6 +6,7 @@ import { FakeRestClient } from '../helpers/fake-rest.js';
 import { withPreset } from '../helpers/preset.js';
 import { runWithInstance, type InstanceRuntime } from '../../src/servicenow/context.js';
 import { expandPreset } from '../../src/utils/permissions.js';
+import { ServiceNowError } from '../../src/utils/errors.js';
 
 withPreset('pdi-developer');
 
@@ -70,5 +71,19 @@ describe('ARC-09-C128 - current_update_set_read reads the session\'s preference,
     const r = await read(client);
     expect(r.session_update_set).toEqual({ sys_id: OTHER_SET, found: false });
     expect(r.in_progress_update_sets).toEqual([]);
+  });
+
+  it('the instance\'s NOT_FOUND for that set reads as found: false; any other error still fails the read', async () => {
+    // The fake answers a missing record with an empty object; the real client turns a 404 into NOT_FOUND.
+    class Answers extends FakeRestClient {
+      constructor(private readonly code: ConstructorParameters<typeof ServiceNowError>[1]) {
+        super({ queries: { [PREF_QUERY]: [{ sys_id: PREF_SYS_ID, value: OTHER_SET }] } });
+      }
+      override async getRecord(): Promise<Record<string, unknown>> {
+        throw new ServiceNowError(`get failed (${this.code})`, this.code);
+      }
+    }
+    expect((await read(new Answers('NOT_FOUND'))).session_update_set).toEqual({ sys_id: OTHER_SET, found: false });
+    await expect(read(new Answers('INSUFFICIENT_PRIVILEGES'))).rejects.toMatchObject({ code: 'INSUFFICIENT_PRIVILEGES' });
   });
 });
