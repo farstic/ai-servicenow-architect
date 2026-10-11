@@ -24,6 +24,17 @@ export declare function takeLicenceNotice(): string | null;
 export declare function licenceAuditField(): {
     licence?: string;
 };
+/** Why the router refused: a refused state, or `scope` for a design-only licence on a live server. */
+export type RefusalState = 'revoked' | 'expired' | 'invalid' | 'missing' | 'scope';
+/**
+ * ARC-11-C1 polish 2 — what a refusal's audit line says about the licence: the id when its signature holds,
+ * else `missing`, and why. A forged file's id is unverified text, and a line written from it would let
+ * whoever edits the file write into the audit trail, so it is never written.
+ */
+export declare function licenceRefusalFields(): {
+    licence: string;
+    state: RefusalState;
+};
 /**
  * Refresh the revocation list in the background and recompute the state when it lands. Never rejects
  * and never throws: a refresh that cannot run is an unreachable list, and the cached state stands.

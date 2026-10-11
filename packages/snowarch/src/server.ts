@@ -33,7 +33,7 @@ import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
 import { capResult, resolveCap } from './utils/result-size.js';
 import { appendAudit, auditDisabled, resolveAuditPath, type AuditWarning } from './audit/writer.js';
-import { currentLicence, licenceAuditField, startLicence, takeLicenceNotice } from './licence/session.js';
+import { currentLicence, licenceAuditField, licenceRefusalFields, startLicence, takeLicenceNotice } from './licence/session.js';
 import { licenceLine } from './licence/state.js';
 import type { ToolDefinition } from './tools/types.js';
 
@@ -171,6 +171,22 @@ export function createServer(): Server {
       });
     };
 
+    // ARC-11-C1 polish 2 — the router's licence refusal, for a read and a write alike, in place of the line
+    // above: the call reached no instance, so it records no argument and no value, only what was refused
+    // and why. A name no tool declares never gets here (UNKNOWN_TOOL is thrown first), so `name` is a
+    // declared tool's.
+    const writeLicenceRefusal = (): void => {
+      if (!auditTool) return;
+      appendAudit({
+        ts: new Date().toISOString(),
+        instance: startInstance?.label ?? '(none)',
+        tool: name,
+        gate: 'licence',
+        result: 'LICENCE_NOT_VALID',
+        ...licenceRefusalFields(),
+      });
+    };
+
     try {
       const tool = tools.find(t => t.name === name);
       if (!tool) {
@@ -241,7 +257,9 @@ export function createServer(): Server {
       auditResult = error instanceof ServiceNowError ? error.code : 'ERROR';
       // A tool that wrote and then failed: the failure is the headline, the cut it left is the rest.
       auditWarnings = summariseWarnings(carriedWarnings(error));
-      writeAudit();
+      // Only the router's `assertLicensed` raises LICENCE_NOT_VALID, so this is the refusal and nothing else.
+      if (auditResult === 'LICENCE_NOT_VALID') writeLicenceRefusal();
+      else writeAudit();
 
       // Includes a sentence about cut values when the tool had already written some before it threw
       // (ARC-09-C93); the text itself is built, and tested, in utils/tool-error.ts.

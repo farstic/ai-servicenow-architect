@@ -50,6 +50,23 @@ export interface AuditEntry {
  * raise was confirmed by a typed label or by `--confirm-label` on a CI command line — the one
  * distinction D-05's "typed" intent turns on.
  */
+/**
+ * ARC-11-C1 polish 2 — a call the router refused for the licence, a read or a write alike.
+ *
+ * The owner's rc.1 sitting found the trail empty after two refusals: the router refuses before the writer
+ * runs, and a read writes no line. A refused attempt is evidence. The line carries no argument and no
+ * value — no table, no sys_id, no query — because nothing was sent, and the tool's name is a declared one.
+ */
+export interface LicenceRefusalEntry {
+    ts: string;
+    instance: string;
+    tool: string;
+    gate: 'licence';
+    result: 'LICENCE_NOT_VALID';
+    /** The licence's id when its signature holds, else `missing`. */
+    licence: string;
+    state: 'revoked' | 'expired' | 'invalid' | 'missing' | 'scope';
+}
 export interface CliAuditEntry {
     ts: string;
     instance: string;
@@ -82,7 +99,7 @@ export declare function resetAuditWarning(): void;
  * local disk was full or read-only — the write already happened, and telling the caller
  * otherwise would be worse than losing the audit line.
  */
-export declare function appendAudit(entry: AuditEntry | CliAuditEntry): void;
+export declare function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry): void;
 /** The last `n` lines, parsed. Unparseable lines are skipped rather than throwing. */
 export declare function tailAudit(n?: number): AuditEntry[];
 /** The name ARC-07/08's `snowarch audit tail` calls. Same function, story's spelling. */

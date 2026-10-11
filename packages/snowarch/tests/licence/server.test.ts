@@ -131,6 +131,80 @@ describe('ARC-11-C1 — enforced, with no licence: every tool refused (R1)', () 
         expect(r.isError, name).toBe(true);
         expect(r.content[0].text, name).toMatch(/^Error: licence missing — .*\(Code: LICENCE_NOT_VALID\)/s);
       }
+      // Polish 2: one line per refused call, and no instance to name on an unconfigured server.
+      expect(auditLines().map((l) => [l.tool, l.instance, l.state])).toEqual(['snow_core_capabilities_read',
+        'snow_core_status_read', 'snow_core_instances_reload', 'snow_core_instances_index',
+        'snow_core_current_instance_read'].map((name) => [name, '(none)', 'missing']));
+    } finally { await client.close(); }
+  }, 40_000);
+});
+
+/** The keys of a licence refusal's audit line, and no others (polish 2). */
+const REFUSAL_KEYS = ['gate', 'instance', 'licence', 'result', 'state', 'tool', 'ts'];
+
+describe('ARC-11-C1 polish 2 — a licence refusal writes one audit line, and nothing else changes', () => {
+  // The owner's rc.1 sitting found .local/audit.jsonl empty after two refusals: the router refuses before
+  // the writer runs, and a read writes no line. For the owner's control story a refused attempt is evidence.
+  it('a refused read writes exactly one line: the tool, the label, gate licence, the licence and why', async () => {
+    writeStore();
+    const client = await connect(SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+    try {
+      expect((await call(client, 'snow_core_capabilities_read')).isError).toBe(true);
+      const lines = auditLines();
+      expect(lines).toHaveLength(1);
+      expect(Object.keys(lines[0]).sort()).toEqual(REFUSAL_KEYS);
+      expect(lines[0]).toMatchObject({ instance: 'pdi', tool: 'snow_core_capabilities_read', gate: 'licence',
+        result: 'LICENCE_NOT_VALID', licence: 'missing', state: 'missing' });
+    } finally { await client.close(); }
+  }, 40_000);
+
+  it('a refused write records no argument: no table, no sys_id, no query, no value', async () => {
+    writeStore();
+    const MARKER = 'POLISH2-PAYLOAD-MARKER';
+    const client = await connect(SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+    try {
+      const r = await call(client, 'snow_core_record_add', { table: 'incident', fields: { short_description: MARKER } });
+      expect(r.isError).toBe(true);
+      const lines = auditLines();
+      expect(lines).toHaveLength(1);
+      expect(Object.keys(lines[0]).sort()).toEqual(REFUSAL_KEYS);
+      expect(lines[0]).toMatchObject({ tool: 'snow_core_record_add', gate: 'licence', result: 'LICENCE_NOT_VALID' });
+      expect(readFileSync(join(checkout, '.local', 'audit.jsonl'), 'utf8')).not.toContain(MARKER);
+    } finally { await client.close(); }
+  }, 40_000);
+
+  it('a licensed build names the licence and why: design-only on live, expired, and a forged file', async () => {
+    writeStore();
+    const forged = JSON.parse(licenceText(licence(), primary));
+    forged.licence.org = 'Another Org';
+    const cases: Array<[string, Record<string, string>]> = [
+      [licenceText(licence({ scope: 'design-only' }), primary), { licence: 'LIC-2026-0002', state: 'scope' }],
+      [licenceText(licence({ valid_until: fromToday(-3) }), primary), { licence: 'LIC-2026-0002', state: 'expired' }],
+      // A forged file's id is unverified text, so the line names no licence.
+      [JSON.stringify(forged), { licence: 'missing', state: 'invalid' }],
+    ];
+    for (const [file, want] of cases) {
+      writeFileSync(join(checkout, '.local', 'licence.json'), file);
+      rmSync(join(checkout, '.local', 'audit.jsonl'), { force: true });
+      const client = await connect(LICENSED_SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+      try {
+        expect((await call(client, 'snow_core_capabilities_read')).isError, want.state).toBe(true);
+        const lines = auditLines();
+        expect(lines, want.state).toHaveLength(1);
+        expect(lines[0], want.state).toMatchObject({ gate: 'licence', result: 'LICENCE_NOT_VALID', ...want });
+      } finally { await client.close(); }
+    }
+  }, 60_000);
+
+  it('warn only: the notice writes no line, and neither does a refused argument (C121, unchanged)', async () => {
+    writeStore();
+    const client = await connect(SERVER);
+    try {
+      expect((await call(client, 'snow_core_current_instance_read')).content).toHaveLength(2);
+      const bad = await call(client, 'snow_core_current_instance_read', { instance: 'other' });
+      expect(bad.isError).toBe(true);
+      expect(bad.content[0].text).toMatch(/\(Code: INVALID_REQUEST\)/);
+      expect(auditLines()).toEqual([]);
     } finally { await client.close(); }
   }, 40_000);
 });

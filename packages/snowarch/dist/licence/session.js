@@ -90,6 +90,16 @@ export function licenceAuditField() {
     const s = currentLicence();
     return s.signatureValid && s.id ? { licence: s.id } : {};
 }
+/**
+ * ARC-11-C1 polish 2 — what a refusal's audit line says about the licence: the id when its signature holds,
+ * else `missing`, and why. A forged file's id is unverified text, and a line written from it would let
+ * whoever edits the file write into the audit trail, so it is never written.
+ */
+export function licenceRefusalFields() {
+    const s = currentLicence();
+    const state = REFUSED.includes(s.state) ? s.state : 'scope';
+    return { licence: s.signatureValid && s.id ? s.id : 'missing', state };
+}
 function readConfig(root) {
     try {
         return JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));

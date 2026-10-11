@@ -1,7 +1,8 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
- * One JSON line per mutating call, in a file inside the checkout.
+ * One JSON line per mutating call, in a file inside the checkout, and one per call the licence refused
+ * (`LicenceRefusalEntry`).
  *
  * §2.1 says a write needs "write approved" from the user. Before this, that was provable only
  * from a conversation transcript — which the reviewer asking the question does not have. The

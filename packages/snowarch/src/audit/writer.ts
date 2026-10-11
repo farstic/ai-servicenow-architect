@@ -1,7 +1,8 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
- * One JSON line per mutating call, in a file inside the checkout.
+ * One JSON line per mutating call, in a file inside the checkout, and one per call the licence refused
+ * (`LicenceRefusalEntry`).
  *
  * §2.1 says a write needs "write approved" from the user. Before this, that was provable only
  * from a conversation transcript — which the reviewer asking the question does not have. The
@@ -85,6 +86,24 @@ export interface AuditEntry {
  * raise was confirmed by a typed label or by `--confirm-label` on a CI command line — the one
  * distinction D-05's "typed" intent turns on.
  */
+/**
+ * ARC-11-C1 polish 2 — a call the router refused for the licence, a read or a write alike.
+ *
+ * The owner's rc.1 sitting found the trail empty after two refusals: the router refuses before the writer
+ * runs, and a read writes no line. A refused attempt is evidence. The line carries no argument and no
+ * value — no table, no sys_id, no query — because nothing was sent, and the tool's name is a declared one.
+ */
+export interface LicenceRefusalEntry {
+  ts: string;
+  instance: string;
+  tool: string;
+  gate: 'licence';
+  result: 'LICENCE_NOT_VALID';
+  /** The licence's id when its signature holds, else `missing`. */
+  licence: string;
+  state: 'revoked' | 'expired' | 'invalid' | 'missing' | 'scope';
+}
+
 export interface CliAuditEntry {
   ts: string;
   instance: string;
@@ -152,7 +171,7 @@ function rotate(file: string): void {
  * local disk was full or read-only — the write already happened, and telling the caller
  * otherwise would be worse than losing the audit line.
  */
-export function appendAudit(entry: AuditEntry | CliAuditEntry): void {
+export function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry): void {
   const file = resolveAuditPath();
   if (file === null) return;
 

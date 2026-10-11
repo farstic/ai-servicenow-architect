@@ -1020,7 +1020,10 @@ The audit trail on B, in `.local/audit.jsonl`:
 - a line written after step 2 carries `"licence": "LIC-2026-0002"`, and so does one written after the
   revocation, because the signature still holds;
 - a line written before step 2 carries no `licence` key;
-- reads write no line at all, so a write or a `snow_core_instance_switch` is what to look at.
+- reads write no line at all, so a write or a `snow_core_instance_switch` is what to look at;
+- every call refused for the licence writes one line, a read included: `"gate": "licence"`,
+  `"result": "LICENCE_NOT_VALID"`, `"licence": "LIC-2026-0002"` (or `missing`) and `"state": "revoked"`, with no
+  argument and no value.
 
 **A failure looks like:**
 - a tool answering at step 6, three seconds after the restart;

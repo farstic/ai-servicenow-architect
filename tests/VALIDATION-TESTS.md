@@ -1595,6 +1595,8 @@ returns.
 - The audit trail on B, `.local/audit.jsonl`: a line written after row 3 carries `"licence": "LIC-2026-0002"`,
   and so does one written after the revocation, because the signature still holds. A line written before
   row 3 carries no `licence` key. Reads write no line, so look at a write or a `snow_core_instance_switch`.
+- Every call the licence refused in rows 6, 8, 11 (the next day) and 12 wrote one line: `"gate": "licence"`, `"result":
+  "LICENCE_NOT_VALID"`, the licence's id (or `missing`) and its `state`, with no argument and no value.
 - Teardown on B: `.local/licence.json` removed and `SNOW_LICENCE_ENFORCE` unset wherever it was set. The list
   stays as it is: a revocation is not undone, and a new licence is issued instead.
 
