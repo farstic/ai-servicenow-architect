@@ -9,14 +9,85 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A licence, checked by the product itself, and warn only by default (ARC-11-C1).** With no licence and
-`SNOW_LICENCE_ENFORCE` unset, which is every checkout today, exactly three things change:
+**This release adds a licence the product checks itself, warn only by default, and the licensing documents.** It
+also changes four behaviours:
+- a co-firing gateway writes its Envelope in the same turn (ARC-09-C118);
+- in live mode, the Architect reads on the instance what the corpus cannot settle, before an Envelope is final
+  (ARC-09-C117);
+- `./snowarch upgrade` names an untracked file that would stop it, before anything moves (ARC-09-C120);
+- the ATF step tool reads its inputs' limits and lists every input row of a step (ARC-09-C122).
+
+There is no migration step: an existing checkout keeps its instance store, its preset and its flags untouched, and
+the documentation corpus stays pinned at `68c0d11`. The server has 399 tools, as in 2.0.11. The error registry
+gains one code (72 to 73), `LICENCE_NOT_VALID`, which only `SNOW_LICENCE_ENFORCE="true"` can raise.
+
+A checkout with no licence and enforcement unset, which is every checkout today, sees exactly three things of the
+licence:
 - doctor check E-31 warns;
 - the session banner and `./snowarch status` gain a `Licence:` line after the `Mode:` line;
-- a session's first tool answer carries one extra block, after the first one, which is unchanged.
+- a session's first tool answer carries one extra block, after its first, which is unchanged.
 
-The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72 to 73), which only
-`SNOW_LICENCE_ENFORCE="true"` can raise.
+**The licence of the code.** Every 2.0.x release, 2.0.12 included, stays under the Apache License 2.0. From 2.1.0
+the licence is enforced by default (ARC-11-C3), and the product moves to the Business Source License 1.1
+(ARC-11-C5). A version's licence is the `LICENSE` file in its release tag (`LICENSING.md`, § Future versions).
+
+**The release candidates, and what a live instance has confirmed.** `v2.0.12-rc.1` (`9a75d8e`) and
+`v2.0.12-rc.2` (`18e5020`) were cut before this release.
+- **rc.1, the owner's licence sitting, round 1:** two folders on one machine; the record is
+  `docs/validation/2.0.12-rc.1-licence-sitting.md`. It confirmed ARC-11-C1:
+  - a creator licence and a colleague's were issued and installed;
+  - under enforcement a revoked licence refused every tool at the next session;
+  - a design-only licence refused every tool of a live server;
+  - a forged file read as invalid;
+  - an end date already past could not be issued;
+  - a placeholder name was refused;
+  - the recovery key verified;
+  - back to warn only, the notice was information.
+
+  Its two defects were fixed before rc.2: the status panel now prints the `Licence:` line in every state, and
+  every licence refusal writes one audit line.
+- **rc.2, the owner's live sitting:** the creator folder, upgraded from rc.1; the record is
+  `docs/validation/2.0.12-rc.2-live-sitting.md`.
+  - T-29, live verification: eleven items measured from seven reads, each cited "measured on instance <label>,
+    <date>", and no audit line written;
+  - T-30, both Envelopes in one turn: FSO and CSM reconciled once, cited by full corpus path, in 2 min 22 s
+    against 2.0.11-rc.1's 1 min 07 s;
+  - the ATF step tool, live: a 2680-character script refused before any write, against its input variable's
+    max_length of 2000, and the listing showing `jasmine_version` defaulted by the instance;
+  - the status panel's `Licence:` line, rc.1's first defect, seen fixed;
+  - the `expired` state: [pending, 2026-10-12: the line and the refusal];
+  - round 2, on the colleague's machine: [pending: result].
+
+The live procedures are in `packages/snowarch/tests/live/README.md`.
+
+**What a user sees, at the terminal.**
+- **A licence.** `.local/licence.json` holds it: issued by the owner, signed with Ed25519, and checked offline
+  against a signed revocation list. `./snowarch licence show` and `licence check` read it, and
+  `licence verify <file>` checks any licence file.
+- **Enforcement is opt-in in 2.0.12.** Without `SNOW_LICENCE_ENFORCE="true"` nothing is refused. With it:
+  - a missing, invalid, expired or revoked licence refuses every MCP tool, and every CLI command but the five
+    that repair the state;
+  - a design-only licence refuses every tool of a live server;
+  - each refused tool call writes one audit line.
+- **The upgrade names what stops it.** An untracked file the release tracks, or a modified one, is named before
+  anything moves, and a failure while the tree moves quotes git's reason.
+
+**What a consultant sees, in a session.**
+- **Co-firing gateways write both Envelopes in the turn.** "Reconcile before dispatch" is gone. Each Envelope
+  cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)`, and has its own eight-page
+  grounding budget.
+- **Live mode reads what the corpus cannot settle.**
+  - Choice values, fields, table parents, installed apps, assignment rules, SLA definitions and workspace pages
+    are read on the instance with read-only calls, eight per Envelope by default, and with no cap under the
+    Ultracode or max-effort opt-in, and cited "measured on instance <label>, <date>".
+  - The raw reads go in `<envelope>-readings.md` beside the Envelope, with the label and the date, never a URL or
+    an account.
+  - What is not an instance fact, such as the wording a customer sees, stays an OPEN QUESTION. Design-only is
+    unchanged.
+- **The ATF step tool reads its inputs' limits.** A value over its input variable's `max_length` is refused
+  before any write. Every input row of the step is listed, including those the instance defaulted.
+- **Under enforcement, a licence not in force stops the deliverable.** The Architect names the state and points
+  to `./snowarch licence check`. Without enforcement, the `Licence:` line is information.
 
 ### Added
 
