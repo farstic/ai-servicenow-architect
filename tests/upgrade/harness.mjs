@@ -347,7 +347,7 @@ const phase = (label, marks, fn) => {
   return r;
 };
 
-export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true } = {}) {
+export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null } = {}) {
   const marks = [];
   const worldStart = process.hrtime.bigint();
   const scratch = tempDir('snowarch-upgrade-', t);
@@ -474,6 +474,12 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // ordering lesson (rebuild first, then generate, because the generated files quote the artefact)
   // arriving in the harness.
   regenerate(work);
+  // ARC-09-C120 — a file release B tracks and release A does not, for the cases where the user's checkout has that
+  // path untracked. Off by default, so every other case builds the world it always did.
+  if (extraFile) {
+    mkdirSync(dirname(join(work, extraFile.path)), { recursive: true });
+    writeFileSync(join(work, extraFile.path), extraFile.content);
+  }
   commit(work, 'feat(server): store schema v2', upstream.pin);
   const tB = process.hrtime.bigint();
   await tagRelease(work, '9.2.0', { claudeFloor });
