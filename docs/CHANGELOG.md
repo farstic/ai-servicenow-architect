@@ -82,6 +82,9 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   refuses to overwrite one even with identical content, and the owner's rc.3 upgrade stopped at U5 with no reason. The
   preflight names the modified files, and a failure while the tree moves quotes git's own reason; "diverged" is said
   only when git refused the fast-forward (ARC-09-C120).
+- `snow_atf_atf_step_add` refuses a value longer than its input variable's `max_length` before any write. It lists
+  every input row of the step, including the rows the instance created from the config's defaults, and reports a mandatory
+  input left without a value (ARC-09-C122).
 
 ## 2.0.11 — 2026-10-10
 

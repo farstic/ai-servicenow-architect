@@ -345,6 +345,9 @@ the 2.0.11-rc.3 live sitting (ARC-09-C95)
   `DELETE_CONSTRAINT` ("ACL Exception Delete Failed due to security constraints"); whether an ACL or a
   reference constraint caused it is not established.
 - **Removed with the step.** Deleting the step removed both rows.
+- **What the tool now reports (ARC-09-C122).** `snow_atf_atf_step_add` lists every input row of the step, these
+  included, as `defaulted by the instance`. A mandatory input left without a value is reported as `FIELD_NOT_STORED` on
+  `inputs.<name>`, after the write. A value longer than its input variable's `max_length` is refused before it.
 
 **Grounding:** `markdown/application-development/automated-test-framework-atf/test-steps-server-category.md`
 names the step's Jasmine version and Test script fields by their labels. The rest is not documented in the

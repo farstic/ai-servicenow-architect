@@ -5,6 +5,7 @@ import { newDb, refused, resetCicd, type CicdState, type FakeDb } from '../helpe
 import { ServiceNowClient } from '../../src/servicenow/client.js';
 import { runWithInstance, type InstanceRuntime } from '../../src/servicenow/context.js';
 import { routeToolInvocation } from '../../src/tools/index.js';
+import { atfToolManifest } from '../../src/tools/atf.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import type { ServiceNowError } from '../../src/utils/errors.js';
 
@@ -441,5 +442,120 @@ describe('ARC-09-C95 — snow_atf_atf_step_add writes the step and its inputs, a
     expect(error?.code).toBe('INSUFFICIENT_PRIVILEGES');
     expect(error?.message).toContain(cicd.db!.rows.sys_atf_step[0].sys_id as string);
     expect(error?.message).toMatch(/was created/);
+  });
+});
+
+describe('ARC-09-C122 — snow_atf_atf_step_add reads each input variable\'s max_length and mandatory, and lists every input row', () => {
+  // On rc.3, "Run Server Side Script" had `script` (max_length 2000) and `jasmine_version` (mandatory), and the step
+  // insert created both input rows itself (PN-16): jasmine_version from the config's default, and script with its own
+  // default, which the tool then overwrote. The tool read neither max_length nor mandatory, and listed only the script.
+  const variable = (element: string) => cicd.db!.rows.atf_input_variable.find((v) => v.model === RSSS && v.element === element)!;
+  const codePoints = (text: string) => Array.from(text).length;
+  /** rc.3's insert: both input rows created by the instance (PN-16). */
+  const rc3Insert = (jasmine = '3.1') => {
+    const db = cicd.db!;
+    db.afterInsert = (table, row) => {
+      if (table !== 'sys_atf_step') return;
+      db.rows.sys_variable_value.push(
+        { sys_id: id('9', 1), document: 'sys_atf_step', document_key: row.sys_id, variable: V_JASMINE, value: jasmine },
+        { sys_id: id('9', 2), document: 'sys_atf_step', document_key: row.sys_id, variable: V_SCRIPT, value: '// default' },
+      );
+    };
+  };
+
+  it('a value longer than its input variable\'s max_length is refused before any write, naming the variable and both lengths', async () => {
+    variable('script').max_length = '20';
+
+    const { error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(error?.code).toBe('VALUE_TOO_LONG');
+    expect(error?.message).toContain(`inputs.script is ${codePoints(SCRIPT)} characters; its input variable's max_length is 20. `
+      + 'Nothing was written.');
+    expect(writes()).toEqual([]);
+  });
+
+  it('a value of exactly its input variable\'s max_length is written', async () => {
+    variable('script').max_length = String(codePoints(SCRIPT));
+
+    const { value, error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(error).toBeUndefined();
+    expect(value).toMatchObject({ inputs: [{ name: 'script', written: 'created' }] });
+  });
+
+  it.each([['absent', undefined], ['0', '0'], ['not a number', 'many']])('a max_length that is %s refuses nothing', async (_, limit) => {
+    if (limit === undefined) delete variable('script').max_length;
+    else variable('script').max_length = limit;
+
+    const { error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(error).toBeUndefined();
+    expect(writesTo('sys_atf_step')).toHaveLength(1);
+  });
+
+  it('every input row of the step is listed: the one the tool wrote, and the one the instance defaulted (rc.3, PN-16)', async () => {
+    rc3Insert();
+
+    const { value, error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(error).toBeUndefined();
+    const inputs = value.inputs as Array<Record<string, unknown>>;
+    expect(inputs).toHaveLength(2);
+    expect(inputs).toEqual(expect.arrayContaining([
+      { name: 'script', sys_id: id('9', 2), written: 'updated' },
+      { name: 'jasmine_version', sys_id: id('9', 1), written: 'defaulted by the instance' },
+    ]));
+    expect(value.warnings).toBeUndefined();
+  });
+
+  it('a row of a variable this config does not have is listed with name null, and no warning', async () => {
+    const db = cicd.db!;
+    db.afterInsert = (table, row) => {
+      if (table === 'sys_atf_step') {
+        db.rows.sys_variable_value.push({ sys_id: id('9', 3), document: 'sys_atf_step', document_key: row.sys_id, variable: V_LOG, value: 'x' });
+      }
+    };
+
+    const { value } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(value.inputs).toEqual(expect.arrayContaining([{ name: null, sys_id: id('9', 3), written: 'defaulted by the instance' }]));
+    expect(value.warnings).toBeUndefined();
+  });
+
+  it('a mandatory input the step was written without is FIELD_NOT_STORED on inputs.<name> after the write, never a refusal', async () => {
+    variable('jasmine_version').mandatory = 'true';
+
+    const { value, error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(error).toBeUndefined();
+    expect(writesTo('sys_atf_step')).toHaveLength(1);
+    expect(warningFor(value, 'inputs.jasmine_version')).toMatchObject({ code: 'FIELD_NOT_STORED', table: 'sys_variable_value' });
+  });
+
+  it('a mandatory input the instance left empty is FIELD_NOT_STORED too', async () => {
+    variable('jasmine_version').mandatory = 'true';
+    rc3Insert('');
+
+    const { value } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(warningFor(value, 'inputs.jasmine_version')).toMatchObject({ code: 'FIELD_NOT_STORED', table: 'sys_variable_value' });
+  });
+
+  it('a mandatory input the instance defaulted is no warning', async () => {
+    variable('jasmine_version').mandatory = 'true';
+    rc3Insert();
+
+    const { value, error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(error).toBeUndefined();
+    expect(warningFor(value, 'inputs.jasmine_version')).toBeUndefined();
+  });
+
+  it('the description says "its input variable\'s max_length" and the rows it lists, and gives no number', () => {
+    const tool = atfToolManifest().find((t) => t.name === 'snow_atf_atf_step_add')!;
+
+    expect(tool.description).toContain("a value longer than its input variable's max_length");
+    expect(tool.description).toContain('lists every input row of the step');
+    expect(tool.description).not.toMatch(/max_length[^.]*\d/);
   });
 });
