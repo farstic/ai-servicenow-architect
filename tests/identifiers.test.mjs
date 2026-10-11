@@ -22,9 +22,12 @@ const EXPECTED = { 'example-field': 9, 'payload-key': 23, 'example-role': 3, 'sc
 // The excuses the real roster rests on, by kind (sites), and the absent names written only in capitals
 // or in mixed case. A new member of either is a decision made in review, as a new allow-list entry is:
 // the marker covers its whole line, and a platform name retyped in capitals is never looked at.
-const EXCUSES = { tool: 6, marker: 7, proposed: 4, glob: 5, glued: 1, placeholder: 4, 'script-code': 19 };
+// ARC-09-C117 moved `tool` from 6 to 18. The live-verification paragraph names `snow_core_records_query` and
+// `snow_disco_table_discover` in each of the six gateways' Part 2, the owner having approved its words.
+const EXCUSES = { tool: 18, marker: 7, proposed: 4, glob: 5, glued: 1, placeholder: 4, 'script-code': 19 };
 const CAPITALS = {
-  constant: ['AT_RISK', 'BODY_SHA256', 'CMDB_WRITE', 'FLAG_DEPENDENCY_VIOLATION', 'GET_TICKET', 'NOW_ASSIST',
+  // ARC-09-C117 added LICENCE_NOT_VALID: the live-verification paragraph says no read runs under it.
+  constant: ['AT_RISK', 'BODY_SHA256', 'CMDB_WRITE', 'FLAG_DEPENDENCY_VIOLATION', 'GET_TICKET', 'LICENCE_NOT_VALID', 'NOW_ASSIST',
     'POST_CLOSE_TICKET', 'POST_TICKET', 'PRESET_FLAGS_MISMATCH', 'PUT_TICKET', 'REST_OUT', 'WAR_ROOM'],
   mixed: ['Discovery_Custom', 'System_Ext'],
 };
