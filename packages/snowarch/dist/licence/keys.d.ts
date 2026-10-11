@@ -7,7 +7,7 @@
  * `tools/snowarch/tests/licence-keys-guard.test.mjs` fails on any private-key armour in this file,
  * its build or the CLI's copy.
  *
- * THE OWNER'S KEYS, from the owner's keygen (2026-10-11), committed here and in the CLI's copy as
+ * THE OWNER'S KEYS, from the owner's keygen, relayed on 2026-10-11 and committed here and in the CLI's copy as
  * ARC-11-C1's last code commit. A third key, or a replacement for either, is ARC-11-C3's key rotation.
  */
 import type { ProductKey } from './core.js';
