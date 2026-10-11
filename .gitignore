@@ -43,6 +43,9 @@ Thumbs.db
 # without racing tests/contract.test.ts, which reads the real one in a parallel worker. Removed
 # in a finally; listed so a killed run leaves nothing tracked.
 packages/snowarch/.tmp-doctor-dist/
+# ARC-11-C1: packages/snowarch/tests/licence/server.test.ts runs a copy of dist/ that trusts a key the test generated,
+# because no committed build trusts any key but the owner's. Removed after the run; listed for a killed one.
+packages/snowarch/.tmp-licence-dist/
 
 # Python's bytecode cache. `scripts/acceptance/tag-controls.py` is IMPORTABLE BY DESIGN — its
 # controls are data, and re-verifying every anchor against a tree is a read of `CONTROLS` rather

@@ -3,7 +3,7 @@
   "mode": "design-only",
   "summary": {
     "ok": 29,
-    "warn": 0,
+    "warn": 1,
     "fail": 1,
     "skip": 11,
     "fixable": 0
@@ -72,6 +72,11 @@
     {
       "id": "E-29",
       "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-31",
+      "status": "warn",
       "fixable": false
     },
     {

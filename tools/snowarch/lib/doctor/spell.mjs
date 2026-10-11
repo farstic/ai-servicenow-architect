@@ -13,12 +13,16 @@
  * `noTtyMessage` call site wrong in ARC-07-W7.
  *
  * A FUNCTION OF ITS ARGUMENT, not a module-load constant: the doctor can be told a platform, so a
- * case can drive a Windows remedy on a mac. `B06.mjs` reads `spellings()` once at load and is right
+ * case can drive a Windows remedy on a mac.
+ *
+ * `ctx.spell` FIRST (ARC-11-C1). `runDoctor` puts the told shell's spelling on the context, so a check
+ * spells what the Mode line spells. A context built without one — a case driving one check — keeps
+ * deriving it from `platform` and `env`, as before. `B06.mjs` reads `spellings()` once at load and is right
  * to — it renders for the process it is in — but the doctor's checks take a ctx, so they use it.
  */
 import { spellings } from '../text.mjs';
 
-export const spellFor = (ctx) => spellings({ platform: ctx?.platform, env: ctx?.env });
+export const spellFor = (ctx) => ctx?.spell ?? spellings({ platform: ctx?.platform, env: ctx?.env });
 
 /** The launcher alone, which is what almost every remedy needs. */
 export const cliOf = (ctx) => spellFor(ctx).cli;

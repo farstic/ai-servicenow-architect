@@ -275,6 +275,13 @@
       "showInRule": false
     },
     {
+      "code": "LICENCE_NOT_VALID",
+      "meaning": "SNOW_LICENCE_ENFORCE is \"true\" and this checkout's licence does not cover the call: it is missing, invalid, expired or revoked, or it is a design-only licence and the server is live. Every tool is refused, the instance-free ones included; with enforcement off, nothing is.",
+      "remedy": "Run <cli> licence check to see why, then install a valid licence as .local/licence.json or unset SNOW_LICENCE_ENFORCE. A running Claude Code session keeps what it read at start, so restart it afterwards",
+      "command": "<cli> licence check",
+      "showInRule": false
+    },
+    {
       "code": "NETWORK_ERROR",
       "meaning": "The instance was unreachable and the cause did not match a more specific classification.",
       "remedy": "the message carries the underlying cause",

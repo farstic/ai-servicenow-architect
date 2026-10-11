@@ -47,6 +47,9 @@ const isNudge = (line) => [
   BANNER.firstRun(SPELL), BANNER.staleRegistration(SPELL),
 ].includes(line) || /^A newer release is available \(/.test(line) || /^Doctor: \d+ FAIL /.test(line);
 
+/** ARC-11-C1 — the licence line, which follows the Mode line on every path that prints one. */
+const isLicence = (line) => /^Licence: (ok|expiring|expired|revoked|invalid|missing)\b/.test(line ?? '');
+
 /**
  * A run that is slower than the watchdog and still finishes.
  *
@@ -106,7 +109,8 @@ test('AC 1 — a fresh cache prints one Mode line and nothing but known nudges',
   // one" made this a test about the fixture's health: a runner without the docs submodule has a
   // failing corpus check, and the doctor-FAIL nudge is then correct output.
   assert.match(r.lines[0], /^Mode: /);
-  for (const line of r.lines.slice(1)) assert.ok(isNudge(line), `unexpected banner line: ${line}`);
+  assert.ok(isLicence(r.lines[1]), `the licence line is missing: ${r.lines[1]}`);
+  for (const line of r.lines.slice(2)) assert.ok(isNudge(line), `unexpected banner line: ${line}`);
 
   // No budget here. What the number was standing in for — that the fast path does no work — is
   // asserted as a FACT by the two cases below: the branch returns `cache` without importing the
@@ -121,7 +125,8 @@ test('AC 1 — the fast path reads two files and imports no part of the doctor',
   const result = await banner({ root, run: () => { throw new Error('the doctor was imported'); } });
   assert.equal(result.path, 'cache');
   assert.match(result.lines[0], /^Mode: /);
-  for (const line of result.lines.slice(1)) assert.ok(isNudge(line), `unexpected: ${line}`);
+  assert.ok(isLicence(result.lines[1]), `the licence line is missing: ${result.lines[1]}`);
+  for (const line of result.lines.slice(2)) assert.ok(isNudge(line), `unexpected: ${line}`);
 });
 
 /**
@@ -150,7 +155,8 @@ test('AC 1 — the fast path spawns nothing: it prints from the cache with git o
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stderr, '');
   assert.match(r.lines[0], /^Mode: /);
-  for (const line of r.lines.slice(1)) assert.ok(isNudge(line), `unexpected banner line: ${line}`);
+  assert.ok(isLicence(r.lines[1]), `the licence line is missing: ${r.lines[1]}`);
+  for (const line of r.lines.slice(2)) assert.ok(isNudge(line), `unexpected banner line: ${line}`);
   // And the line is the CACHE's, not a fallback: a hook that had fallen back would say so.
   assert.equal(r.lines[0], readJson(root, '.local/doctor-last.json').modeLine);
 });

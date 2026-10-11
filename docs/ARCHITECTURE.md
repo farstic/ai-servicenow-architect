@@ -120,6 +120,9 @@ source that drifts. The schema beside it (`engine.config.schema.json`) refuses a
 | `roster.skills` | how many skills the roster has | `gen-roster.mjs --check`, the doctor's E-20 |
 | `roster.agents` | how many agents the roster has | the same two |
 | `roster.utility` | the utility skills, which are not personas and are counted separately | `gen-roster.mjs`, the roster lint |
+| `licence.revocations.repo` | where the signed revocation list is published, fetched by git from this address and never from `origin` (ARC-11-C1) | `licence check --refresh`, `upgrade` and `upgrade --check` with a licence installed, and a live server start |
+| `licence.revocations.ref` | the branch that carries the list | the same three |
+| `licence.revocations.path` | the list's file on that branch | the same three |
 
 ## Registration files
 
@@ -1262,6 +1265,7 @@ about one registry rather than several:
 | `E-10` | repo | settings.local toggles match the recorded mode | yes | yes |
 | `E-11` | repo | .local/ state | yes | yes |
 | `E-29` | repo | the bootstrap finished | yes | — |
+| `E-31` | repo | the licence for this checkout | yes | — |
 | `E-12` | docs | docs corpus present | — | yes |
 | `E-13` | docs | docs pin | — | yes |
 | `E-14` | docs | docs family | — | — |
@@ -1670,5 +1674,5 @@ of `engine.config.json` |
 | D36 | `CLAUDE.md` gates on `mcp__<key>__` | E-20 | re-targeted to the generated rule file, the protocol page and both registrations |
 | D37 | tool-name currency against the rename map | E-19 | `retired-names.json` |
 
-**New checks with no old counterpart** (15): `E-06`, `E-11`, `E-29`, `E-15`, `E-18`, `E-21`, `E-22`, `E-30`, `E-25`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
+**New checks with no old counterpart** (16): `E-06`, `E-11`, `E-29`, `E-31`, `E-15`, `E-18`, `E-21`, `E-22`, `E-30`, `E-25`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
 <!-- /generated:doctor-mapping -->

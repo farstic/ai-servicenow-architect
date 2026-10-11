@@ -208,6 +208,13 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     flags: options,
     platform: process.platform,
     env: childEnv(root),
+    // ARC-11-C1, completing ARC-07-W17 for the CHECKS: the shell this run was TOLD about, as spelled
+    // launchers. `platform` and `env` above stay the machine's, because what a check MEASURES (file
+    // modes, paths, a binary on PATH) is the machine's; what a check TELLS the reader to type is the
+    // told shell's, exactly as the Mode line already is. E-31 was the first quick check whose committed
+    // fixture names a launcher, and the Windows cells rendered `.\snowarch.cmd` into a POSIX fixture.
+    // In production the told shell IS the machine's, so nothing a user sees changes.
+    spell: spellFor({ platform, env }),
     // Supplied by the entry point. Nothing under `lib/` reads the home directory itself — the
     // repo-wide rule — and the doctor needs it only to shorten a path to `~` in a report.
     home,

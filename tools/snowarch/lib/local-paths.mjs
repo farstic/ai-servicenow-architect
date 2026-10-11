@@ -63,3 +63,9 @@ export const upgradeCheckPath = (root) => join(localDir(root), 'upgrade-check.js
 
 /** `.local/logs` — one file per command run, rotated to the last ten. */
 export const logsDir = (root) => join(localDir(root), 'logs');
+
+/** `.local/licence.json` — the installed licence (ARC-11-C1). Signed, not secret, copied in by hand. */
+export const licencePath = (root) => join(localDir(root), 'licence.json');
+
+/** `.local/revocations.json` — the last revocation list fetched, and when (ARC-11-C1). The banner reads it. */
+export const revocationsPath = (root) => join(localDir(root), 'revocations.json');

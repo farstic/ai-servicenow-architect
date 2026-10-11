@@ -10,6 +10,7 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { closeTool, refuseUndeclared } from './arguments.js';
+import { assertLicensed } from '../licence/session.js';
 
 // Core (existing 15 tools)
 import { coreToolManifest, dispatchCoreAction } from './core.js';
@@ -387,6 +388,10 @@ export async function routeToolInvocation(
   name: string,
   args: Record<string, unknown>
 ): Promise<any> {
+  // ARC-11-C1, ruling R1: under SNOW_LICENCE_ENFORCE="true", no valid licence, no tool — the instance-free
+  // ones and a playbook's steps included. First, so a refused session learns nothing about any tool's
+  // arguments; a no-op when enforcement is off.
+  assertLicensed();
   // ARC-09-C121: before anything else, so an instance-free tool and a playbook's step are checked too.
   const tool = TOOLS_BY_NAME.get(name);
   if (tool) refuseUndeclared(tool, args);

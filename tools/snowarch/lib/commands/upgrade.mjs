@@ -42,6 +42,7 @@ import { engineChecks } from '../doctor/checks/index.mjs';
 import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
+import { refreshWithUpgrade } from '../licence/fetch.mjs';
 import { hashFor, INPUTS, STEP_IDS } from '../inputs.mjs';
 
 /**
@@ -591,6 +592,9 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   // whose `behind` was a literal — the asymmetry IS the distinction this row is about.
   writeUpgradeCheck(root, { latestTag: latest, localTag, behind, remote, now,
     source: 'upgrade-check' });
+  // ARC-11-C1 — the revocation list rides on the same user-started fetch, from its own explicit URL and
+  // only with a licence installed: without one this is a no-op, and the run prints what it always did.
+  refreshWithUpgrade(root, { config, env, now: now(), log });
 
   if (flags.check) {
     log.step(behind

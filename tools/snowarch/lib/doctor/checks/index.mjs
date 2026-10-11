@@ -19,6 +19,7 @@ import { engineRepoChecks } from './engine-repo.mjs';
 import { engineRosterChecks } from './engine-roster.mjs';
 import { hostChecks } from './host.mjs';
 import { legacyChecks } from './legacy.mjs';
+import { licenceChecks } from './licence.mjs';
 import { serverChecks } from './server.mjs';
 
 /** Every engine check, as plain definitions — a caller may register a subset. */
@@ -26,6 +27,7 @@ export function engineChecks() {
   return [
     ...enginePrereqChecks(),
     ...engineRepoChecks(),
+    ...licenceChecks(),
     ...engineDocsChecks(),
     ...engineRosterChecks(),
     ...engineContractChecks(),

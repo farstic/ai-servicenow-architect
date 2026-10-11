@@ -29,5 +29,12 @@
     "utility": [
       "snowarch"
     ]
+  },
+  "licence": {
+    "revocations": {
+      "repo": "farstic/snowarch-licences",
+      "ref": "main",
+      "path": "revocations.json"
+    }
   }
 }

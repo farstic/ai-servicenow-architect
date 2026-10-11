@@ -57,7 +57,9 @@ test('the live fixture renders to exactly these bytes', () => {
     // The tally moves when a check is added — ARC-08-C30's E-29 took it from 14 to 15 — so it is
     // read from the fixture's own summary rather than spelled, the way the version and the shas
     // are. What this assertion is for is the SHAPE of the line, not the arithmetic in it.
-    `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn, ${LIVE.summary.fail} fail`
+    // ARC-11-C1 — E-31 warns on every checkout without a licence, the fixture's own included, so the
+    // warning is NAMED here: the shape of the line now carries one id in brackets.
+    `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn (E-31), ${LIVE.summary.fail} fail`
       + ` — quick run 2026-09-20 09:00 UTC · full report: ${CLI} doctor`,
     `Capability packs, citation counts and the corpus branch are not probed on a quick run — ${CLI} doctor reports them.`,
     "Instances are the store's own records; nothing was probed.",
@@ -201,8 +203,10 @@ test('ARC-08-C37 — the count names which check it is talking about', () => {
     ] };
   assert.match(doctorLine(report, CLI), /^Doctor: 20 ok, 2 warn \(E-23, E-25\), 1 fail \(E-10\) — /);
 
-  // A zero count gets no brackets at all: there is nothing to name, and `0 fail ()` is noise.
-  assert.match(doctorLine(LIVE, CLI), /^Doctor: \d+ ok, 0 warn, 0 fail — /);
+  // A zero count gets no brackets at all: there is nothing to name, and `0 fail ()` is noise. Built from
+  // the live fixture without its warnings: since ARC-11-C1 the fixture itself carries E-31's.
+  const quiet = { ...LIVE, summary: { ...LIVE.summary, warn: 0 }, checks: LIVE.checks.filter((c) => c.status !== 'warn') };
+  assert.match(doctorLine(quiet, CLI), /^Doctor: \d+ ok, 0 warn, 0 fail — /);
 
   // THE IDS ARE READ FROM THE REPORT, never from a remembered list. Drop a check and the line
   // drops it, while the COUNT — which the runner owns — is untouched. That divergence is the

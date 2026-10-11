@@ -571,6 +571,15 @@ export const ERROR_CODES = [
     warning: true,
     ruleLineWith: 'VALUE_TRUNCATED',
   },
+  {
+    // ARC-11-C1. Not in the always-loaded rule file: the refusal's own message names the state and
+    // carries this remedy, and a code most sessions never meet is a line every session would load.
+    code: 'LICENCE_NOT_VALID',
+    meaning: "SNOW_LICENCE_ENFORCE is \"true\" and this checkout's licence does not cover the call: it is missing, invalid, expired or revoked, or it is a design-only licence and the server is live. Every tool is refused, the instance-free ones included; with enforcement off, nothing is.",
+    remedy: "Run <cli> licence check to see why, then install a valid licence as .local/licence.json or unset SNOW_LICENCE_ENFORCE. A running Claude Code session keeps what it read at start, so restart it afterwards",
+    command: "<cli> licence check",
+    showInRule: false,
+  },
 ] as const satisfies readonly ErrorCode[];
 
 export const ERROR_CODE_NAMES: ReadonlySet<string> = new Set(ERROR_CODES.map((e) => e.code));

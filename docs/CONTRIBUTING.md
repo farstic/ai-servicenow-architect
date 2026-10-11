@@ -672,6 +672,20 @@ full runs, in a file that story never touched. Copy the artefact and run against
 has to live **inside** the package, because Node resolves dependencies by walking up from the module
 and a copy in `os.tmpdir()` dies with `ERR_MODULE_NOT_FOUND`.
 
+### A test removes every temp directory it makes — `npm test` counts what is left
+
+`npm test` runs both halves with `TMPDIR`, `TMP` and `TEMP` pointed at one directory made for the run. When
+the halves are done, it fails if anything named `snowarch-*` is left in that directory, and it names each
+entry (`scripts/ci/test-all.mjs`, ARC-11-C1). The directory itself is removed afterwards.
+
+The test that made a fixture removes it:
+- in the engine suites, with `tempDir(prefix, t)`, whose `t.after` runs on failure too;
+- in vitest, explicitly, in `afterEach`.
+
+`trackTempDir`'s exit handler is only a backstop, and a vitest worker does not reliably reach it. On #403 the
+licence fixtures relied on it and left 26 directories behind, where every PR since ARC-07-C43 had measured
+none.
+
 ### `SNOWARCH_STATE_ROOT` — where `.local/` goes, for a test that runs the real CLI
 
 Everything the product writes lives under `.local/`: the bootstrap state, the instance store, B07's
@@ -771,6 +785,24 @@ missing test (owner directive, 2026-09-08). Three places, in the same PR as the 
 
 Status filled in later is status nobody can trust; the point of the rule is that the plan is never
 describing a state the repository is not in.
+
+### `gh pr edit` can leave a pull request's body unchanged — update it through the API
+
+`gh pr edit 403 --body-file pr-body.md` left the body unchanged on #403 (ARC-11-C1, 2026-10-10). It printed:
+
+```
+GraphQL: Projects (classic) is being deprecated in favor of the new Projects experience … (repository.pullRequest.projectCards)
+```
+
+`gh pr edit` reads the pull request's classic project cards, which GitHub is retiring. Update the body
+through the REST API instead:
+
+```
+gh api -X PATCH repos/farstic/ai-servicenow-architect/pulls/403 -F body=@pr-body.md
+```
+
+Use your pull request's number and body file. Then read the body back with `gh pr view 403 --json body`,
+whichever command you used: only the body read back shows that the update landed.
 
 ### Citing code in a plan row — the expression, not the line
 
