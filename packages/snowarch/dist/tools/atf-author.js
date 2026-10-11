@@ -164,15 +164,29 @@ async function resolveConfig(client, ref) {
     }
     return { sysId, name };
 }
-/** The config's input variables, by name: the rows whose config IS this one (an ignored condition returns others). */
+/**
+ * The config's input variables, by name: the rows whose config IS this one (an ignored condition returns others).
+ *
+ * ARC-09-C122 — with each one's `max_length` and `mandatory`. On rc.3, Run Server Side Script's `script` had a
+ * max_length of 2000 and `jasmine_version` was mandatory (PN-16), and the tool read neither: C97's pre-check reads the
+ * `sys_variable_value.value` column's limit, not the variable's.
+ */
 async function inputVariables(client, config) {
-    const resp = await client.queryRecords({ table: INPUT_VARIABLE, query: `model=${config}`, fields: 'sys_id,element,model', limit: 100 });
+    const resp = await client.queryRecords({
+        table: INPUT_VARIABLE, query: `model=${config}`, fields: 'sys_id,element,model,max_length,mandatory', limit: 100,
+    });
     const vars = new Map();
     for (const r of resp.records) {
         const name = plain(r.element);
         const id = plain(r.sys_id);
-        if (plain(r.model) === config && name && id)
-            vars.set(name, id);
+        if (plain(r.model) !== config || !name || !id)
+            continue;
+        const limit = Number(plain(r.max_length));
+        vars.set(name, {
+            sysId: id,
+            maxLength: Number.isInteger(limit) && limit > 0 ? limit : null,
+            mandatory: plain(r.mandatory) === 'true',
+        });
     }
     return vars;
 }
@@ -240,12 +254,23 @@ export async function addStep(client, args) {
     const config = await resolveConfig(client, args.step_config.trim());
     if (config.name === SERVER_SCRIPT_CONFIG)
         requireScripting();
-    const variables = inputs.size > 0 ? await inputVariables(client, config.sysId) : new Map();
+    // Every step reads its config's variables now, not only one sent inputs: the listing after the write names the rows the
+    // instance created, and the mandatory check needs every variable (ARC-09-C122).
+    const variables = await inputVariables(client, config.sysId);
     const unknown = [...inputs.keys()].filter((k) => !variables.has(k));
     if (unknown.length > 0) {
         throw new ServiceNowError(`Step config "${config.name}" has no input named ${unknown.map((k) => `"${k}"`).join(', ')}; `
             + `its inputs are: ${[...variables.keys()].join(', ') || 'none this account can read'}. Nothing was written.`, 'INVALID_REQUEST');
     }
+    // ARC-09-C122 — a value longer than its input variable's max_length, refused before any write, every one at once.
+    const tooLong = [...inputs].flatMap(([name, value]) => {
+        const limit = variables.get(name)?.maxLength ?? null;
+        const length = lengthOf(value);
+        return limit !== null && length > limit
+            ? [`inputs.${name} is ${length} characters; its input variable's max_length is ${limit}`] : [];
+    });
+    if (tooLong.length > 0)
+        throw new ServiceNowError(`${tooLong.join('; ')}. Nothing was written.`, 'VALUE_TOO_LONG');
     if (order !== undefined) {
         const steps = await client.queryRecords({ table: STEP, query: `test=${test}`, fields: 'sys_id,test,order', limit: 1000 });
         const clash = steps.records.find((r) => plain(r.test) === test && plain(r.order) === String(order));
@@ -259,7 +284,9 @@ export async function addStep(client, args) {
     const step = await write(client, STEP, sent, active);
     const warnings = [...step.warnings];
     // Its inputs: look before writing, so a row the insert created is updated and not added a second time.
-    const written = [];
+    // ARC-09-C122 — the rows this call wrote, by sys_id, for the listing after the write.
+    const wrote = new Map();
+    let listed = [];
     try {
         const existing = await client.queryRecords({
             table: VALUE, query: `document_key=${step.sysId}`, fields: 'sys_id,document_key,variable,value', limit: 100,
@@ -272,23 +299,45 @@ export async function addStep(client, args) {
             byVariable.set(v, [...(byVariable.get(v) ?? []), r]);
         }
         for (const [name, value] of inputs) {
-            const variable = variables.get(name);
+            const variable = variables.get(name).sysId;
             const rows = byVariable.get(variable) ?? [];
             if (rows.length > 1) {
-                written.push({ name, written: 'none', rows: rows.map((r) => plain(r.sys_id)) });
+                // Neither row is overwritten: `attached` below names them both in its warning.
             }
             else if (rows.length === 1) {
                 const row = plain(rows[0].sys_id);
                 const done = await write(client, VALUE, { value }, false, row);
                 warnings.push(...done.warnings);
-                written.push({ name, sys_id: row, written: 'updated' });
+                wrote.set(row, 'updated');
             }
             else {
                 const done = await write(client, VALUE, { document: STEP, document_key: step.sysId, variable, value }, false);
                 warnings.push(...done.warnings);
-                written.push({ name, sys_id: done.sysId, written: 'created' });
+                wrote.set(done.sysId, 'created');
             }
             warnings.push(...await attached(client, step.sysId, name, variable));
+        }
+        // ARC-09-C122 — every input row of the step, after the write: the caller sees the rows the insert created from the
+        // config's defaults too (PN-16), not only the ones it sent. One read, by the step.
+        const nameOf = new Map([...variables].map(([name, v]) => [v.sysId, name]));
+        const after = await client.queryRecords({
+            table: VALUE, query: `document_key=${step.sysId}`, fields: 'sys_id,document_key,variable,value', limit: 100,
+        });
+        const rows = after.records.filter((r) => plain(r.document_key) === step.sysId);
+        listed = rows.map((r) => {
+            const sysId = plain(r.sys_id);
+            return { name: nameOf.get(plain(r.variable) ?? '') ?? null, sys_id: sysId, written: wrote.get(sysId) ?? 'defaulted by the instance' };
+        });
+        // A mandatory input with no value after the write is reported, never refused before it: the instance may default
+        // it, as it did jasmine_version on rc.3.
+        for (const [name, v] of variables) {
+            if (!v.mandatory)
+                continue;
+            const held = rows.some((r) => plain(r.variable) === v.sysId && (plain(r.value) ?? '') !== '');
+            if (!held) {
+                warnings.push(notStored({ table: VALUE, sysId: step.sysId }, `inputs.${name}`, `is mandatory, and no ${VALUE} row `
+                    + `of step ${step.sysId} holds a value for it after the write.`));
+            }
         }
     }
     catch (error) {
@@ -301,7 +350,9 @@ export async function addStep(client, args) {
         step_config: { sys_id: config.sysId, name: config.name },
         order: plain(step.stored.order),
         active: plain(step.stored.active),
-        inputs: written,
+        // Every input row of the step (ARC-09-C122). An input with more than one row is named in its warning, and listed
+        // row by row here.
+        inputs: listed,
         summary: warnings.length === 0
             ? `Added a "${config.name}" step (${step.sysId}) to test ${test} at order ${plain(step.stored.order) ?? '(not shown)'}; `
                 + `the step${inputs.size > 0 ? ' and its inputs read back as sent, each input attached once' : ' reads back as sent'}.`

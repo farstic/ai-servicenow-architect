@@ -2610,7 +2610,7 @@
   },
   {
     "name": "snow_atf_atf_step_add",
-    "description": "Add a step to an ATF test (sys_atf_step) with its input values, and read each record back: the step, each input row, and, from the step's side, that each input is attached to it once. Refuses before any write: a test or step config that does not exist, an inactive config, a config name two configs share, an order the test already uses, an input the config does not have. A step of the baseline Run Server Side Script config also needs SCRIPTING_ENABLED (other script-bearing configs are not recognised). (requires ATF_ENABLED and WRITE_ENABLED)",
+    "description": "Add a step to an ATF test (sys_atf_step) with its input values, and read each record back: the step, each input row, and, from the step's side, that each input is attached to it once. Refuses before any write: a test or step config that does not exist, an inactive config, a config name two configs share, an order the test already uses, an input the config does not have, a value longer than its input variable's max_length. It lists every input row of the step, including those the instance created from the config's defaults, and reports a mandatory input left without a value rather than refusing it, since the instance may default it. A step of the baseline Run Server Side Script config also needs SCRIPTING_ENABLED (other script-bearing configs are not recognised). (requires ATF_ENABLED and WRITE_ENABLED)",
     "inputSchema": {
       "type": "object",
       "properties": {
