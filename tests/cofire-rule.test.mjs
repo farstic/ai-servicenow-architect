@@ -39,8 +39,13 @@ test('ARC-09-C118 — the co-fire rule is one sentence, in the same words in CLA
   const rules = cofireRules(real);
   for (const r of rules) assert.equal(r.count, 1, `${r.file}: the co-fire rule appears ${r.count} time(s), not once`);
   for (const r of rules) assert.equal(r.words, rules[0].words, `${r.file}: the co-fire rule differs from CLAUDE.md's`);
-  assert.match(rules[0].words, /load its skill, write its five-part Envelope beside this one, and reconcile (them|the two) before the turn ends/);
-  if (rules[0].words.includes('grounding budget')) assert.match(rules[0].words, /Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer\./);
+  assert.match(rules[0].words, /load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends/);
+  assert.match(rules[0].words, /any one Verdict C halting all of them\./, 'three gateways co-fire in T-15: "both" would not cover them');
+  // The architect's after-sitting on 34049d2: F1, two Envelopes in one turn, cited 14–17 bare file names and no
+  // `(citation: …)` at all. The rule says each Envelope cites as a single-gateway turn does.
+  assert.ok(rules[0].words.includes('Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` '
+    + 'on every baseline claim, never a bare file name.'), 'the per-Envelope citation sentence is missing');
+  assert.match(rules[0].words, /Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer\./);
   for (const f of SITES) assert.doesNotMatch(real(f), DISPATCH_BOUND, `${f}: a co-fire is tied to the dispatch again`);
 });
 
@@ -48,4 +53,25 @@ test('ARC-09-C118 — a copy that drifts is found', () => {
   const drifted = (f) => (f.includes('csm-specialist') ? real(f).replace('before the turn ends', 'before dispatch') : real(f));
   const rules = cofireRules(drifted);
   assert.deepEqual(rules.filter((r) => r.words !== rules[0].words).map((r) => r.file), ['.claude/skills/csm-specialist/SKILL.md']);
+});
+
+// The same after-sitting: one F1 run loaded both skills by a Read of their SKILL.md and made no Skill call, which
+// CLAUDE.md:62 accepts as adopting a gateway. So T-24 and T-30, the cases a co-fire is judged by, name both ways, fail a
+// gateway adopted by neither, and fail a bare file name: the architect's ruling (b), 2026-10-11.
+test('ARC-09-C118 — T-24 and T-30 judge each co-firing gateway\'s adoption, both ways, and each Envelope\'s citations', () => {
+  const doc = real('tests/VALIDATION-TESTS.md');
+  const section = (id) => {
+    const at = doc.indexOf(`\n## ${id} `);
+    const next = doc.indexOf('\n## ', at + 1);
+    return doc.slice(at, next < 0 ? undefined : next);
+  };
+  for (const id of ['T-24', 'T-30']) {
+    const s = section(id);
+    const pass = s.slice(s.indexOf('### Pass criteria'), s.indexOf('### Fail signals'));
+    assert.ok(pass.length > 0, `${id}: no Pass criteria section`);
+    assert.match(pass, /by a `Skill` invocation or a Read of its `SKILL\.md`/, `${id}: both ways a gateway is adopted are not named`);
+    assert.match(pass, /a gateway with neither fails/, `${id}: a gateway adopted by neither way is not failed`);
+    assert.match(pass, /\(citation: markdown\/<area>\/<page>\.md\)/, `${id}: the citation form is not held`);
+    assert.match(pass, /a bare file name fails/, `${id}: a bare file name is not failed`);
+  }
 });

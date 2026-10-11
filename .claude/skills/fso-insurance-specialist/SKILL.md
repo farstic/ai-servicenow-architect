@@ -196,7 +196,7 @@ For each table:
 - **PROCEED — dispatch to Technical Designer with constraints** (+ Flow Designer Specialist for playbooks/flows, Integration Specialist for core-system data, Now Assist Specialist for AI).
 - **HALT — §1.1 custom-object proposal required.**
 - Always list the co-firing gateways (CSM; CMDB & CSDM when the product model is touched) and the §3.1 consults triggered (Security & GRC, Licensing, Performance & Scale, DevOps/Release, Estimation).
-- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire.
+- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire.
 
 ## Part 5 — Anti-Patterns to Block
 [Domain-specific anti-patterns. Each anti-pattern is a one-sentence "do not do X, do Y instead" with a citation.]

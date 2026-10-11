@@ -1243,6 +1243,8 @@ gateway with no listed keyword in it.
 - The FSO Insurance gateway fires **automatically** at Phase 1 Step 5, though the prompt names none
   of its keywords.
 - Both Envelopes, FSO's and CSM's, are written in the same turn, each with its five parts, and reconciled.
+- Each co-firing gateway's skill is loaded in the one turn, by a `Skill` invocation or a Read of its `SKILL.md` (the harness counts both); a gateway with neither fails.
+- As in a single-gateway turn, every baseline claim in each Envelope is cited `(citation: markdown/<area>/<page>.md)`; a bare file name fails.
 - No builder is dispatched and no design is produced before the Envelope.
 
 ### Fail signals
@@ -1713,11 +1715,13 @@ gateway named CSM as co-firing and deferred its Envelope.
    both `SKILL.md` files.
 3. Two five-part Envelopes are written in the turn, then one reconciliation. It names the shared constructs once
    and states each layer's owner, and any one Verdict C halts both.
+   Each Envelope cites as a single-gateway turn does: `(citation: markdown/<area>/<page>.md)`, never a bare file name.
 4. The verdict is B, as on rc.1.
 
 ### Pass criteria
 
-- In the one turn: both skills loaded, two five-part Envelopes, and one reconciliation.
+- Each co-firing gateway's skill is loaded in the one turn, by a `Skill` invocation or a Read of its `SKILL.md` (the harness counts both); a gateway with neither fails. Two five-part Envelopes are written, and reconciled once.
+- As in a single-gateway turn, every baseline claim in each Envelope is cited `(citation: markdown/<area>/<page>.md)`; a bare file name fails.
 - The wall time is recorded beside rc.1's 1 min 07 s for the same prompt.
 
 ### Fail signals
