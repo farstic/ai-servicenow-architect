@@ -332,7 +332,7 @@ means a missing path, not a malformed body.
 ## PN-16 — A Test Step's input rows are created by its insert and removed with it
 
 **Applies to:** `sys_atf_step` and `sys_variable_value` · release family not recorded by the sitting · observed in
-the 2.0.11-rc.3 live sitting (ARC-09-C95)
+the 2.0.11-rc.3 live sitting (ARC-09-C95), and again on 2.0.12-rc.2 (ARC-09-C122)
 **Behaviour:**
 - **Created by the insert.** A "Run Server Side Script" step was inserted over the REST Table API, and the insert
   created both of its `sys_variable_value` rows at once:
@@ -344,20 +344,23 @@ the 2.0.11-rc.3 live sitting (ARC-09-C95)
 - **Not deletable on their own here.** Deleting one of those rows directly was refused for this account with
   `DELETE_CONSTRAINT` ("ACL Exception Delete Failed due to security constraints"); whether an ACL or a
   reference constraint caused it is not established.
-- **Removed with the step.** Deleting the step removed both rows.
-- **What the tool now reports (ARC-09-C122).** `snow_atf_atf_step_add` lists every input row of the step, these
-  included, as `defaulted by the instance`. A mandatory input left without a value is reported as `FIELD_NOT_STORED` on
-  `inputs.<name>`, after the write. A value longer than its input variable's `max_length` is refused before it.
+- **Removed with the step.** Deleting the step removed both rows, on 2.0.11-rc.3 and again on 2.0.12-rc.2.
+- **Its input variables,** read on 2.0.12-rc.2: `script` has a `max_length` of 2000 and is not mandatory;
+  `jasmine_version` has a `max_length` of 40 and is mandatory.
+- **What the tool now reports (ARC-09-C122, confirmed live on 2.0.12-rc.2).** `snow_atf_atf_step_add` lists
+  every input row of the step, these included, as `defaulted by the instance`. A mandatory input left without a
+  value is reported as `FIELD_NOT_STORED` on `inputs.<name>`, after the write. A value longer than its input
+  variable's `max_length` is refused before it.
 
 **Grounding:** `markdown/application-development/automated-test-framework-atf/test-steps-server-category.md`
 names the step's Jasmine version and Test script fields by their labels. The rest is not documented in the
 bundled corpus — that an insert creates the input rows from defaults, the default expressions, the refused
-delete and the cascade: observed behaviour.
+delete, the cascade and the variables' limits: observed behaviour.
 **Evidence:** `docs/validation/2.0.11-rc.3-live-sitting.md`, § ARC-09-C95: W2, the follow-up read and the
-teardown.
+teardown. `docs/validation/2.0.12-rc.2-live-sitting.md`, § ARC-09-C122: R2, W3 and the teardown.
 **Engine consequence:** `snow_atf_atf_step_add` updates a row the insert created rather than adding a second
-(ARC-09-C95). Its output lists only the inputs it sent, so the rows the instance defaulted are invisible to the
-caller (ARC-09-C122). A teardown removes the step, not its input rows.
+(ARC-09-C95). Since ARC-09-C122 its output lists every input row of the step, the rows the instance defaulted
+included; before it, they were invisible to the caller. A teardown removes the step, not its input rows.
 
 ## Windows notes — this repository, not ServiceNow
 

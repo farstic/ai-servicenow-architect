@@ -718,6 +718,10 @@ Successful Test" from the C94 sitting provides an existing Run Server Side Scrip
 
 ```
 read-only — no approval needed
+R0 snow_core_records_query { table: "sys_user_preference",
+     query: "name=sys_update_set^user=javascript:gs.getUserID()", fields: "sys_id,value" }
+                                                       the capture target before W1; keep its value for the
+                                                       teardown, and out of the record: it is a sys_id
 R1 snow_core_capabilities_read                         ATF, WRITE and SCRIPTING on
 R2 snow_core_records_query { table: "sys_atf_step_config", query: "name=Run Server Side Script",
      fields: "sys_id,name,active,sys_scope" }          exactly one row, active
@@ -797,7 +801,7 @@ In this order, each with its own "write approved":
    with `DELETE_CONSTRAINT` on rc.3. Confirm it with a read of `sys_variable_value` by `document_key`, which
    counts 0.
 2. `snow_core_record_remove` on the test.
-3. Point capture back at the previous update set, and set this one to Ignore in the UI.
+3. Point capture back at the update set R0 read, and set this one to Ignore in the UI.
 
 ### Verdict
 
@@ -1122,6 +1126,10 @@ As C95's: an instance on the `pdi-developer` preset, and an account with `atf_te
 
 ```
 read-only — no approval needed
+R0 snow_core_records_query { table: "sys_user_preference",
+     query: "name=sys_update_set^user=javascript:gs.getUserID()", fields: "sys_id,value" }
+                                                       the capture target before W1; keep its value for the
+                                                       teardown, and out of the record: it is a sys_id
 R1 snow_core_records_query { table: "sys_atf_step_config", query: "name=Run Server Side Script",
      fields: "sys_id,name,active" }                    exactly one row, active
 R2 snow_core_records_query { table: "atf_input_variable", query: "model=<R1 sys_id>",
@@ -1157,7 +1165,7 @@ In this order, each with its own "write approved":
 1. `snow_core_record_remove` on W3's step. Its input rows go with it (PN-16). Confirm with a read of
    `sys_variable_value` by `document_key`, which counts 0.
 2. `snow_core_record_remove` on the test.
-3. Point capture back at the previous update set, and set this one to Ignore in the UI.
+3. Point capture back at the update set R0 read, and set this one to Ignore in the UI.
 
 ### Verdict
 
