@@ -29,6 +29,7 @@
  * last time it caught `report-text.mjs` on the way in: the code moved, not the test.
  */
 import { idsFor } from './check-ids.mjs';
+import { bannerLine } from '../licence/line.mjs';
 /**
  * ARC-07-W17 — THE LAUNCHER IS AN ARGUMENT HERE, and the purity guard is why.
  *
@@ -114,6 +115,22 @@ export function docsLine(docs, cli) {
     parts.push(`citations checked: ${docs.citations} | dead: ${docs.dead ?? 0}`);
   }
   return `Docs: ${parts.join(' · ')}`;
+}
+
+/**
+ * `Licence: ok · LIC-2026-0002 · perpetual` — the session-start banner's line, from E-31's data.
+ *
+ * ARC-11-C1 — ALWAYS, NOT ONLY WHEN SOMETHING IS WRONG. The owner's rc.1 sitting found the panel
+ * silent with a licence in force: E-31 is ok then, and the panel lists no check that is ok, so the one
+ * answer to "is this checkout licensed" was missing from the place a person asks it. The line is
+ * rendered by the banner's own `bannerLine`, so the banner and the panel cannot word it differently;
+ * a report with no E-31 data (an older report, or a check that errored) prints no line rather than a
+ * guessed one.
+ */
+export function licenceLine(checks) {
+  const data = (Array.isArray(checks) ? checks : []).find((c) => c?.id === 'E-31')?.data;
+  if (!data?.state) return null;
+  return bannerLine(data, { enforced: data.enforced === true });
 }
 
 /** `Roster: 28 skills / 9 agents` */
@@ -262,6 +279,8 @@ export const failureLines = (parsed) => nonOkLines(parsed, ['fail']);
 export function renderPanel(report, cli) {
   const lines = [
     report?.modeLineDetailed ?? null,
+    // Second, as the session-start banner prints it: Mode, then Licence.
+    licenceLine(report?.checks),
     engineLine(report?.engine),
     docsLine(report?.engine?.docs, cli),
     rosterLine(report?.engine?.roster),
@@ -269,7 +288,7 @@ export function renderPanel(report, cli) {
     instancesLine(report?.instances ?? report?.server?.instances ?? null),
     doctorLine(report, cli),
     // A line whose key is null is OMITTED, never guessed — the rule SKILL.md stated and a model
-    // applied by hand. `filter` is that rule, in one place, for all seven.
+    // applied by hand. `filter` is that rule, in one place, for every line.
   ].filter((line) => line !== null && line !== undefined);
 
   const failures = failureLines(report);

@@ -296,6 +296,7 @@
         "id": null,
         "scope": null,
         "validUntil": null,
+        "perpetual": false,
         "enforced": false,
         "listVersion": null
       }

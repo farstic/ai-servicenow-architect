@@ -68,8 +68,19 @@ test('ARC-11-C1 — a licence in force is ok; one in its last month is a warning
 
 test('ARC-11-C1 — E-31\'s data names the state and the id, never the licensee or the org', async (t) => {
   const r = await E31.run(ctxFor(t, { file: licenceText(licence(), primary) }));
-  assert.deepEqual(Object.keys(r.data).sort(), ['enforced', 'id', 'listVersion', 'scope', 'state', 'validUntil']);
+  assert.deepEqual(Object.keys(r.data).sort(),
+    ['enforced', 'id', 'listVersion', 'perpetual', 'scope', 'state', 'validUntil']);
   assert.equal(JSON.stringify(r).includes('Test Licensee'), false);
+});
+
+test('ARC-11-C1 — a perpetual licence says so, and its data carries the word the status panel prints', async (t) => {
+  // The status panel renders its Licence line from this data with the banner's function, and a
+  // perpetual licence has no `validUntil` to print: without `perpetual` the panel would have to
+  // re-derive the core's rule, or print `until null`.
+  const { valid_until: _, ...forever } = licence({ id: 'LIC-2026-0001' });
+  const r = await E31.run(ctxFor(t, { file: licenceText(forever, primary) }));
+  assert.deepEqual([r.status, r.detail], ['ok', 'Licence: ok · LIC-2026-0001 · perpetual']);
+  assert.deepEqual([r.data.perpetual, r.data.validUntil], [true, null]);
 });
 
 test('ARC-11-C1 — a report spells E-31\'s command for the shell the run was TOLD about, not the machine\'s', async (t) => {
