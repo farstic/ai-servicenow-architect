@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 29 tests, T-01 through T-29, no number reserved. The count is asserted by
+> **How many.** 30 tests, T-01 through T-30, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -732,7 +732,7 @@ Design the shared service model so both sides point at the same thing.
 
 ### Pass criteria
 
-- All three gateways fire automatically; the CMDB & CSDM envelope explicitly blocks a bridging table.
+- All three gateways fire automatically, and each writes its five-part Envelope in the same turn; the CMDB & CSDM envelope explicitly blocks a bridging table.
 - Reconciliation is stated (the same service records referenced from both CSM and ITSM).
 - No builder dispatched before the reconciled envelope context exists.
 
@@ -1242,7 +1242,9 @@ gateway with no listed keyword in it.
 
 - The FSO Insurance gateway fires **automatically** at Phase 1 Step 5, though the prompt names none
   of its keywords.
-- The Envelope is written in the same turn, and names CSM as co-firing.
+- Both Envelopes, FSO's and CSM's, are written in the same turn, each with its five parts, and reconciled.
+- Each co-firing gateway's skill is loaded in the one turn, by a `Skill` invocation or a Read of its `SKILL.md` (the harness counts both); a gateway with neither fails.
+- As in a single-gateway turn, every baseline claim in each Envelope is cited `(citation: markdown/<area>/<page>.md)`; a bare file name fails.
 - No builder is dispatched and no design is produced before the Envelope.
 
 ### Fail signals
@@ -1250,6 +1252,7 @@ gateway with no listed keyword in it.
 - The gateway is deferred until a keyword appears — "it fires once the line of business is
   named" — which is how T-10 failed.
 - CSM Specialist fires alone, or ITSM fires because an accident was read as an incident.
+- CSM is named as co-firing with its Envelope deferred ("not yet written", "before any builder dispatch").
 - A design artefact or a builder dispatch before the Envelope.
 
 ---
@@ -1686,6 +1689,46 @@ N = 1. This is the honest count, and no second item is added that the gateway wo
 
 The same prompt on a design-only checkout. The session makes **no MCP call**, every item stays "not documented in the bundled corpus — verify on the instance", and there is no readings file. This is what the scripted run checks.
 
+
+---
+
+## T-30 — co-firing gateways write both Envelopes in the same turn, in normal mode
+
+**Covers:** `CLAUDE.md` §5 Phase 1 Step 5 (gateways co-fire); each gateway's Part 4 co-fire rule (ARC-09-C118)
+**Modes:** design-only ✅ · live ✅
+
+**Run by hand in the owner's sitting.** One turn, in normal mode, with no engagement named.
+
+### Prompt
+
+```
+A P&C insurer needs first notice of loss (FNOL) intake for auto claims: the intake creates a claim from the caller's policy, assigns an adjuster by territory and sets an initial reserve. Design it. No engagement is loaded; treat this as a design-only question grounded in the docs.
+```
+
+This is F1 from the rc.1 grounding sitting (`docs/validation/2.0.11-rc.1-grounding-sitting.md`). There the FSO
+gateway named CSM as co-firing and deferred its Envelope.
+
+### Expected behaviour
+
+1. The FSO Insurance gateway fires at Phase 1 Step 5, and CSM co-fires: the case model is CSM's.
+2. Both skills are loaded in this turn: `Skill(fso-insurance-specialist)` and `Skill(csm-specialist)`, or reads of
+   both `SKILL.md` files.
+3. Two five-part Envelopes are written in the turn, then one reconciliation. It names the shared constructs once
+   and states each layer's owner, and any one Verdict C halts both.
+   Each Envelope cites as a single-gateway turn does: `(citation: markdown/<area>/<page>.md)`, never a bare file name.
+4. The verdict is B, as on rc.1.
+
+### Pass criteria
+
+- Each co-firing gateway's skill is loaded in the one turn, by a `Skill` invocation or a Read of its `SKILL.md` (the harness counts both); a gateway with neither fails. Two five-part Envelopes are written, and reconciled once.
+- As in a single-gateway turn, every baseline claim in each Envelope is cited `(citation: markdown/<area>/<page>.md)`; a bare file name fails.
+- The wall time is recorded beside rc.1's 1 min 07 s for the same prompt.
+
+### Fail signals
+
+- "Its Envelope is not yet written", "reconcile before any builder dispatch", or any other deferral of the second
+  Envelope.
+- A single Envelope that names a co-firing gateway.
 ---
 
 ## Regression Workflow

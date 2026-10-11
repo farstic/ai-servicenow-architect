@@ -50,9 +50,15 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   `docs/validation/2.0.12-rc.1-licence-sitting.md` (ARC-11-C4).
 - T-29 in `tests/VALIDATION-TESTS.md`, live verification, run by hand on a live instance, with T-29b for a bare PDI
   (ARC-09-C117).
+- T-30 in `tests/VALIDATION-TESTS.md`: co-firing gateways write both Envelopes in the same turn, in normal mode
+  (ARC-09-C118).
 
 ### Changed
 
+- A co-firing gateway now writes its five-part Envelope in the same turn, and the Envelopes are reconciled before
+  the turn ends. "Reconcile before dispatch" is gone from `CLAUDE.md` and the gateway skills. Each Envelope cites as
+  a single-gateway turn does, never a bare file name, and has its own grounding budget, eight pages by default
+  (ARC-09-C118).
 - `CLAUDE.md` and the six gateway skills gain one paragraph (ARC-09-C117). In live mode, before an Envelope is
   final, the Architect reads each "verify on the instance" item that is an instance fact, with read-only calls:
   eight per Envelope by default, with no cap under the opt-in. It cites each one "measured on instance <label>, <date>".
