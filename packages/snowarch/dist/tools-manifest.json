@@ -7640,7 +7640,7 @@
   },
   {
     "name": "snow_us_capture_target_set",
-    "description": "[Write] Point THIS session's REST writes at a named update set, by setting the authenticated user's sys_user_preference name=sys_update_set. This is what actually captures REST-created objects — snow_us_update_set_switch only sets is_default for the UI (platform field notes, section 1). Verify with snow_us_update_set_preview.",
+    "description": "[Write] Point THIS session's REST writes at a named update set, by setting the authenticated user's sys_user_preference name=sys_update_set. This is what actually captures REST-created objects — snow_us_update_set_switch only sets is_default for the UI (platform field notes, section 1). Verify with snow_us_update_set_preview. Returns previous, the update set the preference named before the call (null when there was none), to point capture back to.",
     "inputSchema": {
       "type": "object",
       "properties": {
