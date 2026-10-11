@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

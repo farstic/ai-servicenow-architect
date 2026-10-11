@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * Reading and writing the store. The server only ever reads; the wizard (ARC-07) and the
  * doctor's `--fix` (ARC-08) are the writers, through `saveStore` here.

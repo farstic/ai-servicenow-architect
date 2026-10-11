@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C112 — one grounding rule, in the same words wherever a session reads it.
 //
 // The owner's ruling: grounding is a budget with a declaration, not a cap — eight corpus pages by

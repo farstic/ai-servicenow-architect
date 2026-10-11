@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S12 — the only place this project runs `claude mcp`.
 //
 // `~/.claude.json` is Claude Code's file. This project never opens it: every read and every write

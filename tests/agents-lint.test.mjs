@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S02 — the agent roster, checked against the rules in tests/lib/lint-rules.mjs.
 // ARC-02-S04 made the content change AG-04/AG-05 required and flipped ENFORCE_S04 to true, so every
 // rule is now live. The companion test that used to assert the known-bad state is gone with it — its

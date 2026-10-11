@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-03-S03 — the citation gate. The bash script this replaces exited 0 when the corpus was
 // absent, so a fresh clone passed with every citation unverified; criterion 2 is that defect's
 // regression test.

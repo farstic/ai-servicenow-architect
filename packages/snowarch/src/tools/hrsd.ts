@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * HR Service Delivery (HRSD) tools — full lifecycle for HR cases, services, and profiles.
  * Read tools: Tier 0. Write tools: Tier 1 (WRITE_ENABLED=true).

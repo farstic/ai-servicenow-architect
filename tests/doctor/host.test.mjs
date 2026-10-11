@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S03 — E-25, E-26, E-27. Every input is injected: no test here reads this machine.
 //
 // E-27 is the one that could not be tested without a fixture at all — it runs `claude`, and the

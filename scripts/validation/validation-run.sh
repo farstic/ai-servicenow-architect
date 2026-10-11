@@ -1,4 +1,6 @@
 #!/bin/sh
+# Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+# snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 # ARC-02-S13 / ARC-10 acceptance (B02-06) — the design-only validation run, as a command.
 #
 # Reconstructed from `docs/spikes/validation-runs/2026-09-09-design-only.md`, which recorded a run

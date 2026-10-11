@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-03-S11 — what a real corpus must look like on a real runner, asserted once for all three OSes.
 //
 // One Node script rather than a bash branch and a PowerShell branch: the assertions are identical on

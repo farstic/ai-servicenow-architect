@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S05 — the authoritative `Mode:` line: derived, never remembered.
 //
 // The rule file's promise is that this line is the mode — "never infer mode from any other file"

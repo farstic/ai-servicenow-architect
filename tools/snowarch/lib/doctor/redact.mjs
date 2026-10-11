@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S01 — the redaction pass the RUNNER applies to every string a check produces.
 //
 // The rule is not "checks should be careful". It is that a check has no path to the output that

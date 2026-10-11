@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // A ServiceNow-shaped REST endpoint on loopback, for tests that must authenticate against
 // something. It is not a mock of the product — it answers one path, by credential, and counts.
 //

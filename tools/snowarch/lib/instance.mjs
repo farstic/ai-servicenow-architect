@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-07-S05 — the `instance` forwarder: check, hand over, propagate.
 //
 // This file runs the wizard by SPAWNING the server CLI with inherited stdio, and does nothing

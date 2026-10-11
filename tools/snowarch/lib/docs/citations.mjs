@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-03-S02 — one definition of "a citation", shared by the generator (S02) and the verifier (S03)
 // so the two can never disagree about what they are looking at.
 //

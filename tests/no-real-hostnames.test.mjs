@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-01-S10b — criterion 6's substantive half, as a test rather than a hand check.
 //
 // The criterion says the tree may contain no hostname the maintainer actually uses. The list of

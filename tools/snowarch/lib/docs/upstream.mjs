@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-03-S07 — the maintainer refresh: move the pin forward, and show what it broke.
 //
 // A SEPARATE MODULE from `sync.mjs`, deliberately. `sync` is the user-safe local reconcile that

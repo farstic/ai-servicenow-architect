@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S03 — the `bootstrap` sub-command: build the context, show the plan, run the steps.
 //
 // The command itself decides very little. It assembles the context every step reads, gets the plan

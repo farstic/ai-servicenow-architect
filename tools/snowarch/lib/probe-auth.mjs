@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S07 — one authentication attempt, and no more.
 //
 // The non-interactive path has nobody to ask for a corrected password, so a retry loop there is

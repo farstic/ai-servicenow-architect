@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S02 — the parser's contract. It is small on purpose: it accepts exactly what the roster
 // writes and names anything else, so it cannot quietly stop catching mistakes.
 import { test } from 'node:test';

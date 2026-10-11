@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C81 — the roster's identifiers against the bundled corpus, as a library.
 //
 // The citation gate proves that a cited PAGE exists. It never asked whether the NAMES a skill

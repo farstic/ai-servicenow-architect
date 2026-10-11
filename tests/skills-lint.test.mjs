@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S02 — the skill roster, checked against the rules in tests/lib/lint-rules.mjs.
 // The rules live there so tests/lint-negatives.test.mjs can prove each one REJECTS a broken fixture.
 // This file supplies the real tree and the fixtures, and asserts the failure list is empty.

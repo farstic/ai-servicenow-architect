@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * Time the SessionStart banner the way a session pays for it: cold, five times, and report the
  * median.

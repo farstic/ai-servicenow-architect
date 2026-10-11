@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+# snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 """
 md-to-docx.py — cross-platform (macOS / Linux / Windows) port of scripts/md-to-docx.ps1.
 

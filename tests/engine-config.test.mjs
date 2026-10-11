@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-01-S04 — engine.config.json is the single home of the product's constants.
 // Three kinds of check, deliberately separated:
 //   1. shape      — the file matches its own JSON Schema (Ajv 2020, strict)

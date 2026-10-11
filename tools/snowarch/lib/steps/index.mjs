@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S03 — the registry and the runner: what runs, in what order, and what may be skipped.
 //
 // The runner owns three decisions and nothing else: ORDER, whether a step's recorded result may

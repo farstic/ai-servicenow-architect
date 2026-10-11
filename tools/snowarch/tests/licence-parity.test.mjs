@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C1 — the CLI and the server reach the same verdict on the same licence, with the same keys.
 //
 // TWO COPIES, BECAUSE THE SERVER IMPORTS NOTHING FROM OUTSIDE ITS PACKAGE. The key list, the

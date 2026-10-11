@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S06 — `--fix`: the whitelist, the plan, the refusals and the safety rails.
 //
 // The rails are asserted as PROPERTIES, not promised in prose: a grep proves the module cannot

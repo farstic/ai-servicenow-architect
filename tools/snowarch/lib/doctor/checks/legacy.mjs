@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S03 — E-23, E-24: what the OLD install left behind, found and never touched.
 //
 // READ-ONLY BY CONSTRUCTION. `~/.claude.json` belongs to Claude Code and the legacy store belongs

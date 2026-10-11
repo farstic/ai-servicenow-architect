@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // The network diagnosis vocabulary, in one module, because two subsystems reach the same internet.
 //
 // ARC-03-S05 wrote these sentences for git's stderr; ARC-06-S04's preflight reaches github.com over

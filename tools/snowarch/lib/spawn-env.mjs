@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S08 — the environment every child of ours is given.
 //
 // One rule, and it is worth stating plainly because it cost a reviewer's clone a failing run:

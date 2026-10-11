@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // B02 docs — the corpus, obtained by calling ARC-03's recipe rather than by having one of its own.
 //
 // This step is glue, deliberately. `syncCorpus` decides what git does; `verifyCitations` decides

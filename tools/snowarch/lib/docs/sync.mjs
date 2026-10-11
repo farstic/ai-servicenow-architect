@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-03-S03 — recipe C: materialise the corpus, sparse, at the pin, and prove it is complete.
 //
 // Five steps plus a sixth that ADR-0008 made mandatory. On git 2.34.1 — stock Ubuntu 22.04 LTS,

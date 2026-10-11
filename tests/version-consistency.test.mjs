@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-01-S06 — one version of record.
 // P-12 counted five version counters in the engine and P-19 five more in the server. This test
 // exists so that number can never grow back: the three manifests and the CLAUDE.md marker line are

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { needSpell } from '../launcher-spelling.mjs';
 // ARC-06-S03 — the step line, in one place, because three programs print it.
 //

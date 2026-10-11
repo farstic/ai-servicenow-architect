@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-07-S05 (rework) — the ROOT ENTRY, run as a process, with real options.
 //
 // The six tests in `instance-forwarder.test.mjs` are unit tests on the builder: they prove the

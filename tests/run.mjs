@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // Engine-side test launcher. Deliberately a Node file list rather than a shell glob:
 // on Windows npm runs scripts through cmd.exe, which does no glob expansion, and whether
 // `node --test` expands a glob argument itself varies by Node line. Computing the list here is

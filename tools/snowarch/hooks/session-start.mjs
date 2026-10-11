@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S08 — the SessionStart banner: one truthful `Mode:` line, and at most four nudges.
 // ARC-11-C1 — and, second, the `Licence:` line, from `.local/licence.json` and the cached revocation list.
 //

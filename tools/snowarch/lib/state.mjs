@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S03 — `.local/bootstrap-state.json`: what this checkout knows about its own installation.
 //
 // Three properties, and each exists because of a specific way this file could hurt someone:

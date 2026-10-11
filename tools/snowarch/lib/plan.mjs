@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S03 — the one amendable plan screen (principle 10).
 //
 // The whole installation is uninterrupted except here. That is the point: an installer that asks

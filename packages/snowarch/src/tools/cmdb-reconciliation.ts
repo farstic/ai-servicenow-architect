@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * CMDB Reconciliation tools — find duplicates, orphans, stale CIs, and reconcile.
  * Read tools: Tier 0. Reconcile action: Tier 2 (CMDB_WRITE_ENABLED=true).

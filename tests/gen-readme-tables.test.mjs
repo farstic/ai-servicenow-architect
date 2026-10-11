@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // The README generator, proved on a tree with no `node_modules` — which is every fresh clone.
 //
 // It used to `import()` the server's built modules, and one of them pulls the whole tool tree and

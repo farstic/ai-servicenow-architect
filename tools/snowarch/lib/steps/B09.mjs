@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // B09 summary — one verdict, one Mode line, and the exact next thing to type.
 //
 // The last five lines are the only part of the installation most people will read twice, and two of

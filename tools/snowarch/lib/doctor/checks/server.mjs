@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S04 — SV-00…SV-08: the server package's own checks, run inside the engine's report.
 //
 // THE ENGINE DOES NOT RE-IMPLEMENT ANY OF THEM. Flag rules, store schema, presets and the stdio

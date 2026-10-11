@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S03 — what a step's inputs are, and how they become one hash.
 //
 // A step declares `inputs(ctx) → string[]`, and every entry is TAGGED: `file:<path relative to the

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-C1 — what the `--json` form may carry, and what it may not.
 //
 // `--json` IS THE FORM THAT TRAVELS. The text report, the banner and the doctor cache are local to

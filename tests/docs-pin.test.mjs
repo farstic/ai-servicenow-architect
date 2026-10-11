@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-03-S01 — the corpus is registered once, and the two places that name it agree.
 //
 // Deliberately narrow: ARC-01's tests/engine-config.test.mjs already asserts pin == gitlink (it was

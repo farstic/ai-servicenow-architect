@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S03 — the S-13 acceptance test: do all 28 skills reach a fresh session WITH a description.
 //
 // It reads Claude Code's own debug log rather than asking a model to print its listing, because a

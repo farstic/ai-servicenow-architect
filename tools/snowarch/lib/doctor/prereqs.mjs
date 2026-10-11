@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S01 — the `prereqs` object, whose consumer was agreed before it existed.
 //
 // `/snowarch setup-instance` (ARC-07-S09) is its only reader and branches on it, so the fields were

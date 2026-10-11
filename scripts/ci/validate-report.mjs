@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * ARC-08-C25 — hold a doctor report a CI job produced to the SAME schema the product promises.
  *

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-07-C35 — the assertion two `ci.yml` steps used to make inline, moved where the instruments are.
 //
 // `ci.yml` had this as a `node --input-type=module -e "…"` block in two steps: *"The state it wrote is

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // B06 instance — the slot ARC-07's wizard drops into, and the operator path that works today.
 //
 // Two ways in, and they are genuinely different jobs. The INTERACTIVE path hands the terminal to

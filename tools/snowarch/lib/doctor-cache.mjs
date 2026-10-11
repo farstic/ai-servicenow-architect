@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S08 — `.local/doctor-last.json`: what the SessionStart banner reads.
 //
 // The banner has to print a verdict in under 300 ms, on a machine that may have no Node at all, so

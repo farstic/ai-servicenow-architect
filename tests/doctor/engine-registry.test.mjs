@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — the twenty-three checks as a REGISTRY: what runs, in what order, under which flag.
 //
 // Every assertion here reads the flags off the registry rather than naming ids in a list of its

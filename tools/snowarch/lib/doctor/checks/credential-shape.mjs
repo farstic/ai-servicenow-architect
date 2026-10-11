@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — what a credential LOOKS like, defined once for the two things that hunt for one.
 //
 // `tests/never-commit.test.mjs` sweeps the tracked tree at commit time; the doctor's E-09 sweeps

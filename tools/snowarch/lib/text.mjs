@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S09 — the sentences the installation ends with, in one place.
 //
 // Two of them are promises. The `Mode:` line is quoted verbatim by the SessionStart banner, by

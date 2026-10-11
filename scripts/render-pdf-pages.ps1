@@ -1,3 +1,5 @@
+# Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+# snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 <#
 .SYNOPSIS
   Rasterise pages of a PDF to PNG using the built-in Windows runtime PDF renderer (no Ghostscript / Poppler / ImageMagick needed).

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S05 — is this checkout inside a folder something synchronises, and whose?
 //
 // WHETHER is already answered, by `isUnderCloudSyncFolder` in the committed server build. This

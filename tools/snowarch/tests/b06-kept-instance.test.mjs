@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-C18 — B06's console line says WHICH instance it kept, and why the wizard did not run.
 //
 // The owner's sitting (2026-09-23): B06 printed `[B06/09] instance … ok (0.0 s)` while the detail —

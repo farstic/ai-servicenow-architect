@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * A Windows PATH with no Git Bash on it, written where the next step will read it.
  *

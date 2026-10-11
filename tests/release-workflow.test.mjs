@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-S03 — what the release workflow runs, proved without pushing a tag.
 //
 // The workflow itself can only be exercised by a real tag on a real repository, which creates a

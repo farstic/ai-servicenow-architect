@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { dispatchDiscoveryAction, discoveryToolManifest } from '../../src/tools/discovery.js';
 import { schemaCache } from '../../src/tools/schema-cache.js';

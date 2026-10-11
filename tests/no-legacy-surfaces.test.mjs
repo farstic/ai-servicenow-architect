@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S05 — permanent. The engine must not describe a surface a user cannot install, or a tool the
 // product does not ship. Four tokens name what was cut (D-03 items 8 and 9, P-02, P-07, P-14).
 //

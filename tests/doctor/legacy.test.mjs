@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S03 — E-23 and E-24 against a fixture HOME. Nothing here touches the real one.
 //
 // Two properties are asserted about every case, not just the interesting ones: the fixture file is

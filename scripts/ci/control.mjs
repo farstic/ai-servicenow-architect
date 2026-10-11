@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-07-C34 — run a control without being able to destroy the work it is testing.
 //
 // A CONTROL degrades the product, asserts that the named test fails, and restores. The restore was

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S08, trimmed by ARC-08-S05 — the spawn `.mcp.json` describes, and nothing else.
 //
 // This file used to hold a second MCP client: newline-delimited JSON-RPC over a real child's

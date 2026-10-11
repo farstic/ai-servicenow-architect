@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -119,8 +121,13 @@ test('the file is executable, LF-only, and parses under bash', () => {
   assert.doesNotThrow(() => execFileSync('bash', ['-n', join(root, 'bootstrap.sh')], { stdio: 'pipe' }));
 });
 
+// ARC-11-C2 — the two copyright-notice lines every owned source file carries (tests/source-headers.test.mjs) are
+// not counted by the budgets below: a budget stops a launcher becoming an application, and a notice is not code.
+const NOTICE_LINES = (text) => text.replace(/\r/g, '').split('\n')
+  .filter((l) => /^# (Copyright 2026 Cvetomir Grigorov\. |snowarch — AI ServiceNow Architect\. )/.test(l)).length;
+
 test('the launcher is short — it is a launcher, not a second implementation', () => {
-  const lines = launcher.split('\n').filter((l, i, a) => !(i === a.length - 1 && l === '')).length;
+  const lines = launcher.split('\n').filter((l, i, a) => !(i === a.length - 1 && l === '')).length - NOTICE_LINES(launcher);
   const generated = launcher.slice(launcher.indexOf('# text-begin'),
     launcher.indexOf('# text-end')).split('\n').length + 1;
   // The story's budget is 180 and assumed the recipe was EMBEDDED; the ruling moved it out to a
@@ -497,7 +504,8 @@ test('bootstrap.ps1 carries a UTF-8 BOM, because 5.1 reads a file without one as
 });
 
 test('the Windows launcher is a launcher too — the budget, with the region reported', () => {
-  const lines = ps1.replace(/\r/g, '').split('\n').filter((l, i, a) => !(i === a.length - 1 && l === '')).length;
+  const lines = ps1.replace(/\r/g, '').split('\n').filter((l, i, a) => !(i === a.length - 1 && l === '')).length
+    - NOTICE_LINES(ps1);
   const generated = ps1.replace(/\r/g, '').slice(ps1.replace(/\r/g, '').indexOf('# text-begin'),
     ps1.replace(/\r/g, '').indexOf('# text-end')).split('\n').length + 1;
   // PowerShell is wordier than bash for the same work — `[ordered]@{}` state, typed parameters, a

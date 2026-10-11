@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-06-S02 — where the repository is, and what it says about itself.
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';

@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-03-S08 — switching release family: propose the whole edit, then apply it.
 //
 // The dry run IS the proposal (design principle 10). Everything this command would touch is printed

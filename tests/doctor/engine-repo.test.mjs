@@ -1,3 +1,5 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-08-S02 — E-05…E-11 against trees built from this checkout's own committed wiring.
 //
 // Every negative is a MUTATION of the green tree, applied to a copy, so each case says exactly one
