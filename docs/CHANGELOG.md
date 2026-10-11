@@ -46,6 +46,8 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
     accepted;
   - `NOTICE` names the project's contact;
   - every source file the author owns opens with a two-line copyright header.
+- T-28 in `tests/VALIDATION-TESTS.md`, the owner's two-machine licence test, run by hand, and its first record,
+  `docs/validation/2.0.12-rc.1-licence-sitting.md` (ARC-11-C4).
 
 ### Changed
 
