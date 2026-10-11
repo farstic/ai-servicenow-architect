@@ -70,6 +70,12 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   label, the licence's id or `missing`, and the state that refused it. It carries no argument and no value
   (ARC-11-C1). The rc.1 sitting found the trail empty after two refusals.
 
+### Fixed
+
+- `snow_atf_atf_step_add` refuses a value longer than its input variable's `max_length` before any write. It lists
+  every input row of the step, including the rows the instance created from the config's defaults, and reports a mandatory
+  input left without a value (ARC-09-C122).
+
 ## 2.0.11 — 2026-10-10
 
 ### Notes

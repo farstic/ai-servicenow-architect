@@ -757,7 +757,8 @@ that shape, and it is reworked before anything is written.
 
 - W1 returns no `warnings` and its `summary` says the test reads back as sent.
 - W2 returns no `warnings`:
-  - its `inputs` shows the script `created`;
+  - its `inputs` lists every input row of the step: the script `created`, or `updated` (below), and any row the
+    insert created from the config's defaults as `defaulted by the instance`, such as `jasmine_version` (PN-16);
   - its `order` is 1;
   - its `summary` says each input is attached once.
 - The preview lists the test and the step as `sys_update_xml` entries. Record whether the input row is an
