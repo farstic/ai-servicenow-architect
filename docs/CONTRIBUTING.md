@@ -2303,7 +2303,8 @@ generated file that does not match its source.
 `./snowarch upgrade` is seven numbered steps, and the first five happen before anything is written.
 
 ```
-[U1/7] preflight            inside the checkout, and `git status` clean — else exit 2, nothing changed
+[U1/7] preflight            inside the checkout, and `git status` clean — else exit 2, naming the
+                            modified files; nothing changed
 [U2/7] fetch tags           `git fetch --tags --prune origin`, 120 s; a failure prints git's error
                             and, when the shape is recognised, ONE remedy line (#proxy / #tls-ca)
 [U3/7] resolve target       `--to` must be an annotated tag with a `contract:` trailer; otherwise the
@@ -2311,9 +2312,12 @@ generated file that does not match its source.
 [U4/7] plan                 computed from the TAG, before the tree moves: which files changed
                             between HEAD and the tag, restricted to S05's INPUTS table; the gitlink;
                             `storeSchemaVersion` read out of `git show <tag>:…/contract.json`; the
-                            installed Claude Code against the tag's `claude-floor`
+                            installed Claude Code against the tag's `claude-floor`. First, an
+                            untracked file the tag tracks stops it, named, exit 2: git refuses to
+                            overwrite one at U5, even with identical content (ARC-09-C120)
 [U5/7] move                 `--to` detaches; otherwise `git pull --ff-only` on a branch with an
-                            upstream. A diverged branch is reported, never resolved for you
+                            upstream. A diverged branch is reported, never resolved for you; any
+                            other git failure is reported with git's own reason
 [U6/7] bootstrap --yes      a second run in the recorded mode: the resume rule re-runs exactly the
                             stale steps, and B06 MIGRATES a store whose schema moved
 [U7/7] doctor               `doctor --json`, and the upgrade cache is written with `behind: false`

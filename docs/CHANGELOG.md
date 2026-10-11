@@ -70,6 +70,13 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   label, the licence's id or `missing`, and the state that refused it. It carries no argument and no value
   (ARC-11-C1). The rc.1 sitting found the trail empty after two refusals.
 
+### Fixed
+
+- `./snowarch upgrade` refuses before anything moves, by name, when an untracked file is in the release's way: git
+  refuses to overwrite one even with identical content, and the owner's rc.3 upgrade stopped at U5 with no reason. The
+  preflight names the modified files, and a failure while the tree moves quotes git's own reason; "diverged" is said
+  only when git refused the fast-forward (ARC-09-C120).
+
 ## 2.0.11 — 2026-10-10
 
 ### Notes
