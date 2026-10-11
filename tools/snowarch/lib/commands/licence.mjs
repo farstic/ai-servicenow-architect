@@ -74,6 +74,21 @@ function required(flags, sub, names) {
   return names.map((n) => one(flags, n));
 }
 
+/**
+ * A value pasted as it stood from an example, `<your name>`, rather than typed (the architect's ruling,
+ * 2026-10-11). The owner's keygen took `--org "<фирма или твоето име>"` that way, and the creator licence
+ * carries it: a licence is signed, so a placeholder in one stays there. Refused for `--to` and `--org`,
+ * once trimmed, before anything is written; a value that only CONTAINS a bracket is a value.
+ */
+function realValue(flag, value) {
+  const trimmed = String(value).trim();
+  if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+    throw new Usage(`--${flag} ${JSON.stringify(value)} is a placeholder, not a value — type the real `
+      + `${flag === 'to' ? 'name' : 'company, or the name again'}, without angle brackets`);
+  }
+  return value;
+}
+
 /** The real path of `p`, following symlinks through the nearest part of it that exists. */
 function realish(p) {
   let head = resolve(p);
@@ -224,6 +239,8 @@ function check({ flags, log, root, keys, now, env, config }) {
 
 function keygen({ flags, log, root, now, where }) {
   const [out, rec, to, org] = required(flags, 'keygen', ['out', 'recovery-out', 'to', 'org']);
+  realValue('to', to);
+  realValue('org', org);
   outsideOnly(out, root, 'a private key');
   outsideOnly(rec, root, 'a private key');
   if (realish(out) === realish(rec)) throw new Usage('the primary and the recovery key need two different paths');
@@ -280,6 +297,8 @@ function keygen({ flags, log, root, now, where }) {
 
 function issue({ flags, log, root, keys, now }) {
   const [to, org, scope, keyPath] = required(flags, 'issue', ['to', 'org', 'scope', 'key']);
+  realValue('to', to);
+  realValue('org', org);
   const validUntil = one(flags, 'valid-until');
   const perpetual = flags.perpetual === true;
   if ((validUntil === undefined) === !perpetual) {

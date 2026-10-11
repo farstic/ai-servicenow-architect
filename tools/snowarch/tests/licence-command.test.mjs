@@ -295,3 +295,27 @@ test('ARC-11-C1 — after keygen, a perpetual live licence issued with the prima
   const ledger = JSON.parse(readFileSync(join(w.outside, 'issued.json'), 'utf8'));
   assert.deepEqual(ledger.issued.map((e) => [e.id, e.valid_until]), [['LIC-2026-0001', null], ['LIC-2026-0002', null]]);
 });
+
+test('ARC-11-C1 — keygen refuses a placeholder as --org, naming the flag and the value, and writes nothing', async (t) => {
+  // The owner's own keygen took `--org "<фирма или твоето име>"` pasted as it stood, and the creator licence
+  // carries it. A value that is a placeholder — "<" … ">" once trimmed — never reaches a signed licence.
+  const w = world(t);
+  const out = join(w.outside, 'primary.pem');
+  const r = await run(w, ['keygen'], { out, 'recovery-out': join(w.outside, 'recovery.pem'), to: 'Test Owner',
+    org: '<фирма или твоето име>' });
+  assert.equal(r.code, EXIT_USAGE, r.text);
+  assert.match(r.text, /--org "<фирма или твоето име>" is a placeholder, not a value/);
+  assert.equal(existsSync(out), false, 'a refused keygen wrote a key');
+});
+
+test('ARC-11-C1 — issue refuses a placeholder as --to, trimmed, and keeps a value that only contains brackets', async (t) => {
+  const w = world(t);
+  const g = await keygen(t, w);
+  const base = { org: 'Test Org', scope: 'live', 'valid-until': '2027-10-10', key: g.out };
+  const r = await run(w, ['issue'], { ...base, to: '  <your name>  ' }, { keys: g.keys });
+  assert.equal(r.code, EXIT_USAGE, r.text);
+  assert.match(r.text, /--to " {2}<your name> {2}" is a placeholder, not a value/);
+  assert.equal(existsSync(join(w.outside, 'LIC-2026-0002.json')), false, 'a refused issue wrote a licence');
+  const kept = await run(w, ['issue'], { ...base, to: 'Test Licensee <Test Org>' }, { keys: g.keys });
+  assert.equal(kept.code, EXIT_OK, kept.text);
+});
