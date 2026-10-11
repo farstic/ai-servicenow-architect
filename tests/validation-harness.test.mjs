@@ -43,8 +43,14 @@ test('C87 (a) — the extractor reads every case in the spec: extracted count eq
   const tests = extract(spec, t);
   assert.deepEqual(tests.map((x) => x.id), headings, 'a case the extractor skips is a case no run can make');
   assert.ok(headings.length >= 25, `the spec has ${headings.length} cases`);
-  // Each case that has a Prompt section gives the runner at least one prompt.
-  const bare = tests.filter((x) => /\n### Prompt\n/.test(spec.slice(spec.indexOf(`## ${x.id} `))) && x.prompts.length === 0).map((x) => x.id);
+  // Each case that has a Prompt section gives the runner at least one prompt. The case's OWN section: this
+  // sliced to the end of the file, so T-28, which has no Prompt, read T-29's below it and was called bare.
+  const section = (id) => {
+    const at = spec.indexOf(`## ${id} `);
+    const next = spec.indexOf('\n## ', at + 1);
+    return spec.slice(at, next < 0 ? undefined : next);
+  };
+  const bare = tests.filter((x) => /\n### Prompt\n/.test(section(x.id)) && x.prompts.length === 0).map((x) => x.id);
   assert.deepEqual(bare, [], 'a Prompt section with no fenced prompt');
 });
 
