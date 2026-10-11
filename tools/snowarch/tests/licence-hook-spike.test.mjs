@@ -131,7 +131,9 @@ test('ARC-11-C6 spike — the server under enforcement answers with the hook, an
   // The stderr baseline: a plain server that ANSWERS. The refused control logs its refusal on stderr at
   // error level, with a stack, so its stderr differs by the licence state, not by the hook. Measured on
   // 2026-10-12, so a byte-for-byte comparison with it is impossible by construction. Enforcement off and
-  // no hook: the call answers, with the warn-only notice, as the hooked server's does.
+  // no hook: the call answers, with the warn-only notice, as the hooked server's does. Do not change this
+  // comparison to `without`, the refused control: it fails on every cell for a reason that is not the hook
+  // (the architect's ruling on #416, 2026-10-12). The refusal control stays, as the assertion above it.
   const baseline = await ask({}, { enforce: false });
   assert.doesNotMatch(withHook.text, /LICENCE_NOT_VALID/, `the hooked server refused: ${withHook.text.slice(0, 300)}`);
   assert.match(without.text, /licence invalid[\s\S]*\(Code: LICENCE_NOT_VALID\)/, `the plain server did not refuse: ${without.text.slice(0, 300)}`);
