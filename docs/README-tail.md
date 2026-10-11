@@ -19,6 +19,10 @@
 
 Licensed under **Apache-2.0** — see `LICENSE` and `NOTICE`.
 
+What that allows, in plain language, is in [LICENSING.md](LICENSING.md); the name and logo are covered by
+[TRADEMARKS.md](TRADEMARKS.md). Contributions need the signed Contributor Licence Agreement, [CLA.md](CLA.md):
+see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Contact: see `NOTICE`.
+
 ServiceNow platform documentation is vendored from **ServiceNowDocs**
 (<https://github.com/ServiceNow/ServiceNowDocs>) at a pinned commit and is the property of ServiceNow,
 Inc., used under its own licence. This project is not affiliated with or endorsed by ServiceNow.

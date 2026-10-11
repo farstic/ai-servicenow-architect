@@ -40,6 +40,12 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
   `licence`, `doctor`, `status`, `version` and `upgrade`. A design-only licence refuses every tool of a live
   server.
 - An audit line names the licence it was written under, only when that licence's signature holds.
+- The licensing documents (ARC-11-C2):
+  - `LICENSING.md`, `TRADEMARKS.md`, the Contributor Licence Agreement `CLA.md`, and `CONTRIBUTORS.md`;
+  - `docs/CONTRIBUTING.md` gains what a contribution needs: a signed CLA, failing tests first, and what is not
+    accepted;
+  - `NOTICE` names the project's contact;
+  - every source file the author owns opens with a two-line copyright header.
 
 ### Changed
 

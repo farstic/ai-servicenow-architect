@@ -1,7 +1,53 @@
 # CONTRIBUTING
 
-First version, written at the ARC-01 close-out. It records the conventions the foundation stories
-established and the reasons behind them — several exist because something went wrong once.
+Thank you for considering a contribution. This project accepts contributions only from people
+who have signed the Contributor Licence Agreement (CLA, `CLA.md`). The CLA keeps the project's
+ownership clear and lets the author relicense future versions without tracking down every
+contributor; without it, a pull request cannot be merged.
+
+## Before your first pull request
+
+1. Read `LICENSING.md` and `TRADEMARKS.md`.
+2. Sign the CLA: copy `CLA.md`, fill in your details, and send the signed copy to the address in
+   `NOTICE` (a scanned signature or a qualified electronic signature). For a contribution made on
+   behalf of a company, the company signs the entity version.
+3. Add your name to `CONTRIBUTORS.md` in the same pull request as your first change, with the
+   line `I have signed the CLA on <date>`.
+
+## What a pull request needs
+
+- A branch off `develop`; `main` is never targeted directly.
+- Failing tests first, then the change; the gates green (`npm test`, lint, `docs verify`).
+- A plan row or changelog line when the change is user-visible.
+- No pinned model identifiers in agent files; no web tools; no client material (`clients/` is
+  gitignored and must stay out).
+- Every new source file carries the copyright header: these two lines, first in the file or right after its
+  shebang, with `#` in place of `//` for `.sh`, `.py` and `.ps1`. `tests/source-headers.test.mjs` holds every
+  owned source file to them.
+
+  ```
+  // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+  // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
+  ```
+
+## What is not accepted
+
+- Material you do not have the right to contribute (code copied from a client engagement, from a
+  product under another licence, or from a document you cannot redistribute).
+- Changes that add a dependency on a service outside the local checkout and the user's own Claude
+  account.
+- Changes to `LICENSE`, `NOTICE`, `LICENSING.md`, `TRADEMARKS.md` or this file — those are the
+  author's alone.
+
+## Security
+
+A vulnerability is reported privately to the address in `NOTICE`, not in a public issue.
+
+---
+
+The rest of this page is the maintainers' rulebook. First version, written at the ARC-01 close-out. It
+records the conventions the foundation stories established and the reasons behind them — several exist
+because something went wrong once.
 
 ---
 
