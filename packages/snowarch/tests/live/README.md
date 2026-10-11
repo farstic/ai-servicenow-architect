@@ -722,6 +722,9 @@ R0 snow_core_records_query { table: "sys_user_preference",
      query: "name=sys_update_set^user=javascript:gs.getUserID()", fields: "sys_id,value" }
                                                        the capture target before W1; keep its value for the
                                                        teardown, and out of the record: it is a sys_id
+R0b snow_us_current_update_set_read {}                 from 2.1.0 (ARC-09-C128): session_update_set.sys_id
+                                                       equals R0's value. R0 retires once a 2.1.0-rc sitting
+                                                       confirms ARC-09-C127 and C128
 R1 snow_core_capabilities_read                         ATF, WRITE and SCRIPTING on
 R2 snow_core_records_query { table: "sys_atf_step_config", query: "name=Run Server Side Script",
      fields: "sys_id,name,active,sys_scope" }          exactly one row, active
@@ -1130,6 +1133,9 @@ R0 snow_core_records_query { table: "sys_user_preference",
      query: "name=sys_update_set^user=javascript:gs.getUserID()", fields: "sys_id,value" }
                                                        the capture target before W1; keep its value for the
                                                        teardown, and out of the record: it is a sys_id
+R0b snow_us_current_update_set_read {}                 from 2.1.0 (ARC-09-C128): session_update_set.sys_id
+                                                       equals R0's value. R0 retires once a 2.1.0-rc sitting
+                                                       confirms ARC-09-C127 and C128
 R1 snow_core_records_query { table: "sys_atf_step_config", query: "name=Run Server Side Script",
      fields: "sys_id,name,active" }                    exactly one row, active
 R2 snow_core_records_query { table: "atf_input_variable", query: "model=<R1 sys_id>",
