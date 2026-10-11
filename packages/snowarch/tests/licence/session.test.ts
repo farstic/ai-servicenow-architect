@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  assertLicensed, currentLicence, initLicence, licenceAuditField, resetLicenceForTests, takeLicenceNotice,
+  assertLicensed, currentLicence, initLicence, licenceAuditField, licenceRefusalFields, resetLicenceForTests,
+  takeLicenceNotice,
 } from '../../src/licence/session.js';
 import { ServiceNowError } from '../../src/utils/errors.js';
 import { remedyFor } from '../../src/errors/codes.js';
@@ -85,6 +86,30 @@ describe('ARC-11-C1 — the server\'s licence session', () => {
     forged.licence.id = 'LIC-2026-9999';
     start({}, JSON.stringify(forged));
     expect(licenceAuditField()).toEqual({});
+  });
+
+  it('names a refusal for the audit trail: the id only when its signature holds, and why (polish 2)', () => {
+    // The owner's rc.1 sitting found the refusals left no trace. A refused attempt is evidence, so the
+    // router's refusal writes one line naming the licence and the state; a forged file's id is unverified
+    // text, so it is never written.
+    start(ENFORCED);
+    expect(licenceRefusalFields()).toEqual({ licence: 'missing', state: 'missing' });
+    resetLicenceForTests();
+    const list = listText(3, [{ id: 'LIC-2026-0002', revokedAt: fromToday(-1), reason: 'breach' }], primary);
+    start(ENFORCED, licenceText(licence(), primary),
+      JSON.stringify({ checkedAt: new Date().toISOString(), source: 'fixture', list: JSON.parse(list) }));
+    expect(licenceRefusalFields()).toEqual({ licence: 'LIC-2026-0002', state: 'revoked' });
+    resetLicenceForTests();
+    start(ENFORCED, licenceText(licence({ valid_until: fromToday(-3) }), primary));
+    expect(licenceRefusalFields()).toEqual({ licence: 'LIC-2026-0002', state: 'expired' });
+    resetLicenceForTests();
+    start(ENFORCED, licenceText(licence({ scope: 'design-only' }), primary));
+    expect(licenceRefusalFields()).toEqual({ licence: 'LIC-2026-0002', state: 'scope' });
+    resetLicenceForTests();
+    const forged = JSON.parse(licenceText(licence(), primary));
+    forged.licence.id = 'LIC-2026-9999';
+    start(ENFORCED, JSON.stringify(forged));
+    expect(licenceRefusalFields()).toEqual({ licence: 'missing', state: 'invalid' });
   });
 
   it('carries the remedy the CLI prints, and keeps the code out of the always-loaded rule file', () => {
