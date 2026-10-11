@@ -113,6 +113,20 @@ export function licenceAuditField(): { licence?: string } {
   return s.signatureValid && s.id ? { licence: s.id } : {};
 }
 
+/** Why the router refused: a refused state, or `scope` for a design-only licence on a live server. */
+export type RefusalState = 'revoked' | 'expired' | 'invalid' | 'missing' | 'scope';
+
+/**
+ * ARC-11-C1 polish 2 — what a refusal's audit line says about the licence: the id when its signature holds,
+ * else `missing`, and why. A forged file's id is unverified text, and a line written from it would let
+ * whoever edits the file write into the audit trail, so it is never written.
+ */
+export function licenceRefusalFields(): { licence: string; state: RefusalState } {
+  const s = currentLicence();
+  const state = REFUSED.includes(s.state) ? s.state as RefusalState : 'scope';
+  return { licence: s.signatureValid && s.id ? s.id : 'missing', state };
+}
+
 function readConfig(root: string): unknown {
   try { return JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')); } catch { return null; }
 }

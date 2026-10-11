@@ -60,6 +60,9 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
 - `./snowarch status` prints the banner's `Licence:` line second, in every state, `ok` included (ARC-11-C1).
   The owner's rc.1 sitting found the panel silent with a licence in force. The `/snowarch` skill's sample,
   the status template and T-07 carry the line.
+- A call the licence refuses writes one audit line, a read or a write alike, naming the tool, the instance
+  label, the licence's id or `missing`, and the state that refused it. It carries no argument and no value
+  (ARC-11-C1). The rc.1 sitting found the trail empty after two refusals.
 
 ## 2.0.11 — 2026-10-10
 
