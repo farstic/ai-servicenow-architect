@@ -93,6 +93,9 @@ test('ARC-11-C6 spike — the launcher passes NODE_OPTIONS on: the CLI behind it
   const without = verify({ how: 'launcher', file, env: cleanEnv(dir) });
   assert.match(withHook.text, /signature:\s+valid — primary key/, withHook.text);
   assert.match(without.text, /Licence: invalid/, without.text);
+  // The POSIX launcher's own `node -p` version check loads the hook too, so the launcher's stderr is the
+  // one to compare: the hook must add nothing to it (the architect's measurement (a), 2026-10-12).
+  assert.equal(withHook.stderr, without.stderr, 'the hook changed what the launcher prints on stderr');
   t.diagnostic(`${process.platform} node ${process.versions.node} · launcher ${WIN ? 'snowarch.cmd' : './snowarch'}: hook ${withHook.ms} ms, plain ${without.ms} ms`);
 });
 
@@ -104,8 +107,8 @@ test('ARC-11-C6 spike — the server under enforcement answers with the hook, an
   const hook = fixtureKeysHook(dir, productKeys(primary, keyPair()));
   writeFileSync(join(checkout, '.local', 'licence.json'), licenceText(licence({ id: 'LIC-2026-9002' }), primary));
 
-  const ask = async (extra) => {
-    const env = cleanEnv(dir, { CLAUDE_PROJECT_DIR: checkout, SNOW_LICENCE_ENFORCE: 'true', SNOW_LOG_LEVEL: 'error', ...extra });
+  const ask = async (extra, { enforce = true } = {}) => {
+    const env = cleanEnv(dir, { CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error', ...(enforce ? { SNOW_LICENCE_ENFORCE: 'true' } : {}), ...extra });
     const client = new Client({ name: 'hook-spike', version: '0' }, { capabilities: {} });
     const transport = new StdioClientTransport({ command: process.execPath, args: [SERVER], env, cwd: checkout, stderr: 'pipe' });
     let err = '';
@@ -114,14 +117,38 @@ test('ARC-11-C6 spike — the server under enforcement answers with the hook, an
     try {
       await client.connect(transport).catch((e) => { throw new Error(`${e.message} · server stderr: ${err.slice(0, 600)}`); });
       const r = await client.callTool({ name: 'snow_core_capabilities_read', arguments: {} });
-      return { text: r.content.map((c) => c.text ?? '').join('\n'), ms: Math.round(performance.now() - t0) };
-    } finally {
+      const text = r.content.map((c) => c.text ?? '').join('\n');
+      const ms = Math.round(performance.now() - t0);
       await client.close();
+      return { text, ms, stderr: err };
+    } catch (e) {
+      await client.close();
+      throw e;
     }
   };
   const withHook = await ask({ NODE_OPTIONS: hook.nodeOptions });
   const without = await ask({});
+  // The stderr baseline: a plain server that ANSWERS. The refused control logs its refusal on stderr at
+  // error level, with a stack, so its stderr differs by the licence state, not by the hook. Measured on
+  // 2026-10-12, so a byte-for-byte comparison with it is impossible by construction. Enforcement off and
+  // no hook: the call answers, with the warn-only notice, as the hooked server's does.
+  const baseline = await ask({}, { enforce: false });
   assert.doesNotMatch(withHook.text, /LICENCE_NOT_VALID/, `the hooked server refused: ${withHook.text.slice(0, 300)}`);
   assert.match(without.text, /licence invalid[\s\S]*\(Code: LICENCE_NOT_VALID\)/, `the plain server did not refuse: ${without.text.slice(0, 300)}`);
+  assert.doesNotMatch(baseline.text, /LICENCE_NOT_VALID/, `the stderr baseline was refused: ${baseline.text.slice(0, 300)}`);
+  assert.equal(withHook.stderr, baseline.stderr, 'the hook changed what an answering server prints on stderr');
   t.diagnostic(`${process.platform} node ${process.versions.node} · server stdio: hook ${withHook.ms} ms, plain ${without.ms} ms`);
+});
+
+test('ARC-11-C6 spike — a child that never loads a keys module is untouched: exit 7, nothing on stdout or stderr', (t) => {
+  // The architect's measurement (b), 2026-10-12. NODE_OPTIONS reaches every node a launcher starts; the hook
+  // must change nothing for one that never imports a keys module.
+  const { dir, hook } = fixture(t);
+  const inert = (extra) => spawnSync(process.execPath, ['-e', 'process.exit(7)'], { encoding: 'utf8', env: cleanEnv(dir, extra), timeout: 60_000 });
+  const withHook = inert({ NODE_OPTIONS: hook.nodeOptions });
+  const without = inert({});
+  assert.equal(withHook.status, 7, `exit ${withHook.status}: ${withHook.stderr.slice(0, 300)}`);
+  assert.equal(withHook.stdout, '');
+  assert.equal(withHook.stderr, '');
+  assert.deepEqual([without.status, without.stdout, without.stderr], [7, '', ''], 'the control child is not inert');
 });
