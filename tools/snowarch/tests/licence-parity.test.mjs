@@ -10,6 +10,7 @@
 // run against the server's COMMITTED build, which is what a checkout actually starts.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -17,7 +18,9 @@ import * as cli from '../lib/licence/core.mjs';
 import { PRODUCT_KEYS as CLI_KEYS } from '../lib/licence/keys.mjs';
 import { bannerLine as cliBanner, REMEDY as CLI_REMEDY } from '../lib/licence/state.mjs';
 import { listSource as cliSource } from '../lib/licence/fetch.mjs';
+
 import { keyPair, licence, licenceText, listDoc, productKeys } from './helpers/licence.mjs';
+import { tempDir } from './helpers/temp.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const dist = (rel) => import(pathToFileURL(join(ROOT, 'packages/snowarch/dist', rel)).href);
@@ -117,4 +120,38 @@ test('ARC-11-C1 — the CLI and the server read the list\'s address from the sam
     { licence: {} }, {}, null,
   ];
   for (const c of configs) assert.deepEqual(serverState.listSource(c), cliSource(c), JSON.stringify(c));
+});
+
+// ARC-11-C6, the architect's ruling B (2026-10-12) — ONE FILE, WHICHEVER SIDE READS IT. The CLI reads
+// `<state root>/.local/licence.json`, where the state root is the checkout unless SNOWARCH_STATE_ROOT moves it;
+// the server reads `<CLAUDE_PROJECT_DIR, else its working directory>/.local/licence.json`, and Claude Code starts
+// it with CLAUDE_PROJECT_DIR set to the checkout. With no variable set, both are the same file, so a licence
+// copied in once is the one both see; enforcement on every build would otherwise refuse on one side only.
+test('ARC-11-C6 ruling B — with no state root set, the CLI and the server read the licence from one file', async (t) => {
+  const { licencePath: cliPath } = await import('../lib/local-paths.mjs');
+  const { licenceStatus: cliStatus } = await import('../lib/licence/state.mjs');
+  const session = await dist('licence/session.js');
+  const saved = { state: process.env.SNOWARCH_STATE_ROOT, project: process.env.CLAUDE_PROJECT_DIR };
+  t.after(() => {
+    for (const [k, v] of [['SNOWARCH_STATE_ROOT', saved.state], ['CLAUDE_PROJECT_DIR', saved.project]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  });
+  delete process.env.SNOWARCH_STATE_ROOT;
+
+  // The paths, for this checkout: the CLI's, and the one the server takes from CLAUDE_PROJECT_DIR.
+  const want = join(ROOT, '.local', 'licence.json');
+  assert.equal(cliPath(ROOT), want);
+  assert.equal(serverState.licencePath(ROOT), want);
+
+  // And what each side READS, for a checkout of a test's own: the server's session takes its root from
+  // CLAUDE_PROJECT_DIR, the CLI is handed the same root, and both find the one licence written there.
+  const root = tempDir('snowarch-licence-one-file-', t);
+  mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(join(root, '.local', 'licence.json'), licenceText(licence({ id: 'LIC-2026-9003' }), primary));
+  process.env.CLAUDE_PROJECT_DIR = root;
+  const served = session.initLicence({ keys: KEYS, env: {}, now: () => NOW });
+  const read = cliStatus(root, { keys: KEYS, env: {}, now: NOW });
+  assert.deepEqual([served.state, served.id], ['ok', 'LIC-2026-9003'], 'the server did not read <CLAUDE_PROJECT_DIR>/.local/licence.json');
+  assert.deepEqual([read.state, read.id], ['ok', 'LIC-2026-9003'], 'the CLI did not read <root>/.local/licence.json');
 });
