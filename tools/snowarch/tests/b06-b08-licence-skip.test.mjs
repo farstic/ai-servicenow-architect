@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 import { NO_LICENCE_IN_FORCE } from '../lib/doctor/checks/licence.mjs';
 import { runSteps, stepById } from '../lib/steps/index.mjs';
+import { stepContext } from '../lib/bootstrap.mjs';
 import { emptyState } from '../lib/state.mjs';
 import { REMEDY } from '../lib/licence/state.mjs';
 import { spellings } from '../lib/text.mjs';
@@ -71,4 +72,13 @@ test('ARC-11-C6 — the reason is E-31\'s own constant, in the approved words, a
     assert.doesNotMatch(readFileSync(join(STEPS_DIR, `${id}.mjs`), 'utf8'), /no licence in force/,
       `${id} copies the reason's text instead of importing E-31's constant`);
   }
+});
+
+test('ARC-11-C6 — the run reads the licence once: stepContext carries it, for every step that asks', () => {
+  // Without it each step would read the files again, and a step asked with no root could not tell at all.
+  const root = makeCheckout();
+  const ctx = stepContext({ root, config: { docs: { areasFile: 'docs/areas.txt' } },
+    node: { present: true, version: '22.11.0', major: 22 } });
+  assert.equal(ctx.licence?.state, 'missing', 'a checkout with no licence');
+  assert.equal(stepById('B06').runsWhen({ ...ctx, mode: 'live' }), false);
 });
