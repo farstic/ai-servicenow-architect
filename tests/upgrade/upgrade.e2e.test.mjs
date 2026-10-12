@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
-import { bootstrapUser, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
+import { bootstrapUser, buildEnforcementWorld, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
 
 const isWindows = process.platform === 'win32';
 const MINUTES = 10 * 60 * 1000;
@@ -390,4 +390,47 @@ test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t
   assert.match(again.text, /\[B01\/09\][^\n]*ok \(cached\)/, 'the resume re-ran a step it had done');
   assert.match(again.text, /\[B02\/09\] docs … (ok|warn)/, 'the resume did not complete B02');
   assert.notEqual(state(w.user).steps.B02.status, 'fail');
+}, MINUTES);
+
+// ── ARC-11-C6 step 6 — a user without a licence ──────────────────────────────────────────────────────────
+//
+// The owner's own path: a checkout on the last release that runs without a licence, upgrading to the first that
+// refuses. U1 to U5 and finish() are 2.0.12's code, and U6 and U7 are 2.0.13's bootstrap and doctor. So the way back
+// can only reach the reader through 2.0.13's E-31, which is why that remedy carries it (the architect's ruling).
+
+test('ARC-11-C6 — 2.0.12 to 2.0.13 with no licence ends at U7 with E-31 FAIL, its remedy and the way back, which runs', async (t) => {
+  const w = await buildEnforcementWorld(t);
+  bootstrapUser(w.user, { store: false, licence: false });
+  const up = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin, licence: false });
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.13', up.text);
+  assert.ok(up.text.includes('[U7/7]'), up.text);
+  const u7 = up.text.slice(up.text.indexOf('[U7/7]'));
+  assert.match(u7, /E-31 FAIL/, u7);
+  assert.ok(u7.includes('.local/licence.json'), u7);
+  assert.ok(u7.includes('upgrade --to v2.0.12'), u7);
+
+  // The way back is always allowed: `upgrade` runs without a licence, and v2.0.12 itself needs none.
+  const back = snowarch(w.user, ['upgrade', '--to', 'v2.0.12', '--yes'], { bin: w.bin, licence: false });
+  assert.equal(back.status, 0, back.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.12', back.text);
+}, 2 * MINUTES);
+
+test('ARC-11-C6 — with no licence, U4 says what the release refuses and the way back, with --yes and without', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user, { licence: false });
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const said = (text) => text.indexOf('Licence: missing — v9.1.0 runs no MCP tool');
+
+  // Without --yes: said before the question, and a no changes nothing.
+  const asked = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin, licence: false });
+  assert.equal(asked.status, 0, asked.text);
+  assert.ok(said(asked.text) > -1, asked.text);
+  assert.ok(said(asked.text) < asked.text.indexOf('Proceed? [Y/n]'), 'the notice comes after the question');
+  assert.ok(asked.text.includes('upgrade --to v2.0.12'), asked.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
+
+  // With --yes: said, and the move goes ahead, because it is still the reader's to make.
+  const moved = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin, licence: false });
+  assert.ok(said(moved.text) > -1, moved.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0', moved.text);
 }, MINUTES);

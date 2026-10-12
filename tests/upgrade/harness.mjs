@@ -25,7 +25,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 import {
-  chmodSync, cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, writeSync,
+  chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -34,6 +34,7 @@ import { licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/ind
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { writeHead, writeMarker } from '../../scripts/lib/release/writers.mjs';
 import { AREAS, buildUpstream } from '../helpers/docs-fixture.mjs';
+import { LAST_UNENFORCED_RELEASE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 
 export const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -348,31 +349,24 @@ const phase = (label, marks, fn) => {
   return r;
 };
 
-export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null } = {}) {
-  const marks = [];
-  const worldStart = process.hrtime.bigint();
-  const scratch = tempDir('snowarch-upgrade-', t);
-  const work = join(scratch, 'work');
-  mkdirSync(work, { recursive: true });
+/** Every tracked file of this checkout's working tree into `work`, and how many there were. */
+function copyTracked(work) {
+  let n = 0;
+  for (const rel of trackedFiles()) {
+    const from = join(REAL_ROOT, rel);
+    if (!existsSync(from)) continue;          // a file staged for deletion, say
+    mkdirSync(dirname(join(work, rel)), { recursive: true });
+    cpSync(from, join(work, rel), { dereference: true });
+    n += 1;
+  }
+  return n;
+}
 
-  phase('tree-copy', marks, () => {
-    let n = 0;
-    for (const rel of trackedFiles()) {
-      const from = join(REAL_ROOT, rel);
-      if (!existsSync(from)) continue;          // a file staged for deletion, say
-      mkdirSync(dirname(join(work, rel)), { recursive: true });
-      cpSync(from, join(work, rel), { dereference: true });
-      n += 1;
-    }
-    marks.push(`files=${n}`);
-  });
-  // A REAL corpus upstream, three areas big.
-  //
-  // Not the product's: cloning 35,000 files per test would make this harness unusable, and not a
-  // dead path either — AC 1's whole claim is that the docs step RE-RUNS when the areas file moves,
-  // and a step that cannot sync is a step that skips. `buildUpstream` is the docs suite's own
-  // fixture builder, so what B02 does here is what B02 does everywhere.
-  const upstream = phase('corpus-upstream', marks, () => buildUpstream(join(scratch, 'corpus')));
+/**
+ * A tree pointed at the fixture corpus: its config's upstream, pin and family, no revocation list, the areas file, and
+ * the corpus registered in `.gitmodules`. Every release a world carries needs it, whichever tree that release is.
+ */
+function pointAtFixtureCorpus(work, upstream) {
   const config = JSON.parse(readFileSync(join(work, 'engine.config.json'), 'utf8'));
   // No revocation list (ARC-11-C6): the cases start the CLI licensed, and a licensed `upgrade` refreshes the
   // list, so a configured one would be a fetch from the network on every case. Unconfigured, the refresh
@@ -391,6 +385,24 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   writeFileSync(join(work, '.gitmodules'),
     `[submodule "vendor/ServiceNowDocs"]\n\tpath = vendor/ServiceNowDocs\n`
     + `\turl = ${pathToFileURL(upstream.bare).href}\n\tbranch = australia\n\tshallow = true\n`);
+}
+
+export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null } = {}) {
+  const marks = [];
+  const worldStart = process.hrtime.bigint();
+  const scratch = tempDir('snowarch-upgrade-', t);
+  const work = join(scratch, 'work');
+  mkdirSync(work, { recursive: true });
+
+  phase('tree-copy', marks, () => marks.push(`files=${copyTracked(work)}`));
+  // A REAL corpus upstream, three areas big.
+  //
+  // Not the product's: cloning 35,000 files per test would make this harness unusable, and not a
+  // dead path either — AC 1's whole claim is that the docs step RE-RUNS when the areas file moves,
+  // and a step that cannot sync is a step that skips. `buildUpstream` is the docs suite's own
+  // fixture builder, so what B02 does here is what B02 does everywhere.
+  const upstream = phase('corpus-upstream', marks, () => buildUpstream(join(scratch, 'corpus')));
+  pointAtFixtureCorpus(work, upstream);
 
   // `node_modules` — see `placeModules`. Linked by default because fixture release B rebuilds
   // `dist/`, which needs TypeScript, and copying 400 MB per run would make this harness unusable.
@@ -520,15 +532,78 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   return { scratch, work, origin, user, bin };
 }
 
+/**
+ * ARC-11-C6 step 6 — the world a user without a licence upgrades in. Its first release is the REAL last release that
+ * runs without one (LAST_UNENFORCED_RELEASE, from this repository's own tag), and its second is this tree at 2.0.13,
+ * the first that refuses. So an upgrade between them runs 2.0.12's U1 to U5 and its finish(), and 2.0.13's bootstrap
+ * and doctor, which is the owner's own path. The tag has to be in this clone: CI's upgrade-e2e job checks out with
+ * `fetch-depth: 0`, and a shallow clone is told how to fetch it.
+ */
+export async function buildEnforcementWorld(t, { modules = 'link' } = {}) {
+  const marks = [];
+  const worldStart = process.hrtime.bigint();
+  const from = LAST_UNENFORCED_RELEASE;
+  if (spawnSync('git', ['rev-parse', '--verify', '-q', `${from}^{commit}`], { cwd: REAL_ROOT }).status !== 0) {
+    throw new Error(`harness: ${from} is not in this clone — run git fetch --tags, then run again`);
+  }
+  const scratch = tempDir('snowarch-enforce-', t);
+  const work = join(scratch, 'work');
+  mkdirSync(work, { recursive: true });
+
+  // The old release's own tree, from its tag: what a user on it has, not this tree with its version rewritten.
+  phase('tree-old', marks, () => {
+    const tar = join(scratch, 'old.tar');
+    gitRaw(['archive', '--format=tar', '-o', tar, from], { cwd: REAL_ROOT });
+    execFileSync('tar', ['-xf', tar, '-C', work], { stdio: 'pipe' });
+  });
+  const upstream = phase('corpus-upstream', marks, () => buildUpstream(join(scratch, 'corpus')));
+  pointAtFixtureCorpus(work, upstream);
+  phase(`modules-${modules}`, marks, () => placeModules(work, modules));
+  phase('gen-all-old', marks, () => regenerate(work));
+  phase('git-init', marks, () => git(work, ['init', '-q', '-b', 'main']));
+  persistLongPaths(work);
+  disableBackgroundGit(work);
+  commit(work, from, upstream.pin);
+  await tagRelease(work, from.slice(1));
+
+  // This tree at 2.0.13. Everything the old one held goes first, so a file deleted since is not carried over.
+  phase('tree-new', marks, () => {
+    for (const e of readdirSync(work)) {
+      if (e !== '.git' && e !== 'node_modules') rmSync(join(work, e), { recursive: true, force: true });
+    }
+    marks.push(`files=${copyTracked(work)}`);
+  });
+  pointAtFixtureCorpus(work, upstream);
+  phase('rewrite-version-new', marks, () => rewriteVersion(work, '2.0.13'));
+  commit(work, 'v2.0.13', upstream.pin);
+  await tagRelease(work, '2.0.13');
+
+  const origin = join(scratch, 'origin.git');
+  phase('clone-bare', marks, () => gitRaw(['clone', '--quiet', '--bare', work, origin]));
+  disableBackgroundGit(origin);
+  const user = join(scratch, 'user');
+  phase('clone-user', marks, () => gitRaw(['clone', '--quiet', pathToFileURL(origin).href, user]));
+  disableBackgroundGit(user);
+  phase(`modules-user-${modules}`, marks, () => placeModules(user, modules));
+  git(user, ['checkout', '--quiet', from]);
+  git(user, ['config', 'user.email', 'f@example.com']);
+  git(user, ['config', 'user.name', 'f']);
+  const bin = fakeClaude(join(scratch, 'bin'), '2.1.258 (Claude Code)');
+
+  marks.push(`TOTAL=${Math.round(Number(process.hrtime.bigint() - worldStart) / 1e6)}ms`);
+  writeSync(1, `    enforcement world[${process.platform}] ${marks.join(' ')}\n`);
+  return { scratch, work, origin, user, bin };
+}
+
 /** The user's clone, bootstrapped design-only, with a v1 store beside it. */
-export function bootstrapUser(user, { store = true } = {}) {
+export function bootstrapUser(user, { store = true, licence = {} } = {}) {
   // `spawnSync` and an explicit throw, not `execFileSync`: its error message names the COMMAND and
   // swallows the child's output, so a failure on a runner arrives as an unreadable command line
   // and no reason at all. The whole transcript goes into the error instead.
   const r = spawnSync(process.execPath,
     [join(user, 'tools/snowarch/bin/snowarch.mjs'), 'bootstrap',
       '--mode', 'design', '--yes', '--skip-claude-check', '--docs', 'sparse'],
-    { cwd: user, encoding: 'utf8', env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user }) });
+    { cwd: user, encoding: 'utf8', env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user }, { licence }) });
   if (r.status !== 0) {
     throw new Error(`the fixture bootstrap exited ${r.status ?? r.signal ?? 'abnormally'}:\n`
       + `${r.stdout ?? ''}${r.stderr ?? ''}`);
@@ -568,7 +643,7 @@ export function writeStore(user) {
  * Spawned, never imported: the command spawns `bootstrap` and `doctor` of its own, and a test that
  * called the function in-process would be exercising a different program from the one a user runs.
  */
-export function snowarch(user, args, { env = {}, input = '', bin = null } = {}) {
+export function snowarch(user, args, { env = {}, input = '', bin = null, licence = {} } = {}) {
   // The shim goes FIRST on PATH unless the caller brought its own environment: U6 runs a real
   // bootstrap, whose preflight wants Claude Code, and a hosted runner has none.
   const path = bin && !env.PATH
@@ -577,7 +652,9 @@ export function snowarch(user, args, { env = {}, input = '', bin = null } = {}) 
   const r = spawnSync(process.execPath,
     [join(user, 'tools/snowarch/bin/snowarch.mjs'), ...args], {
       cwd: user, encoding: 'utf8', input,
-      env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user, ...path, ...env }),
+      // `licence: false` (ARC-11-C6 step 6): the fixture's keys are trusted and no licence is written, so the state is
+      // `missing`, the path a user without a licence takes.
+      env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user, ...path, ...env }, { licence }),
     });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '',
     text: `${r.stdout ?? ''}${r.stderr ?? ''}` };
