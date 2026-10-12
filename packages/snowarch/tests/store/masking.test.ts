@@ -1,11 +1,11 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, expect, it } from 'vitest';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { trackTempDir } from '../helpers/server-child.js';
+import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 import { serverStderr } from '../helpers/server-stderr.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -75,7 +75,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       expect(stderr).toMatch(/Run, from the checkout: chmod 600 \.local\/instances\.json/);
       expect(stderr).not.toMatch(leakRegex(fakeHome, checkout));
     } finally {
-      rmSync(base, { recursive: true, force: true });
+      removeTempDir(base);
     }
   }, 40_000);
 
@@ -94,7 +94,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       expect(stderr).toContain('store: project (<checkout>');
       expect(stderr).not.toMatch(leakRegex(fakeHome, checkout));
     } finally {
-      rmSync(base, { recursive: true, force: true });
+      removeTempDir(base);
     }
   }, 40_000);
 
@@ -111,7 +111,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       expect(stderr).toContain('STORE_NOT_FOUND');
       expect(stderr).not.toMatch(leakRegex(fakeHome, checkout));
     } finally {
-      rmSync(base, { recursive: true, force: true });
+      removeTempDir(base);
     }
   }, 40_000);
 
@@ -136,7 +136,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       expect(none).toContain('mode: unconfigured');
       expect(none).not.toMatch(leakRegex(fakeHome, empty));
     } finally {
-      rmSync(base, { recursive: true, force: true });
+      removeTempDir(base);
     }
   }, 60_000);
 
@@ -167,7 +167,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       expect(b).toContain(elsewhere);                 // as given, on purpose
       expect(b).not.toContain(fakeHome);              // but never the home directory
     } finally {
-      rmSync(base, { recursive: true, force: true });
+      removeTempDir(base);
     }
   }, 60_000);
 });
