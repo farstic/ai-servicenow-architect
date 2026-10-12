@@ -14,6 +14,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { currentLicence } from '../../src/licence/session.js';
+import { routeToolInvocation } from '../../src/tools/index.js';
+import { SESSION_LICENCE_ID, useLicensedSession } from '../helpers/licensed-session.js';
 
 const TESTS = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -26,6 +29,16 @@ function testFiles(dir: string): string[] {
   }
   return out;
 }
+
+describe('ARC-11-C6 step 2 — useLicensedSession()', () => {
+  useLicensedSession();
+
+  it('starts an enforced session with a live licence in force, which the router answers', async () => {
+    const s = currentLicence();
+    expect([s.state, s.scope, s.enforced, s.id]).toEqual(['ok', 'live', true, SESSION_LICENCE_ID]);
+    await expect(routeToolInvocation(null as never, 'snow_core_instances_index', {})).resolves.toBeDefined();
+  });
+});
 
 describe('ARC-11-C6 step 2 — in-process router calls', () => {
   it('every test file that calls routeToolInvocation starts a licensed session first', () => {
