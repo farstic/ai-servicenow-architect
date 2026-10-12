@@ -1,7 +1,8 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
- * ARC-11-C1 — the `Licence:` line, and nothing else, so that every surface can print it.
+ * ARC-11-C1 — the `Licence:` line, and the days left that follow it, and nothing else, so that every surface can
+ * print them.
  *
  * A LEAF, BECAUSE THE STATUS PANEL READS IT. `doctor/panel.mjs` renders this line from E-31's data,
  * and `tests/doctor/panel.test.mjs` walks the panel's import graph and fails on `node:fs`,
@@ -26,4 +27,15 @@ export function bannerLine(s) {
     parts.push(s.perpetual ? 'perpetual' : `until ${s.validUntil}`);
   }
   return parts.join(' · ');
+}
+
+/**
+ * ARC-11-C6 step 7 — what is left of the term, as E-31's expiring detail and the server's first-answer notice say
+ * it. The day of `valid_until` counts, until 00:00 UTC of the next (docs/USER-GUIDE.md), so 0 days left is the last
+ * day, named so. The server's `daysLeftPhrase` (`packages/snowarch/src/licence/state.ts`) is the twin, and the
+ * parity test holds the two.
+ */
+export function daysLeftPhrase(days) {
+  if (days === 0) return 'last day';
+  return days === 1 ? '1 day left' : `${days} days left`;
 }

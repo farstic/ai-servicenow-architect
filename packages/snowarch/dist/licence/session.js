@@ -25,7 +25,7 @@ import { cliSpelling, bootstrapSpelling } from '../cli/tty.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { PRODUCT_KEYS } from './keys.js';
 import { refreshList, LIVE_BUDGET_MS } from './refresh.js';
-import { licenceLine, licenceStatus, projectRoot, readLicenceText, REFUSED } from './state.js';
+import { daysLeftPhrase, licenceLine, licenceStatus, projectRoot, readLicenceText, REFUSED, } from './state.js';
 let session = null;
 /** Read the licence and the cached list, and hold the result for this process. */
 export function initLicence({ root = projectRoot(), env = process.env, keys = PRODUCT_KEYS, now = () => new Date() } = {}) {
@@ -57,7 +57,7 @@ function noticeWhy(s) {
     if (s.state === 'ok')
         return s.scope === 'design-only' ? `licence ${s.id} covers design-only; live needs a live-scope licence` : null;
     if (s.state === 'expiring')
-        return `${s.daysLeft} days left`;
+        return daysLeftPhrase(s.daysLeft);
     if (s.state === 'missing')
         return 'this checkout has no licence';
     return s.reason;

@@ -25,7 +25,7 @@ import { checkLicence, readList } from './core.mjs';
 import { PRODUCT_KEYS } from './keys.mjs';
 import { licencePath, revocationsPath } from '../local-paths.mjs';
 
-export { bannerLine } from './line.mjs';
+export { bannerLine, daysLeftPhrase } from './line.mjs';
 
 /**
  * ARC-11-C6 step 4b — the states enforcement refuses, the commands that run without a licence and the decision are

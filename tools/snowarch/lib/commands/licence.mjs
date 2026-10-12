@@ -148,6 +148,18 @@ function nextId(ledger, year) {
   return `LIC-${year}-${String((nums.length > 0 ? Math.max(...nums) : 0) + 1).padStart(4, '0')}`;
 }
 
+/**
+ * ARC-11-C6 step 7 — the `valid until:` line that show, verify and check print. The date is a UTC day
+ * (docs/USER-GUIDE.md), and the line says so, with what is left of it: "(UTC, 10 days)", "(UTC, 1 day)",
+ * "(UTC, last day)". An expired licence's says the day alone: its `why:` line says when it ended.
+ */
+function validUntilLine(s) {
+  if (s.perpetual) return '  valid until:  perpetual';
+  const days = s.daysLeft;
+  const left = days < 0 ? '' : `, ${days === 0 ? 'last day' : `${days} day${days === 1 ? '' : 's'}`}`;
+  return `  valid until:  ${s.validUntil} (UTC${left})`;
+}
+
 function describe(log, s) {
   if (s.state === 'missing') return;
   if (s.signatureValid) {
@@ -156,7 +168,7 @@ function describe(log, s) {
     log.step(`  org:          ${s.org}`);
     log.step(`  scope:        ${s.scope}`);
     log.step(`  issued:       ${s.issued}`);
-    log.step(`  valid until:  ${s.perpetual ? 'perpetual' : `${s.validUntil} (${s.daysLeft} days)`}`);
+    log.step(validUntilLine(s));
     log.step(`  signature:    valid — ${s.key} key`);
   }
   if (s.reason && s.state !== 'ok' && s.state !== 'expiring') log.step(`  why:          ${s.reason}`);
@@ -229,6 +241,8 @@ function check({ flags, log, root, keys, now, env, config }) {
     return inForce(s);
   }
   log.step(bannerLine(s));
+  // The command every remedy names says what the day means too (ruling B): a term, from a signature that holds.
+  if (s.signatureValid && !s.perpetual) log.step(validUntilLine(s));
   if (s.reason && s.state !== 'ok' && s.state !== 'expiring') log.step(`  why: ${s.reason}`);
   log.step(listLine(s, now()));
   enforcementLines(log, s);

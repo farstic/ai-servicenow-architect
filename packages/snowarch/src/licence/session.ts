@@ -26,7 +26,9 @@ import { ServiceNowError } from '../utils/errors.js';
 import type { ProductKey } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
 import { refreshList, LIVE_BUDGET_MS, type RefreshResult } from './refresh.js';
-import { licenceLine, licenceStatus, projectRoot, readLicenceText, REFUSED, type CheckoutStatus } from './state.js';
+import {
+  daysLeftPhrase, licenceLine, licenceStatus, projectRoot, readLicenceText, REFUSED, type CheckoutStatus,
+} from './state.js';
 
 interface Options {
   root?: string;
@@ -80,7 +82,7 @@ export function assertLicensed(): void {
 /** Why the state is worth a notice, or `null` when it is not: a live licence in force says nothing. */
 function noticeWhy(s: CheckoutStatus): string | null {
   if (s.state === 'ok') return s.scope === 'design-only' ? `licence ${s.id} covers design-only; live needs a live-scope licence` : null;
-  if (s.state === 'expiring') return `${s.daysLeft} days left`;
+  if (s.state === 'expiring') return daysLeftPhrase(s.daysLeft as number);
   if (s.state === 'missing') return 'this checkout has no licence';
   return s.reason;
 }

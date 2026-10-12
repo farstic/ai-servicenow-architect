@@ -43,6 +43,11 @@ export declare function licenceStatus(root: string, { keys, now }?: {
 }): CheckoutStatus;
 /** The line: the same words as the CLI's banner (the parity test holds them). */
 export declare function licenceLine(s: Pick<LicenceStatus, 'state' | 'id' | 'scope' | 'perpetual' | 'validUntil'>): string;
+/**
+ * What is left of the term, in the same words as the CLI's `daysLeftPhrase` (the parity test holds them): the day of
+ * `valid_until` counts, until 00:00 UTC of the next, so 0 days left is the last day, named so (ARC-11-C6 step 7).
+ */
+export declare function daysLeftPhrase(days: number): string;
 /** `owner/name` is GitHub over HTTPS; anything else is a URL or path, used as written. */
 export declare const repoUrl: (repo: string) => string;
 /** `{ url, ref, path }` from `engine.config.json`'s `licence.revocations`, or `null` when none is configured. */

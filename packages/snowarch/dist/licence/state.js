@@ -80,6 +80,15 @@ export function licenceLine(s) {
     }
     return parts.join(' · ');
 }
+/**
+ * What is left of the term, in the same words as the CLI's `daysLeftPhrase` (the parity test holds them): the day of
+ * `valid_until` counts, until 00:00 UTC of the next, so 0 days left is the last day, named so (ARC-11-C6 step 7).
+ */
+export function daysLeftPhrase(days) {
+    if (days === 0)
+        return 'last day';
+    return days === 1 ? '1 day left' : `${days} days left`;
+}
 const OWNER_NAME = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 /** `owner/name` is GitHub over HTTPS; anything else is a URL or path, used as written. */
 export const repoUrl = (repo) => (OWNER_NAME.test(repo) ? `https://github.com/${repo}.git` : repo);

@@ -93,6 +93,15 @@ export function licenceLine(s: Pick<LicenceStatus, 'state' | 'id' | 'scope' | 'p
   return parts.join(' · ');
 }
 
+/**
+ * What is left of the term, in the same words as the CLI's `daysLeftPhrase` (the parity test holds them): the day of
+ * `valid_until` counts, until 00:00 UTC of the next, so 0 days left is the last day, named so (ARC-11-C6 step 7).
+ */
+export function daysLeftPhrase(days: number): string {
+  if (days === 0) return 'last day';
+  return days === 1 ? '1 day left' : `${days} days left`;
+}
+
 const OWNER_NAME = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
 
 /** `owner/name` is GitHub over HTTPS; anything else is a URL or path, used as written. */
