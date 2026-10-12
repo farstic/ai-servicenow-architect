@@ -8,11 +8,11 @@
  * something a person started (`licence check --refresh`, `upgrade`, `upgrade --check`) or by a live
  * server start, never by the SessionStart hook, which reads it and nothing else.
  *
- * WARN ONLY UNLESS ENFORCED. `SNOW_LICENCE_ENFORCE` is on only for the exact string `"true"`, the
- * rule every flag in this product follows. Off, every state is information: the banner line, doctor
- * check E-31 and one block on the server's first answer. On, `missing`, `invalid`, `expired` and
- * `revoked` refuse every CLI command except the five a person needs to repair the state, and every
- * MCP tool (ruling R1). `expiring` is never refused.
+ * ENFORCED ON EVERY BUILD (ARC-11-C6, from 2.0.13). No variable, and no absence of one, turns it off:
+ * `missing`, `invalid`, `expired` and `revoked` refuse every CLI command except the five a person needs
+ * to repair the state, and every MCP tool (ruling R1). `expiring` is never refused. The architect rejected
+ * an opt-out on 2026-10-12: beside C7's "a modified build still starts and works", a switch would be a
+ * documented recipe for running without a licence.
  *
  * THE LINE (`bannerLine`) is the one wording the banner, the doctor, the status panel and the server's
  * notice print. It lives in `line.mjs`, a leaf the pure status panel can import, and is re-exported
@@ -27,8 +27,6 @@ import { licencePath, revocationsPath } from '../local-paths.mjs';
 
 export { bannerLine } from './line.mjs';
 
-export const ENFORCE_VAR = 'SNOW_LICENCE_ENFORCE';
-
 /** The states enforcement refuses. `expiring` is not one: a licence in its last month is in force. */
 export const REFUSED = Object.freeze(['missing', 'invalid', 'expired', 'revoked']);
 
@@ -42,16 +40,12 @@ export const CLI_ALLOWED = Object.freeze(['licence', 'doctor', 'status', 'versio
  */
 export const LIST_REFRESH_MS = 24 * 60 * 60 * 1000;
 
-/** On only for the exact string "true", like every flag. */
-export const isEnforced = (env = process.env) => env?.[ENFORCE_VAR] === 'true';
-
 /**
  * What to do about a refusal — the same sentence as the server's `LICENCE_NOT_VALID` remedy, with the
  * launcher filled in (the parity test compares them).
  */
 export const REMEDY = (cli) => `Run ${cli} licence check to see why, then install a valid licence as `
-  + '.local/licence.json or unset SNOW_LICENCE_ENFORCE. A running Claude Code session keeps what it read '
-  + 'at start, so restart it afterwards';
+  + '.local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards';
 
 /** The installed licence's text, or `null` when there is none. */
 export function readLicenceText(root) {
@@ -96,22 +90,22 @@ export function listStale(cache, now = new Date(), afterMs = LIST_REFRESH_MS) {
 }
 
 /**
- * This checkout's licence: the core's status, plus whether enforcement is on and which list it was
- * judged against. Reads two files; fetches nothing.
+ * This checkout's licence: the core's status, which list it was judged against, and `enforced`, which is
+ * true on every build. Reads two files; fetches nothing, and reads no variable.
  */
-export function licenceStatus(root, { keys = PRODUCT_KEYS, now = new Date(), env = process.env } = {}) {
+export function licenceStatus(root, { keys = PRODUCT_KEYS, now = new Date() } = {}) {
   const cache = readListCache(root);
   const list = heldList(cache, keys);
   const status = checkLicence(readLicenceText(root), { keys, list, now });
-  return { ...status, enforced: isEnforced(env), list: list ? { version: list.version, checkedAt: cache.checkedAt } : null };
+  return { ...status, enforced: true, list: list ? { version: list.version, checkedAt: cache.checkedAt } : null };
 }
 
 /** What a refused command prints: the state, why it was refused, and the remedy. */
 export const refusalLines = (name, s, cli) => [
-  `snowarch ${name}: licence ${s.state}${s.signatureValid ? ` (${s.id})` : ''} — SNOW_LICENCE_ENFORCE is "true", `
-    + 'so this command does not run without a valid licence',
+  `snowarch ${name}: licence ${s.state}${s.signatureValid ? ` (${s.id})` : ''} — this command does not run `
+    + 'without a valid licence',
   REMEDY(cli),
 ];
 
-/** Is this command refused? Only under enforcement, only for a refused state, never for the five. */
-export const refusesCommand = (name, s) => s.enforced && REFUSED.includes(s.state) && !CLI_ALLOWED.includes(name);
+/** Is this command refused? For a refused state, every command but the five. */
+export const refusesCommand = (name, s) => REFUSED.includes(s.state) && !CLI_ALLOWED.includes(name);

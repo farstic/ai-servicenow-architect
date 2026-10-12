@@ -5,14 +5,14 @@
  *
  * ONE STATE PER PROCESS. The server serves one session over stdio, so the licence is read once at
  * start (`startLicence`, from `main()`), recomputed only when the start's background refresh of the
- * revocation list lands, and applies from the next call. Installing or removing a licence, or changing
- * SNOW_LICENCE_ENFORCE, takes a restart — as every other start-up setting of this server does.
+ * revocation list lands, and applies from the next call. Installing or removing a licence takes a restart,
+ * as every other start-up setting of this server does.
  *
  * WHAT FOLLOWS FROM IT:
- *   `assertLicensed`      — the router's first act (ruling R1). Under SNOW_LICENCE_ENFORCE="true", a
- *                           missing, invalid, expired or revoked licence refuses EVERY tool with
- *                           LICENCE_NOT_VALID, and so does a design-only licence, because a server
- *                           that answers is live (ruling (d)). Off, nothing is refused.
+ *   `assertLicensed`      — the router's first act (ruling R1). On every build (ARC-11-C6), a missing,
+ *                           invalid, expired or revoked licence refuses EVERY tool with LICENCE_NOT_VALID,
+ *                           and so does a design-only licence, because a server that answers is live
+ *                           (ruling (d)). No variable turns that off.
  *   `takeLicenceNotice`   — one extra content block on the session's first answer when the state is
  *                           anything but a live licence in force; `content[0]` is never touched.
  *   `licenceAuditField`   — `{ licence: id }` on an audit line only when the signature holds, so a
@@ -45,15 +45,13 @@ export function currentLicence() {
 /** Test seam: forget the session. Never called by the server. */
 export function resetLicenceForTests() { session = null; }
 const spell = () => ({ cli: cliSpelling(), bootstrap: bootstrapSpelling() });
-/** Throws LICENCE_NOT_VALID when enforcement is on and this licence does not cover a live call. */
+/** Throws LICENCE_NOT_VALID when this licence does not cover a live call. */
 export function assertLicensed() {
     const s = currentLicence();
-    if (!s.enforced)
-        return;
     const { remedy } = remedyFor('LICENCE_NOT_VALID', spell());
     if (REFUSED.includes(s.state)) {
-        throw new ServiceNowError(`licence ${s.state}${s.signatureValid ? ` (${s.id})` : ''} — SNOW_LICENCE_ENFORCE is "true", `
-            + `so no tool runs without a valid licence. ${remedy}`, 'LICENCE_NOT_VALID');
+        throw new ServiceNowError(`licence ${s.state}${s.signatureValid ? ` (${s.id})` : ''} — no tool runs without a valid `
+            + `licence. ${remedy}`, 'LICENCE_NOT_VALID');
     }
     if (s.scope === 'design-only') {
         throw new ServiceNowError(`licence ${s.id} covers design-only; live needs a live-scope licence. ${remedy}`, 'LICENCE_NOT_VALID');
@@ -81,9 +79,7 @@ export function takeLicenceNotice() {
     const why = noticeWhy(s);
     if (why === null)
         return null;
-    const quiet = !s.enforced && (REFUSED.includes(s.state) || s.scope === 'design-only')
-        ? ' Nothing is refused while SNOW_LICENCE_ENFORCE is off.' : '';
-    return `${licenceLine(s, { enforced: s.enforced })} — ${why}.${quiet} Run ${spell().cli} licence check for the details.`;
+    return `${licenceLine(s)} — ${why}. Run ${spell().cli} licence check for the details.`;
 }
 /** `{ licence: id }` when the licence's signature holds; `{}` otherwise, so a default audit line is unchanged. */
 export function licenceAuditField() {

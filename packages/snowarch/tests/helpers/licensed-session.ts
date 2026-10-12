@@ -9,8 +9,8 @@
  * `initLicence`'s `keys` parameter, the way the licence suites do: a pair made here, the key list built from
  * it, and a live licence signed with it, in a checkout of its own.
  *
- * The session is ENFORCED, so a test that relies on it is held to it now, before enforcement stops taking a
- * switch: a session that failed to license would refuse at once, not first at the flip.
+ * Enforcement takes no switch (ARC-11-C6), so a session that failed to license would refuse at once: the
+ * helper checks the session it starts is ok, live and enforced.
  *
  * `useLicensedSession()` registers the hooks: the session starts before the file's first case, and is reset,
  * and its checkout removed, after the last. `afterAll` and not the exit handler, which a vitest worker does
@@ -30,7 +30,7 @@ export function useLicensedSession(): void {
     const primary = pair();
     const root = checkout('snowarch-licensed-session-');
     writeFileSync(join(root, '.local', 'licence.json'), licenceText(licence({ id: SESSION_LICENCE_ID }), primary));
-    const status = initLicence({ root, keys: keysOf(primary, pair()), env: { SNOW_LICENCE_ENFORCE: 'true' } });
+    const status = initLicence({ root, keys: keysOf(primary, pair()) });
     if (status.state !== 'ok' || status.scope !== 'live' || !status.enforced) {
       throw new Error(`useLicensedSession: the fixture session is ${status.state}, ${status.scope}, enforced=${status.enforced}`);
     }

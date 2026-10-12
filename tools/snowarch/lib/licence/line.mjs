@@ -15,17 +15,15 @@
  */
 
 /**
- * The line. `ok` and `expiring` name the licence and its term; every state but `ok` says whether it
- * is enforced, because that word is what decides whether the session may go on. A licence in force
- * needs no such word, so `ok` prints none under enforcement either.
+ * The line. `ok` and `expiring` name the licence and its term. Enforcement is on every build (ARC-11-C6),
+ * so no state carries a word for it: the state alone decides whether the session may go on.
  */
-export function bannerLine(s, { enforced }) {
+export function bannerLine(s) {
   const parts = [`Licence: ${s.state}`];
   if (s.state === 'ok' || s.state === 'expiring') {
     parts.push(s.id);
     if (s.scope === 'design-only') parts.push('design-only');
     parts.push(s.perpetual ? 'perpetual' : `until ${s.validUntil}`);
   }
-  if (s.state !== 'ok') parts.push(enforced ? 'enforced' : 'warn only');
   return parts.join(' · ');
 }

@@ -31,20 +31,18 @@ export function licenceChecks() {
       fixable: false,
       run: async (ctx) => {
         // `licenceKeys` is a test seam: a suite injects the keys it generated. Nothing in the product sets it.
-        const s = licenceStatus(ctx.root, { keys: ctx.licenceKeys ?? PRODUCT_KEYS, now: new Date(ctx.now()), env: ctx.env ?? {} });
+        const s = licenceStatus(ctx.root, { keys: ctx.licenceKeys ?? PRODUCT_KEYS, now: new Date(ctx.now()) });
         // `perpetual` because the status panel renders its Licence line from this data with the banner's
         // function, and a perpetual licence has no `validUntil` to print.
         const data = { state: s.state, id: s.id, scope: s.scope, validUntil: s.validUntil, perpetual: s.perpetual,
           enforced: s.enforced, listVersion: s.list?.version ?? null };
-        const line = bannerLine(s, { enforced: s.enforced });
+        const line = bannerLine(s);
         if (s.state === 'ok') return ok(line, data);
         const why = s.state === 'expiring' ? `${s.daysLeft} days left` : (s.state === 'missing' ? null : s.reason);
         const cli = cliOf(ctx);
         return warn(why ? `${line} — ${why}` : line, {
           data,
-          remedy: s.enforced ? REMEDY(cli)
-            : 'information only while SNOW_LICENCE_ENFORCE is off; to install a licence, copy the file you were given '
-              + 'to .local/licence.json',
+          remedy: REMEDY(cli),
           command: `${cli} licence check`,
         });
       },

@@ -38,7 +38,7 @@ import {
 import { PRODUCT_KEYS } from '../licence/keys.mjs';
 import { listSource, refreshList, refreshSays } from '../licence/fetch.mjs';
 import {
-  bannerLine, heldList, isEnforced, licenceStatus, listStale, readListCache, REFUSED,
+  bannerLine, heldList, licenceStatus, listStale, readListCache, REFUSED,
 } from '../licence/state.mjs';
 
 export const USAGE = (where) => {
@@ -163,13 +163,9 @@ function describe(log, s) {
 }
 
 function enforcementLines(log, s) {
-  if (!s.enforced) {
-    log.step('  enforce: off — warn only; SNOW_LICENCE_ENFORCE="true" turns the refusals on');
-    return;
-  }
   log.step(REFUSED.includes(s.state)
-    ? '  enforce: on — every command but licence, doctor, status, version and upgrade is refused, and every MCP tool'
-    : '  enforce: on — nothing is refused while the licence is in force');
+    ? '  every command but licence, doctor, status, version and upgrade is refused, and every MCP tool'
+    : '  nothing is refused while the licence is in force');
   if (s.scope === 'design-only' && !REFUSED.includes(s.state)) {
     log.step(`  scope: licence ${s.id} covers design-only; live needs a live-scope licence, so a live server refuses every tool`);
   }
@@ -187,13 +183,13 @@ const listLine = (s, now) => {
 
 const inForce = (s) => (s.state === 'ok' || s.state === 'expiring' ? EXIT_OK : EXIT_FAIL);
 
-function show({ log, root, keys, now, env, flags }) {
-  const s = licenceStatus(root, { keys, now: now(), env });
+function show({ log, root, keys, now, flags }) {
+  const s = licenceStatus(root, { keys, now: now() });
   if (flags.json) {
     log.json({ ...s, path: licencePath(root), keys: keys.map(({ role, fingerprint: fp }) => ({ role, fingerprint: fp })) });
     return inForce(s);
   }
-  log.step(bannerLine(s, { enforced: s.enforced }));
+  log.step(bannerLine(s));
   if (s.state === 'missing') log.step(`  no licence is installed at ${licencePath(root)}`);
   describe(log, s);
   log.step(listLine(s, now()));
@@ -211,13 +207,13 @@ function show({ log, root, keys, now, env, flags }) {
   return inForce(s);
 }
 
-function verifyFile({ positional, log, root, keys, now, env }) {
+function verifyFile({ positional, log, root, keys, now }) {
   const file = positional[1];
   if (!file) throw new Usage('licence verify needs the licence file to check');
   let text;
   try { text = readFileSync(file, 'utf8'); } catch { throw new Usage(`cannot read ${file}`); }
   const s = checkLicence(text, { keys, list: heldList(readListCache(root), keys), now: now() });
-  log.step(bannerLine(s, { enforced: isEnforced(env) }));
+  log.step(bannerLine(s));
   describe(log, s);
   return inForce(s);
 }
@@ -227,12 +223,12 @@ function check({ flags, log, root, keys, now, env, config }) {
     const r = refreshList(root, { config: config(), keys, now: now(), env });
     log.step(refreshSays(r));
   }
-  const s = licenceStatus(root, { keys, now: now(), env });
+  const s = licenceStatus(root, { keys, now: now() });
   if (flags.json) {
     log.json(s);
     return inForce(s);
   }
-  log.step(bannerLine(s, { enforced: s.enforced }));
+  log.step(bannerLine(s));
   if (s.reason && s.state !== 'ok' && s.state !== 'expiring') log.step(`  why: ${s.reason}`);
   log.step(listLine(s, now()));
   enforcementLines(log, s);
