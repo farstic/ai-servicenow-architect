@@ -180,7 +180,7 @@ test('ARC-11-C6 — show and check with no licence say missing, what is refused,
     const r = await run(w, [sub]);
     assert.equal(r.code, EXIT_FAIL, r.text);
     assert.match(r.text, /Licence: missing\n/);
-    assert.match(r.text, /every command but licence, doctor, status, version and upgrade is refused, and every MCP tool/);
+    assert.match(r.text, /every command but licence, doctor, status, version, upgrade, bootstrap and mode design is refused, and every MCP tool/);
     assert.doesNotMatch(r.text, /enforce:|warn only/);
   }
 });

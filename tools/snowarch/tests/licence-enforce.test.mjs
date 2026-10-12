@@ -28,7 +28,7 @@ async function run(argv, env = process.env) {
   return { code, out: out.text, err: err.text };
 }
 
-test('ARC-11-C6 — every command but the five is refused for a refused state, whatever the status says of enforcement', () => {
+test('ARC-11-C6 — every command but the allowed ones is refused for a refused state, whatever the status says of enforcement', () => {
   for (const name of Object.keys(COMMANDS)) {
     for (const state of ['ok', 'expiring', ...REFUSED]) {
       const expected = REFUSED.includes(state) && !CLI_ALLOWED.includes(name);
@@ -37,8 +37,13 @@ test('ARC-11-C6 — every command but the five is refused for a refused state, w
       assert.equal(refusesCommand(name, { state, enforced: false }), expected, `${name} with ${state}, enforced: false`);
     }
   }
-  assert.deepEqual(Object.keys(COMMANDS).filter((n) => !CLI_ALLOWED.includes(n)).sort(),
-    ['bootstrap', 'docs', 'instance', 'mode', 'store']);
+  assert.deepEqual(Object.keys(COMMANDS).filter((n) => !CLI_ALLOWED.includes(n)).sort(), ['docs', 'instance', 'mode', 'store']);
+  // `mode` is refused, but for one form: `mode design`, which uninstall needs.
+  const missing = { state: 'missing' };
+  assert.equal(refusesCommand('mode', missing, ['design']), false, 'mode design');
+  assert.equal(refusesCommand('mode', missing, ['live']), true, 'mode live');
+  assert.equal(refusesCommand('mode', missing, []), true, 'bare mode');
+  assert.equal(refusesCommand('docs', missing, ['design']), true, 'a form allowed for mode is not allowed for another command');
 });
 
 test('ARC-11-C6 — with no licence: mode is refused with the state and the remedy, and runs nothing', async () => {
@@ -47,6 +52,17 @@ test('ARC-11-C6 — with no licence: mode is refused with the state and the reme
   assert.equal(r.out, '', 'a refused command printed its own output');
   assert.match(r.err, /^snowarch mode: licence missing — this command does not run without a valid licence\n/);
   assert.match(r.err, /licence check to see why/);
+});
+
+test('ARC-11-C6 — with no licence: mode design reaches the command; mode live is refused', async () => {
+  // This state root was never bootstrapped, so `mode design` stops at its own first check, writing nothing:
+  // what matters is that it got there, past the licence.
+  const design = await run(['mode', 'design']);
+  assert.doesNotMatch(design.err, /licence missing/, design.err);
+  assert.match(`${design.out}${design.err}`, /bootstrap/);
+  const live = await run(['mode', 'live']);
+  assert.equal(live.code, EXIT_PREREQ);
+  assert.match(live.err, /^snowarch mode: licence missing — this command does not run without a valid licence\n/);
 });
 
 test('ARC-11-C6 — with no licence: version and licence still run, and help still answers', async () => {

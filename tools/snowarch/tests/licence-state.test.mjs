@@ -15,6 +15,7 @@ import {
   bannerLine, CLI_ALLOWED, licenceStatus, listStale, readListCache, REFUSED, REMEDY,
   writeListCache,
 } from '../lib/licence/state.mjs';
+import * as state from '../lib/licence/state.mjs';
 import { licencePath, revocationsPath } from '../lib/local-paths.mjs';
 import { keyPair, licence, licenceText, listDoc, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
@@ -40,9 +41,13 @@ test('ARC-11-C1 — the two .local paths', () => {
   assert.equal(revocationsPath('/c'), join('/c', '.local', 'revocations.json'));
 });
 
-test('ARC-11-C1 — the refused states and the five commands a person needs to repair them', () => {
+test('ARC-11-C6 — the refused states, and the commands that run without a licence, as a list', () => {
   assert.deepEqual([...REFUSED], ['missing', 'invalid', 'expired', 'revoked']);
-  assert.deepEqual([...CLI_ALLOWED], ['licence', 'doctor', 'status', 'version', 'upgrade']);
+  // The five a person needs to see and repair the state (R1), and bootstrap in full (ruling A): installing is
+  // how a licence is first seen. A later addition is a visible decision: it changes this list.
+  assert.deepEqual([...CLI_ALLOWED], ['licence', 'doctor', 'status', 'version', 'upgrade', 'bootstrap']);
+  // And one form of one command: `mode design`, which deregisters before a folder is deleted (INSTALL.md, Uninstall).
+  assert.deepEqual(JSON.parse(JSON.stringify(state.CLI_ALLOWED_FORMS ?? null)), { mode: ['design'] });
 });
 
 test('ARC-11-C6 — the banner line has the settled shapes, and no state carries a word for enforcement', () => {
