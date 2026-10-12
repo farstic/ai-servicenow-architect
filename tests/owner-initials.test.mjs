@@ -23,6 +23,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { commit, releasedChangelog } from './helpers/changelog-fixture.mjs';
+import { withoutGeneratedInternal } from './helpers/changelog-history.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MARKER = 'PENDING OWNER';
@@ -63,10 +64,13 @@ const walk = (dir) => readdirSync(dir).flatMap((entry) => {
 
 /**
  * The marker's lines in one file. One function, so the walk over `docs/` and the fixture changelogs
- * below cannot disagree about what a mention is. `rel` is written with forward slashes.
+ * below cannot disagree about what a mention is. `rel` is written with forward slashes. The changelog
+ * is read without its generated Internal entries, the commit log a release writes; they are blanked,
+ * not removed, so every line number is still the file's.
  */
-const markerLines = (rel, text) => text.split('\n').flatMap((line, i) =>
-  (line.includes(MARKER) ? [{ rel, line: i + 1, text: line.trim() }] : []));
+const markerLines = (rel, text) =>
+  (rel === 'docs/CHANGELOG.md' ? withoutGeneratedInternal(text) : text).split('\n').flatMap((line, i) =>
+    (line.includes(MARKER) ? [{ rel, line: i + 1, text: line.trim() }] : []));
 
 function mentions() {
   const found = [];
