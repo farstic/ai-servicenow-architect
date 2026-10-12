@@ -83,6 +83,9 @@ export function fetchList({ url, ref = 'main', path = 'revocations.json', timeou
       '--no-checkout', url, dest]);
     if (clone.status !== 0) return { status: 'unreachable', detail: firstLine(clone) };
     const show = step(['-C', dest, 'show', `HEAD:${path}`]);
+    // No exit status: the deadline killed it, or left it no time to run. The repository never answered, so
+    // nothing was checked (ARC-11-C11). A status means git answered: the file is not on the branch.
+    if (show.status === null) return { status: 'unreachable', detail: firstLine(show) };
     if (show.status !== 0) return { status: 'none', detail: `no ${path} on ${ref} yet` };
     return { status: 'fetched', text: String(show.stdout) };
   } finally {
