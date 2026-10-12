@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { serverDepsInstalled } from '../../instance.mjs';
+import { productDir } from '../../spawn-env.mjs';
 import { defineCheck } from '../registry.mjs';
 
 import { fail, skip } from './result.mjs';
@@ -81,7 +82,8 @@ export async function serverReport(ctx) {
   // this changes nothing there; it makes a doctor run describe the root it was GIVEN, which is
   // what B08, the CI smoke probe and every fixture-based test rely on.
   const saved = { project: process.env.CLAUDE_PROJECT_DIR, store: process.env.SNOW_STORE };
-  process.env.CLAUDE_PROJECT_DIR = ctx.root;
+  // ARC-11-C6 step 4b — the directory whose `.local/` the engine reads, so the server's licence is the engine's.
+  process.env.CLAUDE_PROJECT_DIR = productDir(ctx.root);
   if (ctx.storePath) process.env.SNOW_STORE = ctx.storePath;
   else delete process.env.SNOW_STORE;
   try {

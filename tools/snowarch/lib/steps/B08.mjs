@@ -18,7 +18,7 @@ import { join } from 'node:path';
 import { storePath } from '../local-paths.mjs';
 import { contractSha } from '../config.mjs';
 import { runDoctor } from '../doctor/index.mjs';
-import { childEnv } from '../spawn-env.mjs';
+import { productEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
 
@@ -64,7 +64,7 @@ export function runProbes(root, { run = spawnSync } = {}) {
 
   // Every child is TOLD which checkout it serves: the server CLI resolves its store from
   // `CLAUDE_PROJECT_DIR`, so an inherited value would have it read another repository's store.
-  const options = { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) };
+  const options = { encoding: 'utf8', stdio: 'pipe', cwd: root, env: productEnv(root) };
   const help = run(process.execPath, [cli, 'instance', '--help'], options);
   // ARC-07-S06 adds `instance test`. Until it does, the cache records "unavailable" and the step
   // warns: a probe that does not exist yet is not a failed probe, and calling it a FAIL would stop

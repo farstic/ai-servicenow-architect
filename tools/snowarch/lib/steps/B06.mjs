@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { storePath } from '../local-paths.mjs';
 import { codeForStatus, probeAuth } from '../probe-auth.mjs';
 import { readInstanceFile, SENTENCE } from '../instance-file.mjs';
-import { childEnv } from '../spawn-env.mjs';
+import { productEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
 import { spellings } from '../text.mjs';
@@ -286,7 +286,7 @@ export async function probeWizard(root, { run = spawnSync } = {}) {
   const cli = join(root, CLI);
   if (!existsSync(cli)) return { klass: WIZARD.ABSENT, status: null, signal: null, detail: `${CLI} is not in this checkout` };
   const r = await awaitProbe(run(process.execPath, [cli, 'instance', '--help'],
-    { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) }));
+    { encoding: 'utf8', stdio: 'pipe', cwd: root, env: productEnv(root) }));
 
   if (r.error) return { klass: WIZARD.SPAWN_ERROR, status: null, signal: null, detail: r.error.code || r.error.message };
   if (r.signal) return { klass: WIZARD.SIGNAL, status: null, signal: r.signal, detail: r.signal };
@@ -383,7 +383,7 @@ export async function migrateIfBehind(ctx) {
   const spawn = ctx.spawn ?? spawnSync;
   const r = await awaitChild(spawn(process.execPath,
     [join(ctx.root, CLI), 'store', 'migrate', '--yes'],
-    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) }));
+    { stdio: 'inherit', cwd: ctx.root, env: productEnv(ctx.root) }));
   if (r.status !== 0) {
     // The child's own answer in the line: "exit 1" and "killed by SIGTERM" send a reader to
     // different places, and a message that says neither sends them to guess.
@@ -478,7 +478,7 @@ export const run = async (ctx) => {
   const r = await awaitChild(spawn(process.execPath,
     [join(ctx.root, CLI), ...WIZARD_ARGV],
     // The wizard writes the store; it must write THIS checkout's.
-    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) }));
+    { stdio: 'inherit', cwd: ctx.root, env: productEnv(ctx.root) }));
   if (r.status !== 0) return wizardExitFailure(r.status);
 
   // The same reader the keep-path above used; imported once, higher up, because a second
