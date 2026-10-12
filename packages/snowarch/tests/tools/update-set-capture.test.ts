@@ -275,3 +275,41 @@ describe('the advertised schema says what the handler enforces', () => {
     expect(client.calls.find((c) => c.op === 'create')?.data).toMatchObject({ name: 'S', description: 'D' });
   });
 });
+
+/**
+ * ARC-09-C127 — the tool already reads the preference before it writes, and used to drop the value. A procedure
+ * that points capture back afterwards had to read it first (R0 in the live README's C95 and C122 procedures). On
+ * 2.0.12-rc.2 the teardown could only guess, between two update sets named "Default". `previous` is that value,
+ * from the read the tool makes anyway: no request is added.
+ */
+describe('ARC-09-C127 - capture_target_set returns the target it replaced', () => {
+  const PREVIOUS = 'b1000000000000000000000000000002';
+
+  it('previous is the update set the preference named before the call', async () => {
+    const client = base({
+      queries: {
+        [`sys_user?user_name=${FIXTURE_USER}`]: [{ sys_id: USER_SYS_ID, user_name: FIXTURE_USER }],
+        [`sys_user_preference?user=${USER_SYS_ID}^name=sys_update_set`]: [{ sys_id: PREF_SYS_ID, value: PREVIOUS }],
+      },
+    });
+    const r = await call(client, 'snow_us_capture_target_set', { update_set_sys_id: SET_SYS_ID }) as Record<string, unknown>;
+    expect(r.previous).toBe(PREVIOUS);
+    expect(client.sequence).toHaveLength(4);
+  });
+
+  it('previous is null when there was no preference, or it named nothing', async () => {
+    const created = await call(base({ created: { sys_user_preference: { sys_id: PREF_SYS_ID } } }),
+      'snow_us_capture_target_set', { update_set_sys_id: SET_SYS_ID }) as Record<string, unknown>;
+    expect(created.action).toBe('created');
+    expect(created.previous).toBeNull();
+
+    const empty = await call(base({
+      queries: {
+        [`sys_user?user_name=${FIXTURE_USER}`]: [{ sys_id: USER_SYS_ID, user_name: FIXTURE_USER }],
+        [`sys_user_preference?user=${USER_SYS_ID}^name=sys_update_set`]: [{ sys_id: PREF_SYS_ID, value: '' }],
+      },
+    }), 'snow_us_capture_target_set', { update_set_sys_id: SET_SYS_ID }) as Record<string, unknown>;
+    expect(empty.action).toBe('updated');
+    expect(empty.previous).toBeNull();
+  });
+});
