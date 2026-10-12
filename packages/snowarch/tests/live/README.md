@@ -960,7 +960,12 @@ Error: snow_atf_atf_tests_index takes no `query`; it takes suite_sys_id, active,
 Record **ARC-09-C121 live: CONFIRMED / FAILED** in `docs/validation/`, under the sitting's record for the rc it
 ran on.
 
-## ARC-11-C1 — licence gate test
+## ARC-11-C1 — licence gate test, as the 2.0.12 sitting ran it
+
+**From 2.0.13, run T-28 instead.** T-28 in `tests/VALIDATION-TESTS.md` is this test revised for enforcement on
+every build (ARC-11-C6). No variable turns enforcement off from 2.0.13, so every step below that sets or unsets
+`SNOW_LICENCE_ENFORCE` no longer applies. The rest of this section is kept as the procedure the 2.0.12 sitting ran
+(`docs/validation/2.0.12-rc.1-licence-sitting.md`), whose row numbers are the ones below.
 
 **Build under test:** a build that ships the owner's two public keys (ARC-11-C1's last code commit), on two
 machines: **A**, the owner's, which issues and revokes, and **B**, a colleague's checkout, which installs the
