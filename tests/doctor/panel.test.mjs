@@ -68,7 +68,9 @@ test('the live fixture renders to exactly these bytes', () => {
     `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn, ${LIVE.summary.fail} fail (E-31)`
       + ` — quick run 2026-09-20 09:00 UTC · full report: ${CLI} doctor`,
     `E-31 FAIL the licence for this checkout: Licence: missing — Run ${CLI} licence check to see why, then install a valid`
-      + ' licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards',
+      + ' licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards.'
+      // ARC-11-C6 step 6 — and the way back, which a refused state's remedy ends with.
+      + ` To go back to the last release that runs without a licence: ${CLI} upgrade --to v2.0.12.`,
     `Capability packs, citation counts and the corpus branch are not probed on a quick run — ${CLI} doctor reports them.`,
     "Instances are the store's own records; nothing was probed.",
   ].join('\n'));

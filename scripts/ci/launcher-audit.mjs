@@ -217,6 +217,10 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: 'DOCTOR: 1 ok, 0 warn, 1 fail (E-29) (1 fixable — run ~ d', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs)' },
     { at: '~ x', kind: 'EXPECTED_RENDERING', n: 2, why: 'the assertion is about the launcher alone' },
   ]],
+  ['tests/doctor/licence-e31.test.mjs', [
+    { at: 'To go back to the last release that runs without a licen', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/checks/licence.mjs)' },
+    { at: 'restart it afterwards. ~', kind: 'DERIVED', n: 1, why: 'outside the product index' },
+  ]],
   ['tests/doctor/mode-and-cache.test.mjs', [
     { at: 'DOCTOR: 1 ok, 0 warn, 1 fail, 2 skipped (1 fixable — run', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs)' },
     { at: 'Mode: design-only — ~', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs)' },
