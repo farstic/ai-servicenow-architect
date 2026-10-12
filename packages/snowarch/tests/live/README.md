@@ -722,8 +722,8 @@ R0 snow_core_records_query { table: "sys_user_preference",
      query: "name=sys_update_set^user=javascript:gs.getUserID()", fields: "sys_id,value" }
                                                        the capture target before W1; keep its value for the
                                                        teardown, and out of the record: it is a sys_id
-R0b snow_us_current_update_set_read {}                 from 2.1.0 (ARC-09-C128): session_update_set.sys_id
-                                                       equals R0's value. R0 retires once a 2.1.0-rc sitting
+R0b snow_us_current_update_set_read {}                 from 2.0.13 (ARC-09-C128): session_update_set.sys_id
+                                                       equals R0's value. R0 retires once a 2.0.13-rc sitting
                                                        confirms ARC-09-C127 and C128
 R1 snow_core_capabilities_read                         ATF, WRITE and SCRIPTING on
 R2 snow_core_records_query { table: "sys_atf_step_config", query: "name=Run Server Side Script",
@@ -741,6 +741,8 @@ W1 About to add ATF test "c95-live-probe" on instance "<label>", after ensuring 
    <engagement>-c95 and pointing capture at it — write approved?
    snow_us_active_update_set_ensure { name: "<engagement>-c95" }, snow_us_capture_target_set,
    then snow_atf_atf_test_add { name: "c95-live-probe", description: "ARC-09-C95 live probe" }
+   from 2.0.13 (ARC-09-C127): the capture call's `previous` equals R0's value. R0 retires once a
+   2.0.13-rc sitting confirms ARC-09-C127 and C128
 W2 About to add a Run Server Side Script step, with its script, to ATF test c95-live-probe on instance
    "<label>" — write approved?
    snow_atf_atf_step_add { test: <W1 sys_id>, step_config: "Run Server Side Script",
@@ -1133,8 +1135,8 @@ R0 snow_core_records_query { table: "sys_user_preference",
      query: "name=sys_update_set^user=javascript:gs.getUserID()", fields: "sys_id,value" }
                                                        the capture target before W1; keep its value for the
                                                        teardown, and out of the record: it is a sys_id
-R0b snow_us_current_update_set_read {}                 from 2.1.0 (ARC-09-C128): session_update_set.sys_id
-                                                       equals R0's value. R0 retires once a 2.1.0-rc sitting
+R0b snow_us_current_update_set_read {}                 from 2.0.13 (ARC-09-C128): session_update_set.sys_id
+                                                       equals R0's value. R0 retires once a 2.0.13-rc sitting
                                                        confirms ARC-09-C127 and C128
 R1 snow_core_records_query { table: "sys_atf_step_config", query: "name=Run Server Side Script",
      fields: "sys_id,name,active" }                    exactly one row, active
@@ -1147,6 +1149,8 @@ W1 About to add ATF test "c122-live-probe" on instance "<label>", after ensuring
    <engagement>-c122 and pointing capture at it — write approved?
    snow_us_active_update_set_ensure { name: "<engagement>-c122" }, snow_us_capture_target_set,
    then snow_atf_atf_test_add { name: "c122-live-probe", description: "ARC-09-C122 live probe" }
+   from 2.0.13 (ARC-09-C127): the capture call's `previous` equals R0's value. R0 retires once a
+   2.0.13-rc sitting confirms ARC-09-C127 and C128
 W2 About to add a Run Server Side Script step to ATF test c122-live-probe on instance "<label>" — write approved?
    snow_atf_atf_step_add { test: <W1 sys_id>, step_config: "Run Server Side Script",
      inputs: { script: <a script longer than R2's max_length, such as one comment line repeated> } }

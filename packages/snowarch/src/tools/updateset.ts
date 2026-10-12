@@ -124,7 +124,8 @@ export function updateSetToolManifest(): ToolDefinition[] {
       description: '[Write] Point THIS session\'s REST writes at a named update set, by setting the '
         + 'authenticated user\'s sys_user_preference name=sys_update_set. This is what actually captures '
         + 'REST-created objects — snow_us_update_set_switch only sets is_default for the UI '
-        + '(platform field notes, section 1). Verify with snow_us_update_set_preview.',
+        + '(platform field notes, section 1). Verify with snow_us_update_set_preview. Returns previous, the '
+        + 'update set the preference named before the call (null when there was none), to point capture back to.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -346,8 +347,13 @@ export async function dispatchUpdateSetAction(
 
       let captureAction: 'updated' | 'created';
       let preferenceSysId: string;
+      // ARC-09-C127 — the update set the preference named before this call, from the read above, so a caller
+      // can point capture back without a read of its own. Null when there was no preference, or it named nothing.
+      let previous: string | null = null;
       if (prefs.count > 0) {
-        preferenceSysId = String((prefs.records[0] as Record<string, any>).sys_id);
+        const pref = prefs.records[0] as Record<string, any>;
+        preferenceSysId = String(pref.sys_id);
+        previous = pref.value ? String(pref.value) : null;
         await client.updateRecord('sys_user_preference', preferenceSysId,
           { value: String(args.update_set_sys_id) });
         captureAction = 'updated';
@@ -368,6 +374,7 @@ export async function dispatchUpdateSetAction(
         preference_sys_id: preferenceSysId,
         user_sys_id: userSysId,
         update_set: { sys_id: String(target.sys_id), name: setName, application: target.application ?? null },
+        previous,
         verify_with: 'snow_us_update_set_preview',
       };
     }
