@@ -1,11 +1,13 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PRESETS, FLAG_NAMES } from '../../src/utils/permissions.js';
+import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 
 /**
  * The README's generated blocks, and the negative that proves the check is a check.
@@ -28,9 +30,9 @@ const GEN = resolve(ROOT, 'scripts/gen-readme-tables.mjs');
  */
 const BEFORE = { bytes: readFileSync(README), mtimeMs: statSync(README).mtimeMs };
 
-function check(): { code: number; stderr: string } {
+function check(gen = GEN, cwd = ROOT): { code: number; stderr: string } {
   try {
-    execFileSync(process.execPath, [GEN, '--check'], { cwd: ROOT, encoding: 'utf8' });
+    execFileSync(process.execPath, [gen, '--check'], { cwd, encoding: 'utf8' });
     return { code: 0, stderr: '' };
   } catch (e) {
     const err = e as { status?: number; stderr?: string };
@@ -38,29 +40,54 @@ function check(): { code: number; stderr: string } {
   }
 }
 
+/**
+ * ARC-09-C131 — every tracked file, copied into a root of its own: the working tree's content, not HEAD's, as
+ * `tests/gen-readme-tables.test.mjs` copies it for the fresh clone. The generator finds its README from its own
+ * path, so the copy's generator reads the copy's README, and the drift case never writes the tracked one.
+ */
+const copies: string[] = [];
+afterAll(() => { for (const dir of copies) removeTempDir(dir); });
+
+function copyTracked(): string {
+  const dest = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-readme-blocks-')));
+  copies.push(dest);
+  const files = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+    .split('\n').filter(Boolean);
+  for (const rel of files) {
+    const from = join(ROOT, rel);
+    // A gitlink (`vendor/ServiceNowDocs`) is listed like a file and is a directory; the generator reads none of it.
+    let file = false;
+    try { file = statSync(from).isFile(); } catch { /* deleted in the working tree: not in the copy either */ }
+    if (!file) continue;
+    mkdirSync(join(dest, dirname(rel)), { recursive: true });
+    cpSync(from, join(dest, rel));
+  }
+  return dest;
+}
+
 describe('criterion 1 - the generated blocks are current, and drift is caught', () => {
   it('--check exits 0 on the committed README', () => {
     expect(check().code).toBe(0);
   });
 
-  it('and exits 1 after a hand edit inside a block, naming the command', () => {
-    const original = readFileSync(README, 'utf8');
-    try {
-      // A plausible edit: someone "corrects" a preset row. Inside the markers, so the generator
-      // owns it — and the point is that the reader is told to run the generator rather than
-      // hunting for which sentence to fix, because the answer is none of them.
-      writeFileSync(README, original.replace('| `read-only` |', '| `read-only-x` |'));
-      const r = check();
-      expect(r.code).toBe(1);
-      expect(r.stderr).toContain('gen-readme-tables.mjs');
-      expect(r.stderr).toContain('Do not edit text between');
-      // The mid-read: what a reader of the tracked README in another worker sees while the drift is in place.
-      expect(readFileSync(README).equals(BEFORE.bytes), 'the tracked README changed while the drift was in place').toBe(true);
-      expect(statSync(README).mtimeMs, 'the tracked README was written while the drift was in place').toBe(BEFORE.mtimeMs);
-    } finally {
-      writeFileSync(README, original);
-    }
-  });
+  it('and exits 1 after a hand edit inside a block, naming the command, on a copy of the tracked files', () => {
+    const copy = copyTracked();
+    const readme = join(copy, 'packages', 'snowarch', 'README.md');
+    const original = readFileSync(readme, 'utf8');
+    // A plausible edit: someone "corrects" a preset row. Inside the markers, so the generator
+    // owns it — and the point is that the reader is told to run the generator rather than
+    // hunting for which sentence to fix, because the answer is none of them.
+    const edited = original.replace('| `read-only` |', '| `read-only-x` |');
+    expect(edited, 'the preset row this case edits is not in the README').not.toBe(original);
+    writeFileSync(readme, edited);
+    const r = check(join(copy, 'scripts', 'gen-readme-tables.mjs'), copy);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain('gen-readme-tables.mjs');
+    expect(r.stderr).toContain('Do not edit text between');
+    // The mid-read: what a reader of the tracked README in another worker sees while the drift is in place.
+    expect(readFileSync(README).equals(BEFORE.bytes), 'the tracked README changed while the drift was in place').toBe(true);
+    expect(statSync(README).mtimeMs, 'the tracked README was written while the drift was in place').toBe(BEFORE.mtimeMs);
+  }, 60_000);
 
   it('and the tracked README was never written: its bytes and its mtime are what they were before this file ran', () => {
     // A test that edits a tracked file leaves every later assertion depending on its cleanup, and a restore is a
