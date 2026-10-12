@@ -2,7 +2,7 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,26 +41,41 @@ function check(gen = GEN, cwd = ROOT): { code: number; stderr: string } {
 }
 
 /**
- * ARC-09-C131 — every tracked file, copied into a root of its own: the working tree's content, not HEAD's, as
- * `tests/gen-readme-tables.test.mjs` copies it for the fresh clone. The generator finds its README from its own
- * path, so the copy's generator reads the copy's README, and the drift case never writes the tracked one.
+ * ARC-09-C131 — the drift case runs on a root of its own: the working tree's content, not HEAD's. The generator
+ * finds its README from its own path, so the copy's generator reads the copy's README, and the drift case never
+ * writes the tracked one. ARC-09-C133 — the root holds the generator's inputs alone, not every tracked file.
  */
 const copies: string[] = [];
 afterAll(() => { for (const dir of copies) removeTempDir(dir); });
 
-function copyTracked(): string {
+/**
+ * ARC-09-C133 — what the generator reads, measured on 2026-10-12: the two scripts it loads, and the three files
+ * a read tracer saw it open. A copy holding these five and nothing else passes `--check`, and fails it after the
+ * hand edit. The copy of every tracked file was 1609 files; on the windows node 22 cell of #425's CI (run
+ * 38298355988, attempt 1) it took this case to 84 s against its 60 s cap, while the product's refusal was right.
+ */
+const GENERATOR_INPUTS = [
+  'packages/snowarch/README.md',
+  'packages/snowarch/dist/contract.json',
+  'packages/snowarch/dist/tools/index.js',
+  'scripts/gen-readme-tables.mjs',
+  'scripts/lib/bundles.mjs',
+];
+
+/** Every file under `dir`, relative to it, with forward slashes. */
+function filesUnder(dir: string, rel = ''): string[] {
+  return readdirSync(join(dir, rel), { withFileTypes: true }).flatMap((e) => {
+    const child = rel ? `${rel}/${e.name}` : e.name;
+    return e.isDirectory() ? filesUnder(dir, child) : [child];
+  });
+}
+
+function copyInputs(): string {
   const dest = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-readme-blocks-')));
   copies.push(dest);
-  const files = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
-    .split('\n').filter(Boolean);
-  for (const rel of files) {
-    const from = join(ROOT, rel);
-    // A gitlink (`vendor/ServiceNowDocs`) is listed like a file and is a directory; the generator reads none of it.
-    let file = false;
-    try { file = statSync(from).isFile(); } catch { /* deleted in the working tree: not in the copy either */ }
-    if (!file) continue;
+  for (const rel of GENERATOR_INPUTS) {
     mkdirSync(join(dest, dirname(rel)), { recursive: true });
-    cpSync(from, join(dest, rel));
+    cpSync(join(ROOT, rel), join(dest, rel));
   }
   return dest;
 }
@@ -70,8 +85,13 @@ describe('criterion 1 - the generated blocks are current, and drift is caught', 
     expect(check().code).toBe(0);
   });
 
-  it('and exits 1 after a hand edit inside a block, naming the command, on a copy of the tracked files', () => {
-    const copy = copyTracked();
+  it('and exits 1 after a hand edit inside a block, naming the command, on a copy of what the generator reads', () => {
+    const copy = copyInputs();
+    // Exactly what the generator reads, and enough of it: --check passes on the copy before the edit, so an input
+    // the generator gains later fails here, by name, instead of the copy growing back to the whole tree.
+    expect(filesUnder(copy).sort(), 'the copy holds more than the generator reads').toEqual([...GENERATOR_INPUTS].sort());
+    expect(check(join(copy, 'scripts', 'gen-readme-tables.mjs'), copy), 'the copy lacks a file the generator reads')
+      .toEqual({ code: 0, stderr: '' });
     const readme = join(copy, 'packages', 'snowarch', 'README.md');
     const original = readFileSync(readme, 'utf8');
     // A plausible edit: someone "corrects" a preset row. Inside the markers, so the generator

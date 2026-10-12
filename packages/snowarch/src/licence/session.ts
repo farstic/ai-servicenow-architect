@@ -148,10 +148,15 @@ export async function refreshLicenceList({ budgetMs = LIVE_BUDGET_MS }: { budget
  *
  * No licence, no fetch: there is nothing a list could revoke, and a checkout without a licence starts
  * exactly as it did before ARC-11 — the owner's first requirement.
+ *
+ * `budgetMs` is the refresh's budget, the live three seconds unless a test widens it for a fixture
+ * repository on a slow runner (ARC-09-C133). `main()` passes none. It changes how long the start waits,
+ * and nothing about what the licence or the list is.
  */
-export function startLicence({ live, ...options }: Options & { live: boolean }): Promise<RefreshResult> | null {
+export function startLicence({ live, budgetMs = LIVE_BUDGET_MS, ...options }:
+  Options & { live: boolean; budgetMs?: number }): Promise<RefreshResult> | null {
   initLicence(options);
   const s = session!;
   if (!live || readLicenceText(s.root) === null) return null;
-  return refreshLicenceList();
+  return refreshLicenceList({ budgetMs });
 }

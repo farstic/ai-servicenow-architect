@@ -57,6 +57,10 @@ export async function fetchListAsync({ url, ref = 'main', path = 'revocations.js
         if (clone.code !== 0)
             return { status: 'unreachable', detail: firstLine(clone) };
         const show = await git(['-C', dest, 'show', `HEAD:${path}`], childEnv, left());
+        // No exit code: the deadline killed it, or left it no time to run. The repository never answered, so
+        // nothing was checked (ARC-11-C11). An exit code means git answered: the file is not on the branch.
+        if (show.code === null)
+            return { status: 'unreachable', detail: firstLine(show) };
         if (show.code !== 0)
             return { status: 'none', detail: `no ${path} on ${ref} yet` };
         return { status: 'fetched', text: show.stdout };
