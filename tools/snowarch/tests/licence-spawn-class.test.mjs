@@ -96,6 +96,21 @@ test('the reader — child_process under any local name: a namespace, an alias, 
   ['ns.test.mjs:3:cli', 'alias.test.mjs:3:cli', 'dyn.test.mjs:3:cli', 'prom.test.mjs:5:cli']);
 });
 
+test('the reader — the package CLI is a start: a resolved path, a join of its segments, a path imported from a module', async () => {
+  assert.deepEqual(await scan({
+    'resolved.test.mjs': `${CP}const CLI = resolve(here, '../../dist/cli/index.js');\nspawnSync(process.execPath, [CLI, 'instance', 'list']);\n`,
+    'joined.test.mjs': `${CP}const CLI = join(ROOT, 'packages', 'snowarch', 'dist', 'cli', 'index.js');\n`
+      + "spawnSync(process.execPath, [CLI, 'store', 'migrate'], { env: licensedEnv(process.env) });\n",
+    'paths.mjs': "export const CLI_PATH = join('packages', 'snowarch', 'dist', 'cli', 'index.js');\n",
+    'imported.test.mjs': `${CP}import { CLI_PATH } from './paths.mjs';\nspawnSync(process.execPath, [join(root, CLI_PATH), 'instance', '--help']);\n`,
+    'other.test.mjs': `${CP}spawnSync(process.execPath, [join(ROOT, 'node_modules', 'pkg', 'index.js')]);\n`,
+  }), [
+    { file: 'resolved.test.mjs', line: 4, entry: 'package-cli', licensed: false, declared: null },
+    { file: 'joined.test.mjs', line: 4, entry: 'package-cli', licensed: true, declared: null },
+    { file: 'imported.test.mjs', line: 4, entry: 'package-cli', licensed: false, declared: null },
+  ]);
+});
+
 test('the reader — the launcher by either spelling, and a seam whose program is a parameter is presumed', async () => {
   assert.deepEqual(await scan({
     'launcher.test.mjs': `${CP}const launcher = join(ROOT, WIN ? 'snowarch.cmd' : 'snowarch');\nspawnSync(launcher, ['version']);\n`,
