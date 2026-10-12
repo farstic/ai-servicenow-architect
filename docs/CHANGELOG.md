@@ -33,7 +33,9 @@ silent — the server still refuses every MCP tool. From 2.1 the doctor fails wh
 
 **The release candidate, and what the owner's sitting confirms.** `v2.0.13-rc.3` is release commit `5fac74b`,
 cut from develop `20d05f4`, after #420 (ARC-11-C6), #424 (the sweep) and #425 (ARC-07-C43, the changelog guard).
-The owner's sitting on it runs:
+Its release evidence reads the same on all three operating systems: 35 ok, 1 warn (SV-02), 1 fail (E-00) and
+5 skip. E-31 is ok under the CI fixture licence; 2.0.12's evidence had it as its second warn. The owner's sitting
+on it runs:
 - **T-28, revised for enforcement on every build**, with no variable set anywhere. Row 1 is refused, with E-31's
   remedy and the way back. The `valid until:` line reads in UTC, with "last day" on the last day. Row 15 takes the
   way back, `./snowarch upgrade --to v2.0.12`;
