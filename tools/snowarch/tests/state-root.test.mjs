@@ -9,6 +9,8 @@ import { doctorCachePath, statePath } from '../lib/state.mjs';
 import { storePath } from '../lib/mode.mjs';
 import { cachePath as upgradeCachePath } from '../lib/upgrade-check.mjs';
 import { createLogger } from '../lib/log.mjs';
+import { commit, releasedChangelog } from '../../../tests/helpers/changelog-fixture.mjs';
+import { withoutGeneratedInternal } from '../../../tests/helpers/changelog-history.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
 /**
@@ -140,6 +142,15 @@ test('C43 head 1 — the doctor\'s repository inputs do not move with `.local/`'
   }
 });
 
+/**
+ * Does this file name the variable, as head 2 reads it? One predicate, so the walk over the real tree and
+ * the fixture changelogs below cannot disagree about what "named" means. `rel` is relative to the root,
+ * in the platform's separator. The changelog is read without its generated Internal entries, the commit
+ * log a release writes (the case after head 2's says why).
+ */
+const namesTheVariable = (rel, text) =>
+  (rel === join('docs', 'CHANGELOG.md') ? withoutGeneratedInternal(text) : text).includes('SNOWARCH_STATE_ROOT');
+
 test('C43 head 2 — the variable is documented where a contributor reads, and nowhere else', async () => {
   /*
    * THIS CASE IS THE INVERSION OF HEAD 1'S, AND THE INVERSION IS THE POINT.
@@ -157,6 +168,9 @@ test('C43 head 2 — the variable is documented where a contributor reads, and n
    *   release.yml      yes, for the same reason (ARC-11-C6 step 5, the architect's ruling): its evidence doctor
    *                    runs licensed, per step, so the published evidence is the licensed picture.
    *   docs/plans/      yes. C43's row is the engineering record of both heads.
+   *   the changelog's  yes, in its generated `### Internal` entries alone (the architect's ruling of
+   *   commit log       2026-10-12, after the rc.3 cut): a release writes each commit's subject there, and
+   *                    a commit log is not a page. Its Notes and hand-written groups are pages.
    *   ANY USER PAGE    no. `INSTALL.md`, `README.md`, `TROUBLESHOOTING.md`, `MODES-AND-PRESETS.md`,
    *                    the settings files, the launchers and other workflows stay clean, because nothing
    *                    in the product sets it and an installed checkout keeps its state beside itself.
@@ -173,9 +187,9 @@ test('C43 head 2 — the variable is documented where a contributor reads, and n
     }
   };
   walk(root);
-  const named = pages.filter((p) => readFileSync(p, 'utf8').includes('SNOWARCH_STATE_ROOT'))
-    .map((p) => p.slice(root.length + 1))
-    .filter((p) => !p.startsWith(`docs${sep}plans${sep}`));
+  const named = pages.map((p) => p.slice(root.length + 1))
+    .filter((rel) => !rel.startsWith(`docs${sep}plans${sep}`))
+    .filter((rel) => namesTheVariable(rel, readFileSync(join(root, rel), 'utf8')));
   // Sorted: a directory's entries come back in the filesystem's order, which is not alphabetical everywhere.
   assert.deepEqual(named.sort(), [join('.github', 'workflows', 'ci.yml'), join('.github', 'workflows', 'release.yml'),
     join('docs', 'CONTRIBUTING.md')].sort(),
@@ -186,4 +200,51 @@ test('C43 head 2 — the variable is documented where a contributor reads, and n
   assert.match(contributing, /local-paths\.mjs/, 'the page does not say where the paths are named');
   assert.match(contributing, /useStateRoot\(\)/, 'the page does not say how a suite opts in');
   assert.match(contributing, /test and CI seam/, 'the page does not say it is not for a real install');
+});
+
+test('C43 head 2 — in the changelog, only the generated Internal group is a commit log', () => {
+  /*
+   * THE RC.3 CUT FAILED ON THE RELEASE'S OWN WRITE (the architect's ruling of 2026-10-12). A release writes
+   * every commit since the last final into the new section, and f3843c9, a `test:` commit whose subject says
+   * ci.yml may name the variable, went into its generated `### Internal` group. That group is a commit log
+   * written by `scripts/lib/release/changelog.mjs`, not a page a reader is sent to. The dry run never saw
+   * it, because a dry run writes nothing.
+   *
+   * So the guard reads every other line of the changelog. The Notes and every hand-written group are held,
+   * and so are the hand-written `### Internal` entries the older sections carry: 52 lines today, which is
+   * why the heading alone cannot decide it, only the heading and the generator's exact line together. The
+   * generated Added, Fixed and Changed groups are held too, because they describe a change to the product.
+   *
+   * The fixtures are built by the generator's own functions (`tests/helpers/changelog-fixture.mjs`), so a
+   * change to the line it writes reaches this case.
+   */
+  const VAR = 'SNOWARCH_STATE_ROOT';
+  const changelog = join('docs', 'CHANGELOG.md');
+  const notes = '### Notes\n\nA hand-written note.';
+  const handInternal = `${notes}\n\n### Internal\n\n- **ARC-07-C43** — a hand-written entry naming ${VAR}.`;
+  const plain = commit('docs(plan): a row', 'aaaaaaa1');
+  const fix = commit(`fix(snowarch): the CLI follows ${VAR}`, 'ccccccc3');
+
+  // The commit log: f3843c9's own subject, and one outside the convention, which the generator also files there.
+  const log = releasedChangelog(notes, [plain,
+    commit(`test(tests): ci.yml may name ${VAR}, for its per-step fixture licence (ARC-11-C6)`, 'f3843c94'),
+    commit(`a subject outside the convention, naming ${VAR}`, 'bbbbbbb2')]);
+  assert.ok(log.split('\n').includes(
+    `- tests: ci.yml may name ${VAR}, for its per-step fixture licence (ARC-11-C6) (f3843c9)`),
+  'the fixture does not hold the line the rc.3 write produced, so this case measures something else');
+  assert.equal(namesTheVariable(changelog, log), false,
+    'a generated Internal line was read as a page; the rc.3 cut fails on exactly this');
+
+  // Everything else in the changelog is a page.
+  for (const [where, text] of [
+    ['the Notes', releasedChangelog(`### Notes\n\nA note naming ${VAR}.`, [plain])],
+    ['a hand-written Internal entry', releasedChangelog(handInternal, [plain])],
+    ['a generated Fixed line', releasedChangelog(notes, [fix])],
+  ]) {
+    assert.equal(namesTheVariable(changelog, text), true,
+      `${where} went unread; only the generated Internal group is a commit log`);
+  }
+  // And the reading is the changelog's alone: the same text in any other file is a page.
+  assert.equal(namesTheVariable(join('docs', 'INSTALL.md'), log), true,
+    'the commit-log reading reached a file that is not the changelog');
 });

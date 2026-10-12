@@ -22,6 +22,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { commit, releasedChangelog } from './helpers/changelog-fixture.mjs';
+import { withoutGeneratedInternal } from './helpers/changelog-history.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MARKER = 'PENDING OWNER';
@@ -60,15 +62,23 @@ const walk = (dir) => readdirSync(dir).flatMap((entry) => {
   return /\.(md|mjs|ts|json|yml|yaml)$/.test(entry) ? [full] : [];
 });
 
+/**
+ * The marker's lines in one file. One function, so the walk over `docs/` and the fixture changelogs
+ * below cannot disagree about what a mention is. `rel` is written with forward slashes. The changelog
+ * is read without its generated Internal entries, the commit log a release writes; they are blanked,
+ * not removed, so every line number is still the file's.
+ */
+const markerLines = (rel, text) =>
+  (rel === 'docs/CHANGELOG.md' ? withoutGeneratedInternal(text) : text).split('\n').flatMap((line, i) =>
+    (line.includes(MARKER) ? [{ rel, line: i + 1, text: line.trim() }] : []));
+
 function mentions() {
   const found = [];
   for (const file of walk(join(root, 'docs'))) {
     // Forward slashes always: `relative()` answers in the platform's separator, and an allowlist
     // keyed with `/` misses every entry on Windows (ARC-08, learned the expensive way).
     const rel = relative(root, file).split(sep).join('/');
-    readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-      if (line.includes(MARKER)) found.push({ rel, line: i + 1, text: line.trim() });
-    });
+    found.push(...markerLines(rel, readFileSync(file, 'utf8')));
   }
   return found;
 }
@@ -90,6 +100,24 @@ test('ARC-00 — no Decision-owner cell is waiting on the owner again', () => {
   // next person would have learned to lower it without reading why.
   assert.ok(mentions().length >= 6,
     `the scan found only ${mentions().length} — the tree or the marker moved`);
+});
+
+test('ARC-00 — a subject in the changelog\'s generated Internal group is not a cell (ARC-07-C43)', () => {
+  // THE SAME EXPOSURE AS C43 HEAD 2'S, ruled the same way by the architect on 2026-10-12, after the
+  // rc.3 cut failed there. A release writes every commit's subject into the new section, so a `docs:`
+  // subject that names the marker lands in the generated `### Internal` group and would fail this file
+  // at the next cut, though a commit log is not a Decision-owner cell. The changelog is read without
+  // that group. Its Notes and every hand-written group are still read.
+  const changelog = 'docs/CHANGELOG.md';
+  const planted = releasedChangelog('### Notes\n\nA hand-written note.',
+    [commit(`docs(adr): ADR-0099's owner cell stays ${MARKER} until the sitting`, 'ddddddd4')]);
+  assert.ok(planted.split('\n').includes(`- adr: ADR-0099's owner cell stays ${MARKER} until the sitting (ddddddd)`),
+    'the fixture holds no generated line naming the marker, so this case measures something else');
+  assert.deepEqual(markerLines(changelog, planted), [],
+    'a generated Internal line was read as a Decision-owner cell');
+
+  const cell = releasedChangelog(`### Notes\n\nA cell still ${MARKER}.`, [commit('docs(plan): a row', 'aaaaaaa1')]);
+  assert.equal(markerLines(changelog, cell).length, 1, 'the Notes of the changelog went unread');
 });
 
 test('ARC-00 — every ADR with a Decision-owner cell is initialled', () => {
