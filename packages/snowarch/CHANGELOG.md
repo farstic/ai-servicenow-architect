@@ -24,6 +24,12 @@ ARC-09-C97 to C101 in the ARC-09 plan.
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
 
+**Known gap, raised not closed: the doctor's handshake with a server that has exited (ARC-09-C130).** The
+server doctor's handshake (`src/doctor/checks.ts`) writes `initialize` to the server child's stdin right
+after spawning it, and listens for neither an `error` on that stdin nor the child's `exit`. A server that
+exits before it reads turns that write into an uncaught `EPIPE`, so the doctor dies instead of saying the
+server exited. Seen on one macOS CI cell, with every test passing.
+
 ## 2.0.0 — 2026-09-24
 
 Supersedes `snow-mcp` 1.0.0. Relicensed to Apache-2.0 and renamed to `@farstic/snowarch`; the old
