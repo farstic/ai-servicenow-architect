@@ -10,10 +10,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dirname, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { cellCount, findWideRows, formatTables, trackedMarkdown, verifyTables } from '../tools/snowarch/lib/docs/tables.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const table = (...rows) => ['| A | B |', '|---|---|', ...rows].join('\n');
@@ -61,6 +63,19 @@ test('formatTables names every wide row and fails; a clean scan passes', () => {
   assert.equal(good.text, 'tables: 2 file(s) | wide rows: 0');
 });
 
+test('verifyTables says fail exactly when it found a wide row, so --json cannot print ok beside one', (t) => {
+  // The architect's control on #417 forced `status: 'ok'` and stayed green: the CLI exits on formatTables' count,
+  // but `docs verify --json` prints this object, and its status must agree with its own list.
+  const dir = tempDir('docs-tables-', t);
+  writeFileSync(join(dir, 'wide.md'), `${table('| 1 | `a | b` |')}\n`);
+  writeFileSync(join(dir, 'clean.md'), `${table('| 1 | `a \\| b` |')}\n`);
+  const wide = verifyTables({ root: dir, files: ['wide.md'] });
+  assert.deepEqual([wide.status, wide.wide.length, wide.scanned], ['fail', 1, 1]);
+  const clean = verifyTables({ root: dir, files: ['clean.md'] });
+  assert.deepEqual([clean.status, clean.wide.length], ['ok', 0]);
+  assert.equal(verifyTables({ root: dir, files: ['clean.md', 'wide.md'] }).status, 'fail');
+});
+
 test('the scan reads the tracked Markdown outside vendor/', () => {
   const files = trackedMarkdown(ROOT);
   assert.ok(files.length >= 200, `only ${files.length} file(s): the listing is wrong`);
@@ -71,4 +86,5 @@ test('the scan reads the tracked Markdown outside vendor/', () => {
 test('ARC-09-C126 — no tracked Markdown table has a row wider than its header', () => {
   const r = verifyTables({ root: ROOT });
   assert.deepEqual(r.wide.map((w) => `${w.file}:${w.line}`), [], formatTables(r).text);
+  assert.equal(r.status, 'ok');
 });
