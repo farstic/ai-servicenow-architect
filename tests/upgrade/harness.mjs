@@ -543,7 +543,7 @@ export async function buildEnforcementWorld(t, { modules = 'link' } = {}) {
   const marks = [];
   const worldStart = process.hrtime.bigint();
   const from = LAST_UNENFORCED_RELEASE;
-  if (spawnSync('git', ['rev-parse', '--verify', '-q', `${from}^{commit}`], { cwd: REAL_ROOT }).status !== 0) {
+  try { gitRaw(['rev-parse', '--verify', '-q', `${from}^{commit}`], { cwd: REAL_ROOT }); } catch {
     throw new Error(`harness: ${from} is not in this clone — run git fetch --tags, then run again`);
   }
   const scratch = tempDir('snowarch-enforce-', t);
