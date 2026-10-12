@@ -37,8 +37,9 @@ deliverable was produced under.
 **In 2.0.13, by the owner's decision (2026-10-12):**
 - enforcement on every build, with no switch (C6). The switch above is gone.
 
-**In 2.1.0, where C7, C8, C9 and C5 ship together:**
+**In 2.1.0, where C7, C8, C9, C10 and C5 ship together:**
 - a signed build-integrity manifest, and its detection (C7);
+- the doctor's FAIL when the SessionStart hook is gone (C10);
 - key rotation, from the primary to the recovery key (C8);
 - the licence footer on every artefact the Architect writes (C9);
 - the Business Source License 1.1 for 2.1.0 and later (C5).
@@ -76,7 +77,7 @@ together in 2.1.0.
 3. ARC-11-C3's design (done: the split into C6 to C9, 2026-10-12).
 4. ARC-11-C6 (#420), then a release candidate of 2.0.13 and the owner's two-machine test on it (T-28).
 5. 2.0.13.
-6. The rest of ARC-11-C3's code, in this order: C7, C8, C9.
+6. The rest of ARC-11-C3's code, in this order: C7, C8, C9, with C10 beside C7.
 7. ARC-11-C5.
 8. A release candidate of 2.1.
 9. The owner's two-machine test on it (T-28).
