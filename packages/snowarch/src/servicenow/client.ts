@@ -102,6 +102,14 @@ function validateQuery(query: string): string {
   return query;
 }
 
+/**
+ * ARC-09-C125 — a query's page size: the instance's `maxRecords`, this when the store sets none, and never more
+ * than `MAX_PAGE`. Exported because `snow_core_records_query`'s description states both, from here, so the
+ * advertised default cannot drift from the one sent again (it said "default: 10" while this sent 100).
+ */
+export const DEFAULT_MAX_RECORDS = 100;
+export const MAX_PAGE = 1000;
+
 export class ServiceNowClient {
   private baseUrl: string;
   private authMethod: 'oauth' | 'basic';
@@ -281,7 +289,8 @@ export class ServiceNowClient {
   private async request<T>(
     url: string,
     options: RequestInit = {},
-    requestedRetries: number = this.maxRetries
+    requestedRetries: number = this.maxRetries,
+    onResponse?: (response: { headers?: { get?: (name: string) => string | null } }) => void
   ): Promise<T> {
     let lastError: Error | undefined;
     const maxRetries = Number.isInteger(requestedRetries) && requestedRetries >= 0
@@ -368,6 +377,8 @@ export class ServiceNowClient {
         // 204 No Content or empty body (e.g. a successful DELETE) has nothing to parse.
         // Parsing it as JSON would throw, get caught below, and trigger a spurious retry
         // whose second DELETE then 404s — making a successful delete report NOT_FOUND.
+        // ARC-09-C125: a caller that needs a header of a successful answer (X-Total-Count) reads it here.
+        onResponse?.(response);
         if (response.status === 204) return undefined as T;
         const body = await response.text();
         if (!body) return undefined as T;
@@ -444,8 +455,9 @@ export class ServiceNowClient {
       queryParams.set('sysparm_fields', params.fields);
     }
 
+    let limit: number;
     if (params.limit !== undefined && params.limit > 0) {
-      queryParams.set('sysparm_limit', Math.min(params.limit, 1000).toString());
+      limit = Math.min(params.limit, MAX_PAGE);
     } else {
       // Default page size from the addressed instance's maxRecords (store-declared, default
       // 100), capped at 1000. It used to come from process.env.MAX_RECORDS with a fallback
@@ -453,9 +465,9 @@ export class ServiceNowClient {
       // Outside a request (a direct client construction in a test) there is no ambient
       // instance, and 100 is the documented default.
       const rt = currentInstanceOrNull();
-      const defaultLimit = Math.min(rt?.maxRecords ?? (Number(process.env.MAX_RECORDS) || 100), 1000);
-      queryParams.set('sysparm_limit', defaultLimit.toString());
+      limit = Math.min(rt?.maxRecords ?? (Number(process.env.MAX_RECORDS) || DEFAULT_MAX_RECORDS), MAX_PAGE);
     }
+    queryParams.set('sysparm_limit', limit.toString());
 
     if (params.offset !== undefined) {
       queryParams.set('sysparm_offset', params.offset.toString());
@@ -493,12 +505,20 @@ export class ServiceNowClient {
     logger.debug(`Query: ${this.maskQuery(params.query)}`);
 
     try {
+      // ARC-09-C125: X-Total-Count, the "Total count of records returned by the query"
+      // (markdown/api-reference/rest-apis/c_TableAPI.md:463), is how a caller tells a page from the
+      // whole list: `count` is the page's length. Null when the instance does not send it.
+      let totalHeader: string | null = null;
       const response = await this.request<ServiceNowApiResponse<ServiceNowRecord[]>>(
-        url, {}, params.retries);
+        url, {}, params.retries, (r) => { totalHeader = r.headers?.get?.('x-total-count') ?? null; });
+      const total = totalHeader !== null && /^\d+$/.test(String(totalHeader).trim()) ? Number(totalHeader) : null;
 
       return {
         count: response.result.length,
         records: response.result,
+        limit,
+        offset: params.offset ?? 0,
+        total,
       };
     } catch (error) {
       if (error instanceof ServiceNowError) {
