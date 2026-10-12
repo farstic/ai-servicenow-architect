@@ -161,10 +161,10 @@ is set, and `.local/audit.jsonl` when the instances come from the environment an
 `SNOW_AUDIT_FILE=<path>` moves it; `SNOW_AUDIT_FILE=off` disables it — the server then prints
 `[WARN] audit trail disabled` at start-up, and otherwise its start-up line `audit trail: …` names the file.
 
-A call the licence refuses is recorded too, a read or a write alike (ARC-11-C1). Under
-`SNOW_LICENCE_ENFORCE="true"` each refused call writes one line: the tool, the instance label, `gate: "licence"`,
-`result: "LICENCE_NOT_VALID"`, the licence's id or `missing`, and the state that refused it (`revoked`, `expired`,
-`invalid`, `missing`, or `scope` for a design-only licence on a live server). It carries no argument and no value.
+A call the licence refuses is recorded too, a read or a write alike (ARC-11-C1). Each refused call writes one
+line: the tool, the instance label, `gate: "licence"`, `result: "LICENCE_NOT_VALID"`, the licence's id or
+`missing`, and the state that refused it (`revoked`, `expired`, `invalid`, `missing`, or `scope` for a design-only
+licence on a live server). It carries no argument and no value.
 
 ## 6. Where credentials live
 
