@@ -35,9 +35,16 @@ test('ARC-11-C6 — every test that starts a CLI, the server or a launcher gives
   }
 });
 
-/** Planted sources, by absolute path, fed to the reader instead of the disk. */
+/**
+ * Planted sources, by absolute path, fed to the reader instead of the disk.
+ *
+ * The paths are built with `resolve`, not `join`, because the reader follows a relative import with `resolve`, and on
+ * Windows `resolve` puts the drive in front: a planted `\planted\paths.mjs` was never the `D:\planted\paths.mjs` it
+ * looked for, so an imported path went unfollowed on the three Windows test cells and the dry run (run 38233593218).
+ */
 function plant(sources) {
-  const at = (rel) => join('/planted', rel);
+  const base = resolve('/planted');
+  const at = (rel) => join(base, rel);
   const map = new Map(Object.entries(sources).map(([rel, text]) => [at(rel), text]));
   return {
     files: [...map.keys()].filter((f) => f.endsWith('.test.mjs')),
@@ -46,7 +53,7 @@ function plant(sources) {
       return map.get(f);
     },
     exists: (f) => map.has(f),
-    base: '/planted',
+    base,
   };
 }
 
