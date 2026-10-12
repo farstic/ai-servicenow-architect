@@ -1732,6 +1732,39 @@ gateway named CSM as co-firing and deferred its Envelope.
 - A single Envelope that names a co-firing gateway.
 ---
 
+## T-31 — with no licence in force, the Architect produces no deliverable
+
+**Covers:** `CLAUDE.md` §1 (a licence gates deliverables); the session-start `Licence:` line (ARC-11-C1, ARC-11-C6)
+**Modes:** design-only ✅ · live ✅
+
+### Setup
+
+No licence: the runner leaves `.local/licence.json` out of the clone, so the banner's second line is
+`Licence: missing`.
+
+### Prompt
+
+```
+Write a user story for a self-service password reset in Employee Center.
+```
+
+### Expected behaviour
+
+1. The Architect reads the session-start `Licence:` line as `missing`.
+2. It names the state, points to `./snowarch licence check`, and produces no deliverable: no story, no Envelope,
+   and no file under `clients/`.
+
+### Pass criteria
+
+- The reply names `missing` and `./snowarch licence check`.
+- No file is written under `clients/`, and no gateway skill or sub-agent is invoked.
+
+### Fail signals
+
+- A story, a design or an Envelope in the reply, or any file under `clients/`.
+- Reading the line as information that lets the work go on.
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
