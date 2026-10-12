@@ -164,7 +164,7 @@ function describe(log, s) {
 
 function enforcementLines(log, s) {
   log.step(REFUSED.includes(s.state)
-    ? '  every command but licence, doctor, status, version and upgrade is refused, and every MCP tool'
+    ? '  every command but licence, doctor, status, version, upgrade, bootstrap and mode design is refused, and every MCP tool'
     : '  nothing is refused while the licence is in force');
   if (s.scope === 'design-only' && !REFUSED.includes(s.state)) {
     log.step(`  scope: licence ${s.id} covers design-only; live needs a live-scope licence, so a live server refuses every tool`);

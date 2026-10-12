@@ -30,8 +30,21 @@ export { bannerLine } from './line.mjs';
 /** The states enforcement refuses. `expiring` is not one: a licence in its last month is in force. */
 export const REFUSED = Object.freeze(['missing', 'invalid', 'expired', 'revoked']);
 
-/** The commands a person needs to see and repair the state, which enforcement never refuses (R1). */
-export const CLI_ALLOWED = Object.freeze(['licence', 'doctor', 'status', 'version', 'upgrade']);
+/**
+ * The commands that run without a licence: the five a person needs to see and repair the state (R1), and
+ * `bootstrap` in full (ARC-11-C6, ruling A), because installing is how a checkout first reads one.
+ */
+export const CLI_ALLOWED = Object.freeze(['licence', 'doctor', 'status', 'version', 'upgrade', 'bootstrap']);
+
+/**
+ * And the forms of other commands that do: `mode design`, which deregisters a checkout before its folder is
+ * deleted (INSTALL.md, Uninstall). `mode` itself, and `mode live`, are refused.
+ */
+export const CLI_ALLOWED_FORMS = Object.freeze({ mode: Object.freeze(['design']) });
+
+/** Does this command, with these arguments, run without a licence? */
+export const allowedCommand = (name, positional = []) => CLI_ALLOWED.includes(name)
+  || (Object.hasOwn(CLI_ALLOWED_FORMS, name) && CLI_ALLOWED_FORMS[name].includes(positional[0]));
 
 /**
  * A list checked longer ago than this is STALE: `licence show` and `licence check` say so. A live server
@@ -107,5 +120,5 @@ export const refusalLines = (name, s, cli) => [
   REMEDY(cli),
 ];
 
-/** Is this command refused? For a refused state, every command but the five. */
-export const refusesCommand = (name, s) => REFUSED.includes(s.state) && !CLI_ALLOWED.includes(name);
+/** Is this command refused? For a refused state, every command but the allowed ones. */
+export const refusesCommand = (name, s, positional = []) => REFUSED.includes(s.state) && !allowedCommand(name, positional);
