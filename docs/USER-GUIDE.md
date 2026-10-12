@@ -58,7 +58,8 @@ warning's remedy would be a report rather than a panel.
 
 The `Licence:` line is the session banner's, in every state: `Licence: missing · warn only` on a
 checkout with no licence, and `· enforced` in place of `· warn only` when `SNOW_LICENCE_ENFORCE` is
-`"true"`. A licence in force names no enforcement, because there is nothing for it to refuse.
+`"true"`. A licence in force names no enforcement, because there is nothing for it to refuse. A licence's
+`valid_until` is a calendar date in UTC: the last day counts, until 00:00 UTC of the next day.
 
 ### Reading the Mode line
 
