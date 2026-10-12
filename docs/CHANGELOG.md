@@ -9,14 +9,92 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A licence, checked by the product itself, and warn only by default (ARC-11-C1).** With no licence and
-`SNOW_LICENCE_ENFORCE` unset, which is every checkout today, exactly three things change:
+## 2.0.12 — 2026-10-12
+
+### Notes
+
+**This release adds a licence the product checks itself, warn only by default, and the licensing documents.** It
+also changes four behaviours:
+- a co-firing gateway writes its Envelope in the same turn (ARC-09-C118);
+- in live mode, the Architect reads on the instance what the corpus cannot settle, before an Envelope is final
+  (ARC-09-C117);
+- `./snowarch upgrade` names an untracked file that would stop it, before anything moves (ARC-09-C120);
+- the ATF step tool reads its inputs' limits and lists every input row of a step (ARC-09-C122).
+
+There is no migration step: an existing checkout keeps its instance store, its preset and its flags untouched, and
+the documentation corpus stays pinned at `68c0d11`. The server has 399 tools, as in 2.0.11. The error registry
+gains one code (72 to 73), `LICENCE_NOT_VALID`, which only `SNOW_LICENCE_ENFORCE="true"` can raise.
+
+A checkout with no licence and enforcement unset, which is every checkout today, sees exactly three things of the
+licence:
 - doctor check E-31 warns;
 - the session banner and `./snowarch status` gain a `Licence:` line after the `Mode:` line;
-- a session's first tool answer carries one extra block, after the first one, which is unchanged.
+- a session's first tool answer carries one extra block, after its first, which is unchanged.
 
-The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72 to 73), which only
-`SNOW_LICENCE_ENFORCE="true"` can raise.
+**The licence of the code.** Every 2.0.x release, 2.0.12 included, stays under the Apache License 2.0. **2.0.13
+brings enforcement on every build (ARC-11-C6):** with no valid licence, no tool runs, no CLI command runs but
+the few that repair the state, and no variable turns that off. From 2.1.0 the product moves to the Business
+Source License 1.1 (ARC-11-C5). A version's licence is the `LICENSE` file in its release tag (`LICENSING.md`,
+§ Future versions).
+
+**The release candidates, and what a live instance has confirmed.** `v2.0.12-rc.1` (`9a75d8e`) and
+`v2.0.12-rc.2` (`18e5020`) were cut before this release.
+- **rc.1, the owner's licence sitting, round 1:** two folders on one machine; the record is
+  `docs/validation/2.0.12-rc.1-licence-sitting.md`. It confirmed ARC-11-C1:
+  - a creator licence and a colleague's were issued and installed;
+  - under enforcement a revoked licence refused every tool at the next session;
+  - a design-only licence refused every tool of a live server;
+  - a forged file read as invalid;
+  - an end date already past could not be issued;
+  - a placeholder name was refused;
+  - the recovery key verified;
+  - back to warn only, the notice was information.
+
+  Its two defects were fixed before rc.2: the status panel now prints the `Licence:` line in every state, and
+  every licence refusal writes one audit line.
+- **rc.2, the owner's live sitting:** the creator folder, upgraded from rc.1; the record is
+  `docs/validation/2.0.12-rc.2-live-sitting.md`.
+  - T-29, live verification: eleven items measured from seven reads, each cited "measured on instance <label>,
+    <date>", and no audit line written;
+  - T-30, both Envelopes in one turn: FSO and CSM reconciled once, cited by full corpus path, in 2 min 22 s
+    against 2.0.11-rc.1's 1 min 07 s;
+  - the ATF step tool, live: a 2680-character script refused before any write, against its input variable's
+    max_length of 2000, and the listing showing `jasmine_version` defaulted by the instance;
+  - the status panel's `Licence:` line, rc.1's first defect, seen fixed;
+  - the `expired` state, on 2026-10-12 once the UTC day turned: `Licence: expired · enforced` at the check, the
+    tool refused with `LICENCE_NOT_VALID`, and one audit line written, the first licence-refusal line seen live;
+  - round 2, on the colleague's machine: still to come; it runs on the colleague's machine after this release.
+
+The live procedures are in `packages/snowarch/tests/live/README.md`.
+
+**What a user sees, at the terminal.**
+- **A licence.** `.local/licence.json` holds it: issued by the owner, signed with Ed25519, and checked offline
+  against a signed revocation list. `./snowarch licence show` and `licence check` read it, and
+  `licence verify <file>` checks any licence file.
+- **Enforcement is opt-in in 2.0.12.** Without `SNOW_LICENCE_ENFORCE="true"` nothing is refused. With it:
+  - a missing, invalid, expired or revoked licence refuses every MCP tool, and every CLI command but the five
+    that repair the state;
+  - a design-only licence refuses every tool of a live server;
+  - each refused tool call writes one audit line.
+- **The upgrade names what stops it.** An untracked file the release tracks, or a modified one, is named before
+  anything moves, and a failure while the tree moves quotes git's reason.
+
+**What a consultant sees, in a session.**
+- **Co-firing gateways write both Envelopes in the turn.** "Reconcile before dispatch" is gone. Each Envelope
+  cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)`, and has its own eight-page
+  grounding budget.
+- **Live mode reads what the corpus cannot settle.**
+  - Choice values, fields, table parents, installed apps, assignment rules, SLA definitions and workspace pages
+    are read on the instance with read-only calls, eight per Envelope by default, and with no cap under the
+    Ultracode or max-effort opt-in, and cited "measured on instance <label>, <date>".
+  - The raw reads go in `<envelope>-readings.md` beside the Envelope, with the label and the date, never a URL or
+    an account.
+  - What is not an instance fact, such as the wording a customer sees, stays an OPEN QUESTION. Design-only is
+    unchanged.
+- **The ATF step tool reads its inputs' limits.** A value over its input variable's `max_length` is refused
+  before any write. Every input row of the step is listed, including those the instance defaulted.
+- **Under enforcement, a licence not in force stops the deliverable.** The Architect names the state and points
+  to `./snowarch licence check`. Without enforcement, the `Licence:` line is information.
 
 ### Added
 
@@ -85,6 +163,76 @@ The server still has 399 tools. The error registry gains `LICENCE_NOT_VALID` (72
 - `snow_atf_atf_step_add` refuses a value longer than its input variable's `max_length` before any write. It lists
   every input row of the step, including the rows the instance created from the config's defaults, and reports a mandatory
   input left without a value (ARC-09-C122).
+
+### Added
+
+- snowarch: the owner's two public keys in both key modules; the guard holds two (ARC-11-C1) (3a3e83b)
+- snowarch: the server's licence gate at the router, its notice, audit id, refresh (ARC-11-C1) (e9a2215)
+- snowarch: doctor E-31, the CLI refusing under enforcement, the banner licence line (ARC-11-C1) (f65fcde)
+- snowarch: ./snowarch licence, the checkout's state and the revocation list's fetch (ARC-11-C1) (2f5ca3d)
+- snowarch: the licence core and an empty key list, in the CLI and the server (ARC-11-C1) (df71237)
+
+### Fixed
+
+- server: the ATF step tool reads its inputs' limits and lists every input row (ARC-09-C122) (e75451b)
+- engine: each co-firing Envelope cites as a single-gateway turn does (ARC-09-C118) (4d5d5e1)
+- engine: upgrade refuses an untracked file the release tracks, and quotes git (ARC-09-C120) (7c48374)
+- engine: a co-firing gateway writes its Envelope in the same turn (ARC-09-C118) (639f2c1)
+- engine: in live mode the Architect reads what the corpus cannot settle (ARC-09-C117) (ddadc35)
+- server: every licence refusal writes one audit line, for a read or a write (ARC-11-C1) (8784f54)
+- doctor: the status panel prints the banner's Licence line in every state (ARC-11-C1) (63e8ec6)
+- snowarch: keygen and issue refuse an angle-bracket placeholder as --to or --org (ARC-11-C1) (724171e)
+- snowarch: the key module's built declaration carries the source's comment (ARC-11-C1) (992f8df)
+- snowarch: checks spell the launcher for the shell the doctor was told about (ARC-11-C1) (5365610)
+- snowarch: every live start with a licence refreshes the list; check notes staleness (ARC-11-C1) (bb6d892)
+- snowarch: the list fetcher is not named fetch, and the README counts 73 codes (ARC-11-C1) (5d983b5)
+
+### Internal
+
+- changelog: the expired state confirmed; 2.0.13 brings enforcement on every build (ARC-11) (9fa2d74)
+- docs: T-28 row 11's next day, expired on rc.2, with its audit line seen live (ARC-11-C4) (78e8c59)
+- plan: C6's test-licence shape A approved with conditions; C7 states its bound (ARC-11-C6) (43e7988)
+- plan: ARC-11-C3 split into C6 to C9, with the architect's rulings (ARC-11-C3) (804cdbe)
+- changelog: the 2.0.12 Notes; the expired state and round 2 still pending (ARC-09, ARC-11) (d505e63)
+- docs: row 11 on the last day; the licence day is UTC in the guide, T-28 and C3 (ARC-11-C4) (c2eb324)
+- plan: open C127 and C128 after 2.0.12, C128 as a known gap (ARC-09-C127, ARC-09-C128) (84573a3)
+- plan: open C125 and C126, both after 2.0.12 (ARC-09-C125, ARC-09-C126) (c9f2923)
+- docs: the 2.0.12-rc.2 live sitting; C117, C118 and C122 confirmed, PN-16 (ARC-09) (5729fe9)
+- tests: the live README's T-29 and C122 runs for rc.2 (ARC-09-C117, ARC-09-C122) (a6ee9e8)
+- plan: C122 fixed pending the live run; PN-16 and the C95 pass condition (ARC-09-C122) (9285458)
+- server: the ATF step tool's input limits and its full listing, failing first (ARC-09-C122) (3aa349f)
+- plan: C120 fixed; the upgrade page and the step table name the refusals (ARC-09-C120) (b279666)
+- tests: an untracked file in the release's way is refused at U4, failing first (ARC-09-C120) (384a235)
+- docs: the rc.1 record answers T-28 row 7: refused with exit 3, version served (ARC-11-C4) (34049d2)
+- plan: ARC-11-C5, BSL 1.1 from 2.1.0 shipped with C3, and the order to 2.1.0 (ARC-11) (a7244f9)
+- plan: the C118 row and its changelog lines (ARC-09-C118) (09becdb)
+- tests: T-30, and T-24 and T-15 hold every co-firing Envelope to the turn (ARC-09-C118) (806f068)
+- tests: one co-fire rule in seven copies, tied to the turn, failing first (ARC-09-C118) (b5c15ea)
+- plan: the C117 row and its changelog lines (ARC-09-C117) (21c5f08)
+- tests: T-29 and T-29b by hand, and the bare-Prompt check reads its own case (ARC-09-C117) (8543027)
+- tests: one live-verification rule in seven identical copies, failing first (ARC-09-C117) (e061073)
+- server: a licence refusal writes one audit line, failing first (ARC-11-C1) (121c737)
+- tests: T-28, the two-machine licence test, and its first record (ARC-11-C4) (918c41e)
+- tests: the status panel's Licence line and E-31's perpetual, failing first (ARC-11-C1) (fd79ce7)
+- docs: the published package's NOTICE carries the same contact line (ARC-11-C2) (4b6b79a)
+- docs: the licensing pages, the CLA, contributors, CONTRIBUTING merged, a contact (ARC-11-C2) (4616953)
+- engine: the copyright header in every owned source file, after a shebang or BOM (ARC-11-C2) (c354077)
+- tests: every owned source file starts with the copyright header, failing first (ARC-11-C2) (8a05f3d)
+- plan: the placeholder refusal in the C1 row and the changelog (ARC-11-C1) (1936a17)
+- plan: keygen examples with real values, gh pr edit's workaround, keys in the row (ARC-11-C1) (e067316)
+- snowarch: the expiring window's edges, 30 and 31 days, in both copies and parity (ARC-11-C1) (b765be0)
+- tests: the licence fixtures clean up; npm test fails on any snowarch-* leftover (ARC-11-C1) (9e03a50)
+- plan: ARC-11-C1's row records the architect's rulings (a), (b), (d) and (f) (ARC-11-C1) (8373e4c)
+- plan: ARC-11-C1's four lines approved and applied; the changelog says what changed (ARC-11-C1) (692b658)
+- snowarch: licence keys in the constants table; remedy cases spell no launcher (ARC-11-C1) (89bffd6)
+- contract: the four lines the owner approved, with the pages they regenerate (ARC-11-C1) (2991b1b)
+- plan: ARC-11-C1 built; the two-machine live test, the changelog notes (ARC-11-C1) (e0a26a0)
+- snowarch: the server's licence gate, notice, audit id and refresh, failing first (ARC-11-C1) (16dabf9)
+- snowarch: E-31, the CLI's refusal and the banner's licence line, failing first (ARC-11-C1) (322203a)
+- snowarch: licence commands, the checkout's state and the list fetch, failing first (ARC-11-C1) (7e8fab6)
+- snowarch: ARC-11 plan; licence core, key guard and parity tests, failing first (ARC-11-C1) (9a6a5eb)
+
+Tag v2.0.12 · contract 0c1efdfd4568 · docs-pin 68c0d11
 
 ## 2.0.11 — 2026-10-10
 
