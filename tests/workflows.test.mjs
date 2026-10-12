@@ -340,6 +340,26 @@ test('release-dryrun runs the real release on three OSes, every commit (ARC-09-S
   assert.match(job, /fetch-depth: 0/);
 });
 
+test('ARC-11-C6 — release.yml\'s evidence doctor alone runs licensed, and its citation check is the ungated function', () => {
+  const release = wf('release.yml');
+  // The launcher's `docs verify` is outside the allowed set, and the job holds no licence: the same function, ungated.
+  assert.ok(release.includes('run: node scripts/docs.mjs verify\n'), 'the citation check is not scripts/docs.mjs verify');
+  assert.equal(release.includes('snowarch.mjs docs verify'), false, 'the launcher\'s docs verify is refused without a licence');
+  // The evidence is the licensed picture (the architect's ruling): a fixture licence for that one step, per step.
+  const fixture = release.indexOf('run: node scripts/ci/licence-fixture.mjs');
+  const doctor = release.indexOf('snowarch.mjs doctor --json');
+  assert.ok(fixture > 0 && doctor > fixture, 'the fixture step does not come before the evidence doctor');
+  const step = release.slice(release.lastIndexOf('- name:', doctor), doctor);
+  for (const line of ['NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}',
+    'SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}', 'CLAUDE_PROJECT_DIR: ${{ steps.licence.outputs.root }}']) {
+    assert.ok(step.includes(line), `the evidence doctor lacks ${line}`);
+  }
+  // The install's state reaches the doctor in the fixture's root, without replacing the fixture's licence.
+  assert.ok(step.includes('cp -Rn .local/. "$SNOWARCH_STATE_ROOT/.local/"'), 'the doctor would not read this install\'s state');
+  // Never job-wide: the hook is in exactly one step's environment.
+  assert.equal(release.split('NODE_OPTIONS:').length - 1, 1, 'the hook reaches more than the evidence doctor');
+});
+
 test('release.yml runs on tags only, and is the one workflow that may write (ARC-09-S03)', () => {
   const release = wf('release.yml');
 
