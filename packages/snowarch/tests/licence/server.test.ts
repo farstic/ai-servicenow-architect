@@ -14,9 +14,9 @@ import { fromToday, keysOf, licence, licenceText, pair } from './fixtures.js';
 /**
  * ARC-11-C1 — the licence gate in the BUILT server, over stdio, as Claude Code runs it.
  *
- * THE CLASS CASE FIRST. With no licence and enforcement off — every user's state today — the only
- * changes are one extra content block on the first answer of a session (its first block byte-identical
- * to what it always was), no `licence` key in the audit trail, and the same 399 tools.
+ * THE CLASS CASE FIRST. With no licence, on every build (ARC-11-C6): all 399 tools are still listed, the
+ * refusal is at the call (R1), and every call, a switch included, is refused with `LICENCE_NOT_VALID` and one
+ * audit line.
  *
  * THEN THE LICENSED CASES, against a COPY of `dist/` that trusts a key this test generated. The shipped
  * key list is the owner's alone, so no committed build can verify a test's licence; the copy is how a
