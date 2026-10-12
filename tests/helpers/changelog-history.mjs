@@ -29,3 +29,31 @@ export function historyStartsAt(text) {
 
 /** Is this 0-based line index inside the history region? */
 export const isHistory = (text, index) => index >= historyStartsAt(text);
+
+/** The line `scripts/lib/release/changelog.mjs` writes for one commit, conventional or not. */
+const GENERATED_ENTRY = /^- .+ \([0-9a-f]{7}\)( \(unconventional\))?$/;
+
+/**
+ * The text with each release section's generated `### Internal` entries blanked, and every other line
+ * as it was.
+ *
+ * ARC-07-C43, the architect's ruling of 2026-10-12, after the rc.3 cut. A release writes every commit
+ * since the last final into the new section, and a `test:`, `docs:`, `ci:` or `chore:` subject lands in
+ * its `### Internal` group: a commit log, not a page. A sweep that keeps a name out of the pages reads
+ * the rest. A line is blanked only when it is under an `### Internal` heading AND in the generator's
+ * exact shape, because the older sections carry hand-written Internal entries, in prose or with a pull
+ * request number beside the sha, and those are pages like the Notes. A hand-written line typed in exactly
+ * the generator's shape would read as generated; none is written that way.
+ *
+ * Blanked rather than removed, so a caller's line numbers still match the file.
+ */
+export function withoutGeneratedInternal(text) {
+  let internal = false;
+  return text.split('\n').map((line) => {
+    if (/^#{1,6} /.test(line)) {
+      internal = /^### Internal[ \t]*$/.test(line);
+      return line;
+    }
+    return internal && GENERATED_ENTRY.test(line) ? '' : line;
+  }).join('\n');
+}

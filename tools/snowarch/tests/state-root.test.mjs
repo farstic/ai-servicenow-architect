@@ -10,6 +10,7 @@ import { storePath } from '../lib/mode.mjs';
 import { cachePath as upgradeCachePath } from '../lib/upgrade-check.mjs';
 import { createLogger } from '../lib/log.mjs';
 import { buildFile, extractUnreleased, renderGroups, trailerLine } from '../../../scripts/lib/release/changelog.mjs';
+import { withoutGeneratedInternal } from '../../../tests/helpers/changelog-history.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
 /**
@@ -144,9 +145,11 @@ test('C43 head 1 — the doctor\'s repository inputs do not move with `.local/`'
 /**
  * Does this file name the variable, as head 2 reads it? One predicate, so the walk over the real tree and
  * the fixture changelogs below cannot disagree about what "named" means. `rel` is relative to the root,
- * in the platform's separator.
+ * in the platform's separator. The changelog is read without its generated Internal entries, the commit
+ * log a release writes (the case after head 2's says why).
  */
-const namesTheVariable = (rel, text) => text.includes('SNOWARCH_STATE_ROOT');
+const namesTheVariable = (rel, text) =>
+  (rel === join('docs', 'CHANGELOG.md') ? withoutGeneratedInternal(text) : text).includes('SNOWARCH_STATE_ROOT');
 
 test('C43 head 2 — the variable is documented where a contributor reads, and nowhere else', async () => {
   /*
@@ -165,6 +168,9 @@ test('C43 head 2 — the variable is documented where a contributor reads, and n
    *   release.yml      yes, for the same reason (ARC-11-C6 step 5, the architect's ruling): its evidence doctor
    *                    runs licensed, per step, so the published evidence is the licensed picture.
    *   docs/plans/      yes. C43's row is the engineering record of both heads.
+   *   the changelog's  yes, in its generated `### Internal` entries alone (the architect's ruling of
+   *   commit log       2026-10-12, after the rc.3 cut): a release writes each commit's subject there, and
+   *                    a commit log is not a page. Its Notes and hand-written groups are pages.
    *   ANY USER PAGE    no. `INSTALL.md`, `README.md`, `TROUBLESHOOTING.md`, `MODES-AND-PRESETS.md`,
    *                    the settings files, the launchers and other workflows stay clean, because nothing
    *                    in the product sets it and an installed checkout keeps its state beside itself.
