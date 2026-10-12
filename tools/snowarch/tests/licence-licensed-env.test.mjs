@@ -24,6 +24,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import { checkLicence } from '../lib/licence/core.mjs';
+import * as hook from './helpers/licence-hook/index.mjs';
 import { FIXTURE_LICENCE, licenceFixture, licensedEnv } from './helpers/licence-hook/index.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
@@ -113,6 +114,20 @@ test('licensedEnv — it never writes inside this repository, where the owner\'s
   assert.equal(existsSync(join(ROOT, 'tools', '.local')), false);
   // Refused before anything was written: the good root beside the bad one got nothing either.
   assert.equal(existsSync(licenceAt(fine)), false);
+});
+
+test('releaseLicenceFixture removes the hook\'s directory, the state roots made for children, and their owner records', () => {
+  // node:test's exit sweep removes them anyway; a vitest worker does not reliably reach it, and a run left
+  // `snowarch-licence-hook-*.owner` behind (the full gates on C6, 2026-10-12). The package's setup calls this
+  // after each file.
+  assert.equal(typeof hook.releaseLicenceFixture, 'function', 'there is no releaseLicenceFixture');
+  const { dir } = licenceFixture();
+  const state = licensedEnv({ PATH: process.env.PATH ?? '' }).SNOWARCH_STATE_ROOT;
+  for (const p of [dir, `${dir}.owner`, state, `${state}.owner`]) assert.ok(existsSync(p), `${p} was never made`);
+  hook.releaseLicenceFixture();
+  for (const p of [dir, `${dir}.owner`, state, `${state}.owner`]) assert.equal(existsSync(p), false, `${p} is still there`);
+  // And the next caller gets a fresh fixture, not a removed one.
+  assert.notEqual(licenceFixture().dir, dir);
 });
 
 test('licensedEnv — a spawned CLI trusts the fixture licence it finds in the state root', () => {
