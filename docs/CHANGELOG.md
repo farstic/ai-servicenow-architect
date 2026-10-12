@@ -9,6 +9,17 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**This release brings enforcement on every build (ARC-11-C6):** with no valid licence, no tool runs, no CLI command
+runs but the few that repair the state, and no variable turns that off. It stays under the Apache License 2.0; from
+2.1.0 the product moves to the Business Source License 1.1 (ARC-11-C5).
+
+### Fixed
+
+- `snow_us_capture_target_set` returns `previous`, the update set the authenticated user's capture preference named
+  before the call, from the read it already made, so a procedure that points capture back afterwards no longer reads
+  the preference first. It is null when the tool created the preference, or when the one it found named nothing
+  (ARC-09-C127).
+
 ## 2.0.12 — 2026-10-12
 
 ### Notes
