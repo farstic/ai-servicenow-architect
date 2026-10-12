@@ -34,7 +34,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { keyPair, licenceText, productKeys } from '../licence.mjs';
-import { tempDir } from '../temp.mjs';
+import { remove, tempDir } from '../temp.mjs';
 
 const HOOKS_URL = new URL('./hooks.mjs', import.meta.url).href;
 const REPO = resolve(fileURLToPath(new URL('../../../../../', import.meta.url)));
@@ -51,6 +51,8 @@ export function fixtureKeysHook(dir, keys) {
 }
 
 let fixture = null;
+/** The state roots licensedEnv made for children with nowhere else to read a licence. */
+const made = [];
 
 /**
  * This process's fixture: a primary and a recovery pair made here, the product key list built from them, and
@@ -60,7 +62,8 @@ export function licenceFixture() {
   if (!fixture) {
     const primary = keyPair();
     const keys = productKeys(primary, keyPair());
-    fixture = { primary, keys, hook: fixtureKeysHook(tempDir('snowarch-licence-hook-'), keys) };
+    const dir = tempDir('snowarch-licence-hook-');
+    fixture = { primary, keys, dir, hook: fixtureKeysHook(dir, keys) };
   }
   return fixture;
 }
@@ -83,6 +86,20 @@ const inRepo = (p) => {
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
 };
 
+/**
+ * Remove what this process made: the hook's directory and the state roots made for children, each with its owner
+ * record. node:test's exit sweep does this anyway; a vitest worker does not reliably reach an exit handler (see
+ * `packages/snowarch/tests/licence/fixtures.ts`), so the package's setup calls this after each file. The next
+ * caller of licenceFixture gets a fresh fixture.
+ */
+export function releaseLicenceFixture() {
+  for (const dir of [...(fixture ? [fixture.dir] : []), ...made.splice(0)]) {
+    remove(dir);
+    remove(`${dir}.owner`);
+  }
+  fixture = null;
+}
+
 export function licensedEnv(env = process.env, { root, licence = {} } = {}) {
   const { hook } = licenceFixture();
   const out = {};
@@ -95,6 +112,7 @@ export function licensedEnv(env = process.env, { root, licence = {} } = {}) {
   const roots = new Set([root, out.SNOWARCH_STATE_ROOT, out.CLAUDE_PROJECT_DIR].filter(Boolean).map((r) => resolve(r)));
   if (roots.size === 0) {
     out.SNOWARCH_STATE_ROOT = tempDir('snowarch-licensed-state-');
+    made.push(out.SNOWARCH_STATE_ROOT);
     roots.add(resolve(out.SNOWARCH_STATE_ROOT));
   }
   // Every root is checked before any is written, so a refusal leaves nothing behind.

@@ -20,6 +20,7 @@ export interface ProductKey {
 export interface LicenceFixture {
   primary: { publicKey: string; privateKey: string };
   keys: ProductKey[];
+  dir: string;
   hook: FixtureKeysHook;
 }
 
@@ -35,6 +36,8 @@ export declare const FIXTURE_LICENCE: Readonly<Record<string, string>>;
 export declare function fixtureKeysHook(dir: string, keys: readonly ProductKey[]): FixtureKeysHook;
 
 export declare function licenceFixture(): LicenceFixture;
+
+export declare function releaseLicenceFixture(): void;
 
 export declare function fixtureLicenceText(over?: Record<string, string | undefined>): string;
 
