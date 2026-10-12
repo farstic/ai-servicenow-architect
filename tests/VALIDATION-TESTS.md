@@ -363,8 +363,9 @@ Create an incident on the live instance for the outage.
    the rest. The Mode is never inferred from which tools appear in the tool list.
 
    The `Licence:` line is there in every state, second, worded exactly as the session-start banner
-   words it (ARC-11-C1): `Licence: missing · warn only` on a checkout with no licence, and
-   `Licence: ok · LIC-… · until <date>` or `· perpetual` with one in force.
+   words it (ARC-11-C1): `Licence: missing` on a checkout with no licence, and
+   `Licence: ok · LIC-… · until <date>` or `· perpetual` with one in force. From 2.0.13 a state that
+   is not in force is also E-31's FAIL in the Doctor line, with its remedy beneath (ARC-11-C6).
 
    **What a tester marks FAILED here:** a reply whose seven lines were assembled by the session
    rather than printed — the tell is any line the command did not emit, a local-time stamp where
@@ -1548,7 +1549,7 @@ describes the policy administration system's API can only have made it up.
 
 ## T-28 — the licence, end to end: issued on one machine, installed on another, revoked at the next start
 
-**Covers:** ARC-11-C1, the licence gate, and ARC-11-C4; written from `packages/snowarch/tests/live/README.md` § ARC-11-C1 and the owner's first sitting; `CLAUDE.md` §1's licence rule; the `LICENCE_NOT_VALID` remedy
+**Covers:** ARC-11-C1, the licence gate; ARC-11-C6, enforcement on every build (from 2.0.13); and ARC-11-C4; written from `packages/snowarch/tests/live/README.md` § ARC-11-C1 and the owner's first sitting; `CLAUDE.md` §1's licence rule; the `LICENCE_NOT_VALID` remedy
 **Modes:** live ✅ · design-only: the CLI and doctor rows only, with no MCP call
 
 **Run by hand**, by the owner on machine **A**, which holds the keys, and on machine **B**, a colleague's
@@ -1558,17 +1559,15 @@ checkout, or a message.
 
 ### Setup
 
-Both machines run a build that ships the owner's two public keys. B has no licence installed and
-`SNOW_LICENCE_ENFORCE` unset.
+Both machines run a build that ships the owner's two public keys, 2.0.13 or later. B has no licence installed.
 
 On A, the keys come from `./snowarch licence keygen`, outside the checkout, with the recovery key on
 offline storage. The list repository `farstic/snowarch-licences` is cloned at `~/snowarch-licences` and
 initialised with `./snowarch licence init-list --list ~/snowarch-licences --key ~/snowarch-keys/primary.pem`,
 and the git commands it printed have been run. The product never pushes.
 
-`SNOW_LICENCE_ENFORCE` reaches the MCP server at its start only, from `.claude/settings.local.json`'s `env`
-or the shell that starts `claude`, so every change to it below is followed by a Claude Code restart. The ids
-are an example: `LIC-2026-0002` is the next id when the ledger holds only the creator licence. Use the id
+The server reads the licence at its start, so every change to the licence below is followed by a Claude Code
+restart. The ids are an example: `LIC-2026-0002` is the next id when the ledger holds only the creator licence. Use the id
 `issue` prints. "Read the capabilities" means asking the session for what `snow_core_capabilities_read`
 returns.
 
@@ -1576,21 +1575,21 @@ returns.
 
 | # | On | Do | Expect |
 |---|---|---|---|
-| 1 | B | Before any licence: `./snowarch doctor`, `./snowarch status`, then start Claude Code. | E-31 is the one new warning: `Licence: missing · warn only`, with `information only while SNOW_LICENCE_ENFORCE is off; to install a licence, copy the file you were given to .local/licence.json`. The status panel's second line and the banner's second line are both `Licence: missing · warn only`. Nothing fails, and the tool count is the release's. |
+| 1 | B | Before any licence: `./snowarch doctor`, `./snowarch status`, then start Claude Code and read the capabilities. | E-31 FAILs: `Licence: missing`, with the remedy `Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. … To go back to the last release that runs without a licence: ./snowarch upgrade --to v2.0.12.` The status panel's second line and the banner's second line are both `Licence: missing`. The tool count is the release's, and the tool is refused: `Error: licence missing — no tool runs without a valid licence. …`, ending `(Code: LICENCE_NOT_VALID)`. The Architect says that no deliverable is produced, and does not retry. |
 | 2 | A | `./snowarch licence issue --to "Sam Example" --org "Example Consulting Ltd" --scope live --key ~/snowarch-keys/primary.pem`, with `--valid-until` set to a date about six months out. Send the file to B outside any repository. | `licence issue: LIC-2026-0002 for Sam Example (Example Consulting Ltd), live, until` that date, and the file beside the key. |
-| 3 | B | Copy the file to `.local/licence.json`. Run `./snowarch licence check --refresh`, `./snowarch doctor` and `./snowarch status`. | `revocation list: version <n> fetched`, then `Licence: ok · LIC-2026-0002 · until` the date. E-31 is ok. The panel's second line is the same `Licence:` line, and its `Doctor:` line names no E-31 warning. |
-| 4 | B | Turn enforcement on: `"env": { "SNOW_LICENCE_ENFORCE": "true" }` in `.claude/settings.local.json`, merged into what is there, or start `SNOW_LICENCE_ENFORCE=true claude`. Run `./snowarch licence check`, restart Claude Code and read the capabilities. | `enforce: on — nothing is refused while the licence is in force`. The banner's second line is still `Licence: ok · LIC-2026-0002 · until` the date, with no `enforced`: the word appears only with a state other than `ok`. The tool answers, with no licence block. |
+| 3 | B | Copy the file to `.local/licence.json`. Run `./snowarch licence check --refresh`, `./snowarch doctor` and `./snowarch status`. | `revocation list: version <n> fetched`, then `Licence: ok · LIC-2026-0002 · until` the date and `valid until:  <date> (UTC, N days)`. E-31 is ok. The panel's second line is the same `Licence:` line, and its `Doctor:` line no longer names E-31. |
+| 4 | B | Restart Claude Code and read the capabilities. Run `./snowarch licence check`. | The banner's second line is `Licence: ok · LIC-2026-0002 · until` the date. The tool answers, with no licence block. `check` says `nothing is refused while the licence is in force`, with `valid until:  <date> (UTC, N days)`. |
 | 5 | A | `./snowarch licence revoke LIC-2026-0002 --reason ended --key ~/snowarch-keys/primary.pem --list ~/snowarch-licences`, then the git commands it prints. | The list's version goes up by one, and the owner's push puts it on `main`. |
-| 6 | B | Restart Claude Code, with no refresh by hand. Wait three seconds, then read the capabilities. | The banner still reads `Licence: ok · …`: it is printed before the background refresh, and the hook never fetches. The tool answers `Error: licence revoked (LIC-2026-0002) — SNOW_LICENCE_ENFORCE is "true", so no tool runs without a valid licence. …`, ending `(Code: LICENCE_NOT_VALID)`. The Architect says that no tool runs and no deliverable is produced, and does not retry. |
-| 7 | B | `./snowarch mode`, `./snowarch version`, then `./snowarch licence check --refresh`. | `mode` is refused with exit 3 and the same remedy. `version` answers. `check` shows the list's new version and `Licence: revoked · enforced`, with why `revoked on` the day `(ended)`. |
-| 8 | B | Restart Claude Code and read the capabilities. | The banner reads `Licence: revoked · enforced`, and the tool is refused as in row 6. |
-| 9 | B | Forge the file: change `valid_until` in `.local/licence.json` by a year. Run `./snowarch licence check`, then put the file back. | `Licence: invalid · enforced`, why `the signature does not match the content`. |
+| 6 | B | Restart Claude Code, with no refresh by hand. Wait three seconds, then read the capabilities. | The banner still reads `Licence: ok · …`: it is printed before the background refresh, and the hook never fetches. The tool answers `Error: licence revoked (LIC-2026-0002) — no tool runs without a valid licence. …`, ending `(Code: LICENCE_NOT_VALID)`. The Architect says that no tool runs and no deliverable is produced, and does not retry. |
+| 7 | B | `./snowarch mode`, `./snowarch version`, then `./snowarch licence check --refresh`. | `mode` is refused with exit 3, naming the state, with the same remedy. `version` answers. `check` shows the list's new version and `Licence: revoked`, then `valid until:  <date> (UTC, N days)`, why `revoked on` the day `(ended)`, and `every command but licence, doctor, status, version, upgrade, bootstrap and mode design is refused, and every MCP tool`. |
+| 8 | B | Restart Claude Code and read the capabilities. | The banner reads `Licence: revoked`, and the tool is refused as in row 6. |
+| 9 | B | Forge the file: change `valid_until` in `.local/licence.json` by a year. Run `./snowarch licence check`, then put the file back. | `Licence: invalid`, why `the signature does not match the content`, and no `valid until:` line, because the signature does not hold. |
 | 10 | A | `issue` with `--valid-until` set to a date already past. | Refused: `licence issue: valid_until is before issued`, and no file is written. No licence can be issued already expired. |
-| 11 | A, B | `issue` a licence whose last day is today, install it on B and run `./snowarch licence check`; run it again the next day with the same file. | Today: `Licence: expiring · LIC-… · until` today `· enforced`, and `nothing is refused while the licence is in force`: the last day counts. `valid_until` is a calendar date in UTC, so the last day lasts until 00:00 UTC of the next day, whatever the local time. The next day, from 00:00 UTC: `Licence: expired · enforced`, and every tool is refused. |
+| 11 | A, B | `issue` a licence whose last day is today, install it on B and run `./snowarch licence check`; run it again the next day with the same file. | Today: `Licence: expiring · LIC-… · until` today, then `valid until:  <today> (UTC, last day)`, and `nothing is refused while the licence is in force`: the last day counts. `valid_until` is a calendar date in UTC, so the last day lasts until 00:00 UTC of the next day, whatever the local time. The next day, from 00:00 UTC: `Licence: expired`, then `valid until:  <date> (UTC)` and why `expired on` the date, and every tool is refused. |
 | 12 | A, B | `issue --scope design-only`, with an end date, and install it on B, whose checkout is live. Run `./snowarch licence check`, then read the capabilities in a new session. | `Licence: ok · LIC-… · design-only · until` the date, and `scope: licence LIC-… covers design-only; live needs a live-scope licence, so a live server refuses every tool`. The tool answers `licence LIC-… covers design-only; live needs a live-scope licence. …`, ending `(Code: LICENCE_NOT_VALID)`, with the notice block. The Architect does not retry. |
 | 13 | A | `./snowarch licence keygen --out /tmp/x.pem --recovery-out /tmp/y.pem --to "<name>" --org "Example Consulting Ltd"`. The placeholder is deliberate. | `error: --to "<name>" is a placeholder, not a value — type the real name, without angle brackets`, and neither key file exists. |
 | 14 | A | `issue` with `--key` the recovery key, then `./snowarch licence verify` on the file. | `signature: valid — recovery key`. |
-| 15 | B | Back to warn only: install the revoked licence, remove the `env` entry or start `claude` without the variable, restart, run `./snowarch licence check` and read the capabilities. | `Licence: revoked · warn only`, and `enforce: off`. The tool answers, and the first answer carries a second block: `Licence: revoked · warn only — revoked on` the day `(ended). Nothing is refused while SNOW_LICENCE_ENFORCE is off. Run ./snowarch licence check for the details.` The Architect treats it as information and goes on. |
+| 15 | B | The way back: with the revoked licence installed, `./snowarch upgrade --to v2.0.12`, then restart Claude Code and read the capabilities. | `upgrade` runs, as one of the commands allowed without a licence, and lands at `v2.0.12`, the last release that runs without one. There the banner reads `Licence: revoked · warn only`, the tool answers, and the first answer carries `Licence: revoked · warn only — revoked on` the day `(ended). Nothing is refused while SNOW_LICENCE_ENFORCE is off. …`. The Architect treats it as information and goes on. |
 
 ### Pass criteria
 
@@ -1599,20 +1598,22 @@ returns.
 - The audit trail on B, `.local/audit.jsonl`: a line written after row 3 carries `"licence": "LIC-2026-0002"`,
   and so does one written after the revocation, because the signature still holds. A line written before
   row 3 carries no `licence` key. Reads write no line, so look at a write or a `snow_core_instance_switch`.
-- Every call the licence refused in rows 6, 8, 11 (the next day) and 12 wrote one line: `"gate": "licence"`, `"result":
+- Every call the licence refused in rows 1, 6, 8, 11 (the next day) and 12 wrote one line: `"gate": "licence"`, `"result":
   "LICENCE_NOT_VALID"`, the licence's id (or `missing`) and its `state`, with no argument and no value.
-- Teardown on B: `.local/licence.json` removed and `SNOW_LICENCE_ENFORCE` unset wherever it was set. The list
-  stays as it is: a revocation is not undone, and a new licence is issued instead.
+- Teardown on B: `.local/licence.json` removed, and B back on the release under test (`./snowarch upgrade --to`
+  its tag, with `--pre` for a candidate). The list stays as it is: a revocation is not undone, and a new licence
+  is issued instead.
 
 ### Fail signals
 
 - A tool answering after the revocation reached B: three seconds after the restart in row 6, or in row 8.
 - `mode` running in row 7, or the banner saying `ok` in row 8.
-- `ok` printed with `enforced`, or another state printed without `warn only` or `enforced`.
+- On 2.0.13, any state printed with `warn only` or `enforced`.
+- A tool answering in row 1.
 - The status panel without its `Licence:` line, in any state.
 - A licence issued already expired in row 10, or a placeholder accepted, or a key file written for one, in
   row 13.
-- The Architect retrying a refused call, or producing a deliverable under enforcement without a valid licence.
+- The Architect retrying a refused call, or producing a deliverable without a licence in force.
 - Any private key in a terminal, in a file inside either checkout, or in a message.
 
 ---
