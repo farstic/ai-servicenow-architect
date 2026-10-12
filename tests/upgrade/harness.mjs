@@ -30,6 +30,7 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { writeHead, writeMarker } from '../../scripts/lib/release/writers.mjs';
 import { AREAS, buildUpstream } from '../helpers/docs-fixture.mjs';
@@ -373,10 +374,14 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // fixture builder, so what B02 does here is what B02 does everywhere.
   const upstream = phase('corpus-upstream', marks, () => buildUpstream(join(scratch, 'corpus')));
   const config = JSON.parse(readFileSync(join(work, 'engine.config.json'), 'utf8'));
+  // No revocation list (ARC-11-C6): the cases start the CLI licensed, and a licensed `upgrade` refreshes the
+  // list, so a configured one would be a fetch from the network on every case. Unconfigured, the refresh
+  // fetches and prints nothing; the refresh itself is `licence-fetch`'s, against a local list repository.
   writeFileSync(join(work, 'engine.config.json'), `${JSON.stringify({
     ...config,
     docs: { ...config.docs, upstream: pathToFileURL(upstream.bare).href, pin: upstream.pin,
       family: 'australia' },
+    licence: {},
   }, null, 2)}\n`);
   writeFileSync(join(work, 'vendor/docs-areas.txt'), `${AREAS.join('\n')}\n`);
   // The corpus REGISTERED, exactly as a cloned engine checkout carries it: a `.gitmodules` entry
@@ -523,7 +528,7 @@ export function bootstrapUser(user, { store = true } = {}) {
   const r = spawnSync(process.execPath,
     [join(user, 'tools/snowarch/bin/snowarch.mjs'), 'bootstrap',
       '--mode', 'design', '--yes', '--skip-claude-check', '--docs', 'sparse'],
-    { cwd: user, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: user } });
+    { cwd: user, encoding: 'utf8', env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user }) });
   if (r.status !== 0) {
     throw new Error(`the fixture bootstrap exited ${r.status ?? r.signal ?? 'abnormally'}:\n`
       + `${r.stdout ?? ''}${r.stderr ?? ''}`);
@@ -572,7 +577,7 @@ export function snowarch(user, args, { env = {}, input = '', bin = null } = {}) 
   const r = spawnSync(process.execPath,
     [join(user, 'tools/snowarch/bin/snowarch.mjs'), ...args], {
       cwd: user, encoding: 'utf8', input,
-      env: { ...process.env, CLAUDE_PROJECT_DIR: user, ...path, ...env },
+      env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user, ...path, ...env }),
     });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '',
     text: `${r.stdout ?? ''}${r.stderr ?? ''}` };
