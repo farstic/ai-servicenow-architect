@@ -18,6 +18,13 @@ import { defineCheck } from '../registry.mjs';
 import { cliOf } from '../spell.mjs';
 import { ok, warn } from './result.mjs';
 
+/**
+ * ARC-11-C6 (ruling R1) — what a step or a check that cannot run without a licence says instead of running. B06 and
+ * B08 skip with it, and the server checks that call a tool will report it (step 5). They are E-31's words, so
+ * every one points at the check that names the state and its remedy, and none keeps a copy.
+ */
+export const NO_LICENCE_IN_FORCE = 'no licence in force (see E-31)';
+
 export function licenceChecks() {
   return [
     defineCheck({

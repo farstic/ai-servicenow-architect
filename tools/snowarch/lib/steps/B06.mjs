@@ -21,6 +21,8 @@ import { childEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
 import { spellings } from '../text.mjs';
+import { packageCliRefused, REMEDY } from '../licence/state.mjs';
+import { NO_LICENCE_IN_FORCE } from '../doctor/checks/licence.mjs';
 
 export const id = 'B06';
 export const title = 'instance';
@@ -48,8 +50,16 @@ export const needsNode = true;
 const SPELL = spellings();
 
 
-export const runsWhen = (ctx) => ctx.mode === 'live' || storeExists(ctx.root);
-export const skipReason = 'design-only';
+const applies = (ctx) => ctx.mode === 'live' || storeExists(ctx.root);
+/**
+ * ARC-11-C6 (ruling R1) — and a licence in force. This step starts the package CLI's `store migrate` and its
+ * `instance add`, which that CLI refuses without one, by the gate ./snowarch uses. Asked here, so the runner records
+ * the step skipped, and the first bootstrap after a licence is installed runs it.
+ */
+const unlicensed = (ctx) => applies(ctx) && packageCliRefused(ctx);
+export const runsWhen = (ctx) => applies(ctx) && !unlicensed(ctx);
+export const skipReason = (ctx) => (unlicensed(ctx) ? NO_LICENCE_IN_FORCE : 'design-only');
+export const skipNote = (spell, ctx) => (unlicensed(ctx) ? REMEDY(spell.cli) : null);
 
 export const MIGRATION_FAILED =
   `the store migration did not complete — run ${SPELL.cli} store migrate to see why; `

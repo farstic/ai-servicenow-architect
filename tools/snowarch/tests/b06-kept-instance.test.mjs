@@ -51,7 +51,8 @@ async function runB06(t, { label = 'pdi' } = {}) {
   state.mode = 'live';
   const result = await runSteps({
     root,
-    ctx: { root, mode: 'live', docs: 'sparse', env: {}, yes: true,
+    // ARC-11-C6 — a licence in force: these cases are about the kept instance, and B06 skips without one (ruling R1).
+    ctx: { root, mode: 'live', docs: 'sparse', env: {}, yes: true, licence: { state: 'ok' },
       node: { present: true, version: '22.11.0', major: 22 } },
     state,
     steps: [stepById('B06')],

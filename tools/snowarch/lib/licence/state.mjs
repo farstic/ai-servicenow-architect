@@ -34,8 +34,10 @@ export { bannerLine } from './line.mjs';
  * its own objects and that nothing else defines them. The build imports nothing, so the engine still loads before
  * any install has run.
  */
-export { allowedCommand, CLI_ALLOWED, CLI_ALLOWED_FORMS, REFUSED, refusesCommand }
+import { allowedCommand, CLI_ALLOWED, CLI_ALLOWED_FORMS, REFUSED, refusesCommand }
   from '../../../../packages/snowarch/dist/licence/gate.js';
+
+export { allowedCommand, CLI_ALLOWED, CLI_ALLOWED_FORMS, REFUSED, refusesCommand };
 
 /**
  * A list checked longer ago than this is STALE: `licence show` and `licence check` say so. A live server
@@ -102,6 +104,17 @@ export function licenceStatus(root, { keys = PRODUCT_KEYS, now = new Date() } = 
   const list = heldList(cache, keys);
   const status = checkLicence(readLicenceText(root), { keys, list, now });
   return { ...status, enforced: true, list: list ? { version: list.version, checkedAt: cache.checkedAt } : null };
+}
+
+/**
+ * ARC-11-C6 (ruling R1) — would the package CLI refuse `instance` and `store` in this run? B06 and B08 start it, so
+ * they ask first, through the gate both doors use, and skip instead of meeting the refusal. The licence is the one
+ * the run read (`stepContext`), or this root's for a caller that has none; with neither, nothing is refused here and
+ * the package CLI's own door still holds.
+ */
+export function packageCliRefused({ licence, root } = {}) {
+  const s = licence ?? (root ? licenceStatus(root) : null);
+  return s !== null && refusesCommand('instance', s);
 }
 
 /** What a refused command prints: the state, why it was refused, and the remedy. */

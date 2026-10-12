@@ -190,9 +190,11 @@ test('the live subset is B06\'s until ARC-07 lands: --instance-file is the only 
   // ARC-09-S06 added the second clause: a design-only checkout that CARRIES a store runs B06 too,
   // because a schema change has to reach that file in either mode. Without a root there is no
   // store to find, and asking must not throw — `mode` alone is a ctx a caller really passes.
+  // ARC-11-C6 — with a licence in force: B06 skips without one (ruling R1), and this case is about the store clause.
   const root = makeCheckout();
-  assert.equal(b06.runsWhen({ mode: 'design-only', root }), false, 'no store yet');
+  const licence = { state: 'ok' };
+  assert.equal(b06.runsWhen({ mode: 'design-only', root, licence }), false, 'no store yet');
   mkdirSync(join(root, '.local'), { recursive: true });
   writeFileSync(join(root, '.local', 'instances.json'), '{"version":1,"instances":{}}\n');
-  assert.equal(b06.runsWhen({ mode: 'design-only', root }), true, 'a store is there');
+  assert.equal(b06.runsWhen({ mode: 'design-only', root, licence }), true, 'a store is there');
 });
