@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { buildTagMessage } from '../scripts/lib/release/tag.mjs';
 import { describe as gitDescribe, isShallow, resetGitBinary } from '../tools/snowarch/lib/git.mjs';
 import { renderVersion, versionInfo } from '../tools/snowarch/lib/version-info.mjs';
+import { licensedEnv } from '../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
 
@@ -239,7 +240,7 @@ test('a pin that disagrees with the artefact is REPORTED, and the exit stays 0',
   // a mismatch can actually be made.
   const r = execFileSync(process.execPath,
     [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'version'],
-    { cwd: REAL_ROOT, encoding: 'utf8', stdio: 'pipe' });
+    { cwd: REAL_ROOT, encoding: 'utf8', stdio: 'pipe', env: licensedEnv(process.env) });
   assert.match(r, /^contract: /m);
 });
 
@@ -263,14 +264,15 @@ test('a moved corpus gitlink is reported against engine.config.json', (t) => {
 
 test('AC 4a — the doctor\'s engine header is this command\'s answer, not a second reading', () => {
   const bin = join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs');
+  const env = licensedEnv(process.env);
   const version = JSON.parse(execFileSync(process.execPath, [bin, 'version', '--json'],
-    { cwd: REAL_ROOT, encoding: 'utf8', stdio: 'pipe', maxBuffer: 1 << 24 }));
+    { cwd: REAL_ROOT, encoding: 'utf8', stdio: 'pipe', maxBuffer: 1 << 24, env }));
   // The doctor exits 1 when any check FAILS, which is a legitimate state for a working checkout
   // and is not what this test is about — the header is. Its stdout is the report either way.
   let out;
   try {
     out = execFileSync(process.execPath, [bin, 'doctor', '--json', '--quick', '--no-cache'],
-      { cwd: REAL_ROOT, encoding: 'utf8', stdio: 'pipe', maxBuffer: 1 << 24 });
+      { cwd: REAL_ROOT, encoding: 'utf8', stdio: 'pipe', maxBuffer: 1 << 24, env });
   } catch (e) {
     out = String(e.stdout ?? '');
     assert.ok(out.trimStart().startsWith('{'), `the doctor printed no report:\n${e.stderr}`);
@@ -349,7 +351,7 @@ test('AC 5 — there is no network code, and a listener that nobody calls proves
         cwd: REAL_ROOT,
         encoding: 'utf8',
         stdio: 'pipe',
-        env: { ...process.env, HTTPS_PROXY: proxy, HTTP_PROXY: proxy, ALL_PROXY: proxy },
+        env: licensedEnv({ ...process.env, HTTPS_PROXY: proxy, HTTP_PROXY: proxy, ALL_PROXY: proxy }),
       });
     assert.match(out, /^snowarch /);
     assert.deepEqual(connections, [],

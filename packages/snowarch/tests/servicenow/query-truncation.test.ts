@@ -5,9 +5,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { respond, resetFetchMock, snFetchMockModule, type SnFetchState } from '../helpers/fetch-mock.js';
+import { useLicensedSession } from '../helpers/licensed-session.js';
 
 const http = vi.hoisted<SnFetchState>(() => ({ calls: [], queue: [] }));
 vi.mock('../../src/servicenow/http.js', async () => snFetchMockModule(http));
+
+// ARC-11-C6 — every case here goes through the router, which refuses every tool with no licence in force.
+useLicensedSession();
 
 /**
  * ARC-09-C125 — a query read says whether it was cut.

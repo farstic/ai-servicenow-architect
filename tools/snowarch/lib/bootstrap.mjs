@@ -17,6 +17,7 @@ import { DOCS, buildPlan, runPlanScreen } from './plan.mjs';
 import { LAST, STEPS, interrupt, runSteps, stepById } from './steps/index.mjs';
 import { RESET_MESSAGE, StateError, emptyState, loadState, resetState, saveState } from './state.mjs';
 import { needSpell, spellings } from './launcher-spelling.mjs';
+import { licenceStatus } from './licence/state.mjs';
 
 /**
  * ARC-07-C31 slice 4 — a function of the reader's shell, the shape every other usage now has.
@@ -97,7 +98,7 @@ const stdinAsker = (input, output) => lineReader(input, output);
  * server's ten, where there was no context to add one to.
  */
 export function stepContext({ root, config, env = process.env, platform = process.platform,
-  node, flags = {}, state = null }) {
+  node, flags = {}, state = null, licence = licenceStatus(root) }) {
   return {
     root,
     config,
@@ -111,6 +112,8 @@ export function stepContext({ root, config, env = process.env, platform = proces
     // upgrade typed at a terminal — which inherits stdio — started the wizard over an instance
     // the run had been told to keep, with `--yes` invisible to the decision.
     yes: Boolean(flags.yes),
+    // ARC-11-C6 (ruling R1) — read once for the run: B06 and B08 ask the gate with it before they start the package CLI.
+    licence,
     state: state ?? emptyState({ engineVersion: version(root), node }),
   };
 }

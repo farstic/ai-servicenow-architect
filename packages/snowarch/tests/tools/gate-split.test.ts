@@ -6,6 +6,10 @@ import { runWithInstance, FLAG_NAMES, type Flags, type InstanceRuntime } from '.
 import { expandPreset } from '../../src/utils/permissions.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
 import { cliSpelling } from '../../src/cli/tty.js';
+import { useLicensedSession } from '../helpers/licensed-session.js';
+
+// ARC-11-C6: this file calls the router in its own process, so it runs in a licensed session.
+useLicensedSession();
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.

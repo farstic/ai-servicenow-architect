@@ -21,6 +21,7 @@ import {
   SERVER_CHECK_IDS, serverChecks,
 } from '../../tools/snowarch/lib/doctor/checks/server.mjs';
 import { serverBlock } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
+import { NO_LICENCE_IN_FORCE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 import { renderText, sectionNote } from '../../tools/snowarch/lib/doctor/report-text.mjs';
 import { contextFor, greenTree, REAL_ROOT, runById } from './helpers/tree.mjs';
 
@@ -146,6 +147,32 @@ test('an adopted result keeps every field a reader acts on', async (t) => {
   assert.equal(r.fixable, true);
   assert.deepEqual(r.data.fix, { kind: 'flags-incomplete' });
   assert.equal(r.data.adopted, true);
+});
+
+test('ARC-11-C6 — with no licence in force, the server check that calls a tool skips with E-31\'s reason', async (t) => {
+  // SV-06 compares the capabilities a `tools/call` returns, and the server refuses every tool with no licence in
+  // force. Its own words then point at SV-05, which passes: E-31 is the one cause, and this says so.
+  const root = greenTree(t);
+  for (const state of ['missing', 'invalid', 'expired', 'revoked']) {
+    const ctx = withModule(root, async () => report({ checks: [
+      { id: 'SV-05', title: 'stdio handshake', status: 'ok', detail: 'unconfigured: 5 core tools advertised' },
+      { id: 'SV-06', title: 'capabilities match the store', status: 'skip',
+        detail: 'the handshake did not return capabilities (SV-05 says why)' },
+    ] }), { licence: { state } });
+    const six = await adopt(ctx, 'SV-06');
+    assert.deepEqual([six.status, six.detail], ['skip', NO_LICENCE_IN_FORCE], `licence ${state}`);
+    // SV-05 lists the tools and calls none, so it is adopted as the server said.
+    assert.deepEqual([(await adopt(ctx, 'SV-05')).status], ['ok'], `licence ${state}`);
+  }
+});
+
+test('ARC-11-C6 — with a licence in force, SV-06 is adopted as the server said', async (t) => {
+  const root = greenTree(t);
+  for (const state of ['ok', 'expiring']) {
+    const ctx = withModule(root, async () => report(), { licence: { state } });
+    const r = await adopt(ctx, 'SV-06');
+    assert.deepEqual([r.status, r.detail], ['ok', 'SV-06 answered'], `licence ${state}`);
+  }
 });
 
 test('an id the server did not report is a skip naming the skew, never a pass', async (t) => {

@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
@@ -32,7 +33,7 @@ function runServer(cwd: string, env: Record<string, string | undefined>): { stdo
     setTimeout(() => process.exit(0), 1500);
   `], {
     cwd,
-    env: { ...process.env, ...env, SNOW_LOG_LEVEL: 'debug' } as NodeJS.ProcessEnv,
+    env: licensedEnv({ ...process.env, ...env, SNOW_LOG_LEVEL: 'debug' }),
     encoding: 'utf8',
     timeout: 30_000,
   });

@@ -20,6 +20,7 @@ import { collectPrereqs, guessShell, SHELLS } from '../../tools/snowarch/lib/doc
 import { doctorCommand, findRoot, notAtRoot } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { useStateRoot } from '../../tools/snowarch/tests/helpers/state-root.mjs';
+import { licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 /*
  * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
  *
@@ -64,7 +65,7 @@ const check = (over = {}) => defineCheck({
 });
 
 const run = (args, cwd = root, env = {}) => spawnSync(process.execPath, [CLI, 'doctor', ...args],
-  { encoding: 'utf8', cwd, env: { ...process.env, ...env } });
+  { encoding: 'utf8', cwd, env: licensedEnv({ ...process.env, ...env }) });
 
 // S02 filled the registry, so the empty case is now asked of the COMMAND with an empty one passed
 // in rather than of the CLI: "a run that reports zero checks and exits 0" is a statement about the

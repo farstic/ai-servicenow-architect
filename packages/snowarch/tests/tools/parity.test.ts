@@ -5,6 +5,10 @@ import { readFileSync } from 'fs';
 import { collectToolCatalog, routeToolInvocation, ROLE_BUNDLE_MAP } from '../../src/tools/index.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
 import { EXPECTED_TOOL_COUNT } from '../helpers/contract.js';
+import { useLicensedSession } from '../helpers/licensed-session.js';
+
+// ARC-11-C6: this file calls the router in its own process, so it runs in a licensed session.
+useLicensedSession();
 
 // One number, in `tests/helpers/contract.ts`, because three places now read it: this suite, the
 // contract suite, and the extractor's comment. Its history and why it is 397 are stated there.

@@ -11,7 +11,7 @@
     "section": null
   },
   "mode": "live",
-  "modeLine": "Mode: live — instance=pdi (pdi) preset=custom — doctor 2026-09-20 15 ok",
+  "modeLine": "Mode: live — instance=pdi (pdi) preset=custom — doctor 2026-09-20 1 FAIL",
   "modeLineDetailed": "Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)",
   "engine": {
     "version": "9.9.9",
@@ -291,10 +291,10 @@
       "id": "E-31",
       "section": "repo",
       "title": "the licence for this checkout",
-      "status": "warn",
-      "severity": "warn",
-      "detail": "Licence: missing · warn only",
-      "remedy": "information only while SNOW_LICENCE_ENFORCE is off; to install a licence, copy the file you were given to .local/licence.json",
+      "status": "fail",
+      "severity": "fail",
+      "detail": "Licence: missing",
+      "remedy": "Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards. To go back to the last release that runs without a licence: ./snowarch upgrade --to v2.0.12.",
       "command": "./snowarch licence check",
       "code": null,
       "fixable": false,
@@ -306,7 +306,7 @@
         "scope": null,
         "validUntil": null,
         "perpetual": false,
-        "enforced": false,
+        "enforced": true,
         "listVersion": null
       }
     },
@@ -744,8 +744,8 @@
   },
   "summary": {
     "ok": 15,
-    "warn": 1,
-    "fail": 0,
+    "warn": 0,
+    "fail": 1,
     "skip": 26,
     "fixable": 0,
     "notInSection": 0,

@@ -109,13 +109,16 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
     const recorded = state.steps[step.id] ?? null;
 
     if (!runs(step, ctx)) {
-      const detail = step.skipReason ?? 'not applicable';
+      // ARC-11-C6 (ruling R1) — a reason may depend on the run, as B06's and B08's do: design-only, or no licence in
+      // force. A string still works.
+      const reason = typeof step.skipReason === 'function' ? step.skipReason(ctx) : step.skipReason;
+      const detail = reason ?? 'not applicable';
       // ARC-07-C31 slice 4 — a skip note is a FUNCTION of the shell now, because the one that exists
       // names a launcher. A step that supplies a plain string still works; one that supplies a
       // function is called with the run's own spelling.
       const raw = step.skipNote ?? null;
       const note = typeof raw === 'function'
-        ? raw(spellings({ platform: ctx.platform, env: ctx.env }))
+        ? raw(spellings({ platform: ctx.platform, env: ctx.env }), ctx)
         : raw;
       state.steps[step.id] = { status: 'skipped', inputsHash: null, detail,
         finishedAt: now().toISOString(), durationMs: 0 };

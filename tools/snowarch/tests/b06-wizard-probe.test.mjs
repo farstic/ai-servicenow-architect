@@ -43,6 +43,7 @@ function fixture(body, t) {
 }
 
 /** EXACTLY what the runner hands a step (`lib/steps/index.mjs`): async spawn, ChildProcess back. */
+// unlicensed start: the runner's seam; every CLI it starts in this file is a fixture script the test wrote
 const runnerSpawn = (cmd, args, opts) => nodeSpawn(cmd, args, opts);
 
 test('ARC-06-C6 — the probe answers OK through the RUNNER\'s real spawn, not only through spawnSync', async (t) => {

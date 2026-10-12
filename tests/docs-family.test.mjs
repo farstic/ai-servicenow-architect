@@ -13,6 +13,7 @@ import {
 import { AREAS, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
 import { tempDir, trackTempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { licensedEnv } from '../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
@@ -215,7 +216,7 @@ const runCli = (ws, args) => {
   try {
     const stdout = execFileSync(process.execPath,
       [join(ws, 'tools/snowarch/bin/snowarch.mjs'), ...args],
-      { cwd: ws, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      { cwd: ws, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: licensedEnv(process.env) });
     return { code: 0, stdout, stderr: '' };
   } catch (e) {
     return { code: e.status ?? 1, stdout: String(e.stdout ?? ''), stderr: String(e.stderr ?? '') };

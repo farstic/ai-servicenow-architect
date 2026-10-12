@@ -103,8 +103,8 @@ test('Windows differs from the POSIX platforms only in the documented rows', () 
 
 test('the snapshots are design-only, and fail only where the runner explains it', () => {
   // A snapshot of a broken install makes the broken install the standard, so what may fail here is
-  // closed: exactly the checks a hosted runner is expected to fail, and nothing else. E-00 is the
-  // list — a runner has no Claude Code — and the snapshots were taken on runners, which is also
+  // closed: exactly the checks a hosted runner is expected to fail, and nothing else. E-00 and E-31 are the
+  // list — a runner has no Claude Code and no licence — and the snapshots were taken on runners, which is also
   // why they are the honest record of what the platforms answer rather than of what I expected.
   for (const platform of present) {
     const s = load(platform);
@@ -114,12 +114,11 @@ test('the snapshots are design-only, and fail only where the runner explains it'
     assert.deepEqual(failing, [...EXPECTED_FAIL_ON_RUNNERS],
       `${platform}: the snapshot records failures the runner does not explain`);
     assert.equal(s.summary.fail, EXPECTED_FAIL_ON_RUNNERS.length);
-    // ARC-11-C1 — with ONE exception: E-31 warns on every install that has no licence, which is every
-    // runner. It is the only warning the owner's first requirement allows ("everything keeps working
-    // exactly as now", apart from one warning), and the only one a design-only install may carry.
-    assert.deepEqual(s.checks.filter((c) => c.status === 'warn').map((c) => c.id), ['E-31'],
-      `${platform}: a WARN in the snapshot — a design-only install should have nothing else to warn about`);
-    assert.equal(s.summary.warn, 1);
+    // ARC-11-C1 allowed one warning, E-31's, while a missing licence was information. From ARC-11-C6 step 5 it is a
+    // FAIL the runner explains (EXPECTED_FAIL_ON_RUNNERS), so a design-only install carries no warning at all.
+    assert.deepEqual(s.checks.filter((c) => c.status === 'warn').map((c) => c.id), [],
+      `${platform}: a WARN in the snapshot — a design-only install should have nothing to warn about`);
+    assert.equal(s.summary.warn, 0);
   }
 });
 

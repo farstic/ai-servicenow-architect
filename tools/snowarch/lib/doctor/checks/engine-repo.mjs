@@ -630,6 +630,8 @@ export function engineRepoChecks() {
           node: state.node ?? { present: false },
           env: {},
           root: ctx.root,
+          // ARC-11-C6 (ruling R1) — B06 and B08 are planned only with a licence in force; with none here, the root's.
+          licence: ctx.licence,
         });
 
         // THE STEP RUNNING THIS CHECK IS NOT A STEP THAT NEVER RAN.

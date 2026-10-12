@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog } from '../../src/tools/index.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/server.js');
 
@@ -67,7 +68,7 @@ function env(over: Record<string, string> = {}): Record<string, string> {
   const clean = { ...process.env } as Record<string, string>;
   for (const k of ['SNOW_STORE', 'SERVICENOW_INSTANCE_URL', 'SERVICENOW_BASIC_USERNAME',
     'SERVICENOW_BASIC_PASSWORD', 'SNOW_ENV_FILE', 'REDACT_SENSITIVE_DATA']) delete clean[k];
-  return {
+  return licensedEnv({
     ...clean, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: checkout,
     SNOW_AUDIT_FILE: auditFile, SNOW_LOG_LEVEL: 'debug',
     // No retry backoff. The fixture host never resolves, and three retries with a 1 s delay
@@ -76,7 +77,7 @@ function env(over: Record<string, string> = {}): Record<string, string> {
     // them with `||`, under which a configured 0 is falsy and silently became 3 retries with a
     // 1 s base delay — 7 s per call from the exponential backoff alone.
     MAX_RETRIES: '0', RETRY_DELAY_MS: '0', REQUEST_TIMEOUT_MS: '300', ...over,
-  };
+  });
 }
 
 /** A connected client plus everything the server wrote to stderr while it ran. */

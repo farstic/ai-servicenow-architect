@@ -3,8 +3,8 @@
   "mode": "design-only",
   "summary": {
     "ok": 29,
-    "warn": 1,
-    "fail": 1,
+    "warn": 0,
+    "fail": 2,
     "skip": 11,
     "fixable": 0
   },
@@ -76,7 +76,7 @@
     },
     {
       "id": "E-31",
-      "status": "warn",
+      "status": "fail",
       "fixable": false
     },
     {

@@ -14,6 +14,10 @@ import { withPreset } from '../helpers/preset.js';
 import { runWithInstance, type Flags, type InstanceRuntime } from '../../src/servicenow/context.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
+import { useLicensedSession } from '../helpers/licensed-session.js';
+
+// ARC-11-C6: this file calls the router in its own process, so it runs in a licensed session.
+useLicensedSession();
 
 withPreset('pdi-developer');
 

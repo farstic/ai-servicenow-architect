@@ -13,7 +13,7 @@ export declare function initLicence({ root, env, keys, now }?: Options): Checkou
 export declare function currentLicence(): CheckoutStatus;
 /** Test seam: forget the session. Never called by the server. */
 export declare function resetLicenceForTests(): void;
-/** Throws LICENCE_NOT_VALID when enforcement is on and this licence does not cover a live call. */
+/** Throws LICENCE_NOT_VALID when this licence does not cover a live call. */
 export declare function assertLicensed(): void;
 /**
  * The first answer's extra block, once per process — or `null`. Always the SECOND block: a caller that

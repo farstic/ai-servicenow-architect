@@ -66,9 +66,9 @@ test('C87 (a) — a case numbered above T-18 is extracted (the old cap would dro
 
 // ── (b) the session is isolated ─────────────────────────────────────────────────────────────────
 
-test('C87 (b) — the policy: Sonnet 5.5 by default, project settings only, and a tool set that is a set', () => {
+test('C87 (b) — the policy: Sonnet 5.5 by default, the clone\'s own settings, and a tool set that is a set', () => {
   assert.equal(DEFAULT_MODEL, 'claude-sonnet-5-5');
-  assert.equal(SETTING_SOURCES, 'project');
+  assert.equal(SETTING_SOURCES, 'project,local');
   const base = policyFor('T-01');
   assert.deepEqual(base.tools, ['Read', 'Grep', 'Glob', 'Skill']);
   assert.deepEqual(base.allowed, base.tools);
@@ -99,10 +99,25 @@ test('C87 (b) — every claude invocation in the runner carries the policy flags
 
 test('C87 (b) — the header names the sha, model, setting sources and tools', () => {
   const lines = header({ tag: 'v9.0.0', sha: 'abc1234', model: DEFAULT_MODEL, version: '2.1.289 (Claude Code)' }).join('\n');
-  for (const want of ['v9.0.0', 'abc1234', 'claude-sonnet-5-5', 'setting sources: project', 'Read,Grep,Glob,Skill', 'T-07', 'Bash', 'T-13', 'Write', '2.1.289']) {
+  for (const want of ['v9.0.0', 'abc1234', 'claude-sonnet-5-5', 'setting sources: project,local', 'Read,Grep,Glob,Skill', 'T-07', 'Bash', 'T-13', 'Write', '2.1.289']) {
     assert.ok(lines.includes(want), `the header does not say ${want}:\n${lines}`);
   }
   assert.match(lines, /mcp: none/, 'a design-only run reaches no MCP server');
+});
+
+// ARC-11-C6 — the architect's sitting on 199e806 (2026-10-12) ran no SessionStart hook, so its sessions had no
+// Licence line, and T-31 could not fire. The hook is registered in the clone's local settings, where the bootstrap
+// writes it (ARC-06-S05: the committed file stays hook-free), and `project` alone does not load that file.
+test('ARC-11-C6 — the sessions load the settings the SessionStart hook is in, so its Licence line reaches T-31', async () => {
+  const { hookEntry, SETTINGS_LOCAL } = await import('../tools/snowarch/lib/settings-local.mjs');
+  assert.ok(hookEntry().SessionStart, 'the bootstrap registers no SessionStart hook');
+  assert.equal(SETTINGS_LOCAL.split('\\').join('/'), '.claude/settings.local.json');
+  assert.equal(JSON.parse(read('.claude/settings.json')).hooks, undefined, 'the committed settings carry a hook');
+  // So a session loads the local file as well as the project's, and still never the machine's own settings.
+  const sources = SETTING_SOURCES.split(',');
+  assert.ok(sources.includes('local'), `the sessions load ${SETTING_SOURCES}, which leaves the hook's file out`);
+  assert.ok(sources.includes('project'));
+  assert.equal(sources.includes('user'), false, 'the machine\'s own settings reach the session');
 });
 
 // ── (c) the turn report ─────────────────────────────────────────────────────────────────────────

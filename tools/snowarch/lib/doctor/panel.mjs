@@ -130,7 +130,7 @@ export function docsLine(docs, cli) {
 export function licenceLine(checks) {
   const data = (Array.isArray(checks) ? checks : []).find((c) => c?.id === 'E-31')?.data;
   if (!data?.state) return null;
-  return bannerLine(data, { enforced: data.enforced === true });
+  return bannerLine(data);
 }
 
 /** `Roster: 28 skills / 9 agents` */

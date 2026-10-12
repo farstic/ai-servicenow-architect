@@ -6,21 +6,23 @@
  * The CLI's `tools/snowarch/lib/licence/state.mjs` is the other copy, and
  * `tools/snowarch/tests/licence-parity.test.mjs` holds `licenceLine` and `listSource` to the CLI's
  * output on every case. Two files under the project's `.local/`: `licence.json`, copied in by hand,
- * and `revocations.json`, the last list a fetch brought back and when it was checked. Enforcement is
- * on only for the exact string "true", like every flag.
+ * and `revocations.json`, the last list a fetch brought back and when it was checked. Enforcement is on
+ * every build (ARC-11-C6, from 2.0.13), and no variable turns it off.
  */
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { checkLicence, readList, type LicenceStatus, type ProductKey, type VerifiedList } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
 
-export const ENFORCE_VAR = 'SNOW_LICENCE_ENFORCE';
+// The states enforcement refuses, with the commands that run without a licence: one gate for both doors, the
+// engine's and this package's CLI (ARC-11-C6, step 4b).
+export { REFUSED } from './gate.js';
 
-/** The states enforcement refuses. `expiring` is not one: a licence in its last month is in force. */
-export const REFUSED: readonly string[] = Object.freeze(['missing', 'invalid', 'expired', 'revoked']);
-
-export const isEnforced = (env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env): boolean =>
-  env?.[ENFORCE_VAR] === 'true';
+/** The project directory: Claude Code's `CLAUDE_PROJECT_DIR`, else the working directory — as the store's. */
+export const projectRoot = (): string => {
+  const dir = process.env.CLAUDE_PROJECT_DIR;
+  return dir !== undefined && dir !== '' ? dir : process.cwd();
+};
 
 export const licencePath = (root: string): string => join(root, '.local', 'licence.json');
 export const revocationsPath = (root: string): string => join(root, '.local', 'revocations.json');
@@ -68,25 +70,36 @@ export function heldList(cache: ListCache | null, keys: readonly ProductKey[] = 
   return list.ok ? list : null;
 }
 
-export function licenceStatus(root: string, { keys = PRODUCT_KEYS, now = new Date(), env = process.env }:
-  { keys?: readonly ProductKey[]; now?: Date; env?: NodeJS.ProcessEnv | Record<string, string | undefined> } = {}): CheckoutStatus {
+/**
+ * The checkout's licence, judged against the held list. `enforced` is true on every build. `env` is accepted and
+ * read by nothing: no variable turns enforcement off, and `licence/unconditional.test.ts` passes every value to show it.
+ */
+export function licenceStatus(root: string, { keys = PRODUCT_KEYS, now = new Date() }:
+  { keys?: readonly ProductKey[]; now?: Date; env?: unknown } = {}): CheckoutStatus {
   const cache = readListCache(root);
   const list = heldList(cache, keys);
   const status = checkLicence(readLicenceText(root), { keys, list, now });
-  return { ...status, enforced: isEnforced(env), list: list && cache ? { version: list.version, checkedAt: cache.checkedAt } : null };
+  return { ...status, enforced: true, list: list && cache ? { version: list.version, checkedAt: cache.checkedAt } : null };
 }
 
 /** The line: the same words as the CLI's banner (the parity test holds them). */
-export function licenceLine(s: Pick<LicenceStatus, 'state' | 'id' | 'scope' | 'perpetual' | 'validUntil'>,
-  { enforced }: { enforced: boolean }): string {
+export function licenceLine(s: Pick<LicenceStatus, 'state' | 'id' | 'scope' | 'perpetual' | 'validUntil'>): string {
   const parts = [`Licence: ${s.state}`];
   if (s.state === 'ok' || s.state === 'expiring') {
     parts.push(String(s.id));
     if (s.scope === 'design-only') parts.push('design-only');
     parts.push(s.perpetual ? 'perpetual' : `until ${s.validUntil}`);
   }
-  if (s.state !== 'ok') parts.push(enforced ? 'enforced' : 'warn only');
   return parts.join(' · ');
+}
+
+/**
+ * What is left of the term, in the same words as the CLI's `daysLeftPhrase` (the parity test holds them): the day of
+ * `valid_until` counts, until 00:00 UTC of the next, so 0 days left is the last day, named so (ARC-11-C6 step 7).
+ */
+export function daysLeftPhrase(days: number): string {
+  if (days === 0) return 'last day';
+  return days === 1 ? '1 day left' : `${days} days left`;
 }
 
 const OWNER_NAME = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;

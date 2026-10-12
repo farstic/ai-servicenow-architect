@@ -79,8 +79,12 @@ export function normalise(report) {
  * machine as it is now. Recording it as expected is not the same as excusing it: `assert-doctor.mjs`
  * asserts the named ids DO fail, so the day a runner arrives with Claude Code installed this list
  * goes red and someone removes the entry, instead of it covering nothing for a year.
+ *
+ * E-31 asks whether a licence is in force (ARC-11-C6 step 5). CI holds no product key, and these cells assert the
+ * install a user without a licence has, so the honest answer is `fail`, and it proves enforcement where the doctor
+ * runs. The release's evidence doctor is the licensed picture instead, with a fixture licence of its own.
  */
-export const EXPECTED_FAIL_ON_RUNNERS = Object.freeze(['E-00']);
+export const EXPECTED_FAIL_ON_RUNNERS = Object.freeze(['E-00', 'E-31']);
 
 /**
  * The ids whose STATUS is allowed to differ between Windows and the POSIX platforms.

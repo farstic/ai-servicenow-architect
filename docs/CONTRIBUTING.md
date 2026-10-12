@@ -17,7 +17,9 @@ contributor; without it, a pull request cannot be merged.
 ## What a pull request needs
 
 - A branch off `develop`; `main` is never targeted directly.
-- Failing tests first, then the change; the gates green (`npm test`, lint, `docs verify`).
+- Failing tests first, then the change; the gates green: `npm test`, lint and `node scripts/docs.mjs verify`. The
+  script runs the same check as `./snowarch docs verify`, which from 2.0.13 runs only under a licence in force, so a
+  contributor without one uses the script (ARC-11-C6).
 - A plan row or changelog line when the change is user-visible.
 - No pinned model identifiers in agent files; no web tools; no client material (`clients/` is
   gitignored and must stay out).
