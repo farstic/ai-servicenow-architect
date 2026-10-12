@@ -47,8 +47,15 @@ export interface QueryRecordsParams {
     retries?: number;
 }
 export interface QueryRecordsResponse {
+    /** The page's length, not the query's: a list cut at the limit has `count` equal to `limit`. */
     count: number;
     records: ServiceNowRecord[];
+    /** ARC-09-C125: the sysparm_limit sent. */
+    limit?: number;
+    /** ARC-09-C125: the sysparm_offset sent, 0 when none was. */
+    offset?: number;
+    /** ARC-09-C125: X-Total-Count, the records the query matches; null when the instance does not send it. */
+    total?: number | null;
 }
 export interface ServiceNowRecord {
     [key: string]: string | number | boolean | ServiceNowReference | null | undefined;

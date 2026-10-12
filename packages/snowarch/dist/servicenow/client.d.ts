@@ -1,4 +1,11 @@
 import type { CicdResult, ServiceNowConfig, QueryRecordsParams, QueryRecordsResponse, ServiceNowRecord } from './types.js';
+/**
+ * ARC-09-C125 — a query's page size: the instance's `maxRecords`, this when the store sets none, and never more
+ * than `MAX_PAGE`. Exported because `snow_core_records_query`'s description states both, from here, so the
+ * advertised default cannot drift from the one sent again (it said "default: 10" while this sent 100).
+ */
+export declare const DEFAULT_MAX_RECORDS = 100;
+export declare const MAX_PAGE = 1000;
 export declare class ServiceNowClient {
     private baseUrl;
     private authMethod;

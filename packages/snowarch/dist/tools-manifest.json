@@ -1,7 +1,7 @@
 [
   {
     "name": "snow_core_records_query",
-    "description": "Query ServiceNow records with filtering, field selection, pagination, and sorting",
+    "description": "Query ServiceNow records with filtering, field selection, pagination, and sorting. The answer says whether the read was cut: count is this page's length, total the records the query matches (X-Total-Count, null when the instance does not send it), and truncated is true when more remain past this page. With no total, truncated means the page reached the limit, not that the list is proven cut.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -19,7 +19,11 @@
         },
         "limit": {
           "type": "number",
-          "description": "Max records (default: 10, max: 1000)"
+          "description": "Max records (default: the instance's maxRecords, 100 unless the store sets one; max 1000)"
+        },
+        "offset": {
+          "type": "number",
+          "description": "Records to skip before the first one returned (default 0). To read the next page of a truncated answer, repeat the call with offset set to this answer's offset + count, until truncated is false."
         },
         "orderBy": {
           "type": "string",

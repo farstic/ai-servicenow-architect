@@ -5,6 +5,7 @@
  * These are always available (Tier 0).
  */
 import type { ServiceNowClient } from '../servicenow/client.js';
+import { DEFAULT_MAX_RECORDS, MAX_PAGE } from '../servicenow/client.js';
 import type {
   QueryRecordsParams,
   GetRecordParams,
@@ -26,14 +27,18 @@ export function coreToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_core_records_query',
-      description: 'Query ServiceNow records with filtering, field selection, pagination, and sorting',
+      description: 'Query ServiceNow records with filtering, field selection, pagination, and sorting. The answer '
+        + 'says whether the read was cut: count is this page\'s length, total the records the query matches '
+        + '(X-Total-Count, null when the instance does not send it), and truncated is true when more remain past '
+        + 'this page. With no total, truncated means the page reached the limit, not that the list is proven cut.',
       inputSchema: {
         type: 'object',
         properties: {
           table: { type: 'string', description: 'Table name (e.g., "incident", "change_request")' },
           query: { type: 'string', description: 'Encoded query string (e.g., "active=true^priority=1")' },
           fields: { type: 'string', description: 'Comma-separated fields to return' },
-          limit: { type: 'number', description: 'Max records (default: 10, max: 1000)' },
+          limit: { type: 'number', description: `Max records (default: the instance's maxRecords, ${DEFAULT_MAX_RECORDS} unless the store sets one; max ${MAX_PAGE})` },
+          offset: { type: 'number', description: 'Records to skip before the first one returned (default 0). To read the next page of a truncated answer, repeat the call with offset set to this answer\'s offset + count, until truncated is false.' },
           orderBy: { type: 'string', description: 'Field to sort by. Prefix with "-" for descending' },
         },
         required: ['table'],
@@ -389,7 +394,18 @@ export async function dispatchCoreAction(
       const params = args as QueryRecordsParams;
       if (!params.table) throw new ServiceNowError('Table name is required', 'INVALID_REQUEST');
       const response = await client.queryRecords(params);
-      return { count: response.count, records: response.records, summary: `Found ${response.count} record(s) in "${params.table}"` };
+      // ARC-09-C125 — whether the read was cut, per page. With a total, more remain past this page; without one,
+      // the page filled its limit, which is all a caller can know: "reached the limit", not "proven cut".
+      const offset = response.offset ?? params.offset ?? 0;
+      const limit = response.limit ?? params.limit ?? null;
+      const total = response.total ?? null;
+      const truncated = total !== null ? offset + response.count < total : limit !== null && response.count >= limit;
+      const next = offset + response.count;
+      const more = !truncated ? ''
+        : total !== null ? `; ${total - next} more match: read on with offset ${next}`
+          : `; the page reached its limit of ${limit}: read on with offset ${next}`;
+      return { count: response.count, records: response.records, limit, offset, total, truncated,
+        summary: `Found ${response.count} record(s) in "${params.table}"${more}` };
     }
     case 'snow_core_table_schema_read':
       if (!args.table) throw new ServiceNowError('Table name is required', 'INVALID_REQUEST');
