@@ -27,6 +27,16 @@ a licence in force nothing is refused, and only the licence line's wording chang
 server has 399 tools and the error registry 73 codes, as in 2.0.12. The contract moves to `20f73faf89cd`, because
 `LICENCE_NOT_VALID`'s meaning and remedy no longer name the variable.
 
+**The release candidate, and what the owner's sitting confirms.** `v2.0.13-rc.3` was cut from develop `a40f6f2`,
+after #420 (ARC-11-C6) and #424 (the sweep). The owner's sitting on it runs:
+- **T-28, revised for enforcement on every build**, with no variable set anywhere. Row 1 is refused, with E-31's
+  remedy and the way back. The `valid until:` line reads in UTC, with "last day" on the last day. Row 15 takes the
+  way back, `./snowarch upgrade --to v2.0.12`;
+- **T-29 and T-30 under a valid licence**, against rc.2's numbers and verdicts
+  (`docs/validation/2.0.12-rc.2-live-sitting.md`);
+- **T-31 with no licence**: the Architect names `missing`, points to `./snowarch licence check`, and produces no
+  deliverable.
+
 ### Changed
 
 - The licence line says the state alone: "warn only" and "enforced" are gone, because enforcement no longer has a
