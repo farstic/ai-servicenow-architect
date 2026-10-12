@@ -61,9 +61,10 @@ test('the probes path RUNS now that ARC-07-S06 exists — and still degrades if 
   // so a real installation takes the arm below and B08 records probes instead of a WARN. The
   // detection is a regex over `instance --help`, so the assertion is made against the help text
   // the shipped CLI actually prints rather than against a fixture that agrees with itself.
+  // `instance` runs only with a licence in force (ARC-11-C6, step 4b): the fixture's, read from the planted checkout.
   const realHelp = spawnSync(process.execPath,
     [join(repoRoot, 'packages/snowarch/dist/cli/index.js'), 'instance', '--help'],
-    { encoding: 'utf8' });
+    { encoding: 'utf8', env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: root }) });
   assert.match(`${realHelp.stdout ?? ''}`, /\btest\b/,
     'the shipped CLI must list `test`, or B08 goes back to reporting probes as unavailable');
 

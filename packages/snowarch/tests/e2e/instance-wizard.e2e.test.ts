@@ -61,9 +61,12 @@ const env = (extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({
   ...extra,
 });
 
+// ARC-11-C6 — `instance` runs only with a licence in force (step 4b): the fixture licence, in a project directory
+// of the run's own, which the CLI reads as the server does.
 const cli = (args: readonly string[], input?: string, extra: NodeJS.ProcessEnv = {}) =>
   spawnSync(process.execPath, [CLI, ...args], {
-    encoding: 'utf8', env: env(extra), ...(input === undefined ? {} : { input }),
+    encoding: 'utf8', env: licensedEnv({ ...env(extra), CLAUDE_PROJECT_DIR: join(base, 'project') }),
+    ...(input === undefined ? {} : { input }),
   });
 
 const readStore = (): Record<string, never> => JSON.parse(readFileSync(store, 'utf8'));
