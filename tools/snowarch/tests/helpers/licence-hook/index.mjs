@@ -29,7 +29,7 @@
  * It never writes inside this repository: the owner's own licence is in its `.local/`, and a test that wrote
  * there would replace it. A root inside the checkout throws.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -105,8 +105,12 @@ export function licensedEnv(env = process.env, { root, licence = {} } = {}) {
   }
   const text = fixtureLicenceText(licence);
   for (const r of roots) {
+    const file = join(r, '.local', 'licence.json');
+    // The same licence is not written again: a doctor's cache keys on its inputs' times, and a test that runs
+    // the CLI twice must not see an input it did not change move.
+    if (existsSync(file) && readFileSync(file, 'utf8') === text) continue;
     mkdirSync(join(r, '.local'), { recursive: true, mode: 0o700 });
-    writeFileSync(join(r, '.local', 'licence.json'), text);
+    writeFileSync(file, text);
   }
   return out;
 }

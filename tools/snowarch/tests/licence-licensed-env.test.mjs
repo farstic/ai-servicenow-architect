@@ -8,6 +8,7 @@
  * - the test-only hook added to NODE_OPTIONS after what is already there, once;
  * - a fixture licence, live and perpetual, signed with this process's fixture key, under every root the child
  *   reads one from: `root`, SNOWARCH_STATE_ROOT and CLAUDE_PROJECT_DIR; with none, a new state root;
+ * - the same licence is not written again, so a test that starts the CLI twice moves no input;
  * - `licence: false` writes none, and an object changes the licence;
  * - never a write inside this repository, where the owner's own licence lives;
  * - and the two ends that matter: a spawned CLI and a spawned server under enforcement trust what it wrote.
@@ -15,7 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, utimesSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -69,6 +70,19 @@ test('licensedEnv — the licence goes under root, the state root and the projec
   }
   // The .local/ it makes is private, as bootstrap makes it.
   if (process.platform !== 'win32') assert.equal(statSync(join(a, '.local')).mode & 0o777, 0o700);
+});
+
+test('licensedEnv — the same licence is not written again, so an input a doctor cache keys on does not move', (t) => {
+  const root = tempDir('snowarch-licensed-env-', t);
+  licensedEnv({ CLAUDE_PROJECT_DIR: root });
+  // Back-dated, so a rewrite shows whatever the file system's time resolution is.
+  const past = new Date('2026-01-01T00:00:00Z');
+  utimesSync(licenceAt(root), past, past);
+  licensedEnv({ CLAUDE_PROJECT_DIR: root });
+  assert.equal(statSync(licenceAt(root)).mtimeMs, past.getTime(), 'an identical licence was written again');
+  // A different licence is.
+  licensedEnv({ CLAUDE_PROJECT_DIR: root }, { licence: { scope: 'design-only' } });
+  assert.equal(verdict(root).scope, 'design-only');
 });
 
 test('licensedEnv — with no root anywhere, a new state root holds the licence, and the environment names it', () => {
