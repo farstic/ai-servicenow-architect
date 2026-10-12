@@ -1813,12 +1813,16 @@ the skills invoked, the corpus pages read and any cited page that does not exist
 resolves to one page is reported as BARE, not accepted. It judges nothing: the Pass criteria above do.
 
 A case's **Setup** block is read by `scripts/validation/setup-plan.mjs` (ARC-09-C106), which says in the
-header which of four things each case's Setup is. **Prose** (T-06, T-13) is context for a person and
+header which of five things each case's Setup is. **Prose** (T-06, T-13) is context for a person and
 nothing runs. **Files** (T-25): shell that writes under `clients/` is run in the clone before every run of
 the case, after `clients/` has been emptied, so a Setup's state reaches only its own case. **The product's
 own install** (T-07) is the runner's bootstrap, already done. **An instance** (T-19, T-22, T-23) is never
 run: the session has no MCP server, so the case runs as its design-only dormant variant and the header says
-`Setup NOT run`. Only `mkdir`, `touch`, `echo` and `printf` writing plain paths under `clients/` are run;
+`Setup NOT run`. **No licence** (T-31): the case runs with no licence in force, so the runner leaves
+`.local/licence.json` out of the clone. Every other case runs under the checkout's own licence, which the runner
+copies into the clone before the case, because from 2.0.13 a session with no licence in force produces no
+deliverable (ARC-11-C6); a checkout without one stops the run before any session. Only `mkdir`, `touch`, `echo`
+and `printf` writing plain paths under `clients/` are run;
 any other command, shell syntax the planner does not interpret, or a path outside `clients/` is refused, and
 a refused or failed Setup stops its case (`Setup did not run clean - case not run`) rather than letting it
 fail for the harness's reason.

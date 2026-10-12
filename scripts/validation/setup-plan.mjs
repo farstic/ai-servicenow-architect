@@ -6,13 +6,20 @@
 // `clients/acme/acme-engagement-state.md`, a file only T-25's Setup creates, so the run failed for a
 // reason that was the harness's and looked like the product's.
 //
-// A Setup comes in four kinds in the spec, and this decides which, from the text:
+// A Setup comes in five kinds in the spec, and this decides which, from the text:
 //   prose     numbered context for a person (T-06, T-13): nothing to run
 //   runner    the product's own design-mode install and doctor (T-07): the runner has already
 //             bootstrapped the clone in design mode, and the session runs the doctor itself
 //   files     shell that writes files under `clients/` (T-25): run, in the clone, before the case
 //   instance  commands that need an instance (T-19, T-22, T-23): NEVER run here; the session has no
 //             MCP server (`--strict-mcp-config`), so the case runs as its design-only dormant variant
+//   no-licence  a Setup that begins "No licence" (T-31): the case runs with no licence in force
+//
+// THE LICENCE (ARC-11-C6, step 10). From 2.0.13 a session with no licence in force produces no deliverable
+// (CLAUDE.md §1), and the runner's clone has no `.local/`. So every case runs as a licensed user would: given the
+// checkout's root, `run` copies its `.local/licence.json` into the clone before the case, and leaves it out for a
+// no-licence one. The file is copied, never read: in a sitting it is the owner's, and in a test the fixture's.
+// `licence <root>` is the runner's check before any session, so a checkout with none stops the run up front.
 //
 // WHAT RUNS IS A WHITELIST, not a blacklist. A command is run only if it is `mkdir`, `touch`, `echo`
 // or `printf` and every path it writes is a plain path under `clients/` (gitignored, so the clone
@@ -27,10 +34,13 @@
 // check; double quotes expand `$` and backticks, so those are refused wherever they are not single-quoted.
 //
 // Usage: node scripts/validation/setup-plan.mjs summary <prompts.json> [T-NN ...]
-//        node scripts/validation/setup-plan.mjs run <prompts.json> <T-NN> <clone>
+//        node scripts/validation/setup-plan.mjs run <prompts.json> <T-NN> <clone> [<root>]
+//        node scripts/validation/setup-plan.mjs licence <root>
 // Exit (run): 0 the Setup ran clean, or there was nothing to run, or it needs an instance and was not
-// run (the case goes on as its dormant variant) · 1 refused or failed (the case is not run) · 2 usage.
-import { readFileSync } from 'node:fs';
+// run (the case goes on as its dormant variant) · 1 refused or failed, or no licence to give the case (the
+// case is not run) · 2 usage. Exit (licence): 0 the checkout has one · 1 it has none.
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +50,8 @@ const WRITERS = new Set(['mkdir', 'touch', 'echo', 'printf']);
 const SAFE_PATH = /^clients\/[A-Za-z0-9_.\/-]+$/;
 // What the planner does not interpret. `>` is handled as a redirect; `\` is a joined continuation by now.
 const SYNTAX = /[;|&()<*?~{}!`$\\]/;
+// A case that runs with no licence in force says so first (T-31).
+const NO_LICENCE = /^No licence\b/;
 // The product's own install and doctor, in the design-only form the runner has already done.
 const RUNNER = /^\.\/(?:bootstrap\.sh\b.*\s--mode\s+design\b|snowarch\s+(?:doctor\b|mode\s+design\b))/;
 
@@ -103,11 +115,12 @@ function classify(cmd) {
 
 /**
  * The plan for one case's Setup text: `{ kind, commands, reason? }`, kind one of none · prose · runner ·
- * files · instance · refused.
+ * files · instance · no-licence · refused.
  */
 export function planSetup(setupText) {
   const text = String(setupText ?? '').replace(/^\s*### Setup\s*\n/, '').trim();
   if (text === '') return { kind: 'none', commands: [] };
+  if (NO_LICENCE.test(text)) return { kind: 'no-licence', commands: [] };
   const blocks = [...text.matchAll(/```([A-Za-z]*)\n([\s\S]*?)```/g)].map((m) => ({ lang: m[1].toLowerCase(), body: m[2] }));
   if (blocks.length === 0) return { kind: 'prose', commands: [] };
 
@@ -133,6 +146,7 @@ function describe(plan) {
       return `Setup not needed - the runner's own design-mode bootstrap is it (${plan.commands.map((c) => c.text).join('; ')})`;
     case 'instance':
       return `Setup NOT run - needs an instance (${plan.marker}); the session is the design-only dormant variant`;
+    case 'no-licence': return 'Setup run - the licence is left out of the clone, so the banner reads Licence: missing';
     case 'files': {
       const files = plan.commands.filter((c) => c.kind === 'file');
       return `Setup run - ${files.length} command${files.length === 1 ? '' : 's'} under clients/ (${[...new Set(files.map((c) => c.prog))].join(', ')})`;
@@ -157,11 +171,44 @@ export function runSetup(plan, cwd, { run = spawnSync } = {}) {
   return { ran: true, ok: false, line: `Setup failed (exit ${r.status}) - ${why}; the case is not run` };
 }
 
+/** Where a checkout keeps its licence. */
+export const licenceOf = (root) => join(root, '.local', 'licence.json');
+const noLicenceAt = (root) => `no licence at ${licenceOf(root)}: from 2.0.13 a session without one produces no `
+  + 'deliverable, so the harness runs every case under this checkout\'s licence - install it there, and run again';
+
+/**
+ * The licence a case runs under, in `clone`: the checkout's own, copied from `root`, or none for a no-licence case.
+ * The cases of a run share the clone, so a no-licence case removes what the case before it was given. `ok` is false
+ * when the checkout has no licence to give: the caller does not run the case.
+ */
+export function placeLicence(plan, clone, root) {
+  const target = licenceOf(clone);
+  if (plan.kind === 'no-licence') {
+    rmSync(target, { force: true });
+    return { ok: true, line: 'the licence is left out of the clone' };
+  }
+  if (!existsSync(licenceOf(root))) return { ok: false, line: noLicenceAt(root) };
+  mkdirSync(join(clone, '.local'), { recursive: true, mode: 0o700 });
+  copyFileSync(licenceOf(root), target);
+  if (process.platform !== 'win32') chmodSync(target, 0o600);
+  return { ok: true, line: 'the checkout\'s licence is in the clone' };
+}
+
 // ── the command line ───────────────────────────────────────────────────────────────────────────
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const [mode, file, ...rest] = process.argv.slice(2);
-  const usage = (msg) => { process.stderr.write(`${msg}\nusage: setup-plan.mjs summary <prompts.json> [T-NN ...] | run <prompts.json> <T-NN> <clone>\n`); process.exit(2); };
-  if (!['summary', 'run'].includes(mode) || !file) usage('bad arguments');
+  const usage = (msg) => {
+    process.stderr.write(`${msg}\nusage: setup-plan.mjs summary <prompts.json> [T-NN ...] | run <prompts.json> <T-NN> <clone> [<root>]`
+      + ' | licence <root>\n');
+    process.exit(2);
+  };
+  if (!['summary', 'run', 'licence'].includes(mode) || !file) usage('bad arguments');
+  // `licence <root>`: the runner's check, before any session.
+  if (mode === 'licence') {
+    const has = existsSync(licenceOf(file));
+    process.stdout.write(`${has ? `licence: ${licenceOf(file)}, copied into the clone for every case but a No licence one` : noLicenceAt(file)}\n`);
+    process.exit(has ? 0 : 1);
+  }
   let cases;
   try { cases = JSON.parse(readFileSync(file, 'utf8')); } catch (e) { usage(`cannot read ${file}: ${e.message}`); }
   const find = (id) => cases.find((c) => c.id === id);
@@ -171,10 +218,17 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       process.stdout.write(`${c ? summaryLine(id, planSetup(c.setup)) : `${id}: not in the spec`}\n`);
     }
   } else {
-    const [id, cwd] = rest;
+    const [id, cwd, home] = rest;
     const c = find(id);
     if (!c || !cwd) usage(`no such case: ${id}`);
     const plan = planSetup(c.setup);
+    if (home) {
+      const placed = placeLicence(plan, cwd, home);
+      if (!placed.ok) {
+        process.stdout.write(`${id}: ${placed.line}\n`);
+        process.exit(1);
+      }
+    }
     const r = runSetup(plan, cwd);
     if (plan.kind !== 'none') process.stdout.write(`${id}: ${r.line}\n`);
     process.exit(r.ok ? 0 : 1);
