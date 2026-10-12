@@ -17,9 +17,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as cli from '../lib/licence/core.mjs';
 import { PRODUCT_KEYS as CLI_KEYS } from '../lib/licence/keys.mjs';
 import { bannerLine as cliBanner, REMEDY as CLI_REMEDY } from '../lib/licence/state.mjs';
-import { listSource as cliSource } from '../lib/licence/fetch.mjs';
+import { fetchList, listSource as cliSource } from '../lib/licence/fetch.mjs';
 
-import { keyPair, licence, licenceText, listDoc, productKeys } from './helpers/licence.mjs';
+import { keyPair, licence, licenceText, listDoc, listRepo, productKeys } from './helpers/licence.mjs';
+import { SLOW_GIT_SKIP, slowGitPath } from './helpers/slow-git.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -169,5 +170,37 @@ test('ARC-11-C6 step 7 — the CLI and the server say the days left in the same 
   for (const [name, text, opts] of cases()) {
     const s = cli.checkLicence(text, { keys: KEYS, now: NOW, list: null, ...opts });
     if (s.state === 'expiring') assert.equal(serverState.daysLeftPhrase(s.daysLeft), cliDays(s.daysLeft), name);
+  }
+});
+
+// ARC-11-C11 — THE TWO FETCHES CLASSIFY THE SAME REPOSITORIES THE SAME WAY, the deadline in the third call among
+// them. Each copy is its own code, the CLI's synchronous on a 15-second budget and the server's asynchronous on
+// three, so a reading fixed in one and not the other is exactly the failure two copies invite. Run against the
+// server's committed build, as the cases above are. The deadline case needs a git that is slow on `show`, which
+// only POSIX can stand in for; on Windows it is reported as not run, by name, and the others still run.
+test('ARC-11-C11 — the CLI and the server classify the same repositories the same way', async (t) => {
+  const { fetchListAsync } = await dist('licence/refresh.js');
+  const text = `${JSON.stringify(listDoc({ version: 1, revoked: [] }, primary), null, 2)}\n`;
+  const gone = pathToFileURL(join(tempDir('snowarch-gone-', t), 'nothing.git')).href;
+  const cases = [
+    ['a published list', listRepo(t, { 'revocations.json': text }), 'fetched', null],
+    ['a repository with no branch', listRepo(t, null), 'none', null],
+    ['a branch with no file', listRepo(t, { 'README.md': 'x\n' }), 'none', null],
+    ['no repository at all', gone, 'unreachable', null],
+    ['a show the deadline kills', listRepo(t, { 'revocations.json': text }), 'unreachable', 'show'],
+  ];
+  for (const [name, url, expected, slow] of cases) {
+    let env = process.env;
+    let budget = 20_000;
+    if (slow) {
+      const PATH = slowGitPath({ dir: tempDir('snowarch-slow-git-', t), subcommand: slow, seconds: 4 });
+      if (PATH === null) { t.diagnostic(`${name}: not run, ${SLOW_GIT_SKIP}`); continue; }
+      env = { ...process.env, PATH };
+      budget = 1_500;
+    }
+    const cli = fetchList({ url, ref: 'main', path: 'revocations.json', timeoutMs: budget, env });
+    const server = await fetchListAsync({ url, ref: 'main', path: 'revocations.json', budgetMs: budget, env });
+    assert.equal(cli.status, expected, `${name}: the CLI says ${JSON.stringify(cli)}`);
+    assert.equal(server.status, expected, `${name}: the server says ${JSON.stringify(server)}`);
   }
 });

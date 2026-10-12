@@ -70,6 +70,10 @@ on it runs:
   preference, where it listed up to five update sets in progress on the whole instance and called that current. It
   returns `session_update_set` (null with no preference, `found: false` for a set that does not exist), and the
   instance's in-progress sets as `in_progress_update_sets`; `count` and `active_update_sets` are gone (ARC-09-C128).
+- A revocation-list refresh whose time runs out while it reads the file now says the list could not be reached, in
+  the server and in `./snowarch licence check --refresh` and `upgrade`. It said no list was published yet, and wrote
+  the cache as checked at that moment, which hid how old the cached list was. The cached list was kept either way
+  (ARC-11-C11).
 
 ## 2.0.12 — 2026-10-12
 
