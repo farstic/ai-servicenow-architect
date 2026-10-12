@@ -7,7 +7,10 @@
  * On the real build, with the keys it ships and no hook, before any fixture licence exists:
  *   1. `docs verify` is refused: exit 3, naming the state, with the remedy;
  *   2. one server tool over stdio is refused with LICENCE_NOT_VALID, and writes exactly one audit line, naming
- *      the tool, the gate `licence` and the state.
+ *      the tool, the gate `licence` and the state;
+ *   3. `bootstrap --mode live` runs without one (ruling A) and finishes, exit 0, skipping exactly the two steps that
+ *      start the package CLI, B06 and B08, each with E-31's reason (ruling R1). On a clone of this checkout, so the
+ *      tree this job's lint and npm test then read is never bootstrapped.
  * ARC-11-C6 step 5 adds the doctor: E-31 FAIL, and the server checks that call a tool reporting skip.
  *
  * Every child runs with NODE_OPTIONS removed, a HOME and a project of its own, so nothing on the runner can
@@ -18,11 +21,12 @@
  * Exit 0 every assertion held · 1 one did not · 2 this checkout holds a licence.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { NO_LICENCE_IN_FORCE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -77,6 +81,28 @@ try {
   const l = lines[0] ?? {};
   check(l.tool === 'snow_core_capabilities_read' && l.gate === 'licence' && l.result === 'LICENCE_NOT_VALID'
     && l.licence === 'missing' && l.state === 'missing', 'the audit line names the tool, the gate, the licence and the state');
+
+  // 3. The bootstrap, live, on a clone: the docs corpus skipped (it is not what this asserts), and no Claude Code.
+  const clone = join(base, 'clone');
+  const cloned = spawnSync('git', ['clone', '--quiet', ROOT, clone], { encoding: 'utf8' });
+  check(cloned.status === 0, `this checkout clones (git exited ${cloned.status}${cloned.stderr ? `: ${cloned.stderr.trim()}` : ''})`);
+  if (cloned.status === 0) {
+    // Live with --yes takes its connection details from a file, and the bootstrap checks only that the file exists,
+    // is 0600 and lies outside the checkout. Its content is read by B06 alone, the step this asserts is skipped, so
+    // it holds nothing: were B06 ever to run here, `{}` would fail it, loudly.
+    const instanceFile = join(base, 'instance.json');
+    writeFileSync(instanceFile, '{}\n', { mode: 0o600 });
+    // unlicensed start: this script asserts the unlicensed product, on the keys the build ships
+    const boot = spawnSync(process.execPath, [join(clone, 'tools', 'snowarch', 'bin', 'snowarch.mjs'), 'bootstrap',
+      '--mode', 'live', '--yes', '--skip-claude-check', '--docs', 'skip', '--instance-file', instanceFile],
+    { cwd: clone, encoding: 'utf8', env: bare({}), timeout: 20 * 60 * 1000 });
+    const out = `${boot.stdout ?? ''}${boot.stderr ?? ''}`;
+    const skips = out.split(/\r?\n/).filter((line) => line.includes(NO_LICENCE_IN_FORCE));
+    check(boot.status === 0, `bootstrap --mode live finishes, exit 0 (it exited ${boot.status})`);
+    check(skips.length === 2 && skips[0].startsWith('[B06/09]') && skips[1].startsWith('[B08/09]'),
+      `exactly two skip lines, B06's then B08's (found ${skips.length}: ${JSON.stringify(skips)})`);
+    if (boot.status !== 0 || skips.length !== 2) writeSync(2, `${out}\n`);
+  }
 } finally {
   rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }
