@@ -2,7 +2,7 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PRESETS, FLAG_NAMES } from '../../src/utils/permissions.js';
@@ -20,6 +20,13 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../../../..');
 const README = resolve(HERE, '../../README.md');
 const GEN = resolve(ROOT, 'scripts/gen-readme-tables.mjs');
+
+/**
+ * ARC-09-C131 — the tracked README as it was before any case here ran. Another vitest worker reads this file
+ * (B04-06 in `tests/cli/contract-cli.test.ts`), so a case that writes it, even to restore it, is a case another
+ * file can read half-written.
+ */
+const BEFORE = { bytes: readFileSync(README), mtimeMs: statSync(README).mtimeMs };
 
 function check(): { code: number; stderr: string } {
   try {
@@ -47,16 +54,20 @@ describe('criterion 1 - the generated blocks are current, and drift is caught', 
       expect(r.code).toBe(1);
       expect(r.stderr).toContain('gen-readme-tables.mjs');
       expect(r.stderr).toContain('Do not edit text between');
+      // The mid-read: what a reader of the tracked README in another worker sees while the drift is in place.
+      expect(readFileSync(README).equals(BEFORE.bytes), 'the tracked README changed while the drift was in place').toBe(true);
+      expect(statSync(README).mtimeMs, 'the tracked README was written while the drift was in place').toBe(BEFORE.mtimeMs);
     } finally {
       writeFileSync(README, original);
     }
   });
 
-  it('and the README is restored', () => {
-    // A test that edits a tracked file leaves every later assertion depending on its cleanup.
-    // ARC-04-S12 learned this the expensive way, with a shared build artefact and parallel
-    // workers; this one is a single file in a single suite, so restoring plus asserting is
-    // enough — but the assertion is not optional.
+  it('and the tracked README was never written: its bytes and its mtime are what they were before this file ran', () => {
+    // A test that edits a tracked file leaves every later assertion depending on its cleanup, and a restore is a
+    // second write. ARC-04-S12 learned this with a shared build artefact and parallel workers; ARC-09-C131 with
+    // this file, whose restore did not stop B04-06 reading it truncated from another worker.
+    expect(readFileSync(README).equals(BEFORE.bytes)).toBe(true);
+    expect(statSync(README).mtimeMs).toBe(BEFORE.mtimeMs);
     expect(check().code).toBe(0);
   });
 });
