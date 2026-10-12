@@ -551,10 +551,12 @@ export async function buildEnforcementWorld(t, { modules = 'link' } = {}) {
   mkdirSync(work, { recursive: true });
 
   // The old release's own tree, from its tag: what a user on it has, not this tree with its version rewritten.
+  // tar is given relative names from the scratch directory: under Git Bash `tar` is GNU tar, which reads
+  // `C:\…` as a remote host (`Cannot connect to C: resolve failed`, run 38260110167), and Windows' own bsdtar
+  // has no --force-local. A name with no colon is local to both.
   phase('tree-old', marks, () => {
-    const tar = join(scratch, 'old.tar');
-    gitRaw(['archive', '--format=tar', '-o', tar, from], { cwd: REAL_ROOT });
-    execFileSync('tar', ['-xf', tar, '-C', work], { stdio: 'pipe' });
+    gitRaw(['archive', '--format=tar', '-o', join(scratch, 'old.tar'), from], { cwd: REAL_ROOT });
+    execFileSync('tar', ['-xf', 'old.tar', '-C', 'work'], { cwd: scratch, stdio: 'pipe' });
   });
   const upstream = phase('corpus-upstream', marks, () => buildUpstream(join(scratch, 'corpus')));
   pointAtFixtureCorpus(work, upstream);

@@ -405,6 +405,8 @@ test('ARC-11-C6 — 2.0.12 to 2.0.13 with no licence ends at U7 with E-31 FAIL, 
   assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.13', up.text);
   assert.ok(up.text.includes('[U7/7]'), up.text);
   const u7 = up.text.slice(up.text.indexOf('[U7/7]'));
+  // The line a user reads at U7, in every cell's log (the owner's rule), spelled for the shell the cell runs.
+  t.diagnostic(u7.split('\n').find((l) => l.includes('E-31')) ?? 'U7 printed no E-31 line');
   assert.match(u7, /E-31 FAIL/, u7);
   assert.ok(u7.includes('.local/licence.json'), u7);
   assert.ok(u7.includes('upgrade --to v2.0.12'), u7);
