@@ -151,9 +151,12 @@ test('C43 head 2 — the variable is documented where a contributor reads, and n
    *
    *   CONTRIBUTING     yes. It is a test and CI seam, and that page is where the rules for whoever
    *                    changes this repository live.
+   *   ci.yml           yes, and the one workflow (ARC-11-C6, the architect's ruling of 2026-10-12): its
+   *                    fixture-licence steps set it per step, for the product steps outside the allowed
+   *                    set. That is the CI seam CONTRIBUTING describes, not a way to relocate an install.
    *   docs/plans/      yes. C43's row is the engineering record of both heads.
    *   ANY USER PAGE    no. `INSTALL.md`, `README.md`, `TROUBLESHOOTING.md`, `MODES-AND-PRESETS.md`,
-   *                    the settings files, the launchers and the workflows stay clean, because nothing
+   *                    the settings files, the launchers and other workflows stay clean, because nothing
    *                    in the product sets it and an installed checkout keeps its state beside itself.
    *                    A user who reads it as a way to relocate an installation has been misled by us.
    */
@@ -171,7 +174,7 @@ test('C43 head 2 — the variable is documented where a contributor reads, and n
   const named = pages.filter((p) => readFileSync(p, 'utf8').includes('SNOWARCH_STATE_ROOT'))
     .map((p) => p.slice(root.length + 1))
     .filter((p) => !p.startsWith(`docs${sep}plans${sep}`));
-  assert.deepEqual(named, [join('docs', 'CONTRIBUTING.md')],
+  assert.deepEqual(named, [join('.github', 'workflows', 'ci.yml'), join('docs', 'CONTRIBUTING.md')],
     'SNOWARCH_STATE_ROOT is named somewhere new — it belongs in CONTRIBUTING, not in a user-facing page');
   // And the page has to actually explain it, not merely mention it: the two bounds are what stop a
   // reader treating it as a way to move a real installation.
