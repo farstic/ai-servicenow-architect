@@ -1,16 +1,16 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog } from '../../src/tools/index.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
-import { fromToday, keysOf, licence, licenceText, pair } from './fixtures.js';
-import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
+import { fromToday, licence, licenceText } from './fixtures.js';
+import { licenceFixture, licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-11-C1 — the licence gate in the BUILT server, over stdio, as Claude Code runs it.
@@ -19,19 +19,18 @@ import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-ho
  * changes are one extra content block on the first answer of a session (its first block byte-identical
  * to what it always was), no `licence` key in the audit trail, and the same 399 tools.
  *
- * THEN THE LICENSED CASES, against a COPY of `dist/` that trusts a key this test generated. The shipped
- * key list is the owner's alone, so no committed build can verify a test's licence; the copy is how a
- * valid licence reaches the real CallTool handler without a key ever entering the repository. It lives
- * INSIDE the package for the reason `tests/doctor/doctor.test.ts` gives — Node resolves the SDK by
- * walking up from the module — and is gitignored and removed after the run.
+ * THEN THE LICENSED CASES, against the same build. The shipped key list is the owner's alone, so the
+ * server runs under the test hook (`licensedEnv`, shape A), which resolves the build's keys module to the
+ * helper's fixture keys for the run, and each case signs with that fixture's primary key. That is how a
+ * valid licence reaches the real CallTool handler without a key ever entering the repository. Until
+ * ARC-11-C6 step 9 these cases ran a copy of `dist/` with its keys module rewritten; the hook is the one
+ * mechanism now, and `licence-key-sources.test.mjs` holds every test to it.
  */
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(HERE, '../../dist/server.js');
-const LICENSED_DIST = resolve(HERE, '../../.tmp-licence-dist');
-const LICENSED_SERVER = join(LICENSED_DIST, 'server.js');
 
-const primary = pair();
-const KEYS = keysOf(primary, pair());
+// The fixture the hook trusts: this process's, made once and removed after the file (the package's setup).
+const { primary } = licenceFixture();
 
 let base: string;
 let checkout: string;
@@ -83,14 +82,6 @@ const auditLines = (): Array<Record<string, unknown>> => {
   return existsSync(p) ? readFileSync(p, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
 };
 
-beforeAll(() => {
-  rmSync(LICENSED_DIST, { recursive: true, force: true });
-  cpSync(resolve(HERE, '../../dist'), LICENSED_DIST, { recursive: true });
-  writeFileSync(join(LICENSED_DIST, 'licence', 'keys.js'), `export const PRODUCT_KEYS = Object.freeze(${JSON.stringify(KEYS)});\n`);
-});
-afterAll(() => {
-  rmSync(LICENSED_DIST, { recursive: true, force: true });
-});
 beforeEach(() => {
   base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-licence-server-')));
   home = join(base, 'home');
@@ -184,7 +175,7 @@ describe('ARC-11-C1 polish 2 — a licence refusal writes one audit line, and no
     for (const [file, want] of cases) {
       writeFileSync(join(checkout, '.local', 'licence.json'), file);
       rmSync(join(checkout, '.local', 'audit.jsonl'), { force: true });
-      const client = await connect(LICENSED_SERVER);
+      const client = await connect(SERVER);
       try {
         expect((await call(client, 'snow_core_capabilities_read')).isError, want.state).toBe(true);
         const lines = auditLines();
@@ -198,7 +189,7 @@ describe('ARC-11-C1 polish 2 — a licence refusal writes one audit line, and no
     writeStore();
     // An expiring licence: served, with the notice on the first answer, in a build that trusts it.
     writeFileSync(join(checkout, '.local', 'licence.json'), licenceText(licence({ valid_until: fromToday(10) }), primary));
-    const client = await connect(LICENSED_SERVER);
+    const client = await connect(SERVER);
     try {
       expect((await call(client, 'snow_core_current_instance_read')).content).toHaveLength(2);
       const bad = await call(client, 'snow_core_current_instance_read', { instance: 'other' });
@@ -209,11 +200,11 @@ describe('ARC-11-C1 polish 2 — a licence refusal writes one audit line, and no
   }, 40_000);
 });
 
-describe('ARC-11-C1 — a build that trusts the licence (a test copy of dist/)', () => {
+describe('ARC-11-C1 — the build under the test hook, which trusts the fixture\'s key', () => {
   it('a live licence in force: served, no notice, and its id in the audit line', async () => {
     writeStore();
     writeLicence(licence());
-    const client = await connect(LICENSED_SERVER);
+    const client = await connect(SERVER);
     try {
       const switched = await call(client, 'snow_core_instance_switch', { name: 'other' });
       expect(switched.isError ?? false).toBe(false);
@@ -227,7 +218,7 @@ describe('ARC-11-C1 — a build that trusts the licence (a test copy of dist/)',
   it('a design-only licence on a live server: refused, naming the scope (ruling (d))', async () => {
     writeStore();
     writeLicence(licence({ scope: 'design-only' }));
-    const client = await connect(LICENSED_SERVER);
+    const client = await connect(SERVER);
     try {
       const r = await call(client, 'snow_core_capabilities_read');
       expect(r.isError).toBe(true);
@@ -238,7 +229,7 @@ describe('ARC-11-C1 — a build that trusts the licence (a test copy of dist/)',
   it('an expiring licence: served, with the notice on the first answer', async () => {
     writeStore();
     writeLicence(licence({ valid_until: fromToday(10) }));
-    const client = await connect(LICENSED_SERVER);
+    const client = await connect(SERVER);
     try {
       const r = await call(client, 'snow_core_current_instance_read');
       expect(r.isError ?? false).toBe(false);
