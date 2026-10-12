@@ -12,11 +12,11 @@
 //
 // THE DATA NAMES THE STATE AND THE ID, never the licensee or the org: a report's `--json` and the
 // banner's cache travel further than the licence file does.
-import { REMEDY, bannerLine, licenceStatus } from '../../licence/state.mjs';
+import { REFUSED, REMEDY, bannerLine, licenceStatus } from '../../licence/state.mjs';
 import { PRODUCT_KEYS } from '../../licence/keys.mjs';
 import { defineCheck } from '../registry.mjs';
 import { cliOf } from '../spell.mjs';
-import { ok, warn } from './result.mjs';
+import { fail, ok, warn } from './result.mjs';
 
 /**
  * ARC-11-C6 (ruling R1) — what a step or a check that cannot run without a licence says instead of running. B06 and
@@ -31,7 +31,9 @@ export function licenceChecks() {
       id: 'E-31',
       section: 'repo',
       title: 'the licence for this checkout',
-      severity: 'warn',
+      // ARC-11-C6 step 5 — a FAIL for a refused state, because nothing runs without a licence in force. The doctor
+      // names this as the one cause, and the server check that would fail behind it skips with its reason.
+      severity: 'fail',
       quick: true,
       network: false,
       spawns: false,
@@ -47,7 +49,8 @@ export function licenceChecks() {
         if (s.state === 'ok') return ok(line, data);
         const why = s.state === 'expiring' ? `${s.daysLeft} days left` : (s.state === 'missing' ? null : s.reason);
         const cli = cliOf(ctx);
-        return warn(why ? `${line} — ${why}` : line, {
+        // `expiring` is in force, so it is a warning; the refused states are what enforcement refuses (gate.ts).
+        return (REFUSED.includes(s.state) ? fail : warn)(why ? `${line} — ${why}` : line, {
           data,
           remedy: REMEDY(cli),
           command: `${cli} licence check`,

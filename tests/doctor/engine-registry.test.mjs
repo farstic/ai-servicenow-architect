@@ -117,11 +117,11 @@ test('the detectors warn and the capability packs inform — only the engine\'s 
   // doctor that FAILED over an available upgrade would be this tool deciding when a user upgrades.
   // E-30 joins them (ARC-08-C34): a registration under a folder that is gone is a leftover the
   // USER chose to leave, exactly like the other detectors — and this check only NAMES it.
-  // E-31 joins them (ARC-11-C1): nobody had a licence before 2.0.12, and the owner's first requirement
-  // is that everything keeps working exactly as now — a FAIL would fail every install. It is first
-  // because it is defined with the repo section, before the detectors.
+  // E-31 joined them at ARC-11-C1, when nobody had a licence and a FAIL would have failed every install, and left them
+  // at ARC-11-C6 step 5: from 2.0.13 nothing runs without a licence in force, so a refused state is the one FAIL a
+  // doctor names for it. An expiring licence, which is in force, is still a warning.
   assert.deepEqual(checks.filter((c) => c.severity === 'warn').map((c) => c.id),
-    ['E-31', 'E-23', 'E-24', 'E-30', 'E-25', 'E-26', 'E-27', 'E-28', 'SV-04']);
+    ['E-23', 'E-24', 'E-30', 'E-25', 'E-26', 'E-27', 'E-28', 'SV-04']);
   assert.deepEqual(checks.filter((c) => c.severity === 'info').map((c) => c.id), ['E-04']);
 });
 

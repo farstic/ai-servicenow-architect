@@ -64,7 +64,7 @@ test('ARC-11-C1 — a licence in force is ok; one in its last month is a warning
 test('ARC-11-C6 — an expired licence and a revoked one are FAILs too, each with the reason and the remedy', async (t) => {
   const expired = await E31.run(ctxFor(t, { file: licenceText(licence({ valid_until: '2026-10-01' }), primary) }));
   assert.equal(expired.status, 'fail');
-  assert.match(expired.detail, /^Licence: expired · LIC-2026-0002/);
+  assert.equal(expired.detail, 'Licence: expired — expired on 2026-10-01');
   assert.match(expired.remedy, /licence check to see why/);
 
   const ctx = ctxFor(t, { file: licenceText(licence(), primary) });
@@ -72,7 +72,7 @@ test('ARC-11-C6 — an expired licence and a revoked one are FAILs too, each wit
     list: listDoc({ version: 1, revoked: [{ id: 'LIC-2026-0002', revokedAt: '2026-10-09', reason: 'ended' }] }, primary) });
   const revoked = await E31.run(ctx);
   assert.equal(revoked.status, 'fail');
-  assert.match(revoked.detail, /^Licence: revoked · LIC-2026-0002/);
+  assert.equal(revoked.detail, 'Licence: revoked — revoked on 2026-10-09 (ended)');
   assert.match(revoked.remedy, /licence check to see why/);
 });
 
