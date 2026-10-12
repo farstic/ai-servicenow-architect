@@ -270,4 +270,3 @@ test('ARC-11-C6 step 10 — the runner checks the licence before any session, an
   assert.match(code, /setup-plan\.mjs" licence "\$ROOT"\)?[^\n]*\|\|[^\n]*exit/, 'a checkout without a licence does not stop the run');
   assert.match(code, /setup-plan\.mjs" run "\$PROMPTS" "\$T" "\$C" "\$ROOT"/, 'a case is not handed the checkout\'s root');
 });
-
