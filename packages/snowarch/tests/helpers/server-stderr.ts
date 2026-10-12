@@ -22,7 +22,8 @@ export function serverStderr(module: string, env: Record<string, string | undefi
       `import(${JSON.stringify(pathToFileURL(module).href)}).catch((e) => { console.error(String(e)); process.exit(1); });`], {
       cwd,
       env: licensedEnv({ ...process.env, ...env, SNOW_LOG_LEVEL: 'info' }),
-      // stdin stays open: the server's stdio transport would exit at its end, before a slow start had logged.
+      // stdin stays open: at its end the server's transport closes and it calls process.exit(0) (server.ts:395),
+      // and an exit can cut stderr writes still pending on a Windows pipe.
       stdio: ['pipe', 'ignore', 'pipe'],
     });
     let stderr = '';

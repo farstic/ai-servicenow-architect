@@ -22,8 +22,11 @@ describe('ARC-09-C132 — the server-stderr helper', () => {
       const slow = join(dir, 'slow-server.mjs');
       writeFileSync(slow, "setTimeout(() => console.error('[INFO] licence: Licence: missing'), 2000);\n"
         + 'setInterval(() => {}, 1000);\n');
+      const started = Date.now();
       const stderr = await serverStderr(slow, {}, dir);
       expect(stderr).toContain('[INFO] licence: Licence: missing');
+      // At the line, not at the 30 s cap: a helper that waited out its cap would pass the line check too.
+      expect(Date.now() - started).toBeLessThan(15_000);
     } finally {
       removeTempDir(dir);
     }
