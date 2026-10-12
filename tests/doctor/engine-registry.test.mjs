@@ -16,6 +16,7 @@ import { engineChecks, engineRegistry } from '../../tools/snowarch/lib/doctor/ch
 import { planRun } from '../../tools/snowarch/lib/doctor/runner.mjs';
 import { SECTIONS } from '../../tools/snowarch/lib/doctor/registry.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
+import { licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 const checks = engineChecks();
 const ids = checks.map((c) => c.id);
@@ -152,7 +153,7 @@ test('nothing in the legacy or host sections offers itself to --fix', () => {
  */
 const cli = (args) => spawnSync(process.execPath,
   [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--no-cache', ...args],
-  { cwd: REAL_ROOT, encoding: 'utf8' });
+  { cwd: REAL_ROOT, encoding: 'utf8', env: licensedEnv(process.env) });
 
 test('--json reports every id with a status each', () => {
   const r = cli(['--json', '--quick']);
