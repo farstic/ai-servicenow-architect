@@ -84,13 +84,16 @@ test('the reader — a server through StdioClientTransport, its path imported fr
   }), [{ file: 'server.test.mjs', line: 3, entry: 'server', licensed: false, declared: null }]);
 });
 
-test('the reader — child_process under any local name: a namespace, an alias, a dynamic import', async () => {
+test('the reader — child_process under any local name: a namespace, an alias, a dynamic import, promisify', async () => {
   const CLI = "const CLI = 'snowarch.mjs';\n";
   assert.deepEqual(await scan({
     'ns.test.mjs': `import * as cp from 'node:child_process';\n${CLI}cp.spawnSync(process.execPath, [CLI]);\n`,
     'alias.test.mjs': `import { execFileSync as run } from 'node:child_process';\n${CLI}run(process.execPath, [CLI]);\n`,
     'dyn.test.mjs': `${CLI}const { spawnSync: go } = await import('node:child_process');\ngo(process.execPath, [CLI]);\n`,
-  }).then((s) => s.map((x) => `${x.file}:${x.line}:${x.entry}`)), ['ns.test.mjs:3:cli', 'alias.test.mjs:3:cli', 'dyn.test.mjs:3:cli']);
+    'prom.test.mjs': `import { execFile } from 'node:child_process';\nimport { promisify } from 'node:util';\n${CLI}`
+      + 'const run = promisify(execFile);\nawait run(process.execPath, [CLI]);\n',
+  }).then((s) => s.map((x) => `${x.file}:${x.line}:${x.entry}`)),
+  ['ns.test.mjs:3:cli', 'alias.test.mjs:3:cli', 'dyn.test.mjs:3:cli', 'prom.test.mjs:5:cli']);
 });
 
 test('the reader — the launcher by either spelling, and a seam whose program is a parameter is presumed', async () => {

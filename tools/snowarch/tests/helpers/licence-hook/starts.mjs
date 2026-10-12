@@ -147,6 +147,13 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
           }
         }
       }
+      // `const run = promisify(execFile)`: the promisified function starts what the original starts.
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
+        && ts.isCallExpression(node.initializer) && /(?:^|\.)promisify$/.test(node.initializer.expression.getText())
+        && node.initializer.arguments[0] && ts.isIdentifier(node.initializer.arguments[0])
+        && p.spawners.has(node.initializer.arguments[0].text)) {
+        p.spawners.add(node.name.text);
+      }
       if (ts.isVariableDeclaration(node) && node.initializer) bindName(node.name, node.initializer, add);
       if (ts.isForOfStatement(node) && ts.isVariableDeclarationList(node.initializer)) {
         for (const d of node.initializer.declarations) bindName(d.name, node.expression, add);
