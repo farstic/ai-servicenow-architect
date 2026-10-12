@@ -117,6 +117,15 @@ export function packageCliRefused({ licence, root } = {}) {
   return s !== null && refusesCommand('instance', s);
 }
 
+/**
+ * ARC-11-C6 step 6 — the commands that run without a licence, as a reader reads them: "licence, doctor, …, bootstrap
+ * and mode design". Built from the gate's lists, so a sentence that names the set cannot hold a copy of it.
+ */
+export function allowedPhrase({ allowed = CLI_ALLOWED, forms = CLI_ALLOWED_FORMS } = {}) {
+  const all = [...allowed, ...Object.entries(forms).flatMap(([command, args]) => args.map((a) => `${command} ${a}`))];
+  return all.length > 1 ? `${all.slice(0, -1).join(', ')} and ${all.at(-1)}` : all.join('');
+}
+
 /** What a refused command prints: the state, why it was refused, and the remedy. */
 export const refusalLines = (name, s, cli) => [
   `snowarch ${name}: licence ${s.state}${s.signatureValid ? ` (${s.id})` : ''} — this command does not run `
