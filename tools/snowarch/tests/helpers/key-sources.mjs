@@ -665,3 +665,49 @@ export async function scanKeySources({ base, files, read = (rel) => readFileSync
 
   return { files: all.length, code: code.length, sinks, slots, declared, violations };
 }
+
+/** Where a fixture key is made: the tests, and the CI scripts that run a licensed product (licence-fixture.mjs). */
+export const FIXTURE_ROOTS = Object.freeze(['packages/snowarch/tests', 'tools/snowarch/tests', 'tests', 'scripts']);
+/** The one place a test may write a keys module: the hook's helper, which writes the fixture's for the run. */
+export const HOOK_HELPER = 'tools/snowarch/tests/helpers/licence-hook/';
+const WRITERS = new Set(['writeFileSync', 'writeFile', 'appendFileSync', 'appendFile']);
+const TEST_CODE = /\.(mjs|js|cjs|ts|mts)$/;
+
+/**
+ * ARC-11-C6 step 9 — the hook is the one mechanism in the tests too (the architect's ruling, 2026-10-12): every
+ * write, in a test or CI script outside the hook's helper, whose content defines PRODUCT_KEYS, followed one hop to a
+ * `const` that holds it, as `{ file, line }`. A test that wrote a keys module of its own would trust a key through a
+ * second mechanism, which no guard holds; `server.test.ts` ran a copy of `dist/` that way until step 9.
+ */
+export async function keysModuleWrites({ base, files, read = (rel) => readFileSync(join(base, rel), 'utf8') }) {
+  const ts = (await import('typescript')).default;
+  const tests = (files ?? shippedFiles(base, FIXTURE_ROOTS)).filter((f) => TEST_CODE.test(f) && !/\.d\.[mc]?ts$/.test(f)
+    && !f.startsWith(HOOK_HELPER) && !f.includes('/node_modules/'));
+  const hits = [];
+  for (const file of tests) {
+    const body = read(file);
+    if (!body.includes('PRODUCT_KEYS')) continue;
+    const src = ts.createSourceFile(file, body, ts.ScriptTarget.Latest, true,
+      /\.m?ts$/.test(file) ? ts.ScriptKind.TS : ts.ScriptKind.JS);
+    const held = new Map();
+    const collect = (n) => {
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer) held.set(n.name.text, n.initializer);
+      ts.forEachChild(n, collect);
+    };
+    collect(src);
+    const defines = (e) => e.getText().includes('PRODUCT_KEYS')
+      || (ts.isIdentifier(e) && held.has(e.text) && held.get(e.text).getText().includes('PRODUCT_KEYS'));
+    const visit = (n) => {
+      if (ts.isCallExpression(n)) {
+        const callee = ts.isIdentifier(n.expression) ? n.expression.text
+          : ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : null;
+        if (WRITERS.has(callee) && n.arguments.slice(1).some(defines)) {
+          hits.push({ file, line: src.getLineAndCharacterOfPosition(n.getStart()).line + 1 });
+        }
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(src);
+  }
+  return hits;
+}

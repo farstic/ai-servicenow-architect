@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { DECLARED_MIN, scanKeySources } from './helpers/key-sources.mjs';
+import { DECLARED_MIN, keysModuleWrites, scanKeySources } from './helpers/key-sources.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const real = scanKeySources({ base: ROOT });
@@ -142,4 +142,20 @@ test('ARC-11-C6 step 8 — planted: a declared site with its reason is reported,
     + 'export const a = (r) => licenceStatus(r, { keys: process.env.K });'));
   assert.deepEqual(r.violations, []);
   assert.deepEqual(r.declared.map((d) => [d.file, d.line]), [[USE, 3]]);
+});
+
+// ── In the tests: the hook is the one mechanism (ARC-11-C6 step 9) ──────────────────────────────────────────
+test('ARC-11-C6 step 9 — no test writes a keys module of its own: a fixture key reaches a process only through the hook', async () => {
+  assert.deepEqual(await keysModuleWrites({ base: ROOT }), []);
+});
+
+test('ARC-11-C6 step 9 — planted: a keys module written directly or from a binding is found; the helper\'s, and a string, are not', async () => {
+  const tree = {
+    'packages/snowarch/tests/a.test.ts': "writeFileSync(p, `export const PRODUCT_KEYS = Object.freeze(${k});`);\n",
+    'tests/b.test.mjs': "const body = 'export const PRODUCT_KEYS = [];';\nfs.writeFileSync(p, body);\n",
+    'tools/snowarch/tests/helpers/licence-hook/c.mjs': "writeFileSync(p, 'export const PRODUCT_KEYS = [];');\n",
+    'tools/snowarch/tests/d.test.mjs': "const planted = 'export const PRODUCT_KEYS = [];';\nscan(planted);\n",
+  };
+  const writes = await keysModuleWrites({ base: ROOT, files: Object.keys(tree), read: (f) => tree[f] });
+  assert.deepEqual(writes, [{ file: 'packages/snowarch/tests/a.test.ts', line: 1 }, { file: 'tests/b.test.mjs', line: 2 }]);
 });
