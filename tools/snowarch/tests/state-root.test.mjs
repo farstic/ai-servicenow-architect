@@ -9,7 +9,7 @@ import { doctorCachePath, statePath } from '../lib/state.mjs';
 import { storePath } from '../lib/mode.mjs';
 import { cachePath as upgradeCachePath } from '../lib/upgrade-check.mjs';
 import { createLogger } from '../lib/log.mjs';
-import { buildFile, extractUnreleased, renderGroups, trailerLine } from '../../../scripts/lib/release/changelog.mjs';
+import { commit, releasedChangelog } from '../../../tests/helpers/changelog-fixture.mjs';
 import { withoutGeneratedInternal } from '../../../tests/helpers/changelog-history.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
@@ -215,28 +215,18 @@ test('C43 head 2 — in the changelog, only the generated Internal group is a co
    * why the heading alone cannot decide it, only the heading and the generator's exact line together. The
    * generated Added, Fixed and Changed groups are held too, because they describe a change to the product.
    *
-   * The fixtures are built by the generator's own functions, so a change to the line it writes reaches
-   * this case.
+   * The fixtures are built by the generator's own functions (`tests/helpers/changelog-fixture.mjs`), so a
+   * change to the line it writes reaches this case.
    */
   const VAR = 'SNOWARCH_STATE_ROOT';
   const changelog = join('docs', 'CHANGELOG.md');
-  const sha = (seed) => seed.padEnd(40, '0');
-  const commit = (subject, seed) => ({ sha: sha(seed), subject, body: '', parents: [sha('0')] });
-  /** A changelog as the release writes it: the hand-written block carried down, then the commits. */
-  const trailer = trailerLine('9.9.9', { contract: '0'.repeat(12), docsPin: '0'.repeat(7) });
-  const released = (handWritten, commits) => {
-    const text = `# Changelog\n\n## Unreleased\n\n${handWritten}\n`;
-    const built = buildFile({ text, version: '9.9.9', date: '2026-10-12', carried: extractUnreleased(text),
-      body: renderGroups(commits), trailer });
-    assert.ok(built.ok, built.message);
-    return built.text;
-  };
   const notes = '### Notes\n\nA hand-written note.';
   const handInternal = `${notes}\n\n### Internal\n\n- **ARC-07-C43** — a hand-written entry naming ${VAR}.`;
   const plain = commit('docs(plan): a row', 'aaaaaaa1');
+  const fix = commit(`fix(snowarch): the CLI follows ${VAR}`, 'ccccccc3');
 
   // The commit log: f3843c9's own subject, and one outside the convention, which the generator also files there.
-  const log = released(notes, [plain,
+  const log = releasedChangelog(notes, [plain,
     commit(`test(tests): ci.yml may name ${VAR}, for its per-step fixture licence (ARC-11-C6)`, 'f3843c94'),
     commit(`a subject outside the convention, naming ${VAR}`, 'bbbbbbb2')]);
   assert.ok(log.split('\n').includes(
@@ -247,9 +237,9 @@ test('C43 head 2 — in the changelog, only the generated Internal group is a co
 
   // Everything else in the changelog is a page.
   for (const [where, text] of [
-    ['the Notes', released(`### Notes\n\nA note naming ${VAR}.`, [plain])],
-    ['a hand-written Internal entry', released(handInternal, [plain])],
-    ['a generated Fixed line', released(notes, [commit(`fix(snowarch): the CLI follows ${VAR}`, 'ccccccc3')])],
+    ['the Notes', releasedChangelog(`### Notes\n\nA note naming ${VAR}.`, [plain])],
+    ['a hand-written Internal entry', releasedChangelog(handInternal, [plain])],
+    ['a generated Fixed line', releasedChangelog(notes, [fix])],
   ]) {
     assert.equal(namesTheVariable(changelog, text), true,
       `${where} went unread; only the generated Internal group is a commit log`);
