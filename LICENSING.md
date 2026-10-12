@@ -71,4 +71,9 @@ licence are available by agreement. Contact: see `NOTICE`.
 The author may release future versions under a different licence. A version's licence is the
 `LICENSE` file shipped in its release tag; this page is updated with it.
 
+From 2.0.13 the product checks for a valid licence from the author on every build: without one, no
+MCP tool runs, and no command runs but the few that show and repair the state (`docs/USER-GUIDE.md`).
+2.0.13 is still released under the Apache License 2.0. From 2.1.0 the code moves to the Business
+Source License 1.1, and the `LICENSE` file in that release's tag says so.
+
 *This page is an explanation, not legal advice.*
