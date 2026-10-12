@@ -54,6 +54,20 @@ test('ARC-09-C117 — the live-verification rule is one paragraph, in the same w
   ]) assert.ok(first.includes(phrase), `the live-verification rule lacks: ${phrase}`);
 });
 
+// ARC-09-C125 — a read that comes back cut. The tool says so now (`truncated`, with `total` and `offset`), so the
+// rule names the field instead of asking the session to notice a count equal to its limit, which it could not
+// (measured on develop a4d2cb6). The sentence replaces "a capped read cites only what it returned", which it
+// subsumes: the architect's ruling, 2026-10-12, with the owner's approval of the exact text.
+export const TRUNCATED = 'A read whose answer says `truncated: true` is read to its end within the budget — its next pages, '
+  + 'counted against the eight — or cited with what it returned and its `total`.';
+
+test('ARC-09-C125 — every copy names the truncated field, and the clause it replaces is gone', () => {
+  for (const r of liveRules(real)) {
+    assert.ok(r.words?.includes(TRUNCATED), `${r.file}: the truncated sentence is missing`);
+    assert.doesNotMatch(r.words ?? '', /a capped read cites only what it returned/, `${r.file}: the replaced clause is still there`);
+  }
+});
+
 test('ARC-09-C117 — it sits in Phase 1 Step 5, and in each gateway\'s Part 2 under the grounding rule', () => {
   const claude = real('CLAUDE.md');
   const step5 = claude.indexOf('\n5. **Apply the Domain Expert gateway.**');
