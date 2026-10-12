@@ -113,9 +113,16 @@ function presetsBlock() {
   ].join('\n');
 }
 
+/**
+ * ARC-09-C126 — a table cell's text with its pipes escaped. GitHub ends a cell at an unescaped pipe,
+ * inside backticks too, and drops the cells past the header's count: `ENV_REQUIRED`'s remedy,
+ * `--env pdi|dev|test|prod`, rendered as "pass `--env pdi" until this escaped it.
+ */
+const cell = (text) => String(text).replace(/(?<!\\)\|/g, '\\|');
+
 function errorCodesBlock() {
   const rows = contract.errorCodes
-    .map(({ code, remedy }) => `| \`${code}\` | ${remedy || '—'} |`);
+    .map(({ code, remedy }) => `| \`${code}\` | ${cell(remedy || '—')} |`);
   return [
     `Every code the server can throw (${contract.errorCodes.length}), with what to do about it.`,
     'Generated from `src/errors/codes.ts` via `dist/contract.json`.',
