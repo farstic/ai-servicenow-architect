@@ -1,22 +1,43 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
- * ARC-11-C6, the spike — how a test starts a process that trusts a fixture key.
+ * ARC-11-C6 — how a test starts a process that trusts a fixture key, and finds a licence signed with it.
  *
- * `fixtureKeysHook(dir, keys)` writes two files into a test's own temp directory:
- * - `keys.mjs`, a fixture keys module in the shape of the shipped ones (`PRODUCT_KEYS` and nothing else);
- * - `register.mjs`, which registers `hooks.mjs` with that module's URL baked in, so the hook reads no
+ * `fixtureKeysHook(dir, keys)`, from the spike, writes two files into a test's own temp directory:
+ * - `fixture-keys.mjs`, a fixture keys module in the shape of the shipped ones (`PRODUCT_KEYS` and nothing else);
+ * - `register-hook.mjs`, which registers `hooks.mjs` with that module's URL baked in, so the hook reads no
  *   variable at all.
  *
  * It returns `nodeOptions`, the `--import` flag for `NODE_OPTIONS` (which reaches a node started through
  * a launcher), and `importArgs`, the same flag for a node started directly. URLs, never paths: on
  * Windows `--import` refuses an absolute path that is not a `file:` URL, and a URL carries no space.
+ *
+ * `licensedEnv(env, { root, licence })` is what a test calls when it starts the CLI, the server or a launcher
+ * (C6 step 1; `licence-spawn-class.test.mjs` holds every such start to it). From 2.0.13 that process refuses
+ * without a licence it trusts, so a test that started one bare would be testing the gate, not its subject.
+ * It returns a copy of `env` with:
+ * - the hook added to `NODE_OPTIONS`, after anything already there, so the child, and any node it starts,
+ *   trusts this process's fixture key;
+ * - a fixture licence signed with that key, at `.local/licence.json` under every root the child reads one
+ *   from: `root` when given, and `SNOWARCH_STATE_ROOT` and `CLAUDE_PROJECT_DIR` when `env` sets them. With
+ *   none of the three, a new temp directory becomes `SNOWARCH_STATE_ROOT`, which is where the CLI reads it.
+ *
+ * `licence: false` writes none, for a test of a checkout without one; the child still runs under the fixture
+ * keys. An object replaces fields of the licence (`{ scope: 'design-only' }`). The default is live and
+ * perpetual, so no test starts failing on a date.
+ *
+ * It never writes inside this repository: the owner's own licence is in its `.local/`, and a test that wrote
+ * there would replace it. A root inside the checkout throws.
  */
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+import { keyPair, licenceText, productKeys } from '../licence.mjs';
+import { tempDir } from '../temp.mjs';
 
 const HOOKS_URL = new URL('./hooks.mjs', import.meta.url).href;
+const REPO = resolve(fileURLToPath(new URL('../../../../../', import.meta.url)));
 
 export function fixtureKeysHook(dir, keys) {
   const keysFile = join(dir, 'fixture-keys.mjs');
@@ -27,4 +48,65 @@ export function fixtureKeysHook(dir, keys) {
     + `register(${JSON.stringify(HOOKS_URL)}, { data: { keysUrl: ${JSON.stringify(keysUrl)} } });\n`);
   const registerUrl = pathToFileURL(registerFile).href;
   return { keysUrl, registerUrl, importArgs: [`--import=${registerUrl}`], nodeOptions: `--import=${registerUrl}` };
+}
+
+let fixture = null;
+
+/**
+ * This process's fixture: a primary and a recovery pair made here, the product key list built from them, and
+ * the hook that trusts that list. Made once per process, in a temp directory removed at exit.
+ */
+export function licenceFixture() {
+  if (!fixture) {
+    const primary = keyPair();
+    const keys = productKeys(primary, keyPair());
+    fixture = { primary, keys, hook: fixtureKeysHook(tempDir('snowarch-licence-hook-'), keys) };
+  }
+  return fixture;
+}
+
+/** The fixture licence: live, perpetual (no `valid_until`), and an id no real licence has. */
+export const FIXTURE_LICENCE = Object.freeze({
+  id: 'LIC-2026-9000', licensee: 'Test Licensee', org: 'Test Org', scope: 'live', issued: '2026-01-15',
+  issuer: 'Test Issuer', notes: '',
+});
+
+/** A licence file's text, signed with this process's fixture key; `over` replaces fields of the fixture's. */
+export function fixtureLicenceText(over = {}) {
+  const payload = { ...FIXTURE_LICENCE, ...over };
+  for (const [k, v] of Object.entries(payload)) if (v === undefined) delete payload[k];
+  return licenceText(payload, licenceFixture().primary);
+}
+
+const inRepo = (p) => {
+  const rel = relative(REPO, resolve(p));
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+};
+
+export function licensedEnv(env = process.env, { root, licence = {} } = {}) {
+  const { hook } = licenceFixture();
+  const out = {};
+  for (const [k, v] of Object.entries(env)) if (v !== undefined) out[k] = String(v);
+  const flags = (out.NODE_OPTIONS ?? '').split(/\s+/).filter(Boolean);
+  if (!flags.includes(hook.nodeOptions)) flags.push(hook.nodeOptions);
+  out.NODE_OPTIONS = flags.join(' ');
+
+  if (licence === false) return out;
+  const roots = new Set([root, out.SNOWARCH_STATE_ROOT, out.CLAUDE_PROJECT_DIR].filter(Boolean).map((r) => resolve(r)));
+  if (roots.size === 0) {
+    out.SNOWARCH_STATE_ROOT = tempDir('snowarch-licensed-state-');
+    roots.add(resolve(out.SNOWARCH_STATE_ROOT));
+  }
+  // Every root is checked before any is written, so a refusal leaves nothing behind.
+  const inside = [...roots].filter(inRepo);
+  if (inside.length) {
+    throw new Error(`licensedEnv: ${inside.join(', ')} is inside this repository — a fixture licence there would `
+      + 'replace the one in its .local/; give the child a temp root (root, SNOWARCH_STATE_ROOT or CLAUDE_PROJECT_DIR)');
+  }
+  const text = fixtureLicenceText(licence);
+  for (const r of roots) {
+    mkdirSync(join(r, '.local'), { recursive: true, mode: 0o700 });
+    writeFileSync(join(r, '.local', 'licence.json'), text);
+  }
+  return out;
 }
