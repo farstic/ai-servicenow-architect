@@ -53,7 +53,7 @@ test('the live fixture renders to exactly these bytes', () => {
     LIVE.modeLineDetailed,
     // ARC-11-C1 — the licence, second, exactly as the session-start banner prints it. The fixture's
     // checkout has none, and enforcement is off.
-    'Licence: missing · warn only',
+    'Licence: missing',
     `Engine: snowarch ${LIVE.engine.version} · contract ${LIVE.engine.contractSha.slice(0, 12)}`,
     `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · sparse`,
     // The roster moves when a skill is added, the way the tally moves when a check is — fso-insurance-
