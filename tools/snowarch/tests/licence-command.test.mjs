@@ -320,3 +320,39 @@ test('ARC-11-C1 — issue refuses a placeholder as --to, trimmed, and keeps a va
   const kept = await run(w, ['issue'], { ...base, to: 'Test Licensee <Test Org>' }, { keys: g.keys });
   assert.equal(kept.code, EXIT_OK, kept.text);
 });
+
+test('ARC-11-C6 step 7 — show\'s and verify\'s valid until: line says the day is UTC, with the days left, and the last day by name', async (t) => {
+  const w = world(t);
+  const key = keyPair();
+  const keys = productKeys(key, keyPair());
+  // NOW is 2026-10-10. An expired licence's line has no count: its why: line says when it ended.
+  for (const [until, tail] of [['2026-10-20', '(UTC, 10 days)'], ['2026-10-11', '(UTC, 1 day)'],
+    ['2026-10-10', '(UTC, last day)'], ['2026-10-09', '(UTC)']]) {
+    writeFileSync(licencePath(w.root), licenceText(licence({ valid_until: until }), key));
+    for (const args of [['show'], ['verify', licencePath(w.root)]]) {
+      const r = await run(w, args, {}, { keys });
+      assert.ok(r.lines.includes(`step:   valid until:  ${until} ${tail}`), `${args[0]} ${until}\n${r.text}`);
+    }
+  }
+});
+
+test('ARC-11-C6 step 7 — check prints the same valid until: line after its banner, when the signature holds and there is a term', async (t) => {
+  // check is the command every remedy names, so it carries the day's meaning too (the architect's ruling B, 2026-10-12).
+  const w = world(t);
+  const key = keyPair();
+  const keys = productKeys(key, keyPair());
+  for (const [until, tail] of [['2026-10-20', '(UTC, 10 days)'], ['2026-10-10', '(UTC, last day)'], ['2026-10-09', '(UTC)']]) {
+    writeFileSync(licencePath(w.root), licenceText(licence({ valid_until: until }), key));
+    const r = await run(w, ['check'], {}, { keys });
+    assert.equal(r.lines[1], `step:   valid until:  ${until} ${tail}`, r.text);
+  }
+  // No term, or no signature to trust one from: no line.
+  const { valid_until: _, ...forever } = licence();
+  writeFileSync(licencePath(w.root), licenceText(forever, key));
+  const perpetual = await run(w, ['check'], {}, { keys });
+  const forged = JSON.parse(licenceText(licence(), key));
+  forged.licence.valid_until = '2099-12-31';
+  writeFileSync(licencePath(w.root), JSON.stringify(forged));
+  const invalid = await run(w, ['check'], {}, { keys });
+  for (const r of [perpetual, invalid]) assert.equal(r.text.includes('valid until:'), false, r.text);
+});

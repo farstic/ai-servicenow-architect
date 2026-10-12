@@ -155,3 +155,19 @@ test('ARC-11-C6 ruling B — with no state root set, the CLI and the server read
   assert.deepEqual([served.state, served.id], ['ok', 'LIC-2026-9003'], 'the server did not read <CLAUDE_PROJECT_DIR>/.local/licence.json');
   assert.deepEqual([read.state, read.id], ['ok', 'LIC-2026-9003'], 'the CLI did not read <root>/.local/licence.json');
 });
+
+// ARC-11-C6 step 7 — THE DAYS LEFT, IN ONE WORDING. E-31's expiring detail and the server's first-answer notice each
+// say what is left of the term through their side's phrase. The day of `valid_until` counts, until 00:00 UTC of the
+// next (docs/USER-GUIDE.md), so 0 days left is the last day, and is named so, not "0 days left".
+test('ARC-11-C6 step 7 — the CLI and the server say the days left in the same words, and name the last day', async () => {
+  const { daysLeftPhrase: cliDays } = await import('../lib/licence/state.mjs');
+  for (const [days, phrase] of [[0, 'last day'], [1, '1 day left'], [2, '2 days left'], [30, '30 days left']]) {
+    assert.equal(cliDays(days), phrase, `the CLI, ${days}`);
+    assert.equal(serverState.daysLeftPhrase(days), phrase, `the server, ${days}`);
+  }
+  // And on every expiring case the core reaches, the window's edges included.
+  for (const [name, text, opts] of cases()) {
+    const s = cli.checkLicence(text, { keys: KEYS, now: NOW, list: null, ...opts });
+    if (s.state === 'expiring') assert.equal(serverState.daysLeftPhrase(s.daysLeft), cliDays(s.daysLeft), name);
+  }
+});

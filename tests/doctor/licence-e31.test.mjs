@@ -80,6 +80,14 @@ test('ARC-11-C1 — a licence in force is ok; one in its last month is a warning
   assert.match(forged.detail, /^Licence: invalid — the signature does not match the content$/);
 });
 
+test('ARC-11-C6 step 7 — E-31 names the last day, and says "1 day left" on the day before it', async (t) => {
+  // NOW is 2026-10-10: valid until that day is its last day, and still a warning, not a refusal.
+  for (const [until, why] of [['2026-10-10', 'last day'], ['2026-10-11', '1 day left'], ['2026-10-25', '15 days left']]) {
+    const r = await E31.run(ctxFor(t, { file: licenceText(licence({ valid_until: until }), primary) }));
+    assert.deepEqual([r.status, r.detail], ['warn', `Licence: expiring · LIC-2026-0002 · until ${until} — ${why}`]);
+  }
+});
+
 test('ARC-11-C6 — an expired licence and a revoked one are FAILs too, each with the reason and the remedy', async (t) => {
   const expired = await E31.run(ctxFor(t, { file: licenceText(licence({ valid_until: '2026-10-01' }), primary) }));
   assert.equal(expired.status, 'fail');

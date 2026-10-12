@@ -67,6 +67,19 @@ describe('ARC-11-C1 — the server\'s licence session', () => {
     expect(takeLicenceNotice()).toMatch(/^Licence: expiring · LIC-2026-0002 · until \d{4}-\d{2}-\d{2} — 10 days left/);
   });
 
+  it('names the last day in the notice, and says "1 day left" on the day before it (ARC-11-C6 step 7)', () => {
+    // 23:59:59 UTC on 2026-10-10: the last day still counts (docs/USER-GUIDE.md), and serves.
+    const now = (): Date => new Date('2026-10-10T23:59:59Z');
+    for (const [until, why] of [['2026-10-10', 'last day'], ['2026-10-11', '1 day left'], ['2026-10-20', '10 days left']]) {
+      resetLicenceForTests();
+      const root = checkout();
+      writeFileSync(join(root, '.local', 'licence.json'), licenceText(licence({ valid_until: until }), primary));
+      initLicence({ root, keys: KEYS, now });
+      expect(refusal()).toBeNull();
+      expect(takeLicenceNotice()).toMatch(new RegExp(`^Licence: expiring · LIC-2026-0002 · until ${until} — ${why}\\. Run `));
+    }
+  });
+
   it('refuses a revoked licence, read from the cached list', () => {
     const list = listText(3, [{ id: 'LIC-2026-0002', revokedAt: fromToday(-1), reason: 'breach' }], primary);
     start(licenceText(licence(), primary), JSON.stringify({ checkedAt: new Date().toISOString(), source: 'fixture', list: JSON.parse(list) }));
