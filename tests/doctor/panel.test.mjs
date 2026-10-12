@@ -64,13 +64,12 @@ test('the live fixture renders to exactly these bytes', () => {
     // read from the fixture's own summary rather than spelled, the way the version and the shas
     // are. What this assertion is for is the SHAPE of the line, not the arithmetic in it.
     // ARC-11-C6 step 5 — E-31 FAILS on every checkout without a licence, the fixture's own included, so the
-    // failure is NAMED in the tally, and listed under it with its remedy, as every FAIL is.
+    // failure is NAMED in the tally, and listed under it with its remedy, as every FAIL is. The remedy is the
+    // fixture's own text, which the panel prints as it was captured, so it is read from the fixture like the
+    // version: spelled with this process's launcher, it was right on a mac and wrong on all seven Windows cells.
     `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn, ${LIVE.summary.fail} fail (E-31)`
       + ` — quick run 2026-09-20 09:00 UTC · full report: ${CLI} doctor`,
-    `E-31 FAIL the licence for this checkout: Licence: missing — Run ${CLI} licence check to see why, then install a valid`
-      + ' licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards.'
-      // ARC-11-C6 step 6 — and the way back, which a refused state's remedy ends with.
-      + ` To go back to the last release that runs without a licence: ${CLI} upgrade --to v2.0.12.`,
+    `E-31 FAIL the licence for this checkout: Licence: missing — ${LIVE.checks.find((c) => c.id === 'E-31').remedy}`,
     `Capability packs, citation counts and the corpus branch are not probed on a quick run — ${CLI} doctor reports them.`,
     "Instances are the store's own records; nothing was probed.",
   ].join('\n'));
