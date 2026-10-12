@@ -1125,6 +1125,18 @@ shrinks unless an example invents something; its size by reason is asserted in
 
 ---
 
+## Table rows
+
+`docs verify` also reads every table in the tracked Markdown outside `vendor/`
+(`tools/snowarch/lib/docs/tables.mjs`, ARC-09-C126), and fails on a body row with more cells than its header:
+`WIDE <file>:<line> <n> cells, header <m>`. GitHub ends a cell at an unescaped pipe, inside backticks too, and
+drops every cell past the header's count, so such a row reads whole in the file and renders short on the page.
+Escape the pipe as `\|`, which GitHub renders as a plain pipe even inside code, or reword the cell; a
+placeholder lists its choices with "or" (`<design-only or live>`). A generated table escapes its own cells
+(`scripts/gen-readme-tables.mjs`).
+
+---
+
 ## The engine's git floor
 
 `floors.git` is **2.34.1** (ADR-0008), not ADR-0001's 2.25.0. Below 2.34.1 nothing has been measured, and
