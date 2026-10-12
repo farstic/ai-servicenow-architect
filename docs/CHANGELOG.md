@@ -27,9 +27,11 @@ licence:
 - the session banner and `./snowarch status` gain a `Licence:` line after the `Mode:` line;
 - a session's first tool answer carries one extra block, after its first, which is unchanged.
 
-**The licence of the code.** Every 2.0.x release, 2.0.12 included, stays under the Apache License 2.0. From 2.1.0
-the licence is enforced by default (ARC-11-C3), and the product moves to the Business Source License 1.1
-(ARC-11-C5). A version's licence is the `LICENSE` file in its release tag (`LICENSING.md`, § Future versions).
+**The licence of the code.** Every 2.0.x release, 2.0.12 included, stays under the Apache License 2.0. **2.0.13
+brings enforcement on every build (ARC-11-C6):** with no valid licence, no tool runs, no CLI command runs but
+the few that repair the state, and no variable turns that off. From 2.1.0 the product moves to the Business
+Source License 1.1 (ARC-11-C5). A version's licence is the `LICENSE` file in its release tag (`LICENSING.md`,
+§ Future versions).
 
 **The release candidates, and what a live instance has confirmed.** `v2.0.12-rc.1` (`9a75d8e`) and
 `v2.0.12-rc.2` (`18e5020`) were cut before this release.
@@ -55,8 +57,9 @@ the licence is enforced by default (ARC-11-C3), and the product moves to the Bus
   - the ATF step tool, live: a 2680-character script refused before any write, against its input variable's
     max_length of 2000, and the listing showing `jasmine_version` defaulted by the instance;
   - the status panel's `Licence:` line, rc.1's first defect, seen fixed;
-  - the `expired` state: [pending, 2026-10-12: the line and the refusal];
-  - round 2, on the colleague's machine: [pending: result].
+  - the `expired` state, on 2026-10-12 once the UTC day turned: `Licence: expired · enforced` at the check, the
+    tool refused with `LICENCE_NOT_VALID`, and one audit line written, the first licence-refusal line seen live;
+  - round 2, on the colleague's machine: still to come; it runs on the colleague's machine after this release.
 
 The live procedures are in `packages/snowarch/tests/live/README.md`.
 
