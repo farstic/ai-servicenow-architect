@@ -31,8 +31,9 @@ The no-deliverable rule reads the session banner's `Licence:` line, which the Se
 that loads no local settings, has hooks off, or has the hook entry removed does not see it, and only the rule goes
 silent — the server still refuses every MCP tool. From 2.1 the doctor fails when the hook is gone (ARC-11-C10).
 
-**The release candidate, and what the owner's sitting confirms.** `v2.0.13-rc.3` was cut from develop `a40f6f2`,
-after #420 (ARC-11-C6) and #424 (the sweep). The owner's sitting on it runs:
+**The release candidate, and what the owner's sitting confirms.** `v2.0.13-rc.3` is release commit `5fac74b`,
+cut from develop `20d05f4`, after #420 (ARC-11-C6), #424 (the sweep) and #425 (ARC-07-C43, the changelog guard).
+The owner's sitting on it runs:
 - **T-28, revised for enforcement on every build**, with no variable set anywhere. Row 1 is refused, with E-31's
   remedy and the way back. The `valid until:` line reads in UTC, with "last day" on the last day. Row 15 takes the
   way back, `./snowarch upgrade --to v2.0.12`;
