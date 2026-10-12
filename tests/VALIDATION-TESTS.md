@@ -1807,8 +1807,9 @@ T-05 and T-06 run on their dormant variant in `design-only`; their live halves n
 instance and are ARC-09/ARC-10's gate. T-07's setup is in its own section above.
 
 The scripted form is `scripts/validation/validation-run.sh <tag> [--repeat N] [T-NN …]`. It reads every
-case in this file, runs each in a session confined to the checkout's own settings
-(`--setting-sources project`), with no MCP server, a fixed tool set (`--tools`) and Sonnet 5.5 unless
+case in this file, runs each in a session confined to the clone's own settings
+(`--setting-sources project,local`: the local file is the one the bootstrap writes, with the SessionStart hook
+whose banner carries the `Licence:` line), with no MCP server, a fixed tool set (`--tools`) and Sonnet 5.5 unless
 `VALIDATION_MODEL` says otherwise, and prints a header (sha, model, setting sources, tools) and, per turn,
 the skills invoked, the corpus pages read and any cited page that does not exist — a bare file name that
 resolves to one page is reported as BARE, not accepted. It judges nothing: the Pass criteria above do.

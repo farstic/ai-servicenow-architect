@@ -15,7 +15,8 @@
 #
 # EVERY CASE, ISOLATED (ARC-09-C87). The prompts come from all of `tests/VALIDATION-TESTS.md` (T-01 to
 # the last), and each session runs on the policy in `scripts/validation/session-policy.mjs`: the
-# checkout's own settings and hooks only (`--setting-sources project`), no MCP server
+# clone's own settings and hooks only (`--setting-sources project,local`, the local file being the one the
+# bootstrap writes, with the SessionStart hook in it), no MCP server
 # (`--strict-mcp-config`), a tool set that is a set (`--tools`, with `--allowedTools` for the few that
 # would ask), and Sonnet 5.5 unless VALIDATION_MODEL says otherwise. The header prints the sha, the
 # model, the setting sources and the tools; each turn prints the skills invoked, the corpus pages read
