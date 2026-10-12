@@ -369,7 +369,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `DNS_FAILURE` | the name `<host>` does not resolve. Check the instance name first — a typo is the usual cause; on a corporate network the name may resolve only over VPN, or only through a proxy, so set `HTTPS_PROXY` if there is one (there is one — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, which makes a wrong name the likelier cause) |
 | `ECONNREFUSED` | as `CONNECTION_REFUSED`: check the URL, the port and any proxy |
 | `ENOTFOUND` | as `DNS_FAILURE`: check the host in the store |
-| `ENV_REQUIRED` | pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do |
+| `ENV_REQUIRED` | pass `--env pdi\|dev\|test\|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do |
 | `ETIMEDOUT` | as `CONNECTION_TIMEOUT` |
 | `FIELD_NOT_STORED` | read the record back; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance |
 | `FLAG_DEPENDENCY_VIOLATION` | decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically |

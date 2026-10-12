@@ -9,6 +9,27 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**This release brings enforcement on every build (ARC-11-C6):** with no valid licence, no tool runs, no CLI command
+runs but the few that repair the state, and no variable turns that off. It stays under the Apache License 2.0; from
+2.1.0 the product moves to the Business Source License 1.1 (ARC-11-C5).
+
+### Changed
+
+- `docs verify` refuses a Markdown table row with more cells than its header, outside fences. GitHub cuts a cell at
+  the first unescaped pipe, inside a code span too, and drops every cell past the header's count, so such a row reads
+  whole in the file and short on the page. The 33 rows that broke this are fixed (ARC-09-C126).
+
+### Fixed
+
+- `snow_us_capture_target_set` returns `previous`, the update set the authenticated user's capture preference named
+  before the call, from the read it already made, so a procedure that points capture back afterwards no longer reads
+  the preference first. It is null when the tool created the preference, or when the one it found named nothing
+  (ARC-09-C127).
+- `snow_us_current_update_set_read` reads the session's update set, the authenticated user's `sys_update_set`
+  preference, where it listed up to five update sets in progress on the whole instance and called that current. It
+  returns `session_update_set` (null with no preference, `found: false` for a set that does not exist), and the
+  instance's in-progress sets as `in_progress_update_sets`; `count` and `active_update_sets` are gone (ARC-09-C128).
+
 ## 2.0.12 — 2026-10-12
 
 ### Notes

@@ -60,7 +60,7 @@ Confirmed by the owner on 2026-09-04.
 |---|---|---|---|
 | **A (chosen)** | `ai-servicenow-architect` / `snowarch` / `servicenow` / `@farstic/snowarch` | Matches the product the user already calls "AI ServiceNow Architect"; ends the three-way name mismatch (`00` P-15); `snowarch` is short, lowercase and collides with nothing on npm or in the bundled skills; tools read `mcp__servicenow__snow_…`, which two candidate designs and two judges had already assumed | A brand-new npm record has no download history |
 | B | Keep the server package name `@farstic/snow-mcp` (the `02` recommendation for (d)) | The scoped name is already owned and published | The owner's constraint is that this record is frozen; publishing a new major under it is exactly what must not happen. **Amended by the owner to option A.** |
-| C | Server key `snow` or `servicenow-mcp` | `servicenow-mcp` preserves today's working-tree `CLAUDE.md` text | `snow` yields the stuttering `mcp__snow__snow_…`; `servicenow-mcp` is longer for no benefit | <!-- retired-name: historical -->
+| C | Server key `snow` or `servicenow-mcp` | `servicenow-mcp` preserves today's working-tree `CLAUDE.md` text | `snow` yields the stuttering `mcp__snow__snow_…`; `servicenow-mcp` is longer for no benefit <!-- retired-name: historical -->
 | D (defer) | Decide names during ARC-01 | None | The names are inputs to the generated governance texts (ARC-05); deciding after generation means regenerating everything |
 
 ## §1.1 record (if a custom object was in play)

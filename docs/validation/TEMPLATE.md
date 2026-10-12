@@ -5,21 +5,21 @@
      refusal names the pattern and the line. The redaction is the point of the format: a record
      nobody can publish is a record nobody writes. -->
 
-# Validation run — <date> — <macos | ubuntu | windows>
+# Validation run — <date> — <macos, ubuntu or windows>
 
 | Field | Value |
 |---|---|
 | **Date** | `<YYYY-MM-DD>` |
 | **Observer** | `<role, never a name — "the owner", "a second reader">` |
-| **Machine** | `<macos 15 · arm64 | ubuntu 24.04 · x64 | windows 11 · x64>` |
-| **Clean?** | `<yes — never had this product | no — what was left from before>` |
+| **Machine** | `<macos 15 · arm64, ubuntu 24.04 · x64 or windows 11 · x64>` |
+| **Clean?** | `<yes — never had this product or no — what was left from before>` |
 | **Product version** | `<v2.0.0>` at `<sha>` |
 | **Claude Code** | `<claude --version>` |
 | **Node** | `<node -v, or "absent — design-only">` |
-| **Mode** | `<design-only | live>` |
-| **Preset** | `<read-only | pdi-developer | full | custom | n/a in design-only>` |
-| **Gate** | `<n/a | RUN_LIVE_E2E=1>` |
-| **Writes allowed** | `<n/a | SNOW_E2E_ALLOW_WRITES set | unset>` |
+| **Mode** | `<design-only or live>` |
+| **Preset** | `<read-only, pdi-developer, full, custom or n/a in design-only>` |
+| **Gate** | `<n/a or RUN_LIVE_E2E=1>` |
+| **Writes allowed** | `<n/a, SNOW_E2E_ALLOW_WRITES set or unset>` |
 
 ## Install timeline
 
@@ -43,7 +43,7 @@ reason; a bare `n/a` is not a result.
 
 | Id | Result | Evidence or why not run |
 |---|---|---|
-| `T-01` | `<pass | fail | n/a>` | |
+| `T-01` | `<pass, fail or n/a>` | |
 
 **Probes** (live runs only): `<what the connectivity probe returned>` ·
 `<what the permission probe returned>`.
