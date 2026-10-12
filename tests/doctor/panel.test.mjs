@@ -52,7 +52,7 @@ test('the live fixture renders to exactly these bytes', () => {
   assert.equal(renderPanel(LIVE, CLI), [
     LIVE.modeLineDetailed,
     // ARC-11-C1 — the licence, second, exactly as the session-start banner prints it. The fixture's
-    // checkout has none, and enforcement is off.
+    // checkout has none, and from 2.0.13 that refuses (ARC-11-C6).
     'Licence: missing',
     `Engine: snowarch ${LIVE.engine.version} · contract ${LIVE.engine.contractSha.slice(0, 12)}`,
     `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · sparse`,
@@ -63,10 +63,12 @@ test('the live fixture renders to exactly these bytes', () => {
     // The tally moves when a check is added — ARC-08-C30's E-29 took it from 14 to 15 — so it is
     // read from the fixture's own summary rather than spelled, the way the version and the shas
     // are. What this assertion is for is the SHAPE of the line, not the arithmetic in it.
-    // ARC-11-C1 — E-31 warns on every checkout without a licence, the fixture's own included, so the
-    // warning is NAMED here: the shape of the line now carries one id in brackets.
-    `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn (E-31), ${LIVE.summary.fail} fail`
+    // ARC-11-C6 step 5 — E-31 FAILS on every checkout without a licence, the fixture's own included, so the
+    // failure is NAMED in the tally, and listed under it with its remedy, as every FAIL is.
+    `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn, ${LIVE.summary.fail} fail (E-31)`
       + ` — quick run 2026-09-20 09:00 UTC · full report: ${CLI} doctor`,
+    `E-31 FAIL the licence for this checkout: Licence: missing — Run ${CLI} licence check to see why, then install a valid`
+      + ' licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards',
     `Capability packs, citation counts and the corpus branch are not probed on a quick run — ${CLI} doctor reports them.`,
     "Instances are the store's own records; nothing was probed.",
   ].join('\n'));
@@ -251,8 +253,9 @@ test('ARC-08-C37 — the count names which check it is talking about', () => {
   assert.match(doctorLine(report, CLI), /^Doctor: 20 ok, 2 warn \(E-23, E-25\), 1 fail \(E-10\) — /);
 
   // A zero count gets no brackets at all: there is nothing to name, and `0 fail ()` is noise. Built from
-  // the live fixture without its warnings: since ARC-11-C1 the fixture itself carries E-31's.
-  const quiet = { ...LIVE, summary: { ...LIVE.summary, warn: 0 }, checks: LIVE.checks.filter((c) => c.status !== 'warn') };
+  // the live fixture without its warnings and failures: since ARC-11-C6 step 5 the fixture carries E-31's FAIL.
+  const quiet = { ...LIVE, summary: { ...LIVE.summary, warn: 0, fail: 0 },
+    checks: LIVE.checks.filter((c) => c.status !== 'warn' && c.status !== 'fail') };
   assert.match(doctorLine(quiet, CLI), /^Doctor: \d+ ok, 0 warn, 0 fail — /);
 
   // THE IDS ARE READ FROM THE REPORT, never from a remembered list. Drop a check and the line
