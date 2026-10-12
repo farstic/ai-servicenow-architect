@@ -13,6 +13,7 @@ import { collectToolCatalog } from '../../src/tools/index.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 import { cliSpelling } from '../../src/cli/tty.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
@@ -84,7 +85,7 @@ function env(): Record<string, string> {
   const clean = { ...process.env } as Record<string, string>;
   for (const k of ['SNOW_STORE', 'SERVICENOW_INSTANCE_URL', 'SERVICENOW_BASIC_USERNAME',
     'SERVICENOW_BASIC_PASSWORD', 'SNOW_ENV_FILE']) delete clean[k];
-  return { ...clean, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error' };
+  return licensedEnv({ ...clean, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error' });
 }
 
 async function connect(): Promise<{ client: Client; notifications: string[] }> {

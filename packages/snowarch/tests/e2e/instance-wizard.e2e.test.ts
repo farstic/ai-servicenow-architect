@@ -12,6 +12,7 @@ import { LIVE, ALLOW_WRITES, hasOauth, liveConfig, type LiveConfig } from './env
 import { findSecret, redact } from './redact.js';
 import { ptyAvailable, runInPty, stdinPayload } from '../helpers/pty.js';
 import { trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-07-S11 — the CLI against a REAL instance, behind `RUN_LIVE_E2E=1`.
@@ -221,7 +222,8 @@ describe.skipIf(!ready)('ARC-07-S11 live E2E — the wizard against a real insta
       expect(store2.instances['e2e-prod']?.prodWriteAck).toBe(true);
 
       // And the server loads it. Spawned rather than imported: the claim is about the program.
-      const started = spawnSync(process.execPath, [SERVER, '--version'], { encoding: 'utf8', env: env() });
+      const started = spawnSync(process.execPath, [SERVER, '--version'],
+        { encoding: 'utf8', env: licensedEnv({ ...env(), CLAUDE_PROJECT_DIR: base }) });
       expect(started.status === 0 || started.status === null).toBe(true);
     }, 180_000);
   });

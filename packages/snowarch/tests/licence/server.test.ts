@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { collectToolCatalog } from '../../src/tools/index.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 import { fromToday, keysOf, licence, licenceText, pair } from './fixtures.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-11-C1 — the licence gate in the BUILT server, over stdio, as Claude Code runs it.
@@ -60,7 +61,9 @@ function env(extra: Record<string, string> = {}): Record<string, string> {
   const clean = { ...process.env } as Record<string, string>;
   for (const k of ['SNOW_STORE', 'SERVICENOW_INSTANCE_URL', 'SERVICENOW_BASIC_USERNAME', 'SERVICENOW_BASIC_PASSWORD',
     'SNOW_ENV_FILE', 'SNOW_AUDIT_FILE', 'SNOW_LICENCE_ENFORCE']) delete clean[k];
-  return { ...clean, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error', ...extra };
+  // ARC-11-C6: each case writes the licence it is about, so the helper adds the hook and writes none.
+  return licensedEnv({ ...clean, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error', ...extra },
+    { licence: false });
 }
 
 async function connect(server: string, extra: Record<string, string> = {}): Promise<Client> {

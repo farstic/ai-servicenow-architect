@@ -2,12 +2,17 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
+/** A project of its own (ARC-11-C6): the server reads its licence from CLAUDE_PROJECT_DIR. Removed at exit. */
+const project = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-handshake-')));
 /** The package's own version, read rather than typed — see the initialize test (ARC-09-C12). */
 const packageVersion = (): string =>
   JSON.parse(readFileSync(resolve(here, '../../package.json'), 'utf8')).version;
@@ -28,7 +33,7 @@ function initialize(): Promise<any> {
       // legacy env path DOES still read this variable, so it cannot simply be dropped, and a
       // hostname whose non-resolution is a promise the network keeps only usually has no place in
       // a suite that touches no network.
-      env: { ...process.env, SERVICENOW_INSTANCE_URL: 'https://127.0.0.1:9' },
+      env: licensedEnv({ ...process.env, SERVICENOW_INSTANCE_URL: 'https://127.0.0.1:9', CLAUDE_PROJECT_DIR: project }),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let out = '';

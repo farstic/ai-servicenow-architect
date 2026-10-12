@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { removeTempDir, reapServerChildren, trackServerChild, trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-07-S07, AC 2 (the server half) — with an instance in BOTH stores, which one does the server
@@ -50,8 +51,8 @@ function env(): Record<string, string> {
   const clean = { ...process.env } as Record<string, string>;
   for (const k of ['SNOW_STORE', 'SERVICENOW_INSTANCE_URL', 'SERVICENOW_BASIC_USERNAME',
     'SERVICENOW_BASIC_PASSWORD', 'SNOW_ENV_FILE']) delete clean[k];
-  return { ...clean, HOME: home, USERPROFILE: home, APPDATA: join(home, 'AppData', 'Roaming'),
-    XDG_CONFIG_HOME: join(home, '.config'), CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error' };
+  return licensedEnv({ ...clean, HOME: home, USERPROFILE: home, APPDATA: join(home, 'AppData', 'Roaming'),
+    XDG_CONFIG_HOME: join(home, '.config'), CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error' });
 }
 
 async function connect(): Promise<Client> {
