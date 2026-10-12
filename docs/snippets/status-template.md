@@ -30,8 +30,8 @@ re-deriving it, so no two surfaces can disagree about whether the checkout is li
 
 Line 2 is the session-start banner's `Licence:` line, in every state, `ok` included (ARC-11-C1). It is
 rendered from E-31's data by the banner's own `bannerLine` (`tools/snowarch/lib/licence/line.mjs`),
-so the banner and the panel cannot word it differently. Enforcement is named — `warn only` or
-`enforced` — with every state except `ok`: a licence in force needs no such word.
+so the banner and the panel cannot word it differently. From 2.0.13 the line names the state alone:
+enforcement has no switch, so it has no word.
 
 Where each line comes from, all of it schema-v1 JSON (`./snowarch status --json` prints that report
 unchanged — it is the same object `doctor --quick --json` prints, not a shape of its own):
