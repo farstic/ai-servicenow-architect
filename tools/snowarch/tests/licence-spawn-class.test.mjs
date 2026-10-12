@@ -1,7 +1,7 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
- * ARC-11-C6 step 1 — every start of the CLI, the server or a launcher in the tests carries a licence.
+ * ARC-11-C6 steps 1 and 4b — every start of a CLI, the server or a launcher in the tests carries a licence.
  *
  * From 2.0.13 a product process with no valid licence refuses (C6). A test that starts one bare would test the
  * gate and not its subject, and would pass or fail by whether the machine running it happens to hold a licence.
@@ -22,7 +22,7 @@ import { scanProductStarts } from './helpers/licence-hook/starts.mjs';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const ROOTS = ['tools/snowarch/tests', 'packages/snowarch/tests', 'tests'].map((r) => join(ROOT, r));
 
-test('ARC-11-C6 — every test that starts the CLI, the server or a launcher gives it a licence through licensedEnv', async () => {
+test('ARC-11-C6 — every test that starts a CLI, the server or a launcher gives it a licence through licensedEnv', async () => {
   const { starts, unresolved, files } = await scanProductStarts({ roots: ROOTS, base: ROOT });
   // An instrument that read nothing, or found nothing, proves nothing: 314 files and 36 starts on 2026-10-12.
   assert.ok(files > 300, `the reader read ${files} files`);

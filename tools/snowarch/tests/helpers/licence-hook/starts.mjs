@@ -20,8 +20,9 @@
  * iterates), destructured names, a function's return expressions, and a name imported from a relative
  * module, followed into that module once. A name from a package or a built-in is known and not followed.
  *
- * A start is a PRODUCT START when that value names an entry point: the CLI (`snowarch.mjs`), the server
- * (`server.js`) or a launcher (`snowarch`, `snowarch.cmd`). When the program cannot be followed (a command,
+ * A start is a PRODUCT START when that value names an entry point: the CLI (`snowarch.mjs`), the package CLI
+ * (`dist/cli/index.js`, behind the same gate from step 4b), the server (`server.js`) or a launcher (`snowarch`,
+ * `snowarch.cmd`). When the program cannot be followed (a command,
  * or the script node is given, that is a parameter) in a file that names an entry point, it is PRESUMED one:
  * "could not tell" and "nothing here" are different answers, and only the second may pass silently.
  *
@@ -43,16 +44,18 @@ const GLOBALS = new Set(['process', 'JSON', 'String', 'Object', 'Array', 'Number
 const RUNNER = /process\.execPath|COMSPEC|(['"`])(?:node|node\.exe|sh|bash|\/bin\/sh|\/bin\/bash|cmd|cmd\.exe|pwsh|pwsh\.exe|powershell|powershell\.exe)\1/;
 const LAUNCHER = /^(?:\.[\\/]|\$\{[^}]*\}[\\/])?snowarch(?:\.cmd)?(?:\s|$)/;
 
-/** The entry points a string value IS: a path ending in the CLI or the server, or the launcher's spellings. */
+/** The entry points a string value IS: a path ending in a CLI or the server, or the launcher's spellings. */
 export function entryPointsOf(value) {
   const v = value.trim();
-  return [/(?:^|[\\/])snowarch\.mjs(?:\s|$)/.test(v) && 'cli', /(?:^|[\\/])server\.js(?:\s|$)/.test(v) && 'server',
-    LAUNCHER.test(v) && 'launcher'].filter(Boolean);
+  return [/(?:^|[\\/])snowarch\.mjs(?:\s|$)/.test(v) && 'cli',
+    /(?:^|[\\/])cli[\\/]index\.js(?:\s|$)/.test(v) && 'package-cli',
+    /(?:^|[\\/])server\.js(?:\s|$)/.test(v) && 'server', LAUNCHER.test(v) && 'launcher'].filter(Boolean);
 }
 
 /** The entry points a piece of code names anywhere in it — `-e` code that imports the CLI. */
 export function entryPointsIn(code) {
-  return [/snowarch\.mjs\b/.test(code) && 'cli', /\bserver\.js\b/.test(code) && 'server'].filter(Boolean);
+  return [/snowarch\.mjs\b/.test(code) && 'cli', /\bcli[\\/]index\.js\b/.test(code) && 'package-cli',
+    /\bserver\.js\b/.test(code) && 'server'].filter(Boolean);
 }
 
 /** Every source file under `roots`, outside `node_modules`; declaration files are not code. */
@@ -229,8 +232,11 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
       const lits = (n) => {
         if (ts.isStringLiteralLike(n)) values.push(n.text);
         if (ts.isTemplateExpression(n)) values.push(n.getText().slice(1, -1));
-        // A path is named by its last segment: `join(root, 'tools', 'snowarch', 'tests')` is not the launcher.
+        // A path is named by its last segment: `join(root, 'tools', 'snowarch', 'tests')` is not the launcher. And
+        // by its last two when both are written out, because the package CLI's last segment alone is `index.js`.
         if (ts.isCallExpression(n) && /(?:^|\.)(?:join|resolve)$/.test(n.expression.getText()) && n.arguments.length) {
+          const [a, b] = n.arguments.slice(-2);
+          if (b && ts.isStringLiteralLike(a) && ts.isStringLiteralLike(b)) values.push(`${a.text}/${b.text}`);
           lits(n.arguments[n.arguments.length - 1]);
           return;
         }
