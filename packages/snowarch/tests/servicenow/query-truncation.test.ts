@@ -1,6 +1,9 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { respond, resetFetchMock, snFetchMockModule, type SnFetchState } from '../helpers/fetch-mock.js';
 
 const http = vi.hoisted<SnFetchState>(() => ({ calls: [], queue: [] }));
@@ -119,5 +122,25 @@ describe('ARC-09-C125 — the description states the defaults the client uses', 
     expect(props.offset.description).toMatch(/offset \+ count/);
     expect(props.offset.description).toMatch(/until `?truncated`? is false/);
     expect(tool.description).toMatch(/reached the limit/);
+  });
+});
+
+describe('ARC-09-C125 — the numbers are written once, in client.ts', () => {
+  // A description that hard-coded "100" would pass the value check above while the constant it copies moved on.
+  // That is how "default: 10" survived a client that sent 100. So the SOURCE is read: both places name the constants.
+  const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../../src');
+
+  it('the limit description and the client\'s default use DEFAULT_MAX_RECORDS and MAX_PAGE, never the numbers', () => {
+    const core = readFileSync(resolve(SRC, 'tools/core.ts'), 'utf8');
+    const limitLine = core.split('\n').find((l) => /^\s*limit: \{ type: 'number', description: `Max records/.test(l));
+    expect(limitLine, 'the limit property is not where the guard reads it').toBeDefined();
+    expect(limitLine).toContain('${DEFAULT_MAX_RECORDS}');
+    expect(limitLine).toContain('${MAX_PAGE}');
+    expect(limitLine).not.toMatch(/\b(10|100|1000)\b/);
+    const client = readFileSync(resolve(SRC, 'servicenow/client.ts'), 'utf8');
+    const queryRecords = client.slice(client.indexOf('async queryRecords'), client.indexOf('async getTableSchema'));
+    expect(queryRecords).toContain('DEFAULT_MAX_RECORDS');
+    expect(queryRecords).toContain('MAX_PAGE');
+    expect(queryRecords).not.toMatch(/Math\.min\([^;]*\b(100|1000)\b/);
   });
 });
