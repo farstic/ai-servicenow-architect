@@ -53,7 +53,7 @@ function leakRegex(home: string, checkout: string): RegExp {
 }
 
 describe('F2 - no absolute home or checkout path reaches a log line', () => {
-  it.skipIf(win32)('a refused store: neither the description nor the Run: remedy carries an absolute path (skipped on Windows: the mode check that produces this message does not run there)', () => {
+  it.skipIf(win32)('a refused store: neither the description nor the Run: remedy carries an absolute path (skipped on Windows: the mode check that produces this message does not run there)', async () => {
     const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
     const fakeHome = join(base, 'home');
     const checkout = join(base, 'volume', 'repo');   // NOT under fakeHome — see the note above
@@ -64,7 +64,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       writeFileSync(store, JSON.stringify(STORE), { mode: 0o600 });
       chmodSync(store, 0o644); // the refusal this test is about
 
-      const stderr = serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: undefined,
+      const stderr = await serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: undefined,
         SERVICENOW_INSTANCE_URL: undefined }, checkout);
 
       expect(stderr).toContain('STORE_PERMISSIONS_TOO_OPEN');
@@ -79,7 +79,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
     }
   }, 40_000);
 
-  it('a loaded store: the startup line names the checkout, never the absolute path', () => {
+  it('a loaded store: the startup line names the checkout, never the absolute path', async () => {
     const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
     const fakeHome = join(base, 'home');
     const checkout = join(base, 'volume', 'repo');   // NOT under fakeHome — see the note above
@@ -88,7 +88,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       mkdirSync(join(checkout, '.local'), { recursive: true, mode: 0o700 });
       writeFileSync(join(checkout, '.local', 'instances.json'), JSON.stringify(STORE), { mode: 0o600 });
 
-      const stderr = serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: undefined,
+      const stderr = await serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: undefined,
         SERVICENOW_INSTANCE_URL: undefined }, checkout);
 
       expect(stderr).toContain('store: project (<checkout>');
@@ -98,14 +98,14 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
     }
   }, 40_000);
 
-  it('a store that is not found: the message is masked too', () => {
+  it('a store that is not found: the message is masked too', async () => {
     const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
     const fakeHome = join(base, 'home');
     const checkout = join(base, 'volume', 'repo');   // NOT under fakeHome — see the note above
     mkdirSync(fakeHome, { recursive: true });
     try {
       mkdirSync(checkout, { recursive: true });
-      const stderr = serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout,
+      const stderr = await serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout,
         SNOW_STORE: join(checkout, 'absent.json'), SERVICENOW_INSTANCE_URL: undefined }, checkout);
 
       expect(stderr).toContain('STORE_NOT_FOUND');
@@ -115,7 +115,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
     }
   }, 40_000);
 
-  it('the env-instances note and the "no store" note are masked as well', () => {
+  it('the env-instances note and the "no store" note are masked as well', async () => {
     const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
     const fakeHome = join(base, 'home');
     const checkout = join(base, 'volume', 'repo');   // NOT under fakeHome — see the note above
@@ -124,14 +124,14 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       mkdirSync(join(checkout, '.local'), { recursive: true, mode: 0o700 });
       writeFileSync(join(checkout, '.local', 'instances.json'), JSON.stringify(STORE), { mode: 0o600 });
 
-      const withEnv = serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: undefined,
+      const withEnv = await serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: undefined,
         SERVICENOW_INSTANCE_URL: 'https://envtest.service-now.com' }, checkout);
       expect(withEnv).toContain('store ignored: <checkout>');
       expect(withEnv).not.toMatch(leakRegex(fakeHome, checkout));
 
       const empty = join(base, 'empty');
       mkdirSync(empty, { recursive: true });
-      const none = serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: empty, SNOW_STORE: undefined,
+      const none = await serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: empty, SNOW_STORE: undefined,
         SERVICENOW_INSTANCE_URL: undefined }, empty);
       expect(none).toContain('mode: unconfigured');
       expect(none).not.toMatch(leakRegex(fakeHome, empty));
@@ -140,7 +140,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
     }
   }, 60_000);
 
-  it.skipIf(win32)('a SNOW_STORE under HOME uses ~; one outside both HOME and the checkout is left as given (skipped on Windows: both halves assert a chmod remedy, and the mode check that produces it does not run there)', () => {
+  it.skipIf(win32)('a SNOW_STORE under HOME uses ~; one outside both HOME and the checkout is left as given (skipped on Windows: both halves assert a chmod remedy, and the mode check that produces it does not run there)', async () => {
     // The user named that path explicitly. Rewriting it would point the remedy somewhere
     // they did not choose, which is worse than printing a path they already typed.
     const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
@@ -153,7 +153,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       writeFileSync(underHome, JSON.stringify(STORE), { mode: 0o600 });
       chmodSync(underHome, 0o644);
 
-      const a = serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: underHome,
+      const a = await serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: underHome,
         SERVICENOW_INSTANCE_URL: undefined }, checkout);
       expect(a).toMatch(/Run: chmod 600 ~\/secrets\/s\.json/);
       expect(a).not.toMatch(leakRegex(fakeHome, checkout));
@@ -161,7 +161,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
       const elsewhere = join(base, 'volume', 'chosen.json');
       writeFileSync(elsewhere, JSON.stringify(STORE), { mode: 0o600 });
       chmodSync(elsewhere, 0o644);
-      const b = serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: elsewhere,
+      const b = await serverStderr(SERVER, { HOME: fakeHome, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: elsewhere,
         SERVICENOW_INSTANCE_URL: undefined }, checkout);
       expect(b).toContain('STORE_PERMISSIONS_TOO_OPEN');
       expect(b).toContain(elsewhere);                 // as given, on purpose

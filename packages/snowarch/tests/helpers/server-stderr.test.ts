@@ -28,4 +28,19 @@ describe('ARC-09-C132 — the server-stderr helper', () => {
       removeTempDir(dir);
     }
   }, 40_000);
+
+  it('returns what there is when the line never comes, at the timeout, rather than hanging', async () => {
+    const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-c132-')));
+    try {
+      const silent = join(dir, 'silent-server.mjs');
+      writeFileSync(silent, "console.error('[INFO] store: none');\nsetInterval(() => {}, 1000);\n");
+      const started = Date.now();
+      const stderr = await serverStderr(silent, {}, dir, { timeout: 3000 });
+      expect(stderr).toContain('[INFO] store: none');
+      expect(stderr).not.toMatch(/\[INFO\] licence: /);
+      expect(Date.now() - started).toBeLessThan(20_000);
+    } finally {
+      removeTempDir(dir);
+    }
+  }, 40_000);
 });
