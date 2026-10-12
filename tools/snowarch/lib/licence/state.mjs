@@ -27,24 +27,15 @@ import { licencePath, revocationsPath } from '../local-paths.mjs';
 
 export { bannerLine } from './line.mjs';
 
-/** The states enforcement refuses. `expiring` is not one: a licence in its last month is in force. */
-export const REFUSED = Object.freeze(['missing', 'invalid', 'expired', 'revoked']);
-
 /**
- * The commands that run without a licence: the five a person needs to see and repair the state (R1), and
- * `bootstrap` in full (ARC-11-C6, ruling A), because installing is how a checkout first reads one.
+ * ARC-11-C6 step 4b — the states enforcement refuses, the commands that run without a licence and the decision are
+ * the PACKAGE'S, imported from its build: one gate for both doors, this CLI and `dist/cli/index.js` (ruling R3).
+ * `packages/snowarch/src/licence/gate.ts` is the source, and `licence-gate-shared.test.mjs` holds that these are
+ * its own objects and that nothing else defines them. The build imports nothing, so the engine still loads before
+ * any install has run.
  */
-export const CLI_ALLOWED = Object.freeze(['licence', 'doctor', 'status', 'version', 'upgrade', 'bootstrap']);
-
-/**
- * And the forms of other commands that do: `mode design`, which deregisters a checkout before its folder is
- * deleted (INSTALL.md, Uninstall). `mode` itself, and `mode live`, are refused.
- */
-export const CLI_ALLOWED_FORMS = Object.freeze({ mode: Object.freeze(['design']) });
-
-/** Does this command, with these arguments, run without a licence? */
-export const allowedCommand = (name, positional = []) => CLI_ALLOWED.includes(name)
-  || (Object.hasOwn(CLI_ALLOWED_FORMS, name) && CLI_ALLOWED_FORMS[name].includes(positional[0]));
+export { allowedCommand, CLI_ALLOWED, CLI_ALLOWED_FORMS, REFUSED, refusesCommand }
+  from '../../../../packages/snowarch/dist/licence/gate.js';
 
 /**
  * A list checked longer ago than this is STALE: `licence show` and `licence check` say so. A live server
@@ -119,6 +110,3 @@ export const refusalLines = (name, s, cli) => [
     + 'without a valid licence',
   REMEDY(cli),
 ];
-
-/** Is this command refused? For a refused state, every command but the allowed ones. */
-export const refusesCommand = (name, s, positional = []) => REFUSED.includes(s.state) && !allowedCommand(name, positional);

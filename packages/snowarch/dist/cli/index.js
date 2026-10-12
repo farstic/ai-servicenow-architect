@@ -20,9 +20,12 @@
 // the unsanitised one. Same ordering rule that bit ARC-04-S02 with dotenv.
 import '../env-sanitise.js';
 import { Command } from 'commander';
-import { argvCarriesSecret, ARGV_SECRET, EXIT_USAGE } from './tty.js';
+import { argvCarriesSecret, ARGV_SECRET, bootstrapSpelling, cliSpelling, EXIT_USAGE } from './tty.js';
+import { remedyFor } from '../errors/codes.js';
+import { refusesCommand } from '../licence/gate.js';
+import { licenceStatus, projectRoot } from '../licence/state.js';
 import { spawn } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeSync } from 'fs';
 import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 import path from 'path';
@@ -30,6 +33,7 @@ const __cliDir = path.dirname(fileURLToPath(import.meta.url));
 const __pkgJson = JSON.parse(readFileSync(path.resolve(__cliDir, '..', '..', 'package.json'), 'utf8'));
 const CLI_VERSION = __pkgJson.version;
 const NOT_IMPLEMENTED_EXIT = 2; // still used by `contract` when dist/ has not been built
+const EXIT_LICENCE = 3; // ./snowarch's EXIT_PREREQ: a licence in force is a prerequisite
 /**
  * THE ARGV GATE — before commander, before anything.
  *
@@ -50,6 +54,27 @@ program
     .name('snowarch')
     .description('ServiceNow MCP server')
     .version(CLI_VERSION);
+/**
+ * ARC-11-C6 step 4b — THE SECOND DOOR, with the first one's rule (the architect's rulings R2 and R3).
+ *
+ * With no valid licence in force, `./snowarch` refuses every command but the few that see, repair, install and
+ * uninstall, and it forwards `instance` and `store` here. This CLI is also the npm package's `bin`, so a door with
+ * a rule of its own would be the way round the first. One set and one decision, `../licence/gate.ts`, with the
+ * licence read where the server reads it: CLAUDE_PROJECT_DIR, else the working directory. Of this CLI's commands
+ * only `doctor` is in the set. A hook on the action, so help, the version and a command's own help are answered
+ * before it, as at ./snowarch, and a refused command has run nothing when it says so. `writeSync` before the exit:
+ * a write to a piped stderr is asynchronous on POSIX, and `process.exit` would drop it (ARC-09-C129).
+ */
+program.hook('preAction', (_program, action) => {
+    const name = action.name();
+    const s = licenceStatus(projectRoot());
+    if (!refusesCommand(name, s))
+        return;
+    const { meaning, remedy } = remedyFor('LICENCE_NOT_VALID', { cli: cliSpelling(), bootstrap: bootstrapSpelling() });
+    writeSync(2, `snowarch ${name}: licence ${s.state}${s.signatureValid ? ` (${s.id})` : ''} (Code: LICENCE_NOT_VALID) — `
+        + `${meaning}\n${remedy}\n`);
+    process.exit(EXIT_LICENCE);
+});
 program
     .command('start')
     .description('Start the MCP server on stdio')

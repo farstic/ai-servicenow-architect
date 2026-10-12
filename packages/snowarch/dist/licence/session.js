@@ -25,13 +25,8 @@ import { cliSpelling, bootstrapSpelling } from '../cli/tty.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { PRODUCT_KEYS } from './keys.js';
 import { refreshList, LIVE_BUDGET_MS } from './refresh.js';
-import { licenceLine, licenceStatus, readLicenceText, REFUSED } from './state.js';
+import { licenceLine, licenceStatus, projectRoot, readLicenceText, REFUSED } from './state.js';
 let session = null;
-/** The project directory: Claude Code's `CLAUDE_PROJECT_DIR`, else the working directory — as the store's. */
-const projectRoot = () => {
-    const dir = process.env.CLAUDE_PROJECT_DIR;
-    return dir !== undefined && dir !== '' ? dir : process.cwd();
-};
 /** Read the licence and the cached list, and hold the result for this process. */
 export function initLicence({ root = projectRoot(), env = process.env, keys = PRODUCT_KEYS, now = () => new Date() } = {}) {
     const status = licenceStatus(root, { keys, now: now(), env });

@@ -14,8 +14,15 @@ import { join } from 'node:path';
 import { checkLicence, readList, type LicenceStatus, type ProductKey, type VerifiedList } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
 
-/** The states enforcement refuses. `expiring` is not one: a licence in its last month is in force. */
-export const REFUSED: readonly string[] = Object.freeze(['missing', 'invalid', 'expired', 'revoked']);
+// The states enforcement refuses, with the commands that run without a licence: one gate for both doors, the
+// engine's and this package's CLI (ARC-11-C6, step 4b).
+export { REFUSED } from './gate.js';
+
+/** The project directory: Claude Code's `CLAUDE_PROJECT_DIR`, else the working directory — as the store's. */
+export const projectRoot = (): string => {
+  const dir = process.env.CLAUDE_PROJECT_DIR;
+  return dir !== undefined && dir !== '' ? dir : process.cwd();
+};
 
 export const licencePath = (root: string): string => join(root, '.local', 'licence.json');
 export const revocationsPath = (root: string): string => join(root, '.local', 'revocations.json');

@@ -26,7 +26,7 @@ import { ServiceNowError } from '../utils/errors.js';
 import type { ProductKey } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
 import { refreshList, LIVE_BUDGET_MS, type RefreshResult } from './refresh.js';
-import { licenceLine, licenceStatus, readLicenceText, REFUSED, type CheckoutStatus } from './state.js';
+import { licenceLine, licenceStatus, projectRoot, readLicenceText, REFUSED, type CheckoutStatus } from './state.js';
 
 interface Options {
   root?: string;
@@ -45,12 +45,6 @@ interface Session {
 }
 
 let session: Session | null = null;
-
-/** The project directory: Claude Code's `CLAUDE_PROJECT_DIR`, else the working directory — as the store's. */
-const projectRoot = (): string => {
-  const dir = process.env.CLAUDE_PROJECT_DIR;
-  return dir !== undefined && dir !== '' ? dir : process.cwd();
-};
 
 /** Read the licence and the cached list, and hold the result for this process. */
 export function initLicence({ root = projectRoot(), env = process.env, keys = PRODUCT_KEYS, now = () => new Date() }: Options = {}): CheckoutStatus {

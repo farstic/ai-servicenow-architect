@@ -1,6 +1,7 @@
 import { type LicenceStatus, type ProductKey, type VerifiedList } from './core.js';
-/** The states enforcement refuses. `expiring` is not one: a licence in its last month is in force. */
-export declare const REFUSED: readonly string[];
+export { REFUSED } from './gate.js';
+/** The project directory: Claude Code's `CLAUDE_PROJECT_DIR`, else the working directory — as the store's. */
+export declare const projectRoot: () => string;
 export declare const licencePath: (root: string) => string;
 export declare const revocationsPath: (root: string) => string;
 export interface ListCache {
