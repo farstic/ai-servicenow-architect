@@ -27,6 +27,10 @@ a licence in force nothing is refused, and only the licence line's wording chang
 server has 399 tools and the error registry 73 codes, as in 2.0.12. The contract moves to `20f73faf89cd`, because
 `LICENCE_NOT_VALID`'s meaning and remedy no longer name the variable.
 
+The no-deliverable rule reads the session banner's `Licence:` line, which the SessionStart hook prints; a session
+that loads no local settings, has hooks off, or has the hook entry removed does not see it, and only the rule goes
+silent — the server still refuses every MCP tool. From 2.1 the doctor fails when the hook is gone (ARC-11-C10).
+
 **The release candidate, and what the owner's sitting confirms.** `v2.0.13-rc.3` was cut from develop `a40f6f2`,
 after #420 (ARC-11-C6) and #424 (the sweep). The owner's sitting on it runs:
 - **T-28, revised for enforcement on every build**, with no variable set anywhere. Row 1 is refused, with E-31's
