@@ -409,6 +409,7 @@ function revoke({ positional, flags, log, root, keys, now, config, where }) {
   if (existsSync(file)) {
     // The signing key is trusted for its own list as well as the shipped keys, so the owner can manage
     // the list with a key a given build does not ship yet.
+    // owner key from path: the owner's own list file, checked before it is re-signed; no licensee's state reads it
     const trust = [...keys, { role: 'signing', publicKey: publicKeyOf(key) }];
     held = readList(readFileSync(file, 'utf8'), { keys: trust });
     if (!held.ok) {
