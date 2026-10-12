@@ -86,33 +86,32 @@ const withLicence = (data) => ({
   ...LIVE, checks: LIVE.checks.map((c) => (c.id === 'E-31' ? { ...c, data } : c)),
 });
 const licenceData = (over = {}) => ({ state: 'ok', id: 'LIC-2026-0002', scope: 'live', validUntil: null,
-  perpetual: true, enforced: false, listVersion: null, ...over });
+  perpetual: true, enforced: true, listVersion: null, ...over });
 
 test('ARC-11-C1 — the Licence line is second, in the banner\'s own words, for every state', () => {
   // The owner's rc.1 sitting found the panel silent with a licence in force: E-31 is ok then, and the
   // panel lists no check that is ok. The line is now always there, rendered from E-31's data by the
-  // function the session-start banner uses, so the two cannot disagree. A state other than `ok` names
-  // enforcement; `ok` does not, under enforcement too — the banner's shape, kept.
+  // function the session-start banner uses, so the two cannot disagree. No state names enforcement: it is on
+  // every build (ARC-11-C6), so the state alone decides.
   const cases = [
     [licenceData(), 'Licence: ok · LIC-2026-0002 · perpetual'],
-    [licenceData({ id: 'LIC-2026-0003', validUntil: '2027-04-11', perpetual: false, enforced: true }),
+    [licenceData({ id: 'LIC-2026-0003', validUntil: '2027-04-11', perpetual: false }),
       'Licence: ok · LIC-2026-0003 · until 2027-04-11'],
     [licenceData({ scope: 'design-only', validUntil: '2027-04-11', perpetual: false }),
       'Licence: ok · LIC-2026-0002 · design-only · until 2027-04-11'],
     [licenceData({ state: 'expiring', validUntil: '2026-10-25', perpetual: false }),
-      'Licence: expiring · LIC-2026-0002 · until 2026-10-25 · warn only'],
-    [licenceData({ state: 'revoked', id: 'LIC-2026-0003', enforced: true }), 'Licence: revoked · enforced'],
-    [licenceData({ state: 'missing', id: null, scope: null, perpetual: false, enforced: true }),
-      'Licence: missing · enforced'],
+      'Licence: expiring · LIC-2026-0002 · until 2026-10-25'],
+    [licenceData({ state: 'revoked', id: 'LIC-2026-0003' }), 'Licence: revoked'],
+    [licenceData({ state: 'missing', id: null, scope: null, perpetual: false }), 'Licence: missing'],
   ];
   for (const [data, line] of cases) {
     const lines = renderPanel(withLicence(data), CLI).split('\n');
     assert.equal(lines[1], line, data.state);
-    assert.equal(lines[1], bannerLine(data, { enforced: data.enforced }), 'the panel and the banner disagree');
+    assert.equal(lines[1], bannerLine(data), 'the panel and the banner disagree');
     assert.equal(lines.filter((l) => l.startsWith('Licence:')).length, 1, 'the licence is said once');
   }
   // The design fixture too: design-only is not a reason to say nothing.
-  assert.equal(renderPanel(DESIGN, CLI).split('\n')[1], 'Licence: missing · warn only');
+  assert.equal(renderPanel(DESIGN, CLI).split('\n')[1], 'Licence: missing');
 });
 
 test('ARC-11-C1 — no E-31 data in the report is no Licence line, never a guessed one', () => {

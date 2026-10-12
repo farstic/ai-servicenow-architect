@@ -12,18 +12,16 @@ import { remedyFor } from '../../src/errors/codes.js';
 import { checkout, fromToday, keysOf, licence, licenceText, listText, pair, removeFixtureDirs } from './fixtures.js';
 
 /**
- * ARC-11-C1 — the server's licence session: computed once at start, refusing under enforcement,
+ * ARC-11-C1 — the server's licence session: computed once at start, refusing on every build (ARC-11-C6),
  * one notice on the first answer, and the id in the audit trail only from an authentic licence.
  */
 const primary = pair();
 const KEYS = keysOf(primary, pair());
-const ENFORCED = { SNOW_LICENCE_ENFORCE: 'true' };
-
-function start(env: Record<string, string>, file: string | null = null, cache: string | null = null): string {
+function start(file: string | null = null, cache: string | null = null): string {
   const root = checkout();
   if (file !== null) writeFileSync(join(root, '.local', 'licence.json'), file);
   if (cache !== null) writeFileSync(join(root, '.local', 'revocations.json'), cache);
-  initLicence({ root, env, keys: KEYS });
+  initLicence({ root, keys: KEYS });
   return root;
 }
 
@@ -34,57 +32,57 @@ const refusal = (): ServiceNowError | null => {
 afterEach(() => { resetLicenceForTests(); removeFixtureDirs(); });
 
 describe('ARC-11-C1 — the server\'s licence session', () => {
-  it('is warn only by default: nothing refused, one notice on the first answer, no audit key', () => {
-    start({});
+  it('with no licence: one notice on the first answer, naming the state, and no audit key', () => {
+    start();
     expect(currentLicence().state).toBe('missing');
-    expect(refusal()).toBeNull();
-    expect(takeLicenceNotice()).toMatch(/^Licence: missing · warn only — /);
+    expect(takeLicenceNotice()).toMatch(/^Licence: missing — this checkout has no licence\. Run /);
     expect(takeLicenceNotice()).toBeNull();
     expect(licenceAuditField()).toEqual({});
   });
 
-  it('refuses every call under enforcement with no licence, with the code and the remedy', () => {
-    start(ENFORCED);
+  it('refuses every call with no licence, on every build, with the code and the remedy', () => {
+    start();
     const e = refusal();
     expect(e).toBeInstanceOf(ServiceNowError);
     expect(e?.code).toBe('LICENCE_NOT_VALID');
-    expect(e?.message).toMatch(/^licence missing — SNOW_LICENCE_ENFORCE is "true", so no tool runs without a valid licence/);
+    expect(e?.message).toMatch(/^licence missing — no tool runs without a valid licence\. /);
     expect(e?.message).toContain('licence check to see why');
+    expect(e?.message).not.toMatch(/SNOW_|unset/);
   });
 
-  it('refuses a design-only licence under enforcement, naming the scope (ruling (d))', () => {
-    start(ENFORCED, licenceText(licence({ scope: 'design-only' }), primary));
+  it('refuses a design-only licence, naming the scope (ruling (d))', () => {
+    start(licenceText(licence({ scope: 'design-only' }), primary));
     const e = refusal();
     expect(e?.code).toBe('LICENCE_NOT_VALID');
     expect(e?.message).toMatch(/^licence LIC-2026-0002 covers design-only; live needs a live-scope licence/);
   });
 
-  it('serves a live licence in force, and an expiring one, under enforcement', () => {
-    start(ENFORCED, licenceText(licence(), primary));
+  it('serves a live licence in force, and an expiring one', () => {
+    start(licenceText(licence(), primary));
     expect(refusal()).toBeNull();
     expect(takeLicenceNotice()).toBeNull();
     resetLicenceForTests();
-    start(ENFORCED, licenceText(licence({ valid_until: fromToday(10) }), primary));
+    start(licenceText(licence({ valid_until: fromToday(10) }), primary));
     expect(refusal()).toBeNull();
-    expect(takeLicenceNotice()).toMatch(/^Licence: expiring · LIC-2026-0002 · until \d{4}-\d{2}-\d{2} · enforced — 10 days left/);
+    expect(takeLicenceNotice()).toMatch(/^Licence: expiring · LIC-2026-0002 · until \d{4}-\d{2}-\d{2} — 10 days left/);
   });
 
   it('refuses a revoked licence, read from the cached list', () => {
     const list = listText(3, [{ id: 'LIC-2026-0002', revokedAt: fromToday(-1), reason: 'breach' }], primary);
-    start(ENFORCED, licenceText(licence(), primary), JSON.stringify({ checkedAt: new Date().toISOString(), source: 'fixture', list: JSON.parse(list) }));
+    start(licenceText(licence(), primary), JSON.stringify({ checkedAt: new Date().toISOString(), source: 'fixture', list: JSON.parse(list) }));
     expect(refusal()?.message).toMatch(/^licence revoked \(LIC-2026-0002\) — /);
   });
 
   it('puts the id in the audit line only when the signature holds — revoked and expired included', () => {
-    start({}, licenceText(licence(), primary));
+    start(licenceText(licence(), primary));
     expect(licenceAuditField()).toEqual({ licence: 'LIC-2026-0002' });
     resetLicenceForTests();
-    start({}, licenceText(licence({ valid_until: fromToday(-3) }), primary));
+    start(licenceText(licence({ valid_until: fromToday(-3) }), primary));
     expect(licenceAuditField()).toEqual({ licence: 'LIC-2026-0002' });
     resetLicenceForTests();
     const forged = JSON.parse(licenceText(licence(), primary));
     forged.licence.id = 'LIC-2026-9999';
-    start({}, JSON.stringify(forged));
+    start(JSON.stringify(forged));
     expect(licenceAuditField()).toEqual({});
   });
 
@@ -92,23 +90,23 @@ describe('ARC-11-C1 — the server\'s licence session', () => {
     // The owner's rc.1 sitting found the refusals left no trace. A refused attempt is evidence, so the
     // router's refusal writes one line naming the licence and the state; a forged file's id is unverified
     // text, so it is never written.
-    start(ENFORCED);
+    start();
     expect(licenceRefusalFields()).toEqual({ licence: 'missing', state: 'missing' });
     resetLicenceForTests();
     const list = listText(3, [{ id: 'LIC-2026-0002', revokedAt: fromToday(-1), reason: 'breach' }], primary);
-    start(ENFORCED, licenceText(licence(), primary),
+    start(licenceText(licence(), primary),
       JSON.stringify({ checkedAt: new Date().toISOString(), source: 'fixture', list: JSON.parse(list) }));
     expect(licenceRefusalFields()).toEqual({ licence: 'LIC-2026-0002', state: 'revoked' });
     resetLicenceForTests();
-    start(ENFORCED, licenceText(licence({ valid_until: fromToday(-3) }), primary));
+    start(licenceText(licence({ valid_until: fromToday(-3) }), primary));
     expect(licenceRefusalFields()).toEqual({ licence: 'LIC-2026-0002', state: 'expired' });
     resetLicenceForTests();
-    start(ENFORCED, licenceText(licence({ scope: 'design-only' }), primary));
+    start(licenceText(licence({ scope: 'design-only' }), primary));
     expect(licenceRefusalFields()).toEqual({ licence: 'LIC-2026-0002', state: 'scope' });
     resetLicenceForTests();
     const forged = JSON.parse(licenceText(licence(), primary));
     forged.licence.id = 'LIC-2026-9999';
-    start(ENFORCED, JSON.stringify(forged));
+    start(JSON.stringify(forged));
     expect(licenceRefusalFields()).toEqual({ licence: 'missing', state: 'invalid' });
   });
 

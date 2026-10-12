@@ -174,16 +174,15 @@ test('ARC-11-C1 — issue with a key this build does not ship says so, and still
   assert.match(r.text, /not one this build ships/);
 });
 
-test('ARC-11-C1 — show and check with no licence say missing, warn only, and exit 1', async (t) => {
+test('ARC-11-C6 — show and check with no licence say missing, what is refused, and exit 1', async (t) => {
   const w = world(t);
   for (const sub of ['show', 'check']) {
     const r = await run(w, [sub]);
     assert.equal(r.code, EXIT_FAIL, r.text);
-    assert.match(r.text, /Licence: missing · warn only/);
+    assert.match(r.text, /Licence: missing\n/);
+    assert.match(r.text, /every command but licence, doctor, status, version and upgrade is refused, and every MCP tool/);
+    assert.doesNotMatch(r.text, /enforce:|warn only/);
   }
-  const enforced = await run(w, ['check'], {}, { env: { SNOW_LICENCE_ENFORCE: 'true' } });
-  assert.match(enforced.text, /Licence: missing · enforced/);
-  assert.match(enforced.text, /enforce: on/);
 });
 
 test('ARC-11-C1 — init-list writes a signed version-1 empty list and the commands for the owner\'s first push', async (t) => {
@@ -243,7 +242,7 @@ test('ARC-11-C1 — check --refresh fetches the list, and a revoked licence read
   assert.match(before.text, /Licence: ok/, 'check without --refresh never fetches');
   const after = await run(w, ['check'], { refresh: true }, { keys: g.keys, config });
   assert.equal(after.code, EXIT_FAIL, after.text);
-  assert.match(after.text, /Licence: revoked · warn only/);
+  assert.match(after.text, /Licence: revoked\n/);
   assert.match(after.text, /version 1/);
   assert.equal(readListCache(w.root).list.list.version, 1);
 });

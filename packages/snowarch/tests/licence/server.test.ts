@@ -102,31 +102,26 @@ afterEach(async () => {
   try { await reapServerChildren(); } finally { removeTempDir(base); }
 });
 
-describe('ARC-11-C1 — the class case: no licence, enforcement off', () => {
-  it('one block more on the first answer, the first block unchanged, no audit key, 399 tools', async () => {
+describe('ARC-11-C6 — the class case: no licence, on every build', () => {
+  it('every tool is still listed, 399 of them: the refusal is at the call (R1), and a switch is refused too', async () => {
     writeStore();
     const client = await connect(SERVER);
     try {
       expect((await client.listTools()).tools.length).toBe(collectToolCatalog().length);
       const first = await call(client, 'snow_core_current_instance_read');
-      const second = await call(client, 'snow_core_current_instance_read');
-      expect(first.content).toHaveLength(2);
-      expect(second.content).toHaveLength(1);
-      expect(first.content[0]).toEqual(second.content[0]);
-      expect(first.content[1].text).toMatch(/^Licence: missing · warn only — /);
+      expect(first.isError).toBe(true);
+      expect(first.content[0].text).toMatch(/^Error: licence missing — .*\(Code: LICENCE_NOT_VALID\)/s);
       const switched = await call(client, 'snow_core_instance_switch', { name: 'other' });
-      expect(switched.isError ?? false).toBe(false);
-      expect(switched.content).toHaveLength(1);
-      const lines = auditLines();
-      expect(lines.length).toBeGreaterThan(0);
-      for (const line of lines) expect(Object.keys(line)).not.toContain('licence');
+      expect(switched.isError).toBe(true);
+      expect(auditLines().map((l) => [l.tool, l.result])).toEqual([['snow_core_current_instance_read', 'LICENCE_NOT_VALID'],
+        ['snow_core_instance_switch', 'LICENCE_NOT_VALID']]);
     } finally { await client.close(); }
   }, 40_000);
 });
 
-describe('ARC-11-C1 — enforced, with no licence: every tool refused (R1)', () => {
+describe('ARC-11-C1 and C6 — with no licence: every tool refused (R1), on every build', () => {
   it('refuses the five instance-free tools of an unconfigured server', async () => {
-    const client = await connect(SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+    const client = await connect(SERVER);
     try {
       for (const name of ['snow_core_capabilities_read', 'snow_core_status_read', 'snow_core_instances_reload',
         'snow_core_instances_index', 'snow_core_current_instance_read']) {
@@ -150,7 +145,7 @@ describe('ARC-11-C1 polish 2 — a licence refusal writes one audit line, and no
   // the writer runs, and a read writes no line. For the owner's control story a refused attempt is evidence.
   it('a refused read writes exactly one line: the tool, the label, gate licence, the licence and why', async () => {
     writeStore();
-    const client = await connect(SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+    const client = await connect(SERVER);
     try {
       expect((await call(client, 'snow_core_capabilities_read')).isError).toBe(true);
       const lines = auditLines();
@@ -164,7 +159,7 @@ describe('ARC-11-C1 polish 2 — a licence refusal writes one audit line, and no
   it('a refused write records no argument: no table, no sys_id, no query, no value', async () => {
     writeStore();
     const MARKER = 'POLISH2-PAYLOAD-MARKER';
-    const client = await connect(SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+    const client = await connect(SERVER);
     try {
       const r = await call(client, 'snow_core_record_add', { table: 'incident', fields: { short_description: MARKER } });
       expect(r.isError).toBe(true);
@@ -189,7 +184,7 @@ describe('ARC-11-C1 polish 2 — a licence refusal writes one audit line, and no
     for (const [file, want] of cases) {
       writeFileSync(join(checkout, '.local', 'licence.json'), file);
       rmSync(join(checkout, '.local', 'audit.jsonl'), { force: true });
-      const client = await connect(LICENSED_SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+      const client = await connect(LICENSED_SERVER);
       try {
         expect((await call(client, 'snow_core_capabilities_read')).isError, want.state).toBe(true);
         const lines = auditLines();
@@ -199,9 +194,11 @@ describe('ARC-11-C1 polish 2 — a licence refusal writes one audit line, and no
     }
   }, 60_000);
 
-  it('warn only: the notice writes no line, and neither does a refused argument (C121, unchanged)', async () => {
+  it('a notice writes no line, and neither does a refused argument (C121, unchanged)', async () => {
     writeStore();
-    const client = await connect(SERVER);
+    // An expiring licence: served, with the notice on the first answer, in a build that trusts it.
+    writeFileSync(join(checkout, '.local', 'licence.json'), licenceText(licence({ valid_until: fromToday(10) }), primary));
+    const client = await connect(LICENSED_SERVER);
     try {
       expect((await call(client, 'snow_core_current_instance_read')).content).toHaveLength(2);
       const bad = await call(client, 'snow_core_current_instance_read', { instance: 'other' });
@@ -213,10 +210,10 @@ describe('ARC-11-C1 polish 2 — a licence refusal writes one audit line, and no
 });
 
 describe('ARC-11-C1 — a build that trusts the licence (a test copy of dist/)', () => {
-  it('a live licence in force: served under enforcement, no notice, and its id in the audit line', async () => {
+  it('a live licence in force: served, no notice, and its id in the audit line', async () => {
     writeStore();
     writeLicence(licence());
-    const client = await connect(LICENSED_SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+    const client = await connect(LICENSED_SERVER);
     try {
       const switched = await call(client, 'snow_core_instance_switch', { name: 'other' });
       expect(switched.isError ?? false).toBe(false);
@@ -227,10 +224,10 @@ describe('ARC-11-C1 — a build that trusts the licence (a test copy of dist/)',
     } finally { await client.close(); }
   }, 40_000);
 
-  it('a design-only licence on a live server under enforcement: refused, naming the scope (ruling (d))', async () => {
+  it('a design-only licence on a live server: refused, naming the scope (ruling (d))', async () => {
     writeStore();
     writeLicence(licence({ scope: 'design-only' }));
-    const client = await connect(LICENSED_SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+    const client = await connect(LICENSED_SERVER);
     try {
       const r = await call(client, 'snow_core_capabilities_read');
       expect(r.isError).toBe(true);
@@ -238,15 +235,15 @@ describe('ARC-11-C1 — a build that trusts the licence (a test copy of dist/)',
     } finally { await client.close(); }
   }, 40_000);
 
-  it('an expiring licence under enforcement: served, with the notice on the first answer', async () => {
+  it('an expiring licence: served, with the notice on the first answer', async () => {
     writeStore();
     writeLicence(licence({ valid_until: fromToday(10) }));
-    const client = await connect(LICENSED_SERVER, { SNOW_LICENCE_ENFORCE: 'true' });
+    const client = await connect(LICENSED_SERVER);
     try {
       const r = await call(client, 'snow_core_current_instance_read');
       expect(r.isError ?? false).toBe(false);
       expect(r.content).toHaveLength(2);
-      expect(r.content[1].text).toMatch(/^Licence: expiring · LIC-2026-0002 · until \d{4}-\d{2}-\d{2} · enforced — 10 days left/);
+      expect(r.content[1].text).toMatch(/^Licence: expiring · LIC-2026-0002 · until \d{4}-\d{2}-\d{2} — 10 days left/);
     } finally { await client.close(); }
   }, 40_000);
 });

@@ -1,12 +1,10 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-// ARC-11-C1 — E-31, the licence: a warning and never a failure, in the quick set, offline.
+// ARC-11-C1 — E-31, the licence: in the quick set, offline, a warning for every state but ok.
 //
-// The owner's first requirement is that everything keeps working exactly as now, and today nobody has
-// a licence. So the default — no file, no enforcement — must be one WARN line in the doctor and
-// nothing else: a FAIL would fail bootstrap's closing check, the status panel and CI on every
-// machine. Enforcement does not change that either; what enforcement refuses is the CLI and the
-// server, and the doctor is one of the commands a person needs to see why.
+// Enforcement is on every build (ARC-11-C6): the CLI and the server refuse without a licence, and the
+// doctor is one of the commands a person needs to see why, so it runs and says so, with the refusal's
+// remedy. ARC-11-C6 step 5 makes a refused state a FAIL.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -40,17 +38,12 @@ test('ARC-11-C1 — E-31 is declared once: repo section, warn, quick, offline, s
   );
 });
 
-test('ARC-11-C1 — no licence is one warning, with the line the banner prints', async (t) => {
+test('ARC-11-C6 — no licence is one warning, with the line the banner prints and the refusal\'s remedy', async (t) => {
   const r = await E31.run(ctxFor(t));
   assert.equal(r.status, 'warn');
-  assert.equal(r.detail, 'Licence: missing · warn only');
+  assert.equal(r.detail, 'Licence: missing');
+  assert.match(r.remedy, /^Run .+ licence check to see why, then install a valid licence as \.local\/licence\.json\./);
   assert.match(r.command, /licence check$/);
-});
-
-test('ARC-11-C1 — enforcement makes it say "enforced", and it is still a warning', async (t) => {
-  const r = await E31.run(ctxFor(t, { env: { SNOW_LICENCE_ENFORCE: 'true' } }));
-  assert.equal(r.status, 'warn');
-  assert.equal(r.detail, 'Licence: missing · enforced');
 });
 
 test('ARC-11-C1 — a licence in force is ok; one in its last month is a warning; a forged one is a warning that says why', async (t) => {
@@ -58,12 +51,12 @@ test('ARC-11-C1 — a licence in force is ok; one in its last month is a warning
   assert.deepEqual([ok.status, ok.detail], ['ok', 'Licence: ok · LIC-2026-0002 · until 2027-10-10']);
   const soon = await E31.run(ctxFor(t, { file: licenceText(licence({ valid_until: '2026-10-25' }), primary) }));
   assert.equal(soon.status, 'warn');
-  assert.match(soon.detail, /^Licence: expiring · LIC-2026-0002 · until 2026-10-25 · warn only/);
+  assert.match(soon.detail, /^Licence: expiring · LIC-2026-0002 · until 2026-10-25 — /);
   const doc = JSON.parse(licenceText(licence(), primary));
   doc.licence.org = 'Another Org';
   const forged = await E31.run(ctxFor(t, { file: JSON.stringify(doc) }));
   assert.equal(forged.status, 'warn');
-  assert.match(forged.detail, /^Licence: invalid · warn only — the signature does not match the content$/);
+  assert.match(forged.detail, /^Licence: invalid — the signature does not match the content$/);
 });
 
 test('ARC-11-C1 — E-31\'s data names the state and the id, never the licensee or the org', async (t) => {

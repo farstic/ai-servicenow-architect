@@ -9,7 +9,7 @@
  * - the CLI, started directly with `--import`, through `NODE_OPTIONS`, and through the launcher
  *   (`./snowarch`, or `snowarch.cmd` through `cmd.exe`), trusts a fixture key with the hook and does
  *   not without it;
- * - the server, spawned over stdio under `SNOW_LICENCE_ENFORCE="true"`, answers with the hook and
+ * - the server, spawned over stdio (it enforces on every build, from ARC-11-C6), answers with the hook and
  *   refuses `LICENCE_NOT_VALID` without it;
  * - each spawn's time, with and without the hook, is printed as a diagnostic for the record.
  *
@@ -108,8 +108,8 @@ test('ARC-11-C6 spike — the server under enforcement answers with the hook, an
   const hook = fixtureKeysHook(dir, productKeys(primary, keyPair()));
   writeFileSync(join(checkout, '.local', 'licence.json'), licenceText(licence({ id: 'LIC-2026-9002' }), primary));
 
-  const ask = async (extra, { enforce = true } = {}) => {
-    const env = cleanEnv(dir, { CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error', ...(enforce ? { SNOW_LICENCE_ENFORCE: 'true' } : {}), ...extra });
+  const ask = async (extra) => {
+    const env = cleanEnv(dir, { CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error', ...extra });
     const client = new Client({ name: 'hook-spike', version: '0' }, { capabilities: {} });
     // unlicensed start: the spike measures the hook itself, each case once with it and once without it
     const transport = new StdioClientTransport({ command: process.execPath, args: [SERVER], env, cwd: checkout, stderr: 'pipe' });
@@ -130,17 +130,17 @@ test('ARC-11-C6 spike — the server under enforcement answers with the hook, an
   };
   const withHook = await ask({ NODE_OPTIONS: hook.nodeOptions });
   const without = await ask({});
-  // The stderr baseline: a plain server that ANSWERS. The refused control logs its refusal on stderr at
-  // error level, with a stack, so its stderr differs by the licence state, not by the hook. Measured on
-  // 2026-10-12, so a byte-for-byte comparison with it is impossible by construction. Enforcement off and
-  // no hook: the call answers, with the warn-only notice, as the hooked server's does. Do not change this
-  // comparison to `without`, the refused control: it fails on every cell for a reason that is not the hook
-  // (the architect's ruling on #416, 2026-10-12). The refusal control stays, as the assertion above it.
-  const baseline = await ask({}, { enforce: false });
+  // Measurement (a), that the hook adds nothing to an answering server's stderr, was taken byte for byte on
+  // every CI cell before enforcement took no switch (#416, 2026-10-12). Its baseline was a plain server that
+  // answered with enforcement off. After ARC-11-C6's flip no unhooked server answers, so that baseline
+  // cannot exist, and comparing with `without`, the refused control, would fail for a reason that is not the
+  // hook (the architect's ruling on #416). What stays, by the architect's ruling of 2026-10-12: the hooked
+  // server's stderr names neither the hook's files nor the fixture keys module.
   assert.doesNotMatch(withHook.text, /LICENCE_NOT_VALID/, `the hooked server refused: ${withHook.text.slice(0, 300)}`);
   assert.match(without.text, /licence invalid[\s\S]*\(Code: LICENCE_NOT_VALID\)/, `the plain server did not refuse: ${without.text.slice(0, 300)}`);
-  assert.doesNotMatch(baseline.text, /LICENCE_NOT_VALID/, `the stderr baseline was refused: ${baseline.text.slice(0, 300)}`);
-  assert.equal(withHook.stderr, baseline.stderr, 'the hook changed what an answering server prints on stderr');
+  for (const name of ['register-hook.mjs', 'hooks.mjs', 'fixture-keys.mjs']) {
+    assert.equal(withHook.stderr.includes(name), false, `the hooked server's stderr names ${name}: ${withHook.stderr.slice(0, 300)}`);
+  }
   t.diagnostic(`${process.platform} node ${process.versions.node} · server stdio: hook ${withHook.ms} ms, plain ${without.ms} ms`);
 });
 
