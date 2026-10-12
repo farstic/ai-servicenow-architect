@@ -424,8 +424,9 @@ jobs:
       - name: The doctor, on the design-only install (POSIX)
         if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
         run: |
-          # Exit 1 means "a check FAILED", and one does here on purpose: a hosted runner has no
-          # Claude Code, so E-00 reports it missing. Which failures this environment explains is
+          # Exit 1 means "a check FAILED", and two do here on purpose: a hosted runner has no
+          # Claude Code, so E-00 reports it missing, and no licence, so E-31 FAILs (ARC-11-C6).
+          # Which failures this environment explains is
           # `assert-doctor.mjs`'s judgement, not this step's — but 2 (usage) and 3 (the doctor
           # could not run at all) are fatal wherever they happen.
           set +e
@@ -504,9 +505,9 @@ jobs:
           if ($LASTEXITCODE -ge 2) { exit 1 }
           $r = Get-Content "$env:RUNNER_TEMP\doctor-ps.json" -Raw | ConvertFrom-Json
           if ($r.mode -ne 'design-only') { Write-Host "mode: $($r.mode)"; exit 1 }
-          # E-00 is the one this environment explains -- see assert-doctor.mjs.
+          # E-00 and E-31 are the ones this environment explains -- see assert-doctor.mjs.
           $failed = @($r.checks | Where-Object { $_.status -eq 'fail' } | ForEach-Object { $_.id })
-          $unexpected = @($failed | Where-Object { $_ -ne 'E-00' })
+          $unexpected = @($failed | Where-Object { $_ -notin @('E-00', 'E-31') })
           if ($unexpected.Count -gt 0) { Write-Host "unexpected FAIL: $($unexpected -join ', ')"; exit 1 }
           exit 0
 
@@ -515,7 +516,7 @@ jobs:
         if: matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash'
         shell: bash
         run: |
-          node scripts/ci/assert-doctor.mjs --in "$RUNNER_TEMP/doctor.json" --expect-fail E-00
+          node scripts/ci/assert-doctor.mjs --in "$RUNNER_TEMP/doctor.json" --expect-fail E-00,E-31
           node scripts/ci/doctor-snapshot.mjs --in "$RUNNER_TEMP/doctor.json" \
             --out "$RUNNER_TEMP/doctor-normalised.json" --summary
 
