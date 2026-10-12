@@ -11,6 +11,7 @@ import {
   currentLicence, initLicence, refreshLicenceList, resetLicenceForTests, startLicence,
 } from '../../src/licence/session.js';
 import { checkout, fixtureDir, keysOf, licence, licenceText, listRepo, listText, pair, removeFixtureDirs } from './fixtures.js';
+import { slowGitPath } from '../../../../tools/snowarch/tests/helpers/slow-git.mjs';
 
 /**
  * ARC-11-C1 — the live server's refresh (the architect's ruling (b)): at a live start with the list
@@ -42,6 +43,17 @@ const quietEnv = (extra: Record<string, string> = {}): Record<string, string> =>
   const env = { ...process.env } as Record<string, string>;
   for (const k of ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']) delete env[k];
   return { ...env, ...extra };
+};
+
+/**
+ * ARC-09-C133 — a git as slow as the one on the Windows node 22 cell of 2026-10-12, where these cases met the
+ * live budget and got 'unreachable': about 1.3 s a call there, against 0.1 s on the cells beside it. Here the
+ * first call, `ls-remote`, alone outlasts the whole live budget, on any machine. POSIX only, as the helper says;
+ * on Windows the cases run on the real git.
+ */
+const slowEnv = (extra: Record<string, string> = {}): Record<string, string> => {
+  const PATH = slowGitPath({ dir: fixtureDir('snowarch-slow-git-'), subcommand: 'ls-remote', seconds: 3.5 });
+  return quietEnv(PATH === null ? extra : { ...extra, PATH });
 };
 
 function project(repo: string, { cache = null, licenceFile = licenceText(licence(), primary) }:
@@ -76,10 +88,10 @@ describe('ARC-11-C1 — the server fetches the list as the CLI does', () => {
 describe('ARC-11-C1 — the live start\'s background refresh', () => {
   it('a stale cache and a reachable list: revoked once the refresh lands, from the next call', async () => {
     const root = project(listRepo({ 'revocations.json': listText(2, [revocation], primary) }), { cache: staleCache(null) });
-    initLicence({ root, env: quietEnv(ENFORCED), keys: KEYS });
+    initLicence({ root, env: slowEnv(ENFORCED), keys: KEYS });
     expect(currentLicence().state).toBe('ok');
-    const r = await refreshLicenceList();
-    expect(r.outcome).toBe('updated');
+    // The whole result, so a mismatch prints the product's `detail`: the reason the cell's log never carried.
+    expect(await refreshLicenceList()).toEqual({ outcome: 'updated', version: 2, previous: null });
     expect(currentLicence().state).toBe('revoked');
     expect(JSON.parse(readFileSync(join(root, '.local', 'revocations.json'), 'utf8')).list.list.version).toBe(2);
   });
@@ -101,14 +113,14 @@ describe('ARC-11-C1 — the live start\'s background refresh', () => {
   it('a list older than the one held is ignored (rollback protection)', async () => {
     const held = listText(5, [revocation], primary);
     const root = project(listRepo({ 'revocations.json': listText(4, [], primary) }), { cache: staleCache(held) });
-    initLicence({ root, env: quietEnv(), keys: KEYS });
-    expect((await refreshLicenceList()).outcome).toBe('older');
+    initLicence({ root, env: slowEnv(), keys: KEYS });
+    expect(await refreshLicenceList()).toEqual({ outcome: 'older', version: 5, fetchedVersion: 4 });
     expect(currentLicence().state).toBe('revoked');
   });
 
   it('starts for every live server with a licence installed, and for nothing else (the architect\'s ruling (a))', async () => {
     const repo = listRepo({ 'revocations.json': listText(1, [], primary) });
-    const opts = { env: quietEnv(), keys: KEYS };
+    const opts = { env: slowEnv(), keys: KEYS };
     expect(startLicence({ ...opts, root: project(repo), live: false })).toBeNull();
     resetLicenceForTests();
     // No licence, nothing to revoke: a checkout without one makes no fetch at all, the class case.
@@ -116,17 +128,17 @@ describe('ARC-11-C1 — the live start\'s background refresh', () => {
     resetLicenceForTests();
     const started = startLicence({ ...opts, root: project(repo), live: true });
     expect(started).not.toBeNull();
-    expect((await started)?.outcome).toBe('updated');
+    expect(await started).toEqual({ outcome: 'updated', version: 1, previous: null });
   });
 
   it('"revoke → it stops at the next start": a FRESH cache and a list that now revokes → revoked after the start\'s refresh', async () => {
     const fresh = JSON.stringify({ checkedAt: new Date().toISOString(), source: 'fixture',
       list: JSON.parse(listText(1, [], primary)) });
     const root = project(listRepo({ 'revocations.json': listText(2, [revocation], primary) }), { cache: fresh });
-    const started = startLicence({ root, env: quietEnv(ENFORCED), keys: KEYS, live: true });
+    const started = startLicence({ root, env: slowEnv(ENFORCED), keys: KEYS, live: true });
     expect(currentLicence().state).toBe('ok');
     expect(started).not.toBeNull();
-    expect((await started)?.outcome).toBe('updated');
+    expect(await started).toEqual({ outcome: 'updated', version: 2, previous: 1 });
     expect(currentLicence().state).toBe('revoked');
   });
 });
