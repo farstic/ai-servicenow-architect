@@ -1,6 +1,6 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -176,5 +176,41 @@ describe('ARC-11-C1 — the live start\'s background refresh', () => {
     expect(started).not.toBeNull();
     expect(await started).toEqual({ outcome: 'updated', version: 2, previous: 1 });
     expect(currentLicence().state).toBe('revoked');
+  });
+});
+
+/**
+ * ARC-11-C11 — a `show` the deadline ends is unreachable, not "no file", and the cache keeps its date: the
+ * repository never answered, so nothing was checked. These need a git that is slow on one call, which only POSIX
+ * can stand in for (`tools/snowarch/tests/helpers/slow-git.mjs`), so they skip on Windows. The CLI's case for the
+ * spent budget runs everywhere, and the two copies are compared in `tools/snowarch/tests/licence-parity.test.mjs`.
+ */
+describe('ARC-11-C11 — the deadline in the third call', () => {
+  const posix = it.skipIf(process.platform === 'win32');
+
+  posix('a show the deadline kills is unreachable, and the cache keeps its date', async () => {
+    const PATH = slowGitPath({ dir: fixtureDir('snowarch-slow-git-'), subcommand: 'show', seconds: 4 }) as string;
+    const root = project(listRepo({ 'revocations.json': listText(2, [revocation], primary) }),
+      { cache: staleCache(listText(1, [], primary)) });
+    initLicence({ root, env: quietEnv({ PATH }), keys: KEYS });
+    const r = await refreshLicenceList({ budgetMs: 1_500 });
+    expect(r).toEqual({ outcome: 'unreachable', version: 1, detail: expect.any(String) });
+    const cache = JSON.parse(readFileSync(join(root, '.local', 'revocations.json'), 'utf8'));
+    expect(cache.checkedAt, 'a check that timed out wrote a date').toBe('2020-01-01T00:00:00.000Z');
+  });
+
+  posix('the budget spent before show runs is unreachable too', async () => {
+    // The clone sleeps a second. Half a second in, the clock moves past the deadline, so `show` finds none left.
+    const PATH = slowGitPath({ dir: fixtureDir('snowarch-slow-git-'), subcommand: 'clone', seconds: 1 }) as string;
+    const url = listRepo({ 'revocations.json': listText(1, [], primary) });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const pending = fetchListAsync({ url, ref: 'main', path: 'revocations.json', budgetMs: 5_000, env: quietEnv({ PATH }) });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      vi.setSystemTime(Date.now() + 10_000);
+      expect(await pending).toEqual({ status: 'unreachable', detail: 'the time budget was spent' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
