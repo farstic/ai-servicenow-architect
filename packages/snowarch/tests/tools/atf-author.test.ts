@@ -8,6 +8,10 @@ import { routeToolInvocation } from '../../src/tools/index.js';
 import { atfToolManifest } from '../../src/tools/atf.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import type { ServiceNowError } from '../../src/utils/errors.js';
+import { useLicensedSession } from '../helpers/licensed-session.js';
+
+// ARC-11-C6: this file calls the router in its own process, so it runs in a licensed session.
+useLicensedSession();
 
 /**
  * ARC-09-C95 — ATF authoring with a read-back (the owner's R2: a test, a step and its script were
