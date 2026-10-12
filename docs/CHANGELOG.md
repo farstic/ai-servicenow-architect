@@ -13,6 +13,12 @@ All notable changes to this project are documented in this file. Everything hand
 runs but the few that repair the state, and no variable turns that off. It stays under the Apache License 2.0; from
 2.1.0 the product moves to the Business Source License 1.1 (ARC-11-C5).
 
+### Changed
+
+- `docs verify` refuses a Markdown table row with more cells than its header, outside fences. GitHub cuts a cell at
+  the first unescaped pipe, inside a code span too, and drops every cell past the header's count, so such a row reads
+  whole in the file and short on the page. The 33 rows that broke this are fixed (ARC-09-C126).
+
 ### Fixed
 
 - `snow_us_capture_target_set` returns `previous`, the update set the authenticated user's capture preference named

@@ -15,6 +15,7 @@ import { syncCorpus, planRecipe, readAreas, inspect, resolveMode, SyncError, EXI
   from './sync.mjs';
 import { verifyCitations, formatResult, EXIT } from './verify.mjs';
 import { verifyIdentifiers, formatIdentifiers } from './identifiers.mjs';
+import { verifyTables, formatTables } from './tables.mjs';
 import { docsStatus, formatStatus } from './status.mjs';
 import { syncUpstream, formatUpstream } from './upstream.mjs';
 import { planFamilySwitch, formatPlan, applyFamilySwitch, EXIT_NEEDS_YES } from './family.mjs';
@@ -127,15 +128,19 @@ export function runDocs(argv, { spell = spellings() } = {}) {
     // ARC-09-C81: the names the roster writes, beside the pages it cites. Only here, not in the
     // doctor's E-16 — one walk of every corpus page is a maintainer's gate, not a health check.
     const ids = verifyIdentifiers({ root });
+    // ARC-09-C126: a table row wider than its header renders short on GitHub, and nothing else notices.
+    const tables = verifyTables({ root });
     const cites = formatResult(r, spell);
     const names = formatIdentifiers(ids);
+    const cells = formatTables(tables);
     if (rest.includes('--json')) {
-      console.log(JSON.stringify({ ...r, identifiers: ids }, null, 2));
-      return (cites.code || names.code);
+      console.log(JSON.stringify({ ...r, identifiers: ids, tables }, null, 2));
+      return (cites.code || names.code || cells.code);
     }
     (cites.code === EXIT.ok ? console.log : console.error)(cites.text);
     (names.code === EXIT.ok ? console.log : console.error)(names.text);
-    return (cites.code || names.code);
+    (cells.code === EXIT.ok ? console.log : console.error)(cells.text);
+    return (cites.code || names.code || cells.code);
   }
 
   if (cmd === 'family') {
