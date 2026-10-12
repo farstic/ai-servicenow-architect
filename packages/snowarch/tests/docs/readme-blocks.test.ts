@@ -41,9 +41,9 @@ function check(gen = GEN, cwd = ROOT): { code: number; stderr: string } {
 }
 
 /**
- * ARC-09-C131 — every tracked file, copied into a root of its own: the working tree's content, not HEAD's, as
- * `tests/gen-readme-tables.test.mjs` copies it for the fresh clone. The generator finds its README from its own
- * path, so the copy's generator reads the copy's README, and the drift case never writes the tracked one.
+ * ARC-09-C131 — the drift case runs on a root of its own: the working tree's content, not HEAD's. The generator
+ * finds its README from its own path, so the copy's generator reads the copy's README, and the drift case never
+ * writes the tracked one. ARC-09-C133 — the root holds the generator's inputs alone, not every tracked file.
  */
 const copies: string[] = [];
 afterAll(() => { for (const dir of copies) removeTempDir(dir); });
@@ -70,19 +70,12 @@ function filesUnder(dir: string, rel = ''): string[] {
   });
 }
 
-function copyTracked(): string {
+function copyInputs(): string {
   const dest = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-readme-blocks-')));
   copies.push(dest);
-  const files = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
-    .split('\n').filter(Boolean);
-  for (const rel of files) {
-    const from = join(ROOT, rel);
-    // A gitlink (`vendor/ServiceNowDocs`) is listed like a file and is a directory; the generator reads none of it.
-    let file = false;
-    try { file = statSync(from).isFile(); } catch { /* deleted in the working tree: not in the copy either */ }
-    if (!file) continue;
+  for (const rel of GENERATOR_INPUTS) {
     mkdirSync(join(dest, dirname(rel)), { recursive: true });
-    cpSync(from, join(dest, rel));
+    cpSync(join(ROOT, rel), join(dest, rel));
   }
   return dest;
 }
@@ -92,8 +85,8 @@ describe('criterion 1 - the generated blocks are current, and drift is caught', 
     expect(check().code).toBe(0);
   });
 
-  it('and exits 1 after a hand edit inside a block, naming the command, on a copy of the tracked files', () => {
-    const copy = copyTracked();
+  it('and exits 1 after a hand edit inside a block, naming the command, on a copy of what the generator reads', () => {
+    const copy = copyInputs();
     // Exactly what the generator reads, and enough of it: --check passes on the copy before the edit, so an input
     // the generator gains later fails here, by name, instead of the copy growing back to the whole tree.
     expect(filesUnder(copy).sort(), 'the copy holds more than the generator reads').toEqual([...GENERATOR_INPUTS].sort());
