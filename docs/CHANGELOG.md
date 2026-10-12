@@ -19,6 +19,10 @@ runs but the few that repair the state, and no variable turns that off. It stays
   before the call, from the read it already made, so a procedure that points capture back afterwards no longer reads
   the preference first. It is null when the tool created the preference, or when the one it found named nothing
   (ARC-09-C127).
+- `snow_us_current_update_set_read` reads the session's update set, the authenticated user's `sys_update_set`
+  preference, where it listed up to five update sets in progress on the whole instance and called that current. It
+  returns `session_update_set` (null with no preference, `found: false` for a set that does not exist), and the
+  instance's in-progress sets as `in_progress_update_sets`; `count` and `active_update_sets` are gone (ARC-09-C128).
 
 ## 2.0.12 — 2026-10-12
 
