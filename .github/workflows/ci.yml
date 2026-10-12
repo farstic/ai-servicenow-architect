@@ -668,8 +668,19 @@ jobs:
       # Its own step: the cert script publishes its paths through `GITHUB_ENV`, which only reaches
       # LATER steps — running both in one leaves the second without them, which is how the first
       # push of this failed.
+      # ARC-11-C6: the next steps run a command outside the allowed set, so each runs licensed, with a licence
+      # signed by a key made for this run (scripts/ci/licence-fixture.mjs), never a product key. Per step, never
+      # job-wide: a hook in the job's environment would reach the test runner (the architect's ruling).
+      - name: 'ARC-11-C6 — a fixture licence for the steps outside the allowed set (POSIX)'
+        id: licence
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: node scripts/ci/licence-fixture.mjs
       - name: 'B09-01 — the password never reaches argv, and the store is written (POSIX)'
         if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        env:
+          NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}
+          SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}
+          CLAUDE_PROJECT_DIR: ${{ steps.licence.outputs.root }}
         run: node scripts/ci/assert-password-stdin.mjs
       # The proxy half, and NOT the one the criterion asked for. It wanted `lastProbe: null` in the
       # store under a dead `HTTPS_PROXY`; measured, there is no store to read — `instance add`
@@ -682,6 +693,9 @@ jobs:
         env:
           SNOWARCH_ASSERT_PROXY_FAILS: '1'
           HTTPS_PROXY: http://127.0.0.1:9
+          NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}
+          SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}
+          CLAUDE_PROJECT_DIR: ${{ steps.licence.outputs.root }}
         run: node scripts/ci/assert-password-stdin.mjs
 
   commitlint:
@@ -737,8 +751,18 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts
+      # ARC-11-C6: the next steps run a command outside the allowed set, so each runs licensed, with a licence
+      # signed by a key made for this run (scripts/ci/licence-fixture.mjs), never a product key. Per step, never
+      # job-wide: a hook in the job's environment would reach the test runner (the architect's ruling).
+      - name: 'ARC-11-C6 — a fixture licence for the steps outside the allowed set'
+        id: licence
+        run: node scripts/ci/licence-fixture.mjs
       # Gate 6 is `docs verify`, which needs the corpus. The same sparse recipe B02 uses.
       - name: The pinned corpus, sparse
+        env:
+          NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}
+          SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}
+          CLAUDE_PROJECT_DIR: ${{ steps.licence.outputs.root }}
         run: node tools/snowarch/bin/snowarch.mjs docs sync --yes
       # ARC-09-S0x AC (acceptance item B09-07). The criterion is that the release runs on
       # windows-latest **under pwsh, with no Git Bash** — and until this acceptance pass this step
@@ -1035,7 +1059,17 @@ jobs:
 
       # The wizard's non-interactive door (ARC-07): a password on STDIN, never in argv, against a
       # store in the checkout. No network — `--no-probes` is what makes that true.
+      # ARC-11-C6: the next steps run a command outside the allowed set, so each runs licensed, with a licence
+      # signed by a key made for this run (scripts/ci/licence-fixture.mjs), never a product key. Per step, never
+      # job-wide: a hook in the job's environment would reach the test runner (the architect's ruling).
+      - name: 'ARC-11-C6 — a fixture licence for the steps outside the allowed set'
+        id: licence
+        run: node scripts\ci\licence-fixture.mjs
       - name: instance add --password-stdin, through snowarch.cmd
+        env:
+          NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}
+          SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}
+          CLAUDE_PROJECT_DIR: ${{ steps.licence.outputs.root }}
         run: |
           npm ci --ignore-scripts
           if not "%ERRORLEVEL%"=="0" exit /b 1
@@ -1061,6 +1095,10 @@ jobs:
       # writes: `--dry-run` and `--check` are the read-only halves, which is what makes them safe
       # on a cell whose job is the entry point rather than the behaviour.
       - name: store migrate --dry-run, through snowarch.cmd
+        env:
+          NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}
+          SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}
+          CLAUDE_PROJECT_DIR: ${{ steps.licence.outputs.root }}
         run: |
           call .\snowarch.cmd store migrate --dry-run
           rem 0 = nothing to do, 1 = no store in this checkout (the wizard wrote its fixture store
