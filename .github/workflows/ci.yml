@@ -49,6 +49,11 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Assert the install changed nothing tracked
         run: node scripts/ci/assert-clean.mjs
+      # ARC-11-C6: CI proves enforcement, not only the licensed path. On the real build, with the keys it ships and
+      # no hook, before any fixture: `docs verify` is refused, exit 3, and one server tool over stdio is refused with
+      # LICENCE_NOT_VALID and one audit line (the architect's ruling). Step 5 adds the doctor's E-31 FAIL.
+      - name: 'ARC-11-C6 — with no licence the real build refuses (no hook, the shipped keys)'
+        run: node scripts/ci/assert-enforced.mjs
       - run: npm run lint
       - run: npm run type-check
       - run: npm test
