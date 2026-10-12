@@ -100,6 +100,14 @@ Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.
 `--yes` skips the plan screen. Interrupting with Ctrl-C is safe: the run records where it stopped,
 and re-running resumes from that step rather than starting again.
 
+### The licence
+
+From 2.0.13 the product checks for a licence from the author. Copy the file you were given to `.local/licence.json`
+in the checkout, before or after the install, which runs without one, and restart Claude Code.
+`./snowarch licence check` shows its state. Without a licence in force no tool runs, and no command but `licence`,
+`doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`. `./snowarch upgrade --to v2.0.12` goes back
+to the last release that runs without one.
+
 ### The dialogs
 
 <!-- generated:dialogs -->
