@@ -8,16 +8,17 @@
  *   1. `docs verify` is refused: exit 3, naming the state, with the remedy;
  *   2. one server tool over stdio is refused with LICENCE_NOT_VALID, and writes exactly one audit line, naming
  *      the tool, the gate `licence` and the state;
- *   3. `bootstrap --mode live` runs without one (ruling A) and finishes, exit 0, skipping exactly the two steps that
- *      start the package CLI, B06 and B08, each with E-31's reason (ruling R1). On a clone of this checkout, so the
- *      tree this job's lint and npm test then read is never bootstrapped.
+ *   3. with `--bootstrap`: `bootstrap --mode live` runs without one (ruling A) and finishes, exit 0, skipping exactly
+ *      the two steps that start the package CLI, B06 and B08, each with E-31's reason (ruling R1). On a clone of this
+ *      checkout, so the tree this job's lint and npm test then read is never bootstrapped. The clone and its install
+ *      cost minutes, so CI passes the flag on one cell per OS, node 24 (the architect's ruling).
  * ARC-11-C6 step 5 adds the doctor: E-31 FAIL, and the server checks that call a tool reporting skip.
  *
  * Every child runs with NODE_OPTIONS removed, a HOME and a project of its own, so nothing on the runner can
  * hand it a licence. A checkout that holds one is refused: this asserts the unlicensed product, and a run
  * that found a licence would be asserting something else.
  *
- * Usage: node scripts/ci/assert-enforced.mjs
+ * Usage: node scripts/ci/assert-enforced.mjs [--bootstrap]
  * Exit 0 every assertion held · 1 one did not · 2 this checkout holds a licence.
  */
 import { spawnSync } from 'node:child_process';
@@ -34,6 +35,8 @@ const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const CLI = join(ROOT, 'tools', 'snowarch', 'bin', 'snowarch.mjs');
 const SERVER = join(ROOT, 'packages', 'snowarch', 'dist', 'server.js');
 const say = (text) => writeSync(1, `${text}\n`);
+/** The live bootstrap on a clone (3.), which costs a clone and an install: CI asks for it on one cell per OS. */
+const BOOTSTRAP = process.argv.includes('--bootstrap');
 const failures = [];
 const check = (ok, what) => { say(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) failures.push(what); };
 
@@ -84,9 +87,11 @@ try {
 
   // 3. The bootstrap, live, on a clone: the docs corpus skipped (it is not what this asserts), and no Claude Code.
   const clone = join(base, 'clone');
-  const cloned = spawnSync('git', ['clone', '--quiet', ROOT, clone], { encoding: 'utf8' });
-  check(cloned.status === 0, `this checkout clones (git exited ${cloned.status}${cloned.stderr ? `: ${cloned.stderr.trim()}` : ''})`);
-  if (cloned.status === 0) {
+  const cloned = BOOTSTRAP ? spawnSync('git', ['clone', '--quiet', ROOT, clone], { encoding: 'utf8' }) : null;
+  if (BOOTSTRAP) {
+    check(cloned.status === 0, `this checkout clones (git exited ${cloned.status}${cloned.stderr ? `: ${cloned.stderr.trim()}` : ''})`);
+  }
+  if (BOOTSTRAP && cloned.status === 0) {
     // Live with --yes takes its connection details from a file, and the bootstrap checks only that the file exists,
     // is 0600 and lies outside the checkout. Its content is read by B06 alone, the step this asserts is skipped, so
     // it holds nothing: were B06 ever to run here, `{}` would fail it, loudly.
