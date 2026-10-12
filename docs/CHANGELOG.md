@@ -10,11 +10,30 @@ All notable changes to this project are documented in this file. Everything hand
 ### Notes
 
 **This release brings enforcement on every build (ARC-11-C6):** with no valid licence, no tool runs, no CLI command
-runs but the few that repair the state, and no variable turns that off. It stays under the Apache License 2.0; from
-2.1.0 the product moves to the Business Source License 1.1 (ARC-11-C5).
+runs but the few that show and repair the state, and no variable turns that off. It stays under the Apache License
+2.0; from 2.1.0 the product moves to the Business Source License 1.1 (ARC-11-C5).
+
+A checkout with no licence in force (missing, invalid, expired or revoked), or with a design-only licence on a live
+server, sees this:
+- every MCP tool answers `LICENCE_NOT_VALID` and writes one audit line, as 2.0.12 did under `SNOW_LICENCE_ENFORCE`;
+- `./snowarch` runs `licence`, `doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`. Every other
+  command exits 3, naming the state and the remedy; the package CLI runs `doctor` only;
+- doctor check E-31 is a FAIL. Its remedy ends with the way back, `./snowarch upgrade --to v2.0.12`, the last
+  release that runs without a licence;
+- `./snowarch upgrade` says so before it moves to a release that refuses, with `--yes` and without.
+
+`SNOW_LICENCE_ENFORCE` is gone: no variable, flag or file turns enforcement off, and setting it changes nothing. With
+a licence in force nothing is refused, and only the licence line's wording changes. There is no migration step. The
+server has 399 tools and the error registry 73 codes, as in 2.0.12. The contract moves to `20f73faf89cd`, because
+`LICENCE_NOT_VALID`'s meaning and remedy no longer name the variable.
 
 ### Changed
 
+- The licence line says the state alone: "warn only" and "enforced" are gone, because enforcement no longer has a
+  switch (ARC-11-C6).
+- A licence's day is a UTC date, and the commands say so. `licence show`, `verify` and `check` print
+  `valid until: <date> (UTC, N days)`, `(UTC, last day)` on its last day, and `<date> (UTC)` once it has ended. E-31
+  and a session's first answer say "last day" where they said "0 days left" (ARC-11-C6).
 - `docs verify` refuses a Markdown table row with more cells than its header, outside fences. GitHub cuts a cell at
   the first unescaped pipe, inside a code span too, and drops every cell past the header's count, so such a row reads
   whole in the file and short on the page. The 33 rows that broke this are fixed (ARC-09-C126).
