@@ -18,6 +18,11 @@ runs but the few that repair the state, and no variable turns that off. It stays
 - `docs verify` refuses a Markdown table row with more cells than its header, outside fences. GitHub cuts a cell at
   the first unescaped pipe, inside a code span too, and drops every cell past the header's count, so such a row reads
   whole in the file and short on the page. The 33 rows that broke this are fixed (ARC-09-C126).
+- `snow_core_records_query` says when a read was cut. It returns `total` (the Table API's `X-Total-Count`), `limit`,
+  `offset` and `truncated`, where `count` alone was the page's length, so a list cut at its limit looked complete. It
+  takes an `offset` to read the next page, and its limit's description states the real default and cap. The Architect
+  reads a truncated answer to its end within the budget, or cites it with its total (CLAUDE.md and the six gateways,
+  ARC-09-C125).
 
 ### Fixed
 
