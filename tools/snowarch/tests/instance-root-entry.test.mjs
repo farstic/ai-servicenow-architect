@@ -22,6 +22,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CLI_PATH, preconditions, USAGE } from '../lib/instance.mjs';
 import { NO_INSTANCE_MESSAGE } from '../../../packages/snowarch/dist/no-instance.js';
 import { cliSpelling } from '../../../packages/snowarch/dist/cli/tty.js';
+import { licensedEnv } from './helpers/licence-hook/index.mjs';
 import { useStateRoot } from './helpers/state-root.mjs';
 import { tempDir } from './helpers/temp.mjs';
 /*
@@ -66,7 +67,7 @@ const ENTRIES = [
 
 const run = (entry, args, env = {}) => {
   const r = spawnSync(entry.argv0, [...entry.lead, ...args],
-    { encoding: 'utf8', cwd: root, env: { ...process.env, ...env } });
+    { encoding: 'utf8', cwd: root, env: licensedEnv({ ...process.env, ...env }) });
   return { status: r.status, text: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 };
 

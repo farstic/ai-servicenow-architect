@@ -10,6 +10,7 @@ import { NO_INSTANCE, PROBES_UNAVAILABLE, SERVER_IDS, runProbes, run as runB08 }
   from '../lib/steps/B08.mjs';
 import { CACHE_VERSION, COMPATIBILITY_KEYS, cachePath, summarise, writeDoctorCache } from '../lib/doctor-cache.mjs';
 import { register, reset } from '../lib/redact.mjs';
+import { licensedEnv } from './helpers/licence-hook/index.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
 import { useStateRoot } from './helpers/state-root.mjs';
 /*
@@ -183,13 +184,13 @@ test('B08 and `doctor --section server` write the same shape', async () => {
   const before = statSync(cachePath(root)).mtimeMs;
   const sectioned = spawnSync(process.execPath,
     [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--section', 'server', '--json'],
-    { cwd: root, encoding: 'utf8', env: { ...process.env } });
+    { cwd: root, encoding: 'utf8', env: licensedEnv({ ...process.env }) });
   assert.ok([0, 1].includes(sectioned.status), sectioned.stderr);
   assert.equal(statSync(cachePath(root)).mtimeMs, before, '--section wrote the cache');
 
   const cli = spawnSync(process.execPath,
     [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--json', '--no-network'],
-    { cwd: root, encoding: 'utf8', env: { ...process.env } });
+    { cwd: root, encoding: 'utf8', env: licensedEnv({ ...process.env }) });
   assert.ok([0, 1].includes(cli.status), cli.stderr);
   const direct = JSON.parse(readFileSync(cachePath(root), 'utf8'));
 

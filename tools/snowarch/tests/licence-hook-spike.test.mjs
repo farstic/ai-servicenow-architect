@@ -61,6 +61,7 @@ function verify({ how, file, env }) {
     ? (WIN ? [process.env.COMSPEC || 'cmd.exe', ['/c', join(ROOT, 'snowarch.cmd'), ...args]] : [join(ROOT, 'snowarch'), args])
     : [process.execPath, [...(how.importArgs ?? []), CLI, ...args]];
   const t0 = performance.now();
+  // unlicensed start: the spike measures the hook itself, each case once with it and once without it
   const r = spawnSync(cmd, argv, { encoding: 'utf8', env, cwd: ROOT, timeout: 60_000 });
   const ms = Math.round(performance.now() - t0);
   assert.equal(r.error, undefined, `${cmd} did not start: ${r.error}`);
@@ -110,6 +111,7 @@ test('ARC-11-C6 spike — the server under enforcement answers with the hook, an
   const ask = async (extra, { enforce = true } = {}) => {
     const env = cleanEnv(dir, { CLAUDE_PROJECT_DIR: checkout, SNOW_LOG_LEVEL: 'error', ...(enforce ? { SNOW_LICENCE_ENFORCE: 'true' } : {}), ...extra });
     const client = new Client({ name: 'hook-spike', version: '0' }, { capabilities: {} });
+    // unlicensed start: the spike measures the hook itself, each case once with it and once without it
     const transport = new StdioClientTransport({ command: process.execPath, args: [SERVER], env, cwd: checkout, stderr: 'pipe' });
     let err = '';
     transport.stderr?.on('data', (b) => { err += b; });
