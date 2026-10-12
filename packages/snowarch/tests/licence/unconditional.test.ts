@@ -1,10 +1,8 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-import { describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 import { licenceStatus } from '../../src/licence/state.js';
+import { checkout, removeFixtureDirs } from './fixtures.js';
 
 /**
  * ARC-11-C6 — the server enforces on every build, with no switch (the owner's decision, 2026-10-12: in 2.0.13).
@@ -13,15 +11,13 @@ import { licenceStatus } from '../../src/licence/state.js';
  */
 const VALUES = [undefined, '', 'true', 'false', '0', '1', 'TRUE', 'off', 'no'];
 
+// The fixtures' own temp checkouts, removed after each case (ARC-09-C80).
+afterEach(() => { removeFixtureDirs(); });
+
 describe('ARC-11-C6 — a server with no licence is enforced, whatever SNOW_LICENCE_ENFORCE says', () => {
   it.each(VALUES)('SNOW_LICENCE_ENFORCE=%s', (v) => {
-    const root = mkdtempSync(join(tmpdir(), 'licence-unconditional-'));
-    try {
-      const s = licenceStatus(root, { env: v === undefined ? {} : { SNOW_LICENCE_ENFORCE: v } });
-      expect(s.state).toBe('missing');
-      expect(s.enforced).toBe(true);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+    const s = licenceStatus(checkout('snowarch-licence-unconditional-'), { env: v === undefined ? {} : { SNOW_LICENCE_ENFORCE: v } });
+    expect(s.state).toBe('missing');
+    expect(s.enforced).toBe(true);
   });
 });

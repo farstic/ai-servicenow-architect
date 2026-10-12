@@ -1,18 +1,22 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { trackTempDir } from '../helpers/server-child.js';
+import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
-/** A project of its own (ARC-11-C6): the server reads its licence from CLAUDE_PROJECT_DIR. Removed at exit. */
+/**
+ * A project of its own (ARC-11-C6): the server reads its licence from CLAUDE_PROJECT_DIR. Removed after the
+ * file's last case: a vitest worker does not reliably reach the exit handler (see `licence/fixtures.ts`).
+ */
 const project = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-handshake-')));
+afterAll(() => { removeTempDir(project); });
 /** The package's own version, read rather than typed — see the initialize test (ARC-09-C12). */
 const packageVersion = (): string =>
   JSON.parse(readFileSync(resolve(here, '../../package.json'), 'utf8')).version;
