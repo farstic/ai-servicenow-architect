@@ -8,11 +8,12 @@
  *   1. `docs verify` is refused: exit 3, naming the state, with the remedy;
  *   2. one server tool over stdio is refused with LICENCE_NOT_VALID, and writes exactly one audit line, naming
  *      the tool, the gate `licence` and the state;
- *   3. with `--bootstrap`: `bootstrap --mode live` runs without one (ruling A) and finishes, exit 0, skipping exactly
+ *   3. the doctor (step 5): E-31 FAILs, the one cause it names, and SV-06, the server check that calls a tool, skips
+ *      with E-31's reason instead of failing behind it;
+ *   4. with `--bootstrap`: `bootstrap --mode live` runs without one (ruling A) and finishes, exit 0, skipping exactly
  *      the two steps that start the package CLI, B06 and B08, each with E-31's reason (ruling R1). On a clone of this
  *      checkout, so the tree this job's lint and npm test then read is never bootstrapped. The clone and its install
  *      cost minutes, so CI passes the flag on one cell per OS, node 24 (the architect's ruling).
- * ARC-11-C6 step 5 adds the doctor: E-31 FAIL, and the server checks that call a tool reporting skip.
  *
  * Every child runs with NODE_OPTIONS removed, a HOME and a project of its own, so nothing on the runner can
  * hand it a licence. A checkout that holds one is refused: this asserts the unlicensed product, and a run
@@ -35,7 +36,7 @@ const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const CLI = join(ROOT, 'tools', 'snowarch', 'bin', 'snowarch.mjs');
 const SERVER = join(ROOT, 'packages', 'snowarch', 'dist', 'server.js');
 const say = (text) => writeSync(1, `${text}\n`);
-/** The live bootstrap on a clone (3.), which costs a clone and an install: CI asks for it on one cell per OS. */
+/** The live bootstrap on a clone (4.), which costs a clone and an install: CI asks for it on one cell per OS. */
 const BOOTSTRAP = process.argv.includes('--bootstrap');
 const failures = [];
 const check = (ok, what) => { say(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) failures.push(what); };
@@ -85,7 +86,20 @@ try {
   check(l.tool === 'snow_core_capabilities_read' && l.gate === 'licence' && l.result === 'LICENCE_NOT_VALID'
     && l.licence === 'missing' && l.state === 'missing', 'the audit line names the tool, the gate, the licence and the state');
 
-  // 3. The bootstrap, live, on a clone: the docs corpus skipped (it is not what this asserts), and no Claude Code.
+  // 3. The doctor, on this checkout with its state moved to a temp root, so nothing is written here.
+  // unlicensed start: this script asserts the unlicensed product, on the keys the build ships
+  const doctor = spawnSync(process.execPath, [CLI, 'doctor', '--json', '--no-network', '--no-cache'],
+    { cwd: ROOT, encoding: 'utf8', env: bare({ SNOWARCH_STATE_ROOT: state, CLAUDE_PROJECT_DIR: state }) });
+  let report = null;
+  try { report = JSON.parse(doctor.stdout); } catch { /* reported below */ }
+  const byId = new Map((report?.checks ?? []).map((c) => [c.id, c]));
+  const e31 = byId.get('E-31');
+  const sv06 = byId.get('SV-06');
+  check(e31?.status === 'fail', `the doctor's E-31 FAILs (${e31 ? e31.status : `no report, exit ${doctor.status}`})`);
+  check(sv06?.status === 'skip' && sv06.detail === NO_LICENCE_IN_FORCE,
+    `SV-06 skips with E-31's reason (${sv06 ? `${sv06.status}: ${sv06.detail}` : 'absent'})`);
+
+  // 4. The bootstrap, live, on a clone: the docs corpus skipped (it is not what this asserts), and no Claude Code.
   const clone = join(base, 'clone');
   const cloned = BOOTSTRAP ? spawnSync('git', ['clone', '--quiet', ROOT, clone], { encoding: 'utf8' }) : null;
   if (BOOTSTRAP) {
