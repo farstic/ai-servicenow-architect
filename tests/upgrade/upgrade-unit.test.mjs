@@ -16,11 +16,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  classifyGitFetchError, doctorLines, parseSemver, renderPlan, returnRef, sortTags,
+  classifyGitFetchError, doctorLines, licenceNotice, parseSemver, renderPlan, returnRef, sortTags,
 } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { branchState, describe } from '../../tools/snowarch/lib/git.mjs';
 import { git as harnessGit } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { REMEDY } from '../../tools/snowarch/lib/licence/state.mjs';
+import { WAY_BACK } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 import { failureLines } from '../../tools/snowarch/lib/doctor/panel.mjs';
 import {
   MAX_AGE_MS, REFRESH_AFTER_MS, cachePath, isFresh, needsRefresh, readUpgradeCheck,
@@ -92,6 +94,25 @@ test('the plan block says the five things a reader has to decide from', () => {
   assert.match(nothing, /steps that will re-run: none \(only the preflight and the summary\)/);
   assert.match(nothing, /\(1 commit\)/, 'one commit is not "1 commits"');
   assert.match(nothing, /claude-floor not stated/);
+});
+
+test('ARC-11-C6 step 6 — U4 says what a release that enforces refuses, and both of E-31\'s sentences', () => {
+  const cli = './snowarch';
+  const lines = licenceNotice({ licence: { state: 'missing' }, target: 'v2.0.13', cli });
+  assert.deepEqual(lines, [
+    'Licence: missing — v2.0.13 runs no MCP tool, and no command but licence, doctor, status, version, upgrade, '
+      + 'bootstrap and mode design, without a licence in force.',
+    `${REMEDY(cli)}. ${WAY_BACK(cli)}`,
+  ]);
+  // Every refused state, and any release after the last that runs without one, prereleases included.
+  for (const state of ['invalid', 'expired', 'revoked']) {
+    assert.ok(licenceNotice({ licence: { state }, target: 'v2.1.0-rc.1', cli }), state);
+  }
+  // A licence in force says nothing, and nor does the way back itself, or a release older than it.
+  for (const state of ['ok', 'expiring']) assert.equal(licenceNotice({ licence: { state }, target: 'v2.0.13', cli }), null);
+  for (const target of ['v2.0.12', 'v2.0.9']) {
+    assert.equal(licenceNotice({ licence: { state: 'missing' }, target, cli }), null, target);
+  }
 });
 
 test('the cache is the hook\'s contract: three keys that may never be renamed', (t) => {

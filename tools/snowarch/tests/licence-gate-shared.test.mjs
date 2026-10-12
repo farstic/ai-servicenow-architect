@@ -45,3 +45,15 @@ test('ARC-11-C6 — no other source defines the set or the decision', () => {
   for (const r of roots) walk(join(ROOT, r));
   assert.deepEqual(found.sort(), NAMES.map((n) => `packages/snowarch/src/licence/gate.ts: ${n}`).sort());
 });
+
+test('ARC-11-C6 step 6 — the sentence that lists the allowed set is derived from the gate, not typed', async () => {
+  const { allowedPhrase } = engine;
+  assert.equal(allowedPhrase(), 'licence, doctor, status, version, upgrade, bootstrap and mode design');
+  const gate = await import(pathToFileURL(join(ROOT, 'packages', 'snowarch', 'dist', 'licence', 'gate.js')).href);
+  // Widen the set and the phrase follows: it reads the lists, it does not hold a copy of them.
+  assert.equal(allowedPhrase({ allowed: [...gate.CLI_ALLOWED, 'docs'], forms: gate.CLI_ALLOWED_FORMS }),
+    'licence, doctor, status, version, upgrade, bootstrap, docs and mode design');
+  const licenceCommand = readFileSync(join(ROOT, 'tools', 'snowarch', 'lib', 'commands', 'licence.mjs'), 'utf8');
+  assert.equal(licenceCommand.includes('licence, doctor, status, version, upgrade, bootstrap and mode design'), false,
+    'licence check still spells the allowed set out instead of deriving it');
+});

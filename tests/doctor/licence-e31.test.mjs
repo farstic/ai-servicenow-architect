@@ -12,6 +12,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
+import { LAST_UNENFORCED_RELEASE, WAY_BACK } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 import { statusCommand } from '../../tools/snowarch/lib/commands/status.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import { greenTree } from './helpers/tree.mjs';
@@ -46,6 +47,24 @@ test('ARC-11-C6 — no licence is a FAIL, with the line the banner prints and th
   assert.equal(r.detail, 'Licence: missing');
   assert.match(r.remedy, /^Run .+ licence check to see why, then install a valid licence as \.local\/licence\.json\./);
   assert.match(r.command, /licence check$/);
+});
+
+test('ARC-11-C6 step 6 — E-31\'s remedy ends with the way back, to the last release that runs without a licence', async (t) => {
+  // v2.0.12, named once: 2.0.13 is the first release that refuses without a licence (C6), so going back to escape
+  // enforcement means that one, whichever release a checkout came from.
+  assert.equal(LAST_UNENFORCED_RELEASE, 'v2.0.12');
+  const ctx = ctxFor(t);
+  const cli = spellings({ platform: ctx.platform, env: ctx.env }).cli;
+  assert.equal(WAY_BACK(cli), `To go back to the last release that runs without a licence: ${cli} upgrade --to v2.0.12.`);
+  for (const file of [null, licenceText(licence({ valid_until: '2026-10-01' }), primary)]) {
+    const r = await E31.run(ctxFor(t, { file }));
+    assert.equal(r.status, 'fail');
+    assert.match(r.remedy, /^Run .+ licence check to see why, then install a valid licence as \.local\/licence\.json\./);
+    assert.ok(r.remedy.endsWith(`restart it afterwards. ${WAY_BACK(cli)}`), r.remedy);
+  }
+  // A licence in its last month is in force: its warning has no way back to offer.
+  const soon = await E31.run(ctxFor(t, { file: licenceText(licence({ valid_until: '2026-10-25' }), primary) }));
+  assert.equal(soon.remedy.includes('upgrade --to'), false, soon.remedy);
 });
 
 test('ARC-11-C1 — a licence in force is ok; one in its last month is a warning; a forged one is a FAIL that says why', async (t) => {
