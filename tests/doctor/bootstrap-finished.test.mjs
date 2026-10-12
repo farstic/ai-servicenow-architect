@@ -55,7 +55,8 @@ import { greenTree, readJson, writeJson } from './helpers/tree.mjs';
 
 const E29 = engineRepoChecks().find((c) => c.id === 'E-29');
 
-const ctxFor = (root) => ({ root, platform: 'darwin', env: {},
+// ARC-11-C6 — a licence in force unless a case says otherwise: live mode plans B06 and B08 only with one (ruling R1).
+const ctxFor = (root, { licence = { state: 'ok' } } = {}) => ({ root, platform: 'darwin', env: {}, licence,
   config: readJson(root, 'engine.config.json') });
 
 /** A state whose steps are all ok under the current version — a finished live install. */
@@ -99,6 +100,24 @@ test('an interrupted B06 is named, with everything after it', async (t) => {
   assert.match(r.detail, /B07–B09 never ran/);
   assert.match(r.remedy, /bootstrap/);
   assert.deepEqual(r.data.problems.map((p) => p.id), ['B06', 'B07', 'B08', 'B09']);
+});
+
+test('ARC-11-C6 — with no licence in force, live mode does not plan B06 and B08, so their absence is no finding', async (t) => {
+  // Ruling R1: the bootstrap skips them under a refused state, and records them skipped. A checkout that never ran
+  // them for want of a licence did not leave its install unfinished.
+  const root = finished(greenTree(t, { mode: 'live' }));
+  const state = readJson(root, '.local/bootstrap-state.json');
+  delete state.steps.B06;
+  delete state.steps.B08;
+  writeJson(root, '.local/bootstrap-state.json', state);
+
+  const licensed = await E29.run(ctxFor(root));
+  assert.equal(licensed.status, 'fail', 'precondition: with a licence in force, the two absent steps are a finding');
+  assert.deepEqual(licensed.data.problems.map((p) => p.id), ['B06', 'B08']);
+  for (const refused of ['missing', 'invalid', 'expired', 'revoked']) {
+    const r = await E29.run(ctxFor(root, { licence: { state: refused } }));
+    assert.equal(r.status, 'ok', `licence ${refused}: ${r.detail}`);
+  }
 });
 
 test('a step recorded under the previous version is named', async (t) => {

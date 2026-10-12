@@ -10,7 +10,10 @@
 //
 //   --tools            the tools that EXIST in the session. Nothing else is there to be allowed or denied.
 //   --allowedTools     permission for the ones that would otherwise ask (Bash patterns, Write).
-//   --setting-sources  `project` alone: the checkout's own settings and hooks, not the machine's.
+//   --setting-sources  `project,local`: the clone's own settings and hooks, never the machine's. `local` is the
+//                      clone's `.claude/settings.local.json`, which the bootstrap writes with the SessionStart
+//                      hook in it (ARC-06-S05 keeps the committed file hook-free). Without it the hook does not
+//                      run, the session has no Licence line, and T-31 cannot fire (ARC-11-C6, 2026-10-12).
 //   --strict-mcp-config  with no --mcp-config: a design-only run reaches no ServiceNow server, and does
 //                      not depend on a user-scope registration the run does not control.
 //   --model            Sonnet 5.5 unless VALIDATION_MODEL says otherwise.
@@ -18,7 +21,7 @@ import { pathToFileURL } from 'node:url';
 import { POSIX } from '../../tools/snowarch/lib/launcher-spelling.mjs';
 
 export const DEFAULT_MODEL = 'claude-sonnet-5-5';
-export const SETTING_SOURCES = 'project';
+export const SETTING_SOURCES = 'project,local';
 
 const BASE = ['Read', 'Grep', 'Glob', 'Skill'];
 // `Skill` is in the base: without it `Skill snowarch status` errors in an untrusted headless session and
@@ -45,7 +48,7 @@ export function header({ tag, sha, model, version }) {
     `validation run: ${tag} @ ${sha}`,
     `claude: ${version}`,
     `model: ${model}`,
-    `setting sources: ${SETTING_SOURCES} (the checkout's settings and hooks; user and local settings are not loaded)`,
+    `setting sources: ${SETTING_SOURCES} (the clone's settings and hooks, its bootstrap-written local file included; user settings are not loaded)`,
     'mcp: none (--strict-mcp-config): a design-only run reaches no ServiceNow server',
     `tools: ${BASE.join(',')} (--tools: only these exist in the session; no sub-agent, web or edit tool)`,
     ...extras,

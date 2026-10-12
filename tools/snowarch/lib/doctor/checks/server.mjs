@@ -18,6 +18,9 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { serverDepsInstalled } from '../../instance.mjs';
+import { productDir } from '../../spawn-env.mjs';
+import { licenceStatus, REFUSED } from '../../licence/state.mjs';
+import { NO_LICENCE_IN_FORCE } from './licence.mjs';
 import { defineCheck } from '../registry.mjs';
 
 import { fail, skip } from './result.mjs';
@@ -81,7 +84,8 @@ export async function serverReport(ctx) {
   // this changes nothing there; it makes a doctor run describe the root it was GIVEN, which is
   // what B08, the CI smoke probe and every fixture-based test rely on.
   const saved = { project: process.env.CLAUDE_PROJECT_DIR, store: process.env.SNOW_STORE };
-  process.env.CLAUDE_PROJECT_DIR = ctx.root;
+  // ARC-11-C6 step 4b — the directory whose `.local/` the engine reads, so the server's licence is the engine's.
+  process.env.CLAUDE_PROJECT_DIR = productDir(ctx.root);
   if (ctx.storePath) process.env.SNOW_STORE = ctx.storePath;
   else delete process.env.SNOW_STORE;
   try {
@@ -136,6 +140,16 @@ export function headroomNote(initializeMs, timeoutMs) {
     : null;
 }
 
+/**
+ * ARC-11-C6 step 5 — the server checks that call a tool. SV-06 compares the capabilities a `tools/call` returns, and
+ * the server refuses every tool with no licence in force, so its own reason would point at SV-05, which passes. SV-05
+ * lists the tools and calls none.
+ */
+export const CALLS_A_TOOL = Object.freeze(['SV-06']);
+
+/** Is a licence in force for this doctor run? The run's own reading, else this root's. */
+const licenceRefused = (ctx) => REFUSED.includes((ctx.licence ?? licenceStatus(ctx.root)).state);
+
 /** One id's result, adopted from the server's report or explained by its absence. */
 export async function adopt(ctx, id) {
   const answer = await serverReport(ctx);
@@ -147,6 +161,8 @@ export async function adopt(ctx, id) {
       // engine. Reported as what it is rather than as a passing check nobody ran.
       return skip(`${id} was not in the server's report (version skew)`, { adopted: false });
     }
+    // With no licence in force a check that calls a tool cannot tell anything, and E-31 names the cause.
+    if (CALLS_A_TOOL.includes(id) && licenceRefused(ctx)) return skip(NO_LICENCE_IN_FORCE, { adopted: false });
     const { id: _id, title: _title, status, detail, ...rest } = result;
     const adopted = { status, detail, ...rest,
       data: { adopted: true, title, ...(result.data ?? {}) } };

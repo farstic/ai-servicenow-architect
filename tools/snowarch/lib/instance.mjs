@@ -12,9 +12,9 @@
 //   THE STORE. The server owns it. A second writer would be a second opinion about the schema,
 //   the file mode and the atomic rename — and this process never reads or writes it at all.
 //
-//   THE ENVIRONMENT. `childEnv` (ARC-06-S08) pins `CLAUDE_PROJECT_DIR` to THIS checkout, so a
-//   wizard started inside a Claude Code session pointed at another repository writes here rather
-//   than there.
+//   THE ENVIRONMENT. `productEnv` (ARC-06-S08's `childEnv`, and ARC-11-C6) pins `CLAUDE_PROJECT_DIR` to THIS
+//   checkout's state, so a wizard started inside a Claude Code session pointed at another repository writes
+//   here rather than there, and the server CLI's licence door reads the licence this door read.
 //
 // The argv it builds is exactly what the user typed. A test asserts there is no code path that
 // adds one — a secret cannot reach `ps` through a forwarder that only forwards.
@@ -25,7 +25,7 @@ import { join } from 'node:path';
 
 import { EXIT_OK, EXIT_PREREQ } from './exit.mjs';
 import { loadConfig, root as defaultRoot } from './config.mjs';
-import { childEnv } from './spawn-env.mjs';
+import { productEnv } from './spawn-env.mjs';
 import { meetsFloor } from './versions.mjs';
 import { needSpell, spellings } from './text.mjs';
 
@@ -136,7 +136,7 @@ export async function forwardToServerCli(command, { log, argv = [], root = defau
   }
 
   const result = run(process.execPath, buildArgv(join(root, CLI_PATH), argv, command),
-    { stdio: 'inherit', cwd: root, env: childEnv(root) });
+    { stdio: 'inherit', cwd: root, env: productEnv(root) });
   return result.status ?? EXIT_PREREQ;
 }
 

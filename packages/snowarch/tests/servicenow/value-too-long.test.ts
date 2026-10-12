@@ -8,6 +8,10 @@ import { resetColumnLimits } from '../../src/servicenow/stored-values.js';
 import { routeToolInvocation } from '../../src/tools/index.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import type { ServiceNowError } from '../../src/utils/errors.js';
+import { useLicensedSession } from '../helpers/licensed-session.js';
+
+// ARC-11-C6: this file calls the router in its own process, so it runs in a licensed session.
+useLicensedSession();
 
 /**
  * ARC-09-C97 — a value longer than its column is refused BEFORE the write, so no record and no update-set

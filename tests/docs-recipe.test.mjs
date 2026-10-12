@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ATTRIBUTION, planRecipe, readAreas } from '../tools/snowarch/lib/docs/sync.mjs';
 import { PRECONDITION, RERUN_NOTE, TOLERATED, joinRecipe, recipeLines, stepName } from '../tools/snowarch/lib/docs/recipe-block.mjs';
+import { licensedEnv } from '../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * The launcher recipe in `docs/ARCHITECTURE.md` and the module must be the same commands.
@@ -272,7 +273,7 @@ test('the CLI prints lines from the same recipe, for the state the tree is in', 
   // function without pretending a populated tree needs a clone.
   const r = spawnSync(process.execPath,
     [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'docs', 'sync', '--print-recipe', '--mode', 'sparse'],
-    { encoding: 'utf8', cwd: root });
+    { encoding: 'utf8', cwd: root, env: licensedEnv(process.env) });
   assert.equal(r.status, 0, r.stderr);
   const printed = r.stdout.split('\n').map((l) => l.trim())
     .filter((l) => l.startsWith('git ') || l.startsWith('echo '));

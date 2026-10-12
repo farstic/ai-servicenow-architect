@@ -16,6 +16,8 @@
 //
 // Neither failure is visible in a plain terminal or in CI, where the variable is unset. That is
 // exactly why it belongs in one helper with a test, rather than in each caller's memory.
+import { stateRoot } from './config.mjs';
+
 export const SESSION_VARIABLES = Object.freeze(['CLAUDE_PROJECT_DIR']);
 
 /**
@@ -26,6 +28,22 @@ export const SESSION_VARIABLES = Object.freeze(['CLAUDE_PROJECT_DIR']);
  */
 export function childEnv(root, extra = {}, base = process.env) {
   return { ...base, ...extra, CLAUDE_PROJECT_DIR: root };
+}
+
+/**
+ * ARC-11-C6 step 4b — the project directory a PRODUCT child is told: the one whose `.local/` holds this checkout's
+ * state. That is the checkout, unless SNOWARCH_STATE_ROOT (a test and CI seam) moves the state (`stateRoot`).
+ *
+ * The package CLI and the server read their licence, store and audit under CLAUDE_PROJECT_DIR, and know no seam
+ * (ARC-07-C43). So the engine translates its own seam for them, and its door and theirs read one licence. Only for
+ * them: git, npm and `claude mcp` are told the checkout, by `childEnv`, because their project is the repository.
+ * With the seam unset this is the checkout, and `productEnv` is `childEnv`, byte for byte.
+ */
+export const productDir = (root, base = process.env) => stateRoot(root, base);
+
+/** `childEnv`, with CLAUDE_PROJECT_DIR at `productDir`: for a child that is the package CLI or the server. */
+export function productEnv(root, extra = {}, base = process.env) {
+  return { ...childEnv(root, extra, base), CLAUDE_PROJECT_DIR: productDir(root, base) };
 }
 
 /**

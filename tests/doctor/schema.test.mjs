@@ -10,6 +10,7 @@ import { buildReport, checkToJson, SCHEMA_KEYS, SCHEMA_VERSION, validateReport }
   from '../../tools/snowarch/lib/doctor/report-json.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
+import { licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-08-S01 — schema v1, and the validator that holds it.
@@ -127,7 +128,7 @@ test('ARC-08-C35 — the guard holds on a REAL report, through the script CI run
   const file = join(dir, 'doctor.json');
   const produced = spawnSync(process.execPath,
     [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--quick', '--json', '--no-cache'],
-    { cwd: REAL_ROOT, encoding: 'utf8' });
+    { cwd: REAL_ROOT, encoding: 'utf8', env: licensedEnv(process.env) });
   assert.ok(produced.stdout.length > 0, `the CLI produced no report: ${produced.stderr}`);
   writeFileSync(file, produced.stdout);
 

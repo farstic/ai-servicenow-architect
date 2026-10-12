@@ -365,7 +365,7 @@ async function main() {
   // failing, and the state it lands applies from the next call. Without a licence it fetches nothing.
   const refresh = startLicence({ live: instanceManager.loadedCount() > 0 });
   const licence = currentLicence();
-  logger.info(`licence: ${licenceLine(licence, { enforced: licence.enforced })}`);
+  logger.info(`licence: ${licenceLine(licence)}`);
   if (refresh) void refresh.then((r) => logger.info(`licence: revocation list ${r.outcome}`));
 
   const server = createServer();

@@ -232,6 +232,10 @@ test('an unmasked address in a report is refused, and the value is never printed
 /** The design-only report the assets check reads, with the named checks forced to `fail`. */
 function reportFailing(root, ids) {
   const report = JSON.parse(readFileSync(join(REAL_ROOT, 'tests/fixtures/doctor/status-design.json'), 'utf8'));
+  // ARC-11-C6 step 5 — the published evidence is the licensed picture: release.yml's evidence doctor runs with a
+  // fixture licence, so E-31 reads ok there. The design fixture is the unlicensed install, whose E-31 FAILs, so that
+  // is put right before the case plants its own failures.
+  report.checks = report.checks.map((c) => (c.id === 'E-31' ? { ...c, status: 'ok' } : c));
   report.checks = report.checks.map((c) => (ids.includes(c.id) ? { ...c, status: 'fail' } : c));
   for (const id of ids) {
     if (!report.checks.some((c) => c.id === id)) report.checks.push({ id, status: 'fail', detail: 'planted' });

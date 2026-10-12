@@ -12,6 +12,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createHash } from 'crypto';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { useLicensedSession } from '../helpers/licensed-session.js';
+
+// ARC-11-C6: this file calls the router in its own process, so it runs in a licensed session.
+useLicensedSession();
 
 const LIVE = !!process.env.RUN_LIVE_E2E;
 

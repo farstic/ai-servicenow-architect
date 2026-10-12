@@ -18,17 +18,27 @@ import { join } from 'node:path';
 import { storePath } from '../local-paths.mjs';
 import { contractSha } from '../config.mjs';
 import { runDoctor } from '../doctor/index.mjs';
-import { childEnv } from '../spawn-env.mjs';
+import { productEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B08';
 export const title = 'verify';
 export const needsNode = true;
-export const runsWhen = (ctx) => ctx.mode === 'live';
+const applies = (ctx) => ctx.mode === 'live';
+/**
+ * ARC-11-C6 (ruling R1) — and a licence in force. The probes are the package CLI's `instance --help`, `list` and
+ * `test`, which that CLI refuses without one, by the gate ./snowarch uses. Asked here, so the runner records the
+ * step skipped, and the first bootstrap after a licence is installed runs it.
+ */
+const unlicensed = (ctx) => applies(ctx) && packageCliRefused(ctx);
+export const runsWhen = (ctx) => applies(ctx) && !unlicensed(ctx);
 import { ADD_INSTANCE } from '../text.mjs';
+import { packageCliRefused, REMEDY } from '../licence/state.mjs';
+import { NO_LICENCE_IN_FORCE } from '../doctor/checks/licence.mjs';
 
-export const skipReason = 'design-only';
+export const skipReason = (ctx) => (unlicensed(ctx) ? NO_LICENCE_IN_FORCE : 'design-only');
+export const skipNote = (spell, ctx) => (unlicensed(ctx) ? REMEDY(spell.cli) : null);
 
 // ARC-08-C7 — the SAME state as the doctor's Mode line and the bootstrap's Next block, so the same
 // remedy. This was a third wording of "there is no instance yet", inside the same runner.
@@ -54,7 +64,7 @@ export function runProbes(root, { run = spawnSync } = {}) {
 
   // Every child is TOLD which checkout it serves: the server CLI resolves its store from
   // `CLAUDE_PROJECT_DIR`, so an inherited value would have it read another repository's store.
-  const options = { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) };
+  const options = { encoding: 'utf8', stdio: 'pipe', cwd: root, env: productEnv(root) };
   const help = run(process.execPath, [cli, 'instance', '--help'], options);
   // ARC-07-S06 adds `instance test`. Until it does, the cache records "unavailable" and the step
   // warns: a probe that does not exist yet is not a failed probe, and calling it a FAIL would stop

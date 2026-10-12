@@ -38,6 +38,7 @@ import { contextFor, greenTree, REAL_ROOT, runById, writeJson } from './helpers/
 // that the commands E-23 and E-24 print for THIS tree appear in `docs/MIGRATION.md`, and a second
 // copy would let the page be checked against a tree these detectors never see.
 import { fixtureHome, PASSWORD, SECRET_KEY, USERNAME } from './helpers/legacy-home.mjs';
+import { licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 const checks = legacyChecks();
 
@@ -492,7 +493,7 @@ function cliHome(t) {
 /** The real command, as a user runs it. */
 const doctorCli = (home, args) => spawnSync(process.execPath,
   [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', ...args],
-  { cwd: REAL_ROOT, encoding: 'utf8', env: { ...process.env, HOME: home, USERPROFILE: home } });
+  { cwd: REAL_ROOT, encoding: 'utf8', env: licensedEnv({ ...process.env, HOME: home, USERPROFILE: home }) });
 
 test('ARC-08-C34 — the terminal names the folder, for E-30 AND E-23, where the user reads it', async (t) => {
   const home = cliHome(t);

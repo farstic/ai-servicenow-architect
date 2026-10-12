@@ -18,7 +18,7 @@ import { USAGE as STORE_USAGE } from './store.mjs';
 import { USAGE as UPGRADE_USAGE } from './commands/upgrade.mjs';
 import { USAGE as STATUS_USAGE } from './commands/status.mjs';
 import { USAGE as LICENCE_USAGE } from './commands/licence.mjs';
-import { CLI_ALLOWED, isEnforced, licenceStatus, refusalLines, refusesCommand } from './licence/state.mjs';
+import { licenceStatus, refusalLines, refusesCommand } from './licence/state.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
@@ -262,17 +262,16 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
   }
 
   /*
-   * ARC-11-C1 — UNDER SNOW_LICENCE_ENFORCE="true", NO VALID LICENCE, NO COMMAND (ruling R1) — except the five
-   * a person needs to see and repair the state: licence, doctor, status, version and upgrade. Here, after the
-   * help and the usage errors and before the logger, so a refused command has written nothing — not even a
-   * log — when it says so. Off, which is the default, this is one string comparison.
+   * ARC-11-C1 and C6 — NO VALID LICENCE, NO COMMAND (ruling R1), on every build — except the ones that see,
+   * repair, install and uninstall: licence, doctor, status, version, upgrade, bootstrap and `mode design`. Here,
+   * after the help and the usage errors and before the logger, so a refused command has written nothing — not
+   * even a log — when it says so. One decision, refusesCommand: reading the licence for an allowed command costs
+   * two small files, which the session hook reads at every start anyway.
    */
-  if (isEnforced(env) && !CLI_ALLOWED.includes(name)) {
-    const licence = licenceStatus(root, { env });
-    if (refusesCommand(name, licence)) {
-      for (const line of refusalLines(name, licence, spellings(where).cli)) err.write(`${line}\n`);
-      return EXIT_PREREQ;
-    }
+  const licence = licenceStatus(root);
+  if (refusesCommand(name, licence, positional)) {
+    for (const line of refusalLines(name, licence, spellings(where).cli)) err.write(`${line}\n`);
+    return EXIT_PREREQ;
   }
 
   /*

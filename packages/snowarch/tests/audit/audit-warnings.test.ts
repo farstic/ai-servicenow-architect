@@ -12,6 +12,7 @@ import type { AddressInfo } from 'node:net';
 import selfsigned from 'selfsigned';
 import { isPrecheckRead } from '../helpers/fake-rest.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/server.js');
 
@@ -127,11 +128,11 @@ function env(): Record<string, string> {
     // The fixture is on loopback. An ambient proxy would send the request to the proxy instead,
     // which is how five other tests fail in a sandbox that sets one.
     'HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy', 'ALL_PROXY', 'all_proxy']) delete clean[k];
-  return {
+  return licensedEnv({
     ...clean, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: checkout, SNOW_AUDIT_FILE: auditFile,
     SNOW_LOG_LEVEL: 'error', NODE_EXTRA_CA_CERTS: caPath, NO_PROXY: '127.0.0.1,localhost',
     MAX_RETRIES: '0', RETRY_DELAY_MS: '0', REQUEST_TIMEOUT_MS: '5000',
-  };
+  });
 }
 
 async function connect(preset: string): Promise<Client> {

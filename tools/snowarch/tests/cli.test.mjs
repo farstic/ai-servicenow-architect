@@ -22,6 +22,7 @@ const FRAME_CLI = spellings().cli;
 const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import { EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
 import { contractSha, cwdNote, loadConfig, version } from '../lib/config.mjs';
+import { licensedEnv } from './helpers/licence-hook/index.mjs';
 import { stateRootInUse, useStateRoot } from './helpers/state-root.mjs';
 import { tempDir } from './helpers/temp.mjs';
 /*
@@ -52,7 +53,7 @@ const bin = join(repoRoot, 'tools', 'snowarch', 'bin', 'snowarch.mjs');
  */
 function run(args, opts = {}) {
   const r = spawnSync(process.execPath, [bin, ...args],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts, env: licensedEnv(opts.env ?? process.env) });
   return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 

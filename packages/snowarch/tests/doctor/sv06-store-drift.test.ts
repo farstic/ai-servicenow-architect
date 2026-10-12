@@ -19,6 +19,7 @@ import { ALL_CHECKS, resetHandshakeCache } from '../../dist/doctor/checks.js';
 import { stubProbesFor } from '../../dist/doctor/types.js';
 import { instanceManager } from '../../dist/servicenow/instances.js';
 import { trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-08-S04 AC 7, second half — acceptance item B08-02.
@@ -75,6 +76,10 @@ const runCheck = async (id: string) => {
   for (const k of ['SERVICENOW_INSTANCE_URL', 'SERVICENOW_BASIC_USERNAME',
     'SERVICENOW_BASIC_PASSWORD', 'SERVICENOW_OAUTH_USERNAME', 'SERVICENOW_OAUTH_PASSWORD',
     'SNOW_ENV_FILE']) delete process.env[k];
+  // ARC-11-C6: the check spawns the server with this process's environment, and the server refuses every tool
+  // without a licence it trusts. So that environment carries the test-only hook, and a licence where the server
+  // reads one (CLAUDE_PROJECT_DIR, set above); `finally` restores it with the rest.
+  Object.assign(process.env, licensedEnv({ ...process.env }));
   try {
     instanceManager.reload();
     return await ALL_CHECKS.find((c) => c.id === id)!.run({

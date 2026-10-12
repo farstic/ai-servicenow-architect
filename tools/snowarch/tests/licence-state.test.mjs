@@ -1,20 +1,21 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-// ARC-11-C1 — the licence as this checkout holds it: the files, the enforcement switch, the line.
+// ARC-11-C1 — the licence as this checkout holds it: the files and the line.
 //
-// `core.mjs` judges a text; this layer finds the text (`.local/licence.json`), the list it is judged
-// against (`.local/revocations.json`, written only by a fetch somebody started) and whether
-// SNOW_LICENCE_ENFORCE is on — and says the result in the one line the banner, the doctor and the
-// server's first answer all print.
+// `core.mjs` judges a text; this layer finds the text (`.local/licence.json`) and the list it is judged
+// against (`.local/revocations.json`, written only by a fetch somebody started), and says the result in
+// the one line the banner, the doctor and the server's first answer all print. Enforcement is on every
+// build (ARC-11-C6): `licence-unconditional.test.mjs` holds that no variable turns it off.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  bannerLine, CLI_ALLOWED, ENFORCE_VAR, isEnforced, licenceStatus, listStale, readListCache, REFUSED, REMEDY,
+  bannerLine, CLI_ALLOWED, licenceStatus, listStale, readListCache, REFUSED, REMEDY,
   writeListCache,
 } from '../lib/licence/state.mjs';
+import * as state from '../lib/licence/state.mjs';
 import { licencePath, revocationsPath } from '../lib/local-paths.mjs';
 import { keyPair, licence, licenceText, listDoc, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
@@ -33,41 +34,33 @@ function checkout(t, { licenceFile = null, cache = null } = {}) {
   return root;
 }
 
-const status = (root, env = {}) => licenceStatus(root, { keys: KEYS, now: NOW, env });
+const status = (root) => licenceStatus(root, { keys: KEYS, now: NOW });
 
 test('ARC-11-C1 — the two .local paths', () => {
   assert.equal(licencePath('/c'), join('/c', '.local', 'licence.json'));
   assert.equal(revocationsPath('/c'), join('/c', '.local', 'revocations.json'));
 });
 
-test('ARC-11-C1 — enforcement is on only for the exact string "true", like every flag', () => {
-  assert.equal(ENFORCE_VAR, 'SNOW_LICENCE_ENFORCE');
-  assert.equal(isEnforced({ SNOW_LICENCE_ENFORCE: 'true' }), true);
-  for (const v of [undefined, '', 'TRUE', '1', 'yes', ' true']) {
-    assert.equal(isEnforced({ SNOW_LICENCE_ENFORCE: v }), false, String(v));
-  }
+test('ARC-11-C6 — the refused states, and the commands that run without a licence, as a list', () => {
   assert.deepEqual([...REFUSED], ['missing', 'invalid', 'expired', 'revoked']);
-  assert.deepEqual([...CLI_ALLOWED], ['licence', 'doctor', 'status', 'version', 'upgrade']);
+  // The five a person needs to see and repair the state (R1), and bootstrap in full (ruling A): installing is
+  // how a licence is first seen. A later addition is a visible decision: it changes this list.
+  assert.deepEqual([...CLI_ALLOWED], ['licence', 'doctor', 'status', 'version', 'upgrade', 'bootstrap']);
+  // And one form of one command: `mode design`, which deregisters before a folder is deleted (INSTALL.md, Uninstall).
+  assert.deepEqual(JSON.parse(JSON.stringify(state.CLI_ALLOWED_FORMS ?? null)), { mode: ['design'] });
 });
 
-test('ARC-11-C1 — the banner line has the settled shapes', () => {
+test('ARC-11-C6 — the banner line has the settled shapes, and no state carries a word for enforcement', () => {
   const s = (state, over = {}) => ({ state, id: null, scope: 'live', validUntil: null, perpetual: false, ...over });
   const lic = { id: 'LIC-2026-0002', validUntil: '2027-10-10' };
-  assert.equal(bannerLine(s('ok', lic), { enforced: false }), 'Licence: ok · LIC-2026-0002 · until 2027-10-10');
-  assert.equal(bannerLine(s('ok', lic), { enforced: true }), 'Licence: ok · LIC-2026-0002 · until 2027-10-10');
-  assert.equal(bannerLine(s('ok', { id: 'LIC-2026-0001', perpetual: true }), { enforced: false }),
-    'Licence: ok · LIC-2026-0001 · perpetual');
-  assert.equal(bannerLine(s('ok', { ...lic, scope: 'design-only' }), { enforced: false }),
-    'Licence: ok · LIC-2026-0002 · design-only · until 2027-10-10');
-  assert.equal(bannerLine(s('expiring', { ...lic, validUntil: '2026-10-20' }), { enforced: false }),
-    'Licence: expiring · LIC-2026-0002 · until 2026-10-20 · warn only');
-  assert.equal(bannerLine(s('expiring', { ...lic, validUntil: '2026-10-20' }), { enforced: true }),
-    'Licence: expiring · LIC-2026-0002 · until 2026-10-20 · enforced');
-  assert.equal(bannerLine(s('missing'), { enforced: false }), 'Licence: missing · warn only');
-  assert.equal(bannerLine(s('missing'), { enforced: true }), 'Licence: missing · enforced');
-  assert.equal(bannerLine(s('revoked', lic), { enforced: true }), 'Licence: revoked · enforced');
-  assert.equal(bannerLine(s('expired', lic), { enforced: false }), 'Licence: expired · warn only');
-  assert.equal(bannerLine(s('invalid'), { enforced: false }), 'Licence: invalid · warn only');
+  assert.equal(bannerLine(s('ok', lic)), 'Licence: ok · LIC-2026-0002 · until 2027-10-10');
+  assert.equal(bannerLine(s('ok', { id: 'LIC-2026-0001', perpetual: true })), 'Licence: ok · LIC-2026-0001 · perpetual');
+  assert.equal(bannerLine(s('ok', { ...lic, scope: 'design-only' })), 'Licence: ok · LIC-2026-0002 · design-only · until 2027-10-10');
+  assert.equal(bannerLine(s('expiring', { ...lic, validUntil: '2026-10-20' })), 'Licence: expiring · LIC-2026-0002 · until 2026-10-20');
+  assert.equal(bannerLine(s('missing')), 'Licence: missing');
+  assert.equal(bannerLine(s('revoked', lic)), 'Licence: revoked');
+  assert.equal(bannerLine(s('expired', lic)), 'Licence: expired');
+  assert.equal(bannerLine(s('invalid')), 'Licence: invalid');
 });
 
 test('ARC-11-C1 — the checkout\'s status: missing, then ok, then revoked by the cached list', (t) => {
@@ -75,11 +68,11 @@ test('ARC-11-C1 — the checkout\'s status: missing, then ok, then revoked by th
   const text = licenceText(licence(), primary);
   const ok = status(checkout(t, { licenceFile: text }));
   assert.equal(ok.state, 'ok');
-  assert.equal(ok.enforced, false);
+  assert.equal(ok.enforced, true);
   assert.equal(ok.list, null);
   const cache = { checkedAt: NOW.toISOString(), source: 'fixture',
     list: listDoc({ version: 3, revoked: [{ id: 'LIC-2026-0002', revokedAt: '2026-10-09', reason: 'ended' }] }, primary) };
-  const revoked = status(checkout(t, { licenceFile: text, cache }), { SNOW_LICENCE_ENFORCE: 'true' });
+  const revoked = status(checkout(t, { licenceFile: text, cache }));
   assert.equal(revoked.state, 'revoked');
   assert.equal(revoked.enforced, true);
   assert.deepEqual(revoked.list, { version: 3, checkedAt: NOW.toISOString() });
@@ -116,5 +109,7 @@ test('ARC-11-C1 — the cache is written whole, 0600, and read back', (t) => {
 test('ARC-11-C1 — the remedy names the command that explains the state', () => {
   // The launcher is a parameter, so the case passes a placeholder rather than spelling a shell.
   assert.ok(REMEDY('<cli>').startsWith('Run <cli> licence check to see why'), REMEDY('<cli>'));
-  assert.match(REMEDY('<cli>'), /SNOW_LICENCE_ENFORCE/);
+  // No way out but a licence: the remedy names no variable (ARC-11-C6).
+  assert.doesNotMatch(REMEDY('<cli>'), /SNOW_|unset/);
+  assert.match(REMEDY('<cli>'), /install a valid licence as \.local\/licence\.json\./);
 });

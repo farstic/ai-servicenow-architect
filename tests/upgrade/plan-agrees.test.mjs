@@ -74,8 +74,11 @@ function clone(t, { change = null } = {}) {
   return dir;
 }
 
+// ARC-11-C6 — a licence in force: these cases are about what the plan names, and with no licence B06 and B08 are not
+// planned at all (ruling R1). In-process, a fixture licence is not trusted, so the run's licence is handed in.
 const ctxFor = (root) => ({
   root,
+  licence: { state: 'ok' },
   config: JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')),
   mode: 'design',
   instanceFile: null,

@@ -27,8 +27,9 @@ const SPELL = spellings();
 /** This repository's root — ARC-07-W14 reads the install page for the figure it must agree with. */
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
+// ARC-11-C6 — a licence in force: these cases are about the plan screen, and B06 and B08 skip without one (ruling R1).
 const ctxOf = (root, { present = true } = {}) => ({
-  root, env: {}, areaCount: 19,
+  root, env: {}, areaCount: 19, licence: { state: 'ok' },
   node: present ? { present: true, version: '22.11.0', major: 22 } : { present: false, version: null },
 });
 

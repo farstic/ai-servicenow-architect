@@ -11,11 +11,12 @@
 # WHAT IT DOES: a fresh --depth 1 clone of <tag> into a folder the CLI has never trusted, the corpus
 # checked out AS THE SUBMODULE AT THE PIN, the real bootstrap in design mode (so
 # `.claude/settings.local.json` comes from the product rather than by hand), then one fresh session
-# per test with the prompts read from `tests/VALIDATION-TESTS.md`.
+# per test with the prompts read from `tests/VALIDATION-TESTS.md`, each under the checkout's own licence.
 #
 # EVERY CASE, ISOLATED (ARC-09-C87). The prompts come from all of `tests/VALIDATION-TESTS.md` (T-01 to
 # the last), and each session runs on the policy in `scripts/validation/session-policy.mjs`: the
-# checkout's own settings and hooks only (`--setting-sources project`), no MCP server
+# clone's own settings and hooks only (`--setting-sources project,local`, the local file being the one the
+# bootstrap writes, with the SessionStart hook in it), no MCP server
 # (`--strict-mcp-config`), a tool set that is a set (`--tools`, with `--allowedTools` for the few that
 # would ask), and Sonnet 5.5 unless VALIDATION_MODEL says otherwise. The header prints the sha, the
 # model, the setting sources and the tools; each turn prints the skills invoked, the corpus pages read
@@ -70,6 +71,13 @@ SEL="${*:-$ALL}"
 echo "setup:" | tee -a "$RUN/header.txt"
 node "$ROOT/scripts/validation/setup-plan.mjs" summary "$PROMPTS" $SEL | sed 's/^/  /' | tee -a "$RUN/header.txt"
 
+# THE LICENCE (ARC-11-C6). From 2.0.13 a session with no licence in force produces no deliverable (CLAUDE.md §1),
+# and this clone has no `.local/`. So every case runs under the checkout's own licence, copied into the clone before
+# it, and a case whose Setup says "No licence" (T-31) runs without one. A checkout with none stops the run here,
+# before any session, rather than letting every case fail for the harness's reason.
+LIC=$(node "$ROOT/scripts/validation/setup-plan.mjs" licence "$ROOT") || { echo "$LIC"; exit 9; }
+echo "$LIC" | tee -a "$RUN/header.txt"
+
 for T in $SEL; do
   N=$(node -e "const t=require('$PROMPTS').find(x=>x.id==='$T');console.log(t?t.prompts.length:0)")
   [ "$N" = 0 ] && { echo "$T: no prompt in the spec"; continue; }
@@ -82,7 +90,7 @@ for T in $SEL; do
     # The case's Setup, in the clone, before its first turn - on EVERY repeat, so each starts from the
     # state the Setup describes. A refused or failed Setup means the state the case needs was not
     # prepared: the case is not run, rather than failing for the harness's reason.
-    node "$ROOT/scripts/validation/setup-plan.mjs" run "$PROMPTS" "$T" "$C" \
+    node "$ROOT/scripts/validation/setup-plan.mjs" run "$PROMPTS" "$T" "$C" "$ROOT" \
       || { echo "$T run$R: Setup did not run clean - case not run"; R=$((R+1)); continue; }
     # The tool set and the permissions come from the policy, one place a test reads (see the header).
     TOOLS=$($POLICY tools "$T")
