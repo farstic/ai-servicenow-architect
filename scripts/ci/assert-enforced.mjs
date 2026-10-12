@@ -28,7 +28,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { NO_LICENCE_IN_FORCE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
+import { LAST_UNENFORCED_RELEASE, NO_LICENCE_IN_FORCE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -88,8 +89,9 @@ try {
 
   // 3. The doctor, on this checkout with its state moved to a temp root, so nothing is written here.
   // unlicensed start: this script asserts the unlicensed product, on the keys the build ships
+  const doctorEnv = bare({ SNOWARCH_STATE_ROOT: state, CLAUDE_PROJECT_DIR: state });
   const doctor = spawnSync(process.execPath, [CLI, 'doctor', '--json', '--no-network', '--no-cache'],
-    { cwd: ROOT, encoding: 'utf8', env: bare({ SNOWARCH_STATE_ROOT: state, CLAUDE_PROJECT_DIR: state }) });
+    { cwd: ROOT, encoding: 'utf8', env: doctorEnv });
   let report = null;
   try { report = JSON.parse(doctor.stdout); } catch { /* reported below */ }
   const byId = new Map((report?.checks ?? []).map((c) => [c.id, c]));
@@ -98,6 +100,13 @@ try {
   check(e31?.status === 'fail', `the doctor's E-31 FAILs (${e31 ? e31.status : `no report, exit ${doctor.status}`})`);
   check(sv06?.status === 'skip' && sv06.detail === NO_LICENCE_IN_FORCE,
     `SV-06 skips with E-31's reason (${sv06 ? `${sv06.status}: ${sv06.detail}` : 'absent'})`);
+  // The line a user reads, printed so every cell's log can be quoted (the owner's rule), and held to the launcher this
+  // shell types: E-31's remedy names `licence check` and the way back with it, `.\snowarch.cmd` on a Windows shell.
+  if (e31) say(`     E-31 ${e31.status}: ${e31.detail} — ${e31.remedy}`);
+  const cli = spellings({ platform: process.platform, env: doctorEnv }).cli;
+  check(Boolean(e31?.remedy?.includes(`${cli} licence check`))
+    && Boolean(e31?.remedy?.includes(`${cli} upgrade --to ${LAST_UNENFORCED_RELEASE}`)),
+  `E-31's remedy spells this shell's launcher, ${cli}, in licence check and in the way back`);
 
   // 4. The bootstrap, live, on a clone: the docs corpus skipped (it is not what this asserts), and no Claude Code.
   const clone = join(base, 'clone');
