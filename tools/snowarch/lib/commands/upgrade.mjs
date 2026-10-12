@@ -379,7 +379,7 @@ export function stepsThatWillRun(root, tag, { ctx, opts = {} }) {
 export function planContext({ root, config, ctx = {}, state = null }) {
   return {
     ...stepContext({ root, config, env: ctx.env ?? process.env, node: ctx.node ?? nodeInfo(),
-      flags: { yes: true }, state }),
+      flags: { yes: true }, state, licence: ctx.licence }),
     mode: state?.mode ?? ctx.mode ?? 'design',
     docs: state?.docs?.mode ?? ctx.docs ?? 'sparse',
   };

@@ -98,7 +98,7 @@ const stdinAsker = (input, output) => lineReader(input, output);
  * server's ten, where there was no context to add one to.
  */
 export function stepContext({ root, config, env = process.env, platform = process.platform,
-  node, flags = {}, state = null }) {
+  node, flags = {}, state = null, licence = licenceStatus(root) }) {
   return {
     root,
     config,
@@ -113,7 +113,7 @@ export function stepContext({ root, config, env = process.env, platform = proces
     // the run had been told to keep, with `--yes` invisible to the decision.
     yes: Boolean(flags.yes),
     // ARC-11-C6 (ruling R1) — read once for the run: B06 and B08 ask the gate with it before they start the package CLI.
-    licence: licenceStatus(root),
+    licence,
     state: state ?? emptyState({ engineVersion: version(root), node }),
   };
 }
