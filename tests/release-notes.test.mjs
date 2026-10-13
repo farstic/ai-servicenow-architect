@@ -70,3 +70,41 @@ test('ARC-11-C6 — the release sweeps the section it will cut: a notes gate aft
   assert.deepEqual(plan.find((g) => g.name === 'notes')?.argv,
     ['node', 'scripts/ci/release-notes-gate.mjs', '--from', 'v2.0.12']);
 });
+
+test('ARC-11-C6 — the notes gate fails on a subject that says it, and passes the cut with the committed overrides', async () => {
+  const { notesGate } = await import('../scripts/ci/release-notes-gate.mjs');
+  const read = () => '# Changelog\n\n## Unreleased\n\n### Notes\n\nA note.\n';
+  const planted = ['1'.repeat(40), 'docs(snowarch): a page names the way back (ARC-11-C6)'];
+  const r = notesGate({ root: ROOT, from: 'v2.0.12', git: fakeGit([...CUT, planted]), read });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.hits.map((h) => h.text), ['- snowarch: a page names the way back (ARC-11-C6) (1111111)']);
+  assert.equal(notesGate({ root: ROOT, from: 'v2.0.12', git: fakeGit(CUT), read }).ok, true);
+  // The hand-written block it carries is swept too.
+  const handWritten = () => '# Changelog\n\n## Unreleased\n\n### Notes\n\nTo go back to the last release, run it.\n';
+  assert.equal(notesGate({ root: ROOT, from: 'v2.0.12', git: fakeGit(CUT), read: handWritten }).ok, false);
+});
+
+test('ARC-11-C6 — an override names a full sha, exactly one of omit or line, and a why; anything else stops the cut', async () => {
+  const { readOverrides } = await import('../scripts/lib/release/changelog.mjs');
+  const at = (map) => () => readOverrides('/x', { exists: () => true, read: () => JSON.stringify(map) });
+  const sha = 'a'.repeat(40);
+  assert.deepEqual(at({ [sha]: { omit: true, why: 'w' } })(), { [sha]: { omit: true, why: 'w' } });
+  for (const bad of [{ ['a'.repeat(7)]: { omit: true, why: 'w' } }, { [sha]: { omit: true, line: 'x', why: 'w' } },
+    { [sha]: { line: ' ', why: 'w' } }, { [sha]: { omit: true } }]) {
+    assert.throws(at(bad), /needs a full sha, exactly one of omit or line, and a why/, JSON.stringify(bad));
+  }
+  assert.deepEqual(readOverrides('/nowhere', { exists: () => false }), {});
+  // The committed map holds to the same rule, and covers the four lines the v2.0.13 cut wrote.
+  const committed = readOverrides(ROOT);
+  for (const [sha4] of CUT.slice(0, 4)) assert.ok(committed[sha4], `${sha4} has no override`);
+});
+
+test('ARC-11-C6 — the gate script: a usage error is 2, and an empty range is clean', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const gate = (args) => spawnSync(process.execPath, ['scripts/ci/release-notes-gate.mjs', ...args],
+    { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(gate(['--from']).status, 2);
+  const empty = gate(['--from', 'HEAD']);
+  assert.equal(empty.status, 0, empty.stderr);
+  assert.match(empty.stdout, /^release notes: clean \(\d+ lines\)$/m);
+});

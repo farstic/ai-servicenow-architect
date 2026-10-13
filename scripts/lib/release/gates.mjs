@@ -55,7 +55,7 @@ export function modulesAreLinked(root, lstat = lstatSync) {
  * that: `tests/release-docs-gate.test.mjs` holds both entry points to the one `runDocs`, with the same
  * arguments and the same report. The launcher's own `docs verify` stays exercised by the install jobs.
  */
-export function gatePlan({ noInstall = false, platform = process.platform } = {}) {
+export function gatePlan({ noInstall = false, platform = process.platform, notesFrom = null } = {}) {
   /*
    * ARC-09-C70 — `npm` IS `npm.cmd` ON WINDOWS, and the plan has to say so.
    *
@@ -74,6 +74,8 @@ export function gatePlan({ noInstall = false, platform = process.platform } = {}
     { name: 'test', argv: [npm, 'test'] },
     { name: 'contract', argv: ['node', 'scripts/contract-gate.mjs', '--skip-build'] },
     { name: 'docs', argv: ['node', 'scripts/docs.mjs', 'verify'] },
+    // ARC-11-C6 — the section this cut will write, swept before the writes, so the dry run fails as the cut would.
+    { name: 'notes', argv: ['node', 'scripts/ci/release-notes-gate.mjs', ...(notesFrom ? ['--from', notesFrom] : [])] },
   ];
 }
 
