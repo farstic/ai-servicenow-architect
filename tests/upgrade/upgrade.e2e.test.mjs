@@ -399,7 +399,7 @@ test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t
 // ruling from the rc.3 sitting (2026-10-13), "the user must not learn how to have a working Architect without a
 // licence": what U7 shows is E-31's FAIL and its remedy, and nothing that sends the reader back.
 
-test('ARC-11-C6 — 2.0.12 to 2.0.13 with no licence ends at U7 with E-31 FAIL and its remedy, and nothing that sends it back', async (t) => {
+test('ARC-11-C6 — 2.0.12 to 2.0.13 with no licence: E-31 FAIL at U7 with no way back; the move back refused, licensed taken', async (t) => {
   const w = await buildEnforcementWorld(t);
   bootstrapUser(w.user, { store: false, licence: false });
   const up = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin, licence: false });
@@ -412,10 +412,20 @@ test('ARC-11-C6 — 2.0.12 to 2.0.13 with no licence ends at U7 with E-31 FAIL a
   assert.ok(u7.includes('.local/licence.json'), u7);
   assert.equal(u7.includes('upgrade --to'), false, u7);
 
-  // The way back is always allowed: `upgrade` runs without a licence, and v2.0.12 itself needs none.
-  const back = snowarch(w.user, ['upgrade', '--to', 'v2.0.12', '--yes'], { bin: w.bin, licence: false });
-  assert.equal(back.status, 0, back.text);
-  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.12', back.text);
+  // And the path is closed (the owner's ruling): with no licence in force, a move to a release at or below the last
+  // that enforces nothing is refused before anything moves, exit 3, with the code and the remedy, and no word of why.
+  const refused = snowarch(w.user, ['upgrade', '--to', 'v2.0.12', '--yes'], { bin: w.bin, licence: false });
+  t.diagnostic(refused.text.split('\n').find((l) => l.includes('LICENCE_NOT_VALID')) ?? 'no refusal line');
+  assert.equal(refused.status, 3, refused.text);
+  assert.match(refused.text, /\(Code: LICENCE_NOT_VALID\)/, refused.text);
+  assert.ok(refused.text.includes('licence check'), refused.text);
+  assert.equal(/last release that runs without|go back to|unenforced|without enforcement/i.test(refused.text), false, refused.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.13', refused.text);
+
+  // The owner's own way back stays: with a licence in force, the same move is taken.
+  const licensed = snowarch(w.user, ['upgrade', '--to', 'v2.0.12', '--yes'], { bin: w.bin });
+  assert.equal(licensed.status, 0, licensed.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.12', licensed.text);
 }, 2 * MINUTES);
 
 test('ARC-11-C6 — with no licence, U4 says what the release refuses and the remedy, with --yes and without', async (t) => {
