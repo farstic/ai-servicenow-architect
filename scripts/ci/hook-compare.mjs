@@ -39,6 +39,7 @@ import { cpus, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { spellings } from '../../tools/snowarch/lib/launcher-spelling.mjs';
 import { spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -102,10 +103,10 @@ function install(ref, dir) {
   if (r.status !== 0) return `git clone failed: ${tail(r.stderr)}`;
   r = git(['-c', 'advice.detachedHead=false', 'checkout', '-q', '--detach', sha], dir);
   if (r.status !== 0) return `git checkout failed: ${tail(r.stderr)}`;
-  const flags = ['--mode', 'design', '--yes', '--skip-claude-check'];
-  const cmd = process.platform === 'win32'
-    ? spawnFor(join(dir, 'bootstrap.cmd'), flags)
-    : { file: join(dir, 'bootstrap.sh'), args: flags, options: {} };
+  // The launcher this platform runs, from its one definition (ARC-07-W17), by PLATFORM rather than by shell: a Git
+  // Bash on Windows gets the POSIX spelling, which this process could not run without the bash.
+  const launcher = spellings({ platform: process.platform, env: {} }).bootstrap.slice(2);
+  const cmd = spawnFor(join(dir, launcher), ['--mode', 'design', '--yes', '--skip-claude-check']);
   r = spawnSync(cmd.file, cmd.args, { ...cmd.options, cwd: dir, encoding: 'utf8' });
   if (r.status !== 0) return `the bootstrap exited ${r.status}: ${tail(`${r.stdout}${r.stderr}`)}`;
   return null;
