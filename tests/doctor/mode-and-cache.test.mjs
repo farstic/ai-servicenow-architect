@@ -352,10 +352,10 @@ test('ARC-11-C12 — a licence installed after the cache was written makes the c
   assert.match(cacheStale(root).reason, /licenceMtime changed/);
 });
 
-test('the inputs are six files, and an absent one is recorded as absent', (t) => {
+test('the inputs are seven files, and an absent one is recorded as absent', (t) => {
   const root = greenTree(t, { mode: 'design' });
   const inputs = collectInputs(root);
-  assert.equal(Object.keys(inputs).length, 6);
+  assert.equal(Object.keys(inputs).length, 7);
   assert.equal(inputs.storeMtime, null, 'the fixture has no store, so the input is null');
   assert.ok(inputs.engineConfigMtime > 0);
 });
