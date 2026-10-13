@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-11
+**Last updated:** 2026-10-13
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 31 tests, T-01 through T-31, no number reserved. The count is asserted by
+> **How many.** 33 tests, T-01 through T-33, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -1763,6 +1763,87 @@ Write a user story for a self-service password reset in Employee Center.
 
 - A story, a design or an Envelope in the reply, or any file under `clients/`.
 - Reading the line as information that lets the work go on.
+---
+
+## T-32 — one figure: skill mode, rendered by the house script
+
+**Covers:** `CLAUDE.md` §3 (`scripts/`) and §8 (the Diagramming Specialist row); `.claude/skills/diagramming-specialist/SKILL.md` (skill mode, the render, the standalone folder); the ITSM gateway's incident state table (ARC-02-C5)
+**Modes:** design-only ✅ · live: not run (live mode reads the instance for what the corpus leaves open, so the Envelope differs)
+
+### Prompt
+
+```
+Draw one figure: the baseline ServiceNow incident state lifecycle (New, In Progress, On Hold, Resolved, Closed, Canceled) with the allowed transitions. Design-only, no engagement is loaded; ground the states and transitions in the docs corpus. Deliver it as an editable draw.io figure with an SVG export, as a single figure — no document around it.
+```
+
+### Expected behaviour
+
+On a machine where doctor check E-04 shows `drawio yes`, with no engagement loaded:
+
+1. The ITSM gateway fires first (Phase 1 Step 5) and writes its Envelope, citing the corpus page for every state and transition it will draw; a move the corpus does not state in words is marked open, and no integer state value appears.
+2. The Architect proposes the Diagramming Specialist in skill mode — not the sub-agent — and waits for approval.
+3. On approval it writes `clients/_unfiled/<name>/diagrams/fig-01-<slug>.drawio`, runs `scripts/render-drawio.sh clients/_unfiled/<name>/diagrams svg` itself, and shows the script's `done: 1 rendered, 0 failed` line.
+4. It checks the drawn edges against the Envelope (Phase 2) and delivers the `.drawio` with the `.svg` the script wrote.
+
+### Pass criteria
+
+- The ITSM Envelope comes before the figure, and every transition drawn carries a citation that resolves.
+- Skill mode: no `diagramming-specialist` sub-agent is dispatched.
+- Both files are under `clients/_unfiled/<name>/diagrams/`, named `fig-01-<slug>.drawio` and `fig-01-<slug>.svg`.
+- The transcript shows `done: 1 rendered, 0 failed`, and the `.svg` is the script's output: its root `<svg>` carries `id="ge-svg-…"` and its style `--ge-adaptive-bg`, which a hand-written SVG does not. No `content="&lt;mxfile…"` attribute is expected — the script exports without `-e`.
+- State labels only: the corpus states no integer value.
+- No new line in the store's `audit.jsonl`.
+
+### Fail signals
+
+- An `.svg` written by hand, or produced any way but `scripts/render-drawio.sh`.
+- A sub-agent dispatched for the single figure.
+- A file directly under `clients/_unfiled/`.
+- A transition drawn as baseline with no citation, or an integer state value.
+- Asking the user to run the script.
+---
+
+## T-33 — a short design note in Word, built by the house scripts
+
+**Covers:** `CLAUDE.md` §3 (`scripts/`); `.claude/skills/hld-lld-writer/SKILL.md` (the Word / PDF row); `.claude/agents/hld-lld-writer.md` (the Word-ready handback) (ARC-02-C5)
+**Modes:** design-only ✅ · live: not run (live mode reads the instance for what the corpus leaves open, so the Envelope differs)
+
+### Prompt
+
+Turn 1 — the T-32 prompt, verbatim:
+
+```
+Draw one figure: the baseline ServiceNow incident state lifecycle (New, In Progress, On Hold, Resolved, Closed, Canceled) with the allowed transitions. Design-only, no engagement is loaded; ground the states and transitions in the docs corpus. Deliver it as an editable draw.io figure with an SVG export, as a single figure — no document around it.
+```
+
+Turn 2 — same session, after the figure is delivered:
+
+```
+Write a short process design note, 3 to 4 pages, titled "Incident lifecycle — baseline process design note": purpose and scope; the six baseline states with their documented meaning; the transitions with trigger and role as a table; the state lifecycle figure placed inside the transitions section (reuse the figure from your previous answer — do not redraw it); open questions; and a sources section citing the corpus pages. Design-only, no engagement is loaded. Deliver the markdown and a Word (.docx) version of it, with the figure embedded as an image, and tell me exactly which commands you ran to produce the image and the .docx.
+```
+
+### Expected behaviour
+
+Turn 1 runs as T-32. On a machine where doctor check E-04 shows `docx yes` and `drawio yes`, turn 2:
+
+1. The Architect proposes the HLD/LLD Writer for the note and waits for approval.
+2. The note references the figure as `diagrams/fig-01-<slug>.png` inside the transitions section; the figure is not redrawn.
+3. The Architect itself runs `scripts/render-drawio.sh <diagrams-dir> png` and `python3 scripts/md-to-docx.py --src <md> --out <docx> --footer-text "<text>"`, and names both commands in the reply.
+
+### Pass criteria
+
+- HLD/LLD Writer proposed and approved before the note is written.
+- Both house scripts run by the Architect: no pandoc, no other docx skill or converter, nothing installed, and nothing added under `clients/` but the note, its figure and the `.docx`.
+- The `.md` references `diagrams/fig-01-<slug>.png` inside the transitions section.
+- The `.docx` holds `word/media/image1.png` and a footer.
+- No new line in the store's `audit.jsonl`.
+
+### Fail signals
+
+- pandoc, LibreOffice, a global docx skill, an install command, or a script written under `clients/`.
+- The `drawio` CLI called directly instead of `scripts/render-drawio.sh`.
+- A Mermaid block in the note, or the figure redrawn.
+- Asking the user to run a command.
 ---
 
 ## Regression Workflow
