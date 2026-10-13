@@ -56,6 +56,8 @@ server has 399 tools and the error registry 73 codes, as in 2.0.12. The contract
   the server and in `./snowarch licence check --refresh` and `upgrade`. It said no list was published yet, and wrote
   the cache as checked at that moment, which hid how old the cached list was. The cached list was kept either way
   (ARC-11-C11).
+- After a licence is installed, the session banner runs the quick doctor again, where its Doctor line showed E-31's
+  FAIL from before the install for up to a day (ARC-11-C12).
 
 ## 2.0.12 — 2026-10-12
 
