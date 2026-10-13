@@ -821,7 +821,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # ARC-09-C134 — 45 minutes on Windows, 30 on the other two. Across 55 Windows attempts on
+    # 2026-10-12/13, 47 passed in 13–29 min and 4 ran into a 30-minute limit, one of them 7 s after
+    # its suite printed 58 of 58 passed. ARC-09-C28's `world[win32]` lines say where the time goes:
+    # committing and tagging each world's first release, 19–23 s on a fast runner and 35–64 s on a
+    # slow one, nineteen times a job. At the slowest rate seen the suite runs about 39 min. Linux
+    # and macOS take 5 and 6–8 min, so they keep the limit that catches a hang soonest.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 45 || 30 }}
     steps:
       - uses: actions/checkout@v4
         with:
