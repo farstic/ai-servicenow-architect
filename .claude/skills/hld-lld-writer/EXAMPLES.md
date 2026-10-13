@@ -53,7 +53,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 1. **R1 — Case escalation** (this HLD's primary scope; the Escalation Button feature, delivered on the baseline): the agent escalates from the case's Escalate Case related link, the Escalation form captures reason, justification, severity and template, the duty manager on the escalation's watch list is emailed, and the escalation's updates are replicated to the case's work notes *(citations: `markdown/customer-service-management/escalate-csm-case.md`, `markdown/customer-service-management/case-escalation-process.md`, `markdown/customer-service-management/case-escalation-form.md`)*.
 2. **R2 — Escalation Reporting** (Q3): Performance Analytics dashboards on escalation rate, reason mix, and duty manager response time.
 3. **R3 — On-Call Rota Integration** (Q4): replace the static `sys_user_group.manager` resolution with an On-Call Management rota for duty managers.
-4. **R4 — Manager-Side De-Escalation** (Q4): structured workflow for duty managers to de-escalate a case with documented disposition; the baseline de-escalation requester role covers it (OD-01).
+4. **R4 — Manager-Side De-Escalation** (Q4): structured workflow for duty managers to de-escalate a case with documented disposition; the baseline de-escalation requester role covers it (OQ-DS-1).
 
 **Architectural commitment:** the programme is delivered entirely on baseline `sn_customerservice` constructs. No custom tables, no new scoped apps, no custom state values. The audit trail uses the case's `work_notes` journal — eliminating ~6 months of platform-upgrade compatibility risk and reducing ongoing support cost. This is captured in §10 Baseline-first audit.
 
@@ -71,7 +71,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 |---|---|
 | The baseline Escalate Case related link on the case form | Escalation analytics dashboards (R2) |
 | Reason, Escalation Justification, severity and template on the baseline Escalation form | On-Call rota integration (R3) |
-| An Escalation record on the case — the baseline escalation feature, per OD-01 | De-escalation workflow (R4) |
+| An Escalation record on the case — the baseline escalation feature, per OQ-DS-1 | De-escalation workflow (R4) |
 | Audit trail: the Escalation record, and its updates replicated to the case's work notes | Custom escalation history table (rejected per §1.1) |
 | Email to the duty manager on the escalation's watch list | Mobile-app integration |
 | Escalation severities and templates configured for Acme | Changes to the baseline Escalation form |
@@ -80,7 +80,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 
 - "Regional duty manager" is the `manager` of the case's `assignment_group` (`sys_user_group.manager`). In R1 the agent adds them to the escalation's watch list; an escalation template can also add the case assignment group's manager to the approvers *(citation: `markdown/customer-service-management/create-escalation-template.md`)*. R3 replaces the manual step with On-Call Management.
 - Escalation updates are replicated to the case's own work notes. No custom audit table is in scope for any release of this programme.
-- Escalation uses the baseline case and account escalation feature: an Escalation record [`sn_customerservice_escalation`] against the case, not a new state value (see OD-01).
+- Escalation uses the baseline case and account escalation feature: an Escalation record [`sn_customerservice_escalation`] against the case, not a new state value (see OQ-DS-1).
 - All work lives in the baseline `sn_customerservice` scope. No new scoped app.
 - Release family is Australia.
 
@@ -131,7 +131,7 @@ No new tables. No new fields. No new scoped app. The programme uses:
 - `sn_customerservice_case.work_notes` (baseline journal) — receives the escalation's updates, replicated as work notes *(citation: `markdown/customer-service-management/case-escalation-form.md`)*.
 - `sys_user_group.manager` (baseline) — duty manager resolution for R1.
 
-The underlying Technical Designer spec, *Acme CSM Case Escalation Button — Technical Design* (`clients/acme/csm/case-escalation-button-technical-design.md`), designed a bespoke button, Business Rule and modal; per OD-01 it is re-issued as configuration of the baseline feature — escalation templates, severities, role assignments and notifications.
+The underlying Technical Designer spec, *Acme CSM Case Escalation Button — Technical Design* (`clients/acme/csm/case-escalation-button-technical-design.md`), designed a bespoke button, Business Rule and modal; per OQ-DS-1 it is re-issued as configuration of the baseline feature — escalation templates, severities, role assignments and notifications.
 
 ### 4.2 Integration architecture
 
@@ -218,7 +218,7 @@ These are downstream handoff items — see §9.
 
 ## 8. Open Decisions
 
-### OD-01: How an escalation is recorded
+### OQ-DS-1: How an escalation is recorded
 
 - **Context:** The story references state="Escalated". The case states the Case API documents are New (1), Open (10), Awaiting Info (18), Resolved (6) and Closed (3); there is no "Escalated" state *(citation: `markdown/api-reference/rest-apis/case-api.md`)*. The case and account escalation feature records an escalation as its own record instead *(citation: `markdown/customer-service-management/case-escalation-components.md`)*.
 - **Options:**
@@ -231,7 +231,7 @@ These are downstream handoff items — see §9.
 - **Decision by:** before R1 sprint start.
 - **Status:** Open — awaiting the CSM Specialist's confirmation of the baseline fit; no §1.1 ruling is needed.
 
-### OD-02: Notification channel scope
+### OQ-DS-2: Notification channel scope
 
 - **Context:** R1 uses email only. Acme operations also use MS Teams.
 - **Options:**
@@ -242,7 +242,7 @@ These are downstream handoff items — see §9.
 - **Decision by:** sprint 1 of R1.
 - **Status:** Open.
 
-### OD-03: Restrict escalation to specific priority levels?
+### OQ-DS-3: Restrict escalation to specific priority levels?
 
 - **Context:** Story does not specify a priority filter on escalation requests.
 - **Options:**
@@ -257,7 +257,7 @@ These are downstream handoff items — see §9.
 
 ## 9. Downstream handoff manifest
 
-- **Technical Designer** — re-issues the R1 component spec as configuration of the baseline escalation feature (OD-01); will produce R2/R3/R4 component specs separately.
+- **Technical Designer** — re-issues the R1 component spec as configuration of the baseline escalation feature (OQ-DS-1); will produce R2/R3/R4 component specs separately.
 - **Developer** — not required for R1: the baseline feature is configured, not built.
 - **Flow Designer Specialist** — not required: escalation approval uses the template's approval subflow, and R4 uses the baseline De-escalate action *(citations: `markdown/customer-service-management/case-escalation-process.md`, `markdown/customer-service-management/de-escalate-csm-case.md`)*.
 - **Integration Specialist** — not required for R1; required for R3 if On-Call Management requires bespoke integration.
@@ -273,11 +273,11 @@ These are downstream handoff items — see §9.
 |---|---|---|
 | Custom tables proposed | 0 | n/a |
 | New scoped apps proposed | 0 | n/a |
-| Custom state values proposed | 0 | n/a — OD-01 recommends the baseline Escalation record. |
+| Custom state values proposed | 0 | n/a — OQ-DS-1 recommends the baseline Escalation record. |
 | Custom Connection Aliases proposed | 0 | n/a |
 | Custom CMDB CI Classes proposed | 0 | n/a |
 
-**Compliance status:** **COMPLIANT.** No custom objects: OD-01 recommends the baseline case and account escalation feature over a new state value.
+**Compliance status:** **COMPLIANT.** No custom objects: OQ-DS-1 recommends the baseline case and account escalation feature over a new state value.
 ```
 
 ### §6.2 post-build manifest
@@ -286,9 +286,9 @@ These are downstream handoff items — see §9.
 >
 > **Open dependency — CSM Specialist confirmation required:**
 >
-> - **OD-01** — the HLD recommends the baseline Escalation record over a new state value; the CSM Specialist confirms the fit before downstream design (the Technical Designer's R1 re-issue and R2/R3/R4) proceeds.
+> - **OQ-DS-1 (case-escalation-programme-hld.md)** — the HLD recommends the baseline Escalation record over a new state value; the CSM Specialist confirms the fit before downstream design (the Technical Designer's R1 re-issue and R2/R3/R4) proceeds.
 >
-> **Downstream handoffs once OD-01 is resolved:**
+> **Downstream handoffs once OQ-DS-1 (case-escalation-programme-hld.md) is resolved:**
 >
 > 1. **Operational Documentation** — author RB-CSM-ESC-01..03 and KBA-CSM-ESC-01 before R1 go-live.
 > 2. **Security & GRC Specialist** — consult on the escalation role assignments before sign-off.
@@ -299,11 +299,11 @@ These are downstream handoff items — see §9.
 
 This HLD demonstrates three disciplines specific to this skill:
 
-1. **Baseline-first audit block at the end of the document.** Section 10 lists all custom objects referenced in the design, with each one's approval status. The block makes governance compliance auditable rather than implicit. In this case it lists no custom object: the "Escalated" state the story asked for is answered by the baseline Escalation record (OD-01), and the audit block says so.
+1. **Baseline-first audit block at the end of the document.** Section 10 lists all custom objects referenced in the design, with each one's approval status. The block makes governance compliance auditable rather than implicit. In this case it lists no custom object: the "Escalated" state the story asked for is answered by the baseline Escalation record (OQ-DS-1), and the audit block says so.
 
-2. **OD-01 weighs the baseline first.** The Open Decision section doesn't pretend the "Escalated" state is a settled question. It evaluates the baseline case and account escalation feature before any custom option, finds that it covers R1 and R4, and records why a new field or state value would be custom work the baseline makes unnecessary. A custom option that survived that test would go to the Chief Architect as an `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`.
+2. **OQ-DS-1 weighs the baseline first.** The Open Decision section doesn't pretend the "Escalated" state is a settled question. It evaluates the baseline case and account escalation feature before any custom option, finds that it covers R1 and R4, and records why a new field or state value would be custom work the baseline makes unnecessary. A custom option that survived that test would go to the Chief Architect as an `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`.
 
-3. **§6.2 manifest is multi-track.** The manifest has an open dependency (the CSM Specialist's confirmation of OD-01), downstream handoffs (Operational Documentation, Security & GRC), and explicitly notes no Code Reviewer trigger. The post-build hook respects that HLD outputs are documents, not code.
+3. **§6.2 manifest is multi-track.** The manifest has an open dependency (the CSM Specialist's confirmation of OQ-DS-1), downstream handoffs (Operational Documentation, Security & GRC), and explicitly notes no Code Reviewer trigger. The post-build hook respects that HLD outputs are documents, not code.
 
 The HLD itself is also valuable as a counter-pattern — earlier in the engagement, the Technical Designer defaulted to a custom audit table. This HLD's §4.1 (Data model summary) makes the no-custom-table commitment first-class and visible to the review board, locking in the architectural decision rather than allowing it to drift across releases.
 
