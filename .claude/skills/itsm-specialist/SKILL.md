@@ -206,18 +206,18 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 
 **Table:** `incident` (extends `task`).
 
-**Baseline state machine:**
+**Baseline state machine:** the six states, and only the moves the corpus states in words. The life-cycle page draws the full flow as an image the corpus omits, so every other move, and the integer value behind each state, is not documented in the bundled corpus — verify on the instance.
 
-| State | Value | Transitions to | Roles |
-|---|---|---|---|
-| New | 1 | In Progress, Closed, Resolved, On Hold | itil |
-| In Progress | 2 | Resolved, On Hold, Closed | itil |
-| On Hold | 3 | In Progress | itil |
-| Resolved | 6 | Closed (auto after grace period), In Progress (reopen) | itil |
-| Closed | 7 | (terminal) | itil_admin |
-| Canceled | 8 | (terminal) | itil_admin |
+| State | Moves to, as the corpus states it | Citation |
+|---|---|---|
+| New | not documented in the bundled corpus — verify on the instance | `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md` |
+| In Progress | not documented in the bundled corpus — verify on the instance | `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md` |
+| On Hold | In Progress, when the caller updates the incident | `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md` |
+| Resolved | Closed, by the user or automatically after the number of days in `glide.ui.autoclose.time`; In Progress, when the incident is reopened | `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`, `markdown/it-service-management/incident-management/configure-incident-auto-close.md`, `markdown/it-service-management/incident-management/reopening-incident.md` |
+| Closed | not reopened — a closed incident cannot be reopened, and a reply to its resolution email opens a new incident instead | `markdown/it-service-management/incident-management/reopening-incident.md` |
+| Canceled | not documented in the bundled corpus — verify on the instance | `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md` |
 
-*Citation:* `markdown/it-service-management/incident-management/reference-section-for-incident-management.md`
+Three entries are stated without the state they leave: an incident is set to Resolved when the service is restored *(citation: `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`)*; it can be placed On Hold one or more times before it is closed, and it is Canceled when triage finds it a duplicate, unnecessary, or not an incident *(citation: `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md`)*.
 
 **Related tables:** `task_sla` (SLA progress per incident), `incident_alert` (link to Event Management alerts), `sys_journal_field` (work_notes / comments stream), `sys_history_set` / `sys_history_line` (field-level audit).
 
@@ -229,7 +229,7 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 
 **Baseline business rules:** `Incident State Change`, `Calculate Inactivity`, `Auto-Close Incident` (Scheduled Job), `Notify Watchlist`.
 
-**Role gates:** `itil` for normal write; `itil_admin` for state transitions to/from Closed and Canceled.
+**Role gates:** resolving takes `itil`, `list_updater`, `sn_incident_write` or `admin`, and closing takes `itil_admin` or `admin` *(citation: `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`)*; reopening a resolved incident takes `sn_incident_write`, or being its caller or requester *(citation: `markdown/it-service-management/incident-management/reopening-incident.md`)*. Any other gate, cancelling included, is not documented in the bundled corpus — verify on the instance.
 
 ### Major Incident Management (MIM)
 
