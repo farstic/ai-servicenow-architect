@@ -9,12 +9,66 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.13 — 2026-10-13
+
+### Notes
+
 **This release brings enforcement on every build (ARC-11-C6):** with no valid licence, no tool runs, no CLI command
-runs but the few that repair the state, and no variable turns that off. It stays under the Apache License 2.0; from
-2.1.0 the product moves to the Business Source License 1.1 (ARC-11-C5).
+runs but the few that show and repair the state, and no variable turns that off. It stays under the Apache License
+2.0; from 2.1.0 the product moves to the Business Source License 1.1 (ARC-11-C5).
+
+A checkout with no licence in force (missing, invalid, expired or revoked), or with a design-only licence on a live
+server, sees this:
+- every MCP tool answers `LICENCE_NOT_VALID` and writes one audit line, as 2.0.12 did under `SNOW_LICENCE_ENFORCE`;
+- `./snowarch` runs `licence`, `doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`. Every other
+  command exits 3, naming the state and the remedy; the package CLI runs `doctor` only;
+- doctor check E-31 is a FAIL, with the remedy every refusal carries;
+- `./snowarch upgrade` says so before it moves to a release that refuses, with `--yes` and without.
+
+`SNOW_LICENCE_ENFORCE` is gone: no variable, flag or file turns enforcement off, and setting it changes nothing. With
+a licence in force nothing is refused, and only the licence line's wording changes. There is no migration step. The
+server has 399 tools and the error registry 73 codes, as in 2.0.12. The contract moves to `20f73faf89cd`, because
+`LICENCE_NOT_VALID`'s meaning and remedy no longer name the variable.
+
+The no-deliverable rule reads the session banner's `Licence:` line, which the SessionStart hook prints; a session
+that loads no local settings, has hooks off, or has the hook entry removed does not see it, and only the rule goes
+silent — the server still refuses every MCP tool. From 2.1 the doctor fails when the hook is gone (ARC-11-C10).
+
+**The release candidate, and what the owner's sitting confirmed.** `v2.0.13-rc.3` is release commit `5fac74b`,
+cut from develop `20d05f4`, after #420 (ARC-11-C6), #424 (the sweep) and #425 (ARC-07-C43, the changelog guard).
+Its release evidence reads the same on all three operating systems: 35 ok, 1 warn (SV-02), 1 fail (E-00) and
+5 skip. E-31 is ok under the CI fixture licence; 2.0.12's evidence had it as its second warn. The owner's sitting
+on it, on 2026-10-13, confirmed every step (`docs/validation/2.0.13-rc.3-live-sitting.md`):
+- **T-28, revised for enforcement on every build**, with no variable set anywhere. With no licence, E-31 FAILs with
+  its remedy. Revoked, `./snowarch licence check` says so, with its `valid until:` line in UTC, and every tool is
+  refused with `LICENCE_NOT_VALID` and one audit line. With a new licence issued and installed, the tool answers
+  again;
+- **T-31 with a refused licence**: the Architect names the state and produces no deliverable;
+- **T-29 and T-30 under a valid licence**, against rc.2's numbers and verdicts
+  (`docs/validation/2.0.12-rc.2-live-sitting.md`): 1 min 47 s and 2 min 05 s.
+
+After rc.3, and covered by unit, parity and e2e tests rather than by the sitting:
+- in #426, ARC-11-C11, the list refresh's deadline in its third git call (under Fixed), and ARC-09-C133, two
+  tests that waited on a slow runner;
+- in rc.4, by the owner's ruling at the sitting, E-31's remedy and U4's notice end at the remedy, and `upgrade
+  --to` checks the licence before it takes the target (ARC-11-C6);
+- in rc.4, the banner runs the quick doctor again after a licence is installed (ARC-11-C12, under Fixed).
+
+**The next release candidate.** `v2.0.13-rc.4` is release commit `c9c6b8d`, cut from develop `a34b845`, after #427.
+Its release evidence reads as rc.3's on all three operating systems: 35 ok, 1 warn (SV-02), 1 fail (E-00) and 5 skip,
+with E-31 ok under the CI fixture licence. The owner's check on it, on 2026-10-13, passed:
+- two checkouts upgraded from rc.3 cleanly, each with its doctor at 40 ok, 2 warn (E-23, E-30) and 0 fail;
+- with a revoked licence restored, E-31 FAILs with its remedy and nothing after it, and SV-06 skips with E-31's
+  reason;
+- without a licence in force, `upgrade --to` refused the target with exit 3, and nothing changed.
 
 ### Changed
 
+- The licence line says the state alone: "warn only" and "enforced" are gone, because enforcement no longer has a
+  switch (ARC-11-C6).
+- A licence's day is a UTC date, and the commands say so. `licence show`, `verify` and `check` print
+  `valid until: <date> (UTC, N days)`, `(UTC, last day)` on its last day, and `<date> (UTC)` once it has ended. E-31
+  and a session's first answer say "last day" where they said "0 days left" (ARC-11-C6).
 - `docs verify` refuses a Markdown table row with more cells than its header, outside fences. GitHub cuts a cell at
   the first unescaped pipe, inside a code span too, and drops every cell past the header's count, so such a row reads
   whole in the file and short on the page. The 33 rows that broke this are fixed (ARC-09-C126).
@@ -34,6 +88,187 @@ runs but the few that repair the state, and no variable turns that off. It stays
   preference, where it listed up to five update sets in progress on the whole instance and called that current. It
   returns `session_update_set` (null with no preference, `found: false` for a set that does not exist), and the
   instance's in-progress sets as `in_progress_update_sets`; `count` and `active_update_sets` are gone (ARC-09-C128).
+- A revocation-list refresh whose time runs out while it reads the file now says the list could not be reached, in
+  the server and in `./snowarch licence check --refresh` and `upgrade`. It said no list was published yet, and wrote
+  the cache as checked at that moment, which hid how old the cached list was. The cached list was kept either way
+  (ARC-11-C11).
+- After a licence is installed, the session banner runs the quick doctor again, where its Doctor line showed E-31's
+  FAIL from before the install for up to a day (ARC-11-C12).
+
+### Added
+
+- server: startLicence takes the refresh's budget, and the fixture cases widen it (ARC-09-C133) (7167a48)
+- tests: harness sessions load project,local settings, so the hook's banner prints (ARC-11-C6) (9cf37f1)
+- tests: the harness runs each case under the checkout's licence, T-31 under none (ARC-11-C6) (cb6f6db)
+- snowarch: the owner's revoke declares the one key it takes from a path; green (ARC-11-C6) (fc9c7ff)
+- snowarch: the last day by name, and valid until: lines say the day is UTC; green (ARC-11-C6) (6b40c3c)
+- doctor: E-31's remedy and U4's notice end at the remedy (ARC-11-C6) (f36165d)
+- doctor: E-31 fails for a refused state, and SV-06 skips with its reason; green (ARC-11-C6) (4aba3f6)
+- engine: product children are told the state root, so both doors read one licence (ARC-11-C6) (4e5adc5)
+- bootstrap: B06 and B08 skip under a refused state, through the gate; green (ARC-11-C6) (a6f6c22)
+- server: the package CLI refuses what ./snowarch refuses, through one gate (ARC-11-C6) (b390586)
+- engine: bootstrap and mode design run without a licence, for install and uninstall (ARC-11-C6) (4795a0f)
+- snowarch: enforcement on every build, with no switch, in the CLI and the server (ARC-11-C6) (cedbdeb)
+- docs: docs verify refuses a table row wider than its header; 33 rows fail it (ARC-09-C126) (5c196f1)
+
+### Fixed
+
+- release: the notes a cut writes honour overrides, and the cut sweeps them first (ARC-11-C6) (606af51)
+- doctor: the licence file is one of the doctor cache's inputs (ARC-11-C12) (531d05f)
+- snowarch: upgrade --to checks the licence before it takes the target (ARC-11-C6) (42c4bd6)
+- snowarch: E-31 and U4 give the refusal's remedy, and nothing after it (ARC-11-C6) (ceadce5)
+- snowarch: a show the deadline ends is unreachable, in the server and the CLI (ARC-11-C11) (df24509)
+- bootstrap: the run's licence passes through upgrade's plan and E-29 (ARC-11-C6) (1ec0d1d)
+- release: the docs gate runs scripts/docs.mjs verify, not the gated launcher (ARC-11-C6) (057bf01)
+- engine: the CLI's licence gate is one decision, so a control can catch it (ARC-11-C6) (7638928)
+- server: records_query reports limit, offset, total, truncated; takes offset (ARC-09-C125) (58ffdb7)
+- server: current_update_set_read reads the session's own update set (ARC-09-C128) (7f864e5)
+- server: capture_target_set returns previous, the target it replaced (ARC-09-C127) (0c2a4bf)
+
+### Internal
+
+- tests: the release-notes cases name the cut by its date, not the next version (ARC-11-C6) (b6c06bb)
+- tests: the section a release cuts is swept, and honours a notes override; red (ARC-11-C6) (9cbd351)
+- changelog: the rc.4 paragraph, with its release evidence and the owner's check (ARC-11-C6) (d950d84)
+- the rc.3 sitting's record; the notes say what it confirmed (ARC-11-C6) (7c66fac)
+- changelog: a Fixed entry for the banner's Doctor line after a licence install (ARC-11-C12) (c4e9f64)
+- plan: row ARC-11-C12, the banner's Doctor line keyed on the licence file (ARC-11-C12) (2cf3a24)
+- doctor: a licence installed after the cache was written leaves it fresh; red (ARC-11-C12) (d251aaf)
+- snowarch: two comments in the licence code are reworded (ARC-11-C6) (0e5d1af)
+- plan: C6's step 6 is reversed by the owner's ruling; its bound is in C6 and C3 (ARC-11-C6) (ebf4151)
+- tests: upgrade --to an earlier release exits 3 unlicensed and moves licensed; red (ARC-11-C6) (df7166b)
+- tests: no shipped file or page says how to work without a licence; red (ARC-11-C6) (89bf4ca)
+- changelog: rc.3's paragraph says C11 and C133 landed after it, covered by tests (ARC-11-C11) (740f472)
+- snowarch: the slowed git's types, for the package's TypeScript tests (ARC-09-C133) (1274db0)
+- plan: rows ARC-09-C133 and ARC-11-C11, with the cell's timings and the controls (ARC-09-C133) (3990145)
+- snowarch: a show the deadline ends is reported as no file, in both copies; red (ARC-11-C11) (8c3993d)
+- changelog: rc.3's paragraph states its release evidence: E-31 ok under the fixture (ARC-11-C6) (e625029)
+- snowarch: readme-blocks copies only what the generator reads (ARC-09-C133) (ae2023d)
+- snowarch: readme-blocks' copy is exactly the generator's five inputs; red (ARC-09-C133) (5a3bab9)
+- snowarch: the refresh cases on a slowed git, asserting whole results; red (ARC-09-C133) (574d093)
+- changelog: rc.3's paragraph names its release commit and the develop it came from (ARC-11-C6) (11e490d)
+- plan: C43's row records the variable's three allowances since head 2 (ARC-07-C43) (139f3ad)
+- tests: owner-initials reads the changelog without its generated Internal entries (ARC-07-C43) (9265f33)
+- tests: owner-initials reads a generated Internal line of the changelog; red (ARC-07-C43) (8528192)
+- tests: the released-changelog fixture moves to a helper the sweeps share (ARC-07-C43) (4e975a6)
+- tests: C43 head 2 reads the changelog without its generated Internal entries (ARC-07-C43) (b4443f1)
+- tests: C43 head 2 reads a generated Internal line of the changelog as a page; red (ARC-07-C43) (00b10c4)
+- changelog: 2.0.13's notes state the no-deliverable rule's bound, the hook (ARC-11-C6) (c05cf97)
+- changelog: 2.0.13's rc.3 paragraph: what the owner's sitting runs (ARC-11-C6) (6767730)
+- plan: C132's row records the second fix: end the child, wait for its exit (ARC-09-C132) (695bd34)
+- tests: the stderr helper ends its child like a client, and returns on its exit (ARC-09-C132) (557bf70)
+- tests: the stderr helper must return only once its child has exited; red (ARC-09-C132) (caaf83f)
+- tests: the helper returns at the line, not at its cap; why stdin stays open (ARC-09-C132) (e76360a)
+- plan: ARC-09-C132, a spawned-server test that exits on a timer, FIXED in 2.0.13 (ARC-09-C132) (34034c2)
+- tests: the spawned-server helper waits for the end-of-startup line, 30 s cap (ARC-09-C132) (fb22c26)
+- tests: the spawned-server stderr helper misses a slow start; red (ARC-09-C132) (23db7fc)
+- plan: ARC-11's scope and order carry C10, beside C7 in 2.1.0 (ARC-11-C6) (6ffe6dd)
+- server: server.test's header states the class case of enforcement on every build (ARC-11-C6) (2002bfd)
+- docs: the install page says how to install a licence, from 2.0.13; README follows (ARC-11-C6) (b98734c)
+- plan: the plans index's ARC-11 line names 2.0.13's enforcement, and counts 10 rows (ARC-11-C6) (8d66683)
+- plan: ARC-11's Goal and C3 name 2.0.13 for C6, C3 records the bound, C10 opens (ARC-11-C6) (c21a3c0)
+- tests: the live README's licence test is 2.0.12's record, and points at T-28 (ARC-11-C6) (5b9c70e)
+- docs: the status template's prose: the licence line names the state alone (ARC-11-C6) (1d935a9)
+- plan: C6's row records the measured bound: no hook, no Licence line, no rule (ARC-11-C6) (312347e)
+- tests: harness sessions load the clone's local settings, where the hook is; red (ARC-11-C6) (f3f5858)
+- docs: CONTRIBUTING's gates run docs.mjs verify, no licence needed; owner's preview (ARC-11-C6) (199e806)
+- docs: LICENSING.md notes 2.0.13's licence check, under Apache-2.0; owner's preview (ARC-11-C6) (c7ce0de)
+- docs: CLAUDE.md's licence rule keys on the state alone, with the owner's preview (ARC-11-C6) (a3fdebc)
+- tests: validation-setup ends with exactly one newline (ARC-11-C6) (12271fb)
+- docs: the user guide and the modes page drop the retired switch (ARC-11-C6) (d8d8554)
+- tests: T-07's licence prose, and T-28 revised for enforcement on every build (ARC-11-C6) (d84bef9)
+- tests: the spec's header counts 31 tests, through T-31 (ARC-11-C6) (8318ed8)
+- changelog: 2.0.13's notes for enforcement on every build, and C6's two bullets (ARC-11-C6) (efcf4ce)
+- plan: C6's row as built, the Order, and the scope by release, for 2.0.13 (ARC-11-C6) (ffa2c0a)
+- tests: each harness case runs licensed, and T-31 runs without one; red (ARC-11-C6) (ec8ca68)
+- server: server.test retires its dist/ copy to the hook, and signs with its fixture (ARC-11-C6) (9ac79b1)
+- tests: no test writes a keys module of its own: the hook is the one mechanism; red (ARC-11-C6) (8130d47)
+- tests: nothing shipped takes a key but the keys modules, a class guard; red (ARC-11-C6) (3533f82)
+- tests: untar the v2.0.12 world by colon-free names, and log U7's E-31 line (ARC-11-C6) (cdf9c28)
+- tests: the last day by name, and the day check, show and verify say is UTC; red (ARC-11-C6) (4e6b837)
+- the unlicensed step prints the real E-31 line and holds it to this shell's launcher (ARC-11-C6) (0a2a963)
+- tests: the enforcement world's tag check goes through gitRaw and longpaths (ARC-11-C6) (db96aa5)
+- doctor: the panel test reads E-31's remedy from the fixture the panel prints (ARC-11-C6) (41c7a67)
+- tests: the 2.0.12 to 2.0.13 path a user without a licence takes, end to end (ARC-11-C6) (5fa0bbb)
+- tests: step 5's fallout, found by the full gates: three suites follow its rulings (ARC-11-C6) (6f0e9e4)
+- the unlicensed step asserts the doctor's E-31 FAIL and SV-06's skip (ARC-11-C6) (c7c8a0d)
+- the release's evidence doctor runs licensed per step; its docs check is ungated (ARC-11-C6) (8693f2f)
+- the bootstrap cells expect E-31's FAIL, two-way, and the snapshots record it (ARC-11-C6) (64fbaea)
+- doctor: the status fixtures and the template's three quotes carry E-31's FAIL (ARC-11-C6) (3eb41ff)
+- doctor: E-31 fails for a refused state, and SV-06 skips with its reason; red (ARC-11-C6) (7256811)
+- the live bootstrap check runs on the node 24 cell of each OS (ARC-11-C6) (d29bfda)
+- the unlicensed step asserts a live bootstrap finishes with B06's and B08's skips (ARC-11-C6) (fd0b1c6)
+- bootstrap: the run reads the licence once, and stepContext carries it (ARC-11-C6) (8c88739)
+- engine: a product child is told the state root, git and claude the checkout; red (ARC-11-C6) (fe41ed2)
+- bootstrap: B06 and B08 skip under a refused state, with E-31's reason; red (ARC-11-C6) (6010781)
+- server: the package CLI's door, and one gate for both doors; red (ARC-11-C6) (0fad266)
+- tests: the reader's planted sources are keyed by resolve, as it looks them up (ARC-11-C6) (71576c8)
+- tests: C125's router test runs in a licensed session (ARC-11-C6) (0fe25f4)
+- plan: C129 and C130 open for 2.0.13, each with its evidence (ARC-09-C129, ARC-09-C130) (849f338)
+- plan: C131's row, fixed for 2.0.13 test-first, with its control (ARC-09-C131) (a60a2e1)
+- tests: readme-blocks proves drift on a copy of the tracked files; green (ARC-09-C131) (9e33de1)
+- tests: readme-blocks reads the tracked README mid-drift and after; red (ARC-09-C131) (c08ed9f)
+- tests: the package CLI's six starts carry a licence or declare why not (ARC-11-C6) (1ec39f3)
+- tests: the reader counts the package CLI as a start; red on six bare starts (ARC-11-C6) (1271736)
+- tests: the reader's planted package-CLI starts, red on today's reader (ARC-11-C6) (3bce2e2)
+- changelog: C125's bullet in 2.0.13's Changed group; its row names 2.0.13 (ARC-09-C125) (80a9710)
+- tests: the package's setup releases the licence fixture after each file (ARC-11-C6) (76069fa)
+- tests: releaseLicenceFixture removes what licensedEnv made, owner records too, red (ARC-11-C6) (f7e39b1)
+- tests: ci.yml may name SNOWARCH_STATE_ROOT, for its per-step fixture licence (ARC-11-C6) (f3843c9)
+- ci: the launcher audit's baseline holds the panel's new Licence sentence (ARC-11-C6) (a6ef987)
+- changelog: C126's bullet in 2.0.13's Changed group; its row names 2.0.13 (ARC-09-C126) (5f1251d)
+- ci: the test job proves the unlicensed build refuses, on the shipped keys (ARC-11-C6) (86281d6)
+- release: the docs gate runs scripts/docs.mjs verify, in parity with the CLI (ARC-11-C6) (77f8c7b)
+- ci: the four product steps outside the allowed set run with the fixture licence (ARC-11-C6) (e8681b9)
+- ci: licence-fixture, a per-step licence for the CI steps outside the allowed set (ARC-11-C6) (b40640a)
+- ci: licence-fixture's contract for the CI steps outside the allowed set, red first (ARC-11-C6) (24196c7)
+- tests: bootstrap and mode design run without a licence, red first (ARC-11-C6) (c741100)
+- tests: the start reader follows promisify(execFile) (ARC-11-C6) (b8a6115)
+- snowarch: the doctor suites license the server their checks spawn (ARC-11-C6) (375e444)
+- tests: tracked temp dirs, a rule for .mts, and the handshake project removed (ARC-11-C6) (2f7b648)
+- doctor: status fixtures regenerated, and the template's Licence line (ARC-11-C6) (4afc3b0)
+- tests: the licence suites assert enforcement on every build, and its words (ARC-11-C6) (6059dc9)
+- changelog: C128's bullet in 2.0.13's Fixed group (ARC-09-C128) (b846f98)
+- tests: no shipped file names the enforcement variable, red on 11 files (ARC-11-C6) (48fae35)
+- snowarch: the in-process router tests run in a licensed session (ARC-11-C6) (5b61a4d)
+- snowarch: useLicensedSession(), an enforced, licensed session for in-process tests (ARC-11-C6) (b1c31b6)
+- snowarch: every in-process router test starts a licensed session, red on 13 files (ARC-11-C6) (27d90b2)
+- changelog: 2.0.13's notes open with enforcement on every build; C127's bullet (ARC-09-C127) (063d40f)
+- snowarch: the package suites start the server through licensedEnv (ARC-11-C6) (57d5d15)
+- tests: the upgrade e2e starts the CLI licensed, with no revocation list configured (ARC-11-C6) (3470d89)
+- tests: the docs, doctor and version suites start the CLI through licensedEnv (ARC-11-C6) (c5e897b)
+- tests: the engine suites start the CLI and the launcher through licensedEnv (ARC-11-C6) (5ecdac5)
+- tests: licensedEnv does not rewrite an identical licence, so no cache input moves (ARC-11-C6) (3b4ff0f)
+- tests: licensedEnv(), the helper a test starts the product through (ARC-11-C6) (ac08050)
+- tests: licensedEnv's contract, red before the helper exists (ARC-11-C6) (487ed41)
+- tests: with no state root set, the CLI and the server read one licence file (ARC-11-C6) (97bf747)
+- tests: every start of the product in the tests carries a licence, red on 36 sites (ARC-11-C6) (ca5207b)
+- plan: C6 ships in 2.0.13, by the owner's decision of 2026-10-12 (ARC-11-C6) (ed305e9)
+- tests: enforcement takes no switch, in the CLI and the server, red first (ARC-11-C6) (52cb5f1)
+- tests: verifyTables' status agrees with its own list, as --json prints it (ARC-09-C126) (b0adef5)
+- plan: C125 fixed for 2.1.0, both halves; the owner approved the sentence (ARC-09-C125) (71e3cc7)
+- engine: the live-verify rule names truncated in all seven copies (ARC-09-C125) (fd7f898)
+- tests: the live-verify rule names truncated in all seven copies, red first (ARC-09-C125) (0d46dc8)
+- plan: C125 retitled; tool half fixed for 2.1.0, rule half awaits the owner (ARC-09-C125) (03b3f1f)
+- server: the limit default is written once, in client.ts, held by a source guard (ARC-09-C125) (c3b4c25)
+- server: a query read says whether it was cut, and reads its next page, red first (ARC-09-C125) (2e2b7e9)
+- docs: CONTRIBUTING names docs verify's table check beside the names (ARC-09-C126) (e50d92a)
+- plan: C126 fixed for 2.1.0, red-first on the tree, 33 rows mended (ARC-09-C126) (cffe9f1)
+- docs: the 33 wide table rows fixed, and the template's placeholders say or (ARC-09-C126) (5bfea2d)
+- plan: C6 takes shape A everywhere; the spike's ten-cell result and its cost (ARC-11-C6) (c1e6e44)
+- tests: say why case 4's stderr baseline is not the refused control (ARC-11-C6) (896e03b)
+- tests: the hook spike compares stderr, and an inert child stays untouched (ARC-11-C6) (cbf8060)
+- tests: spike the test-only key hook for spawned processes, on every CI cell (ARC-11-C6) (902718f)
+- tests: W1's previous checked against R0; C127 confirmed live on the 2.1.0-rc (ARC-09-C127) (e5d55da)
+- tests: R0b checks the tool against R0; C128 confirmed live on the 2.1.0-rc (ARC-09-C128) (b66ba01)
+- server: a preference naming no sys_id reads as found false, with no get (ARC-09-C128) (553c1a7)
+- plan: C128 fixed for 2.1.0, test-first, six controls valid; its known gap closes (ARC-09-C128) (06a92cd)
+- server: a NOT_FOUND for the named set reads as found false; other errors fail (ARC-09-C128) (6bcdf65)
+- server: current_update_set_read reads the session's preference, red first (ARC-09-C128) (f8bc3db)
+- plan: C127 fixed for 2.1.0, test-first, four controls valid (ARC-09-C127) (30b68b9)
+- server: capture_target_set returns the target it replaced, red first (ARC-09-C127) (2bfb2b3)
+
+Tag v2.0.13 · contract 9c8de8f3113f · docs-pin 68c0d11
 
 ## 2.0.12 — 2026-10-12
 

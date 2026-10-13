@@ -14,6 +14,7 @@ import { CHECK_IDS } from '../../src/doctor/types.js';
 import { pollutingAncestors } from '../../src/doctor/checks.js';
 import { cliSpelling } from '../../src/cli/tty.js';
 import { trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
@@ -72,10 +73,13 @@ async function doctorAt(
   args: string[] = ['--no-network'],
   extraEnv: Record<string, string> = {},
 ): Promise<DoctorRun> {
-  const env = { ...process.env, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: home,
+  const base = { ...process.env, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: home,
     SNOW_LOG_LEVEL: 'error', ...extraEnv } as Record<string, string>;
   for (const k of ['SNOW_STORE', 'SERVICENOW_INSTANCE_URL', 'SERVICENOW_BASIC_USERNAME',
-    'SERVICENOW_BASIC_PASSWORD', 'SNOW_ENV_FILE']) delete env[k];
+    'SERVICENOW_BASIC_PASSWORD', 'SNOW_ENV_FILE']) delete base[k];
+  // ARC-11-C6: the doctor's server checks spawn the server with this environment, and the server refuses every
+  // tool without a licence it trusts: the test-only hook, and a licence at CLAUDE_PROJECT_DIR.
+  const env = licensedEnv(base);
   try {
     const { stdout, stderr } = await run(process.execPath, [cli, 'doctor', ...args],
       { encoding: 'utf8', env, timeout: 90_000, maxBuffer: 10 * 1024 * 1024 });

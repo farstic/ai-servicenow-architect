@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { runSetPreset, type AddIo, type ManageDeps } from '../../src/cli/instance.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-07-S06, AC 5 — the CLI raised production, and the SERVER agrees.
@@ -51,8 +52,8 @@ function env(): Record<string, string> {
   const clean = { ...process.env } as Record<string, string>;
   for (const k of ['SERVICENOW_INSTANCE_URL', 'SERVICENOW_BASIC_USERNAME',
     'SERVICENOW_BASIC_PASSWORD', 'SNOW_ENV_FILE']) delete clean[k];
-  return { ...clean, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: checkout,
-    SNOW_STORE: store, SNOW_LOG_LEVEL: 'error' };
+  return licensedEnv({ ...clean, HOME: home, APPDATA: home, CLAUDE_PROJECT_DIR: checkout,
+    SNOW_STORE: store, SNOW_LOG_LEVEL: 'error' });
 }
 
 async function connect(): Promise<Client> {

@@ -18,6 +18,10 @@ import { expandPreset, PRESETS, type PresetName } from '../src/utils/permissions
 import { ERROR_CODES } from '../src/errors/codes.js';
 import type { Gate, ToolDefinition } from '../src/tools/types.js';
 import type { ServiceNowClient } from '../src/servicenow/client.js';
+import { useLicensedSession } from './helpers/licensed-session.js';
+
+// ARC-11-C6: this file calls the router in its own process, so it runs in a licensed session.
+useLicensedSession();
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CONTRACT = JSON.parse(readFileSync(resolve(here, '../dist/contract.json'), 'utf8'));

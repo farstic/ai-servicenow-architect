@@ -25,20 +25,21 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { EXPECTED_FAIL_ON_RUNNERS } from '../scripts/ci/doctor-snapshot.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = join(root, 'scripts/ci/assert-doctor.mjs');
 
 const judge = (file, args = []) => spawnSync(process.execPath,
-  [SCRIPT, '--in', file, '--expect-fail', 'E-00', ...args], { encoding: 'utf8' });
+  [SCRIPT, '--in', file, '--expect-fail', EXPECTED_FAIL_ON_RUNNERS.join(','), ...args], { encoding: 'utf8' });
 
 /** A report on disk, from the bootstrap snapshot with the named changes. */
 function reportFile(t, mutate) {
   const dir = tempDir('snowarch-judge-', t);
   const report = JSON.parse(readFileSync(join(root, 'tests/fixtures/doctor/snapshot-linux.json'), 'utf8'));
-  // The snapshot is a PASSING bootstrap report except that E-00 is expected to fail there, which is
-  // what `--expect-fail E-00` says. Make that true rather than assuming it.
-  report.checks = report.checks.map((c) => (c.id === 'E-00' ? { ...c, status: 'fail' } : c));
+  // The snapshot is a PASSING bootstrap report except that the runner-expected checks fail there (E-00, and
+  // E-31 since ARC-11-C6 step 5), which is what `--expect-fail` says. Make that true rather than assuming it.
+  report.checks = report.checks.map((c) => (EXPECTED_FAIL_ON_RUNNERS.includes(c.id) ? { ...c, status: 'fail' } : c));
   // The snapshot fixture is a NORMALISED report — `doctor-snapshot.mjs` strips the volatile fields,
   // `modeLine` among them — and this script asserts one. Restored here rather than added to the
   // snapshot, which exists to be compared and would then carry a line that changes per machine.

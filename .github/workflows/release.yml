@@ -73,8 +73,11 @@ jobs:
       - name: Install, design-only
         if: always()
         run: node tools/snowarch/bin/snowarch.mjs bootstrap --mode design --yes --skip-claude-check
+      # ARC-11-C6: the launcher's `docs verify` is outside the allowed set, and this job holds no licence.
+      # `scripts/docs.mjs verify` is the same function with the same arguments and the same report, which
+      # the release gate already runs (tests/release-docs-gate.test.mjs holds the parity).
       - name: Every citation resolves against the pinned corpus
-        run: node tools/snowarch/bin/snowarch.mjs docs verify
+        run: node scripts/docs.mjs verify
 
       # `--no-network --no-cache`: the report has to be about this checkout and nothing else, and it
       # is about to be published where anyone can read it.
@@ -100,11 +103,29 @@ jobs:
       #
       # Same reasoning as `ci.yml`'s doctor artifact, which has said `if: always()` since it was
       # written — this workflow simply never had the failure that shows why.
+      #
+      # ARC-11-C6 step 5 — THE EVIDENCE IS THE LICENSED PICTURE (the architect's ruling). From 2.0.13 E-31 FAILs
+      # where no licence is in force, and a FAIL on every tag's evidence would teach everyone to ignore a FAIL.
+      # So this one step runs licensed, and the judge below is unchanged: E-00 is the one failure it explains,
+      # and E-31 reads ok with LIC-2026-9000. That licence is a FIXTURE, signed by a key made for this run
+      # (scripts/ci/licence-fixture.mjs), never a product key: CI holds none. Per step, never job-wide, as in
+      # ci.yml. The fixture's root becomes the state root, so the install's `.local/` is copied into it first,
+      # without replacing the fixture's licence: the doctor reads this install's state and the fixture's licence.
+      - name: 'ARC-11-C6 — a fixture licence for the evidence doctor'
+        id: licence
+        if: always()
+        shell: bash
+        run: node scripts/ci/licence-fixture.mjs
       - name: The doctor, on the install just made
         if: always()
         shell: bash
+        env:
+          NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}
+          SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}
+          CLAUDE_PROJECT_DIR: ${{ steps.licence.outputs.root }}
         run: |
           set +e
+          if [ -d .local ]; then cp -Rn .local/. "$SNOWARCH_STATE_ROOT/.local/"; fi
           node tools/snowarch/bin/snowarch.mjs doctor --json --no-network --no-cache \
             > doctor-${{ matrix.os }}.json
           code=$?

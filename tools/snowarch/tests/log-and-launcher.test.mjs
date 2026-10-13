@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLogger } from '../lib/log.mjs';
 import { register, reset } from '../lib/redact.mjs';
+import { licensedEnv } from './helpers/licence-hook/index.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -116,12 +117,12 @@ test('AC 3 - the launcher refuses without Node, and with Node below the floor',
       const launcher = join(repoRoot, 'snowarch');
       assert.ok(existsSync(launcher), 'the launcher is missing');
       // Precondition: with a real node on PATH it works, so a failure below is the shim, not the CLI.
-      const ok = spawnSync(launcher, ['version'], { encoding: 'utf8', cwd: repoRoot });
+      const ok = spawnSync(launcher, ['version'], { encoding: 'utf8', cwd: repoRoot, env: licensedEnv(process.env) });
       assert.equal(ok.status, 0, 'the launcher does not work with a real node');
 
       // (a) no node at all.
       const none = spawnSync(launcher, ['version'],
-        { encoding: 'utf8', cwd: repoRoot, env: { ...process.env, PATH: binDir } });
+        { encoding: 'utf8', cwd: repoRoot, env: licensedEnv({ ...process.env, PATH: binDir }) });
       assert.equal(none.status, 3, 'a missing Node must be a prerequisite failure');
       assert.match(none.stderr, /Node\.js 20\+ is required and was not found on PATH/);
       assert.match(none.stderr, /brew install node@22/);
@@ -131,7 +132,7 @@ test('AC 3 - the launcher refuses without Node, and with Node below the floor',
         '#!/bin/sh\nif [ "$1" = "-p" ]; then echo 18; else echo "v18.0.0"; fi\n');
       chmodSync(join(binDir, 'node'), 0o755);
       const old = spawnSync(launcher, ['version'],
-        { encoding: 'utf8', cwd: repoRoot, env: { ...process.env, PATH: binDir } });
+        { encoding: 'utf8', cwd: repoRoot, env: licensedEnv({ ...process.env, PATH: binDir }) });
       assert.equal(old.status, 3, 'an old Node must be a prerequisite failure');
       assert.match(old.stderr, /Node\.js 20\+ is required; found/);
     } finally { rmSync(dir, { recursive: true, force: true }); }

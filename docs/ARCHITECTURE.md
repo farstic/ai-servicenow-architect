@@ -741,7 +741,7 @@ hashed:
 
 <!-- generated:bootstrap-input-notes -->
 - **`B06` the instance store.** MIGRATE, DON'T RE-WIZARD: a store whose schema is behind makes this step stale so the migration runs — and a store whose CONTENTS changed does not, because re-running the wizard over somebody's credentials is never the right answer to "something moved".
-- **`B08` the doctor.** B08 calls the doctor (ARC-08-S05). This row answers "must the bootstrap run it again"; the doctor CACHE answers "may the banner reuse the last report" (`cacheStale()`, six mtimes). Two mechanisms for two consumers — do not merge them.
+- **`B08` the doctor.** B08 calls the doctor (ARC-08-S05). This row answers "must the bootstrap run it again"; the doctor CACHE answers "may the banner reuse the last report" (`cacheStale()`, seven mtimes). Two mechanisms for two consumers — do not merge them.
 <!-- /generated:bootstrap-input-notes -->
 
 **Determinism across platforms** is the other requirement, and it is why files are hashed as raw
@@ -765,7 +765,7 @@ opposite reason: they have no inputs and run unconditionally, so `alwaysRuns` ex
 the launcher rule is reached, and they never appear in the list of what changed.
 
 Two caches, two consumers, and they are **not** the same mechanism: this table answers "must the
-bootstrap run B08 again"; the doctor's own cache (`cacheStale()`, six mtimes) answers "may the
+bootstrap run B08 again"; the doctor's own cache (`cacheStale()`, seven mtimes) answers "may the
 banner reuse the last report". Merging them would tie an install's decisions to a banner's budget.
 
 ### `.local/bootstrap-state.json` v1

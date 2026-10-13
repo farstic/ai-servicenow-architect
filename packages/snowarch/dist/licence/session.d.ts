@@ -13,7 +13,7 @@ export declare function initLicence({ root, env, keys, now }?: Options): Checkou
 export declare function currentLicence(): CheckoutStatus;
 /** Test seam: forget the session. Never called by the server. */
 export declare function resetLicenceForTests(): void;
-/** Throws LICENCE_NOT_VALID when enforcement is on and this licence does not cover a live call. */
+/** Throws LICENCE_NOT_VALID when this licence does not cover a live call. */
 export declare function assertLicensed(): void;
 /**
  * The first answer's extra block, once per process — or `null`. Always the SECOND block: a caller that
@@ -50,8 +50,13 @@ export declare function refreshLicenceList({ budgetMs }?: {
  *
  * No licence, no fetch: there is nothing a list could revoke, and a checkout without a licence starts
  * exactly as it did before ARC-11 — the owner's first requirement.
+ *
+ * `budgetMs` is the refresh's budget, the live three seconds unless a test widens it for a fixture
+ * repository on a slow runner (ARC-09-C133). `main()` passes none. It changes how long the start waits,
+ * and nothing about what the licence or the list is.
  */
-export declare function startLicence({ live, ...options }: Options & {
+export declare function startLicence({ live, budgetMs, ...options }: Options & {
     live: boolean;
+    budgetMs?: number;
 }): Promise<RefreshResult> | null;
 export {};

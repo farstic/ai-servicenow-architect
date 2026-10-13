@@ -1,14 +1,19 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-import { beforeAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach } from 'vitest';
 import { enterInstance } from '../src/servicenow/context.js';
 import { resetColumnLimits } from '../src/servicenow/stored-values.js';
 import { expandPreset } from '../src/utils/permissions.js';
 import { currentSuitePreset } from './helpers/preset.js';
+import { releaseLicenceFixture } from '../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 beforeAll(() => {
   process.env.SERVICENOW_INSTANCE_URL = 'https://test.service-now.com';
 });
+
+// ARC-11-C6 — the licence fixture a file's licensedEnv calls made (the hook, any state root), removed after the
+// file. A vitest worker does not reliably reach the exit sweep that removes them under node:test.
+afterAll(() => { releaseLicenceFixture(); });
 
 /**
  * A FIXED runtime for every test — `pdi-developer`, not a live view of `process.env`.

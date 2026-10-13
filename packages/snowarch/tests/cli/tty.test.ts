@@ -287,6 +287,7 @@ describe('the argv rule', () => {
     // so a `--password` that reached the parser would be printed to stderr by the code refusing
     // it. Run with a proxy that cannot connect — a network call would fail loudly rather than
     // silently succeed.
+    // unlicensed start: the argv gate refuses a password before anything else runs, the licence door included
     const r = spawnSync(process.execPath,
       [CLI, 'instance', 'add', 'dev', '--password', PASSWORD],
       { encoding: 'utf8', env: { ...process.env, HTTPS_PROXY: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9' } });

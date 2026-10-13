@@ -339,10 +339,23 @@ test('the staleness rule is one rule: a changed input, a missing file, or an unr
   assert.ok(bootstrap);
 });
 
-test('the inputs are six files, and an absent one is recorded as absent', (t) => {
+test('ARC-11-C12 — a licence installed after the cache was written makes the cache stale', async (t) => {
+  // The owner's rc.3 sitting (2026-10-13): a session started two minutes after the licence was installed printed the
+  // cached Doctor line, with E-31's FAIL from before the install, while `./snowarch status` two minutes later had E-31
+  // ok. The licence decides E-31, so a changed licence file is a reason to re-run rather than to read.
+  const root = greenTree(t, { mode: 'design' });
+  await doctorAt(root);
+  assert.deepEqual(cacheStale(root), { stale: false, reason: null });
+  mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(join(root, '.local', 'licence.json'), '{"format":"snowarch-licence/1"}\n');
+  assert.equal(cacheStale(root).stale, true, 'a licence installed after the cache was written left the cache fresh');
+  assert.match(cacheStale(root).reason, /licenceMtime changed/);
+});
+
+test('the inputs are seven files, and an absent one is recorded as absent', (t) => {
   const root = greenTree(t, { mode: 'design' });
   const inputs = collectInputs(root);
-  assert.equal(Object.keys(inputs).length, 6);
+  assert.equal(Object.keys(inputs).length, 7);
   assert.equal(inputs.storeMtime, null, 'the fixture has no store, so the input is null');
   assert.ok(inputs.engineConfigMtime > 0);
 });

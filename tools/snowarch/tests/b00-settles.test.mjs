@@ -8,6 +8,7 @@ import { createServer } from 'node:net';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { which } from '../lib/which.mjs';
+import { licensedEnv } from './helpers/licence-hook/index.mjs';
 import { useStateRoot } from './helpers/state-root.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
@@ -58,8 +59,8 @@ test('without git, on a network that needs a retry, bootstrap still exits 3 — 
     [BIN, 'bootstrap', '--mode', 'design', '--yes', '--skip-claude-check', '--docs', 'skip'], {
       cwd: ROOT,
       encoding: 'utf8',
-      env: childEnv({ PATH, PATHEXT: '.EXE;.CMD', SNOWARCH_STATE_ROOT: useStateRoot(t),
-        SNOWARCH_TEST_NET_URL: `https://127.0.0.1:${await refusingPort()}/` }),
+      env: licensedEnv(childEnv({ PATH, PATHEXT: '.EXE;.CMD', SNOWARCH_STATE_ROOT: useStateRoot(t),
+        SNOWARCH_TEST_NET_URL: `https://127.0.0.1:${await refusingPort()}/` })),
     });
   const out = `${r.stdout}${r.stderr}`;
 

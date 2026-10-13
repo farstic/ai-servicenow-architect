@@ -133,8 +133,8 @@ async function reRun({ config, watchdogMs, run }) {
 async function licenceLine({ root, now, env, keys }) {
   try {
     const { bannerLine, licenceStatus } = await import('../lib/licence/state.mjs');
-    const s = licenceStatus(root, { now: new Date(now), env, keys });
-    return bannerLine(s, { enforced: s.enforced });
+    const s = licenceStatus(root, { now: new Date(now), keys });
+    return bannerLine(s);
   } catch {
     return null;
   }

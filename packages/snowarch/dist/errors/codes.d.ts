@@ -460,8 +460,8 @@ export declare const ERROR_CODES: readonly [{
     readonly ruleLineWith: "VALUE_TRUNCATED";
 }, {
     readonly code: "LICENCE_NOT_VALID";
-    readonly meaning: "SNOW_LICENCE_ENFORCE is \"true\" and this checkout's licence does not cover the call: it is missing, invalid, expired or revoked, or it is a design-only licence and the server is live. Every tool is refused, the instance-free ones included; with enforcement off, nothing is.";
-    readonly remedy: "Run <cli> licence check to see why, then install a valid licence as .local/licence.json or unset SNOW_LICENCE_ENFORCE. A running Claude Code session keeps what it read at start, so restart it afterwards";
+    readonly meaning: "This checkout's licence does not cover the call: it is missing, invalid, expired or revoked, or it is a design-only licence and the server is live. Every tool is refused, the instance-free ones included, on every build.";
+    readonly remedy: "Run <cli> licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards";
     readonly command: "<cli> licence check";
     readonly showInRule: false;
 }];

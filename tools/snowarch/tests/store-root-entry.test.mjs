@@ -20,6 +20,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { preconditions } from '../lib/instance.mjs';
+import { licensedEnv } from './helpers/licence-hook/index.mjs';
 import { useStateRoot } from './helpers/state-root.mjs';
 import { tempDir } from './helpers/temp.mjs';
 /*
@@ -45,7 +46,7 @@ const ENTRIES = [
 
 const run = (entry, args, env = {}) => {
   const r = spawnSync(entry.argv0, [...entry.lead, ...args],
-    { encoding: 'utf8', cwd: root, env: { ...process.env, ...env } });
+    { encoding: 'utf8', cwd: root, env: licensedEnv({ ...process.env, ...env }) });
   return { status: r.status, text: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 };
 

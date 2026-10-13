@@ -17,7 +17,6 @@
  */
 import { spawnSync } from 'node:child_process';
 import { lstatSync } from 'node:fs';
-import { spellings } from '../../../tools/snowarch/lib/text.mjs';
 import { join } from 'node:path';
 import { npmCommand, spawnFor } from '../../../tools/snowarch/lib/spawn-batch.mjs';
 
@@ -49,21 +48,14 @@ export function modulesAreLinked(root, lstat = lstatSync) {
 /**
  * `{ name, argv, cwd? }` — everything the runner needs, and nothing about how to run it.
  *
- * `./snowarch docs verify` is spelled as the launcher rather than as `node scripts/docs.mjs`
- * because that is the command a maintainer would run by hand, and a gate that passes through a path
- * users do not take is a gate that can pass while the product is broken.
+ * `docs verify` runs as `node scripts/docs.mjs verify`, the maintainer entry, not through the launcher
+ * (ARC-11-C6, the architect's (A1)). From 2.0.13 the launcher's `docs` refuses without a licence, and a
+ * release dry run holds none: its gates share one process tree, which no per-step licence can split. The
+ * launcher was chosen so that the gate could not pass while the product's own path failed, and parity keeps
+ * that: `tests/release-docs-gate.test.mjs` holds both entry points to the one `runDocs`, with the same
+ * arguments and the same report. The launcher's own `docs verify` stays exercised by the install jobs.
  */
-export function gatePlan({ noInstall = false, platform = process.platform,
-  env = process.env } = {}) {
-  // ARC-07-W17 — a maintainer's PowerShell refuses a bare `snowarch.cmd` exactly as a user's does, and
-  // this line is one a maintainer pastes when a gate fails. `scripts/` may read `tools/snowarch/lib`;
-  // that direction is allowed.
-  // `env` IS THREADED, and omitting it is the trap `tests/windows-spellings.test.mjs` writes out at
-  // length: `isWindowsShell` reads SHELL and MSYSTEM — so Git Bash on Windows keeps the POSIX
-  // spelling — and `env` defaults to `process.env`. `spellings({ platform: 'win32' })` alone therefore
-  // returns `./snowarch` on any machine with SHELL set, and a caller written that way asserts the
-  // POSIX spelling while believing it asked about Windows. Measured here before it could mislead.
-  const launcher = spellings({ platform, env }).cli;
+export function gatePlan({ noInstall = false, platform = process.platform, notesFrom = null } = {}) {
   /*
    * ARC-09-C70 — `npm` IS `npm.cmd` ON WINDOWS, and the plan has to say so.
    *
@@ -72,8 +64,7 @@ export function gatePlan({ noInstall = false, platform = process.platform,
    * DEP0190 with an args array — and a bare `npm` then reached `CreateProcess`, which appends `.exe`
    * and nothing else. The Windows `release-dryrun` cell failed on `gate lint (exit 1)` with no output
    * at all: `status` was `null` from a spawn that never happened, and `?? 1` turned that into an exit
-   * code. The plan names the command for the platform it will run on, the way `launcher` above already
-   * does — one expression, beside the other one that already had to know this.
+   * code. The plan names the command for the platform it will run on.
    */
   const npm = npmCommand(platform);
   return [
@@ -82,7 +73,9 @@ export function gatePlan({ noInstall = false, platform = process.platform,
     { name: 'lint', argv: [npm, 'run', 'lint'] },
     { name: 'test', argv: [npm, 'test'] },
     { name: 'contract', argv: ['node', 'scripts/contract-gate.mjs', '--skip-build'] },
-    { name: 'docs', argv: [launcher, 'docs', 'verify'] },
+    { name: 'docs', argv: ['node', 'scripts/docs.mjs', 'verify'] },
+    // ARC-11-C6 — the section this cut will write, swept before the writes, so the dry run fails as the cut would.
+    { name: 'notes', argv: ['node', 'scripts/ci/release-notes-gate.mjs', ...(notesFrom ? ['--from', notesFrom] : [])] },
   ];
 }
 

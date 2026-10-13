@@ -1,8 +1,8 @@
 # AI ServiceNow Architect
 
-**v2.0.13-dev** · Apache-2.0 · Claude Code ≥ 2.1.214
+**v2.1.0-dev** · Apache-2.0 · Claude Code ≥ 2.1.214
 
-![version](https://img.shields.io/badge/version-2.0.13--dev-blue)
+![version](https://img.shields.io/badge/version-2.1.0--dev-blue)
 
 A virtual ServiceNow consulting team that runs inside Claude Code. You describe what you need; a Chief
 Architect routes the request to the right specialist, reviews what comes back, and hands you the
@@ -37,7 +37,7 @@ the doctor, the live wizard and the MCP server are what wait for Node.
 ### Path A — terminal first
 
 ```sh
-git -c advice.detachedHead=false clone --branch v2.0.12 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
+git -c advice.detachedHead=false clone --branch v2.0.13 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
 ```
 
 **The `--branch` is not optional, and it names a release.** A plain `git clone` checks out this repository's default branch, which is not a release line and is a long way behind — cloning it installs a development tree with none of the released fixes. The tag above is the current release, and it is written by the release itself, so this page never names a version that has not shipped. The `-c advice.detachedHead=false` is there because a release tag is a *tag*: without it
@@ -51,7 +51,7 @@ you have one.
 On Windows, three lines instead — or double-click `bootstrap.cmd` in the folder:
 
 ```bat
-git -c advice.detachedHead=false clone --branch v2.0.12 https://github.com/farstic/ai-servicenow-architect.git
+git -c advice.detachedHead=false clone --branch v2.0.13 https://github.com/farstic/ai-servicenow-architect.git
 cd ai-servicenow-architect
 .\bootstrap.cmd
 ```
@@ -100,6 +100,13 @@ Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.
 `--yes` skips the plan screen. Interrupting with Ctrl-C is safe: the run records where it stopped,
 and re-running resumes from that step rather than starting again.
 
+### The licence
+
+From 2.0.13 the product checks for a licence from the author. Copy the file you were given to `.local/licence.json`
+in the checkout, before or after the install, which runs without one, and restart Claude Code.
+`./snowarch licence check` shows its state. Without a licence in force no tool runs, and no command but `licence`,
+`doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`.
+
 ### The dialogs
 
 <!-- generated:dialogs -->
@@ -117,9 +124,9 @@ mkdir my-engagement && cd my-engagement && claude
 Accept the workspace-trust dialog, then paste exactly this:
 
 > Install the AI ServiceNow Architect from https://github.com/farstic/ai-servicenow-architect into
-> this folder, from release tag v2.0.12.
+> this folder, from release tag v2.0.13.
 
-Claude runs two commands — `git -c advice.detachedHead=false clone --branch v2.0.12 https://github.com/farstic/ai-servicenow-architect.git .` and
+Claude runs two commands — `git -c advice.detachedHead=false clone --branch v2.0.13 https://github.com/farstic/ai-servicenow-architect.git .` and
 `./bootstrap.sh --mode design --yes --skip-claude-check` — asking your permission for each unless the
 session already allows them. They are written out here for a reason: if Claude proposes anything else
 — cloning into a *subfolder* is the common variation — paste them yourself and you are back on the
@@ -278,7 +285,7 @@ Nothing is touched before the plan is printed and accepted: it names the release
 will re-run, whether the store's schema moves (a migration, with a 0600 backup, announced first),
 and `credentials: untouched` — `.local/instances.json` is never read or written by an upgrade.
 Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a specific release and
-prints the way back; a diverged branch is reported, and a file in the release's way is named; a failed
+prints how to return to your branch; a diverged branch is reported, and a file in the release's way is named; a failed
 fetch prints git's error and a [proxy](docs/TROUBLESHOOTING.md#proxy_unreachable) or [TLS](docs/TROUBLESHOOTING.md#tls_ca_untrusted)
 remedy. The banner mentions a newer release only from a check you already ran — it never fetches.
 Full detail: [CONTRIBUTING.md](docs/CONTRIBUTING.md#upgrading-the-product).

@@ -38,7 +38,7 @@ import {
 import { PRODUCT_KEYS } from '../licence/keys.mjs';
 import { listSource, refreshList, refreshSays } from '../licence/fetch.mjs';
 import {
-  bannerLine, heldList, isEnforced, licenceStatus, listStale, readListCache, REFUSED,
+  allowedPhrase, bannerLine, heldList, licenceStatus, listStale, readListCache, REFUSED,
 } from '../licence/state.mjs';
 
 export const USAGE = (where) => {
@@ -148,6 +148,18 @@ function nextId(ledger, year) {
   return `LIC-${year}-${String((nums.length > 0 ? Math.max(...nums) : 0) + 1).padStart(4, '0')}`;
 }
 
+/**
+ * ARC-11-C6 step 7 — the `valid until:` line that show, verify and check print. The date is a UTC day
+ * (docs/USER-GUIDE.md), and the line says so, with what is left of it: "(UTC, 10 days)", "(UTC, 1 day)",
+ * "(UTC, last day)". An expired licence's says the day alone: its `why:` line says when it ended.
+ */
+function validUntilLine(s) {
+  if (s.perpetual) return '  valid until:  perpetual';
+  const days = s.daysLeft;
+  const left = days < 0 ? '' : `, ${days === 0 ? 'last day' : `${days} day${days === 1 ? '' : 's'}`}`;
+  return `  valid until:  ${s.validUntil} (UTC${left})`;
+}
+
 function describe(log, s) {
   if (s.state === 'missing') return;
   if (s.signatureValid) {
@@ -156,20 +168,16 @@ function describe(log, s) {
     log.step(`  org:          ${s.org}`);
     log.step(`  scope:        ${s.scope}`);
     log.step(`  issued:       ${s.issued}`);
-    log.step(`  valid until:  ${s.perpetual ? 'perpetual' : `${s.validUntil} (${s.daysLeft} days)`}`);
+    log.step(validUntilLine(s));
     log.step(`  signature:    valid — ${s.key} key`);
   }
   if (s.reason && s.state !== 'ok' && s.state !== 'expiring') log.step(`  why:          ${s.reason}`);
 }
 
 function enforcementLines(log, s) {
-  if (!s.enforced) {
-    log.step('  enforce: off — warn only; SNOW_LICENCE_ENFORCE="true" turns the refusals on');
-    return;
-  }
   log.step(REFUSED.includes(s.state)
-    ? '  enforce: on — every command but licence, doctor, status, version and upgrade is refused, and every MCP tool'
-    : '  enforce: on — nothing is refused while the licence is in force');
+    ? `  every command but ${allowedPhrase()} is refused, and every MCP tool`
+    : '  nothing is refused while the licence is in force');
   if (s.scope === 'design-only' && !REFUSED.includes(s.state)) {
     log.step(`  scope: licence ${s.id} covers design-only; live needs a live-scope licence, so a live server refuses every tool`);
   }
@@ -187,13 +195,13 @@ const listLine = (s, now) => {
 
 const inForce = (s) => (s.state === 'ok' || s.state === 'expiring' ? EXIT_OK : EXIT_FAIL);
 
-function show({ log, root, keys, now, env, flags }) {
-  const s = licenceStatus(root, { keys, now: now(), env });
+function show({ log, root, keys, now, flags }) {
+  const s = licenceStatus(root, { keys, now: now() });
   if (flags.json) {
     log.json({ ...s, path: licencePath(root), keys: keys.map(({ role, fingerprint: fp }) => ({ role, fingerprint: fp })) });
     return inForce(s);
   }
-  log.step(bannerLine(s, { enforced: s.enforced }));
+  log.step(bannerLine(s));
   if (s.state === 'missing') log.step(`  no licence is installed at ${licencePath(root)}`);
   describe(log, s);
   log.step(listLine(s, now()));
@@ -211,13 +219,13 @@ function show({ log, root, keys, now, env, flags }) {
   return inForce(s);
 }
 
-function verifyFile({ positional, log, root, keys, now, env }) {
+function verifyFile({ positional, log, root, keys, now }) {
   const file = positional[1];
   if (!file) throw new Usage('licence verify needs the licence file to check');
   let text;
   try { text = readFileSync(file, 'utf8'); } catch { throw new Usage(`cannot read ${file}`); }
   const s = checkLicence(text, { keys, list: heldList(readListCache(root), keys), now: now() });
-  log.step(bannerLine(s, { enforced: isEnforced(env) }));
+  log.step(bannerLine(s));
   describe(log, s);
   return inForce(s);
 }
@@ -227,12 +235,14 @@ function check({ flags, log, root, keys, now, env, config }) {
     const r = refreshList(root, { config: config(), keys, now: now(), env });
     log.step(refreshSays(r));
   }
-  const s = licenceStatus(root, { keys, now: now(), env });
+  const s = licenceStatus(root, { keys, now: now() });
   if (flags.json) {
     log.json(s);
     return inForce(s);
   }
-  log.step(bannerLine(s, { enforced: s.enforced }));
+  log.step(bannerLine(s));
+  // The command every remedy names says what the day means too (ruling B): a term, from a signature that holds.
+  if (s.signatureValid && !s.perpetual) log.step(validUntilLine(s));
   if (s.reason && s.state !== 'ok' && s.state !== 'expiring') log.step(`  why: ${s.reason}`);
   log.step(listLine(s, now()));
   enforcementLines(log, s);
@@ -399,6 +409,7 @@ function revoke({ positional, flags, log, root, keys, now, config, where }) {
   if (existsSync(file)) {
     // The signing key is trusted for its own list as well as the shipped keys, so the owner can manage
     // the list with a key a given build does not ship yet.
+    // owner key from path: the owner's own list file, checked before it is re-signed; no licensee's state reads it
     const trust = [...keys, { role: 'signing', publicKey: publicKeyOf(key) }];
     held = readList(readFileSync(file, 'utf8'), { keys: trust });
     if (!held.ok) {

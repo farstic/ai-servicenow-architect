@@ -14,12 +14,13 @@
 
 ```
 Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
-Licence: missing · warn only
+Licence: missing
 Engine: snowarch 9.9.9 · contract deadbeefdead
 Docs: vendor/ServiceNowDocs @ 68c0d1123adf (australia) · sparse
 Roster: 29 skills / 9 agents
 Instances: pdi (pdi, custom)
-Doctor: 15 ok, 1 warn (E-31), 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
+Doctor: 15 ok, 0 warn, 1 fail (E-31) — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
+E-31 FAIL the licence for this checkout: Licence: missing — Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards
 Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
 Instances are the store's own records; nothing was probed.
 ```
@@ -30,8 +31,8 @@ re-deriving it, so no two surfaces can disagree about whether the checkout is li
 
 Line 2 is the session-start banner's `Licence:` line, in every state, `ok` included (ARC-11-C1). It is
 rendered from E-31's data by the banner's own `bannerLine` (`tools/snowarch/lib/licence/line.mjs`),
-so the banner and the panel cannot word it differently. Enforcement is named — `warn only` or
-`enforced` — with every state except `ok`: a licence in force needs no such word.
+so the banner and the panel cannot word it differently. From 2.0.13 the line names the state alone:
+enforcement has no switch, so it has no word.
 
 Where each line comes from, all of it schema-v1 JSON (`./snowarch status --json` prints that report
 unchanged — it is the same object `doctor --quick --json` prints, not a shape of its own):

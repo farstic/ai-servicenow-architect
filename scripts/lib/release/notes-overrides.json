@@ -1,0 +1,18 @@
+{
+  "f36165d84503c5e9f15fa3b36bd51aa3f0b4df72": {
+    "line": "doctor: E-31's remedy and U4's notice end at the remedy (ARC-11-C6)",
+    "why": "ARC-11-C6 step 6's subject, reversed before release by the owner's ruling of 2026-10-13; the line says what 2.0.13 ships, as the architect ruled"
+  },
+  "fb0aef03bb889ad9ad8cc338a24a3b1010cf56b4": {
+    "omit": true,
+    "why": "ARC-11-C6 step 6's test work, reversed before release by the owner's ruling of 2026-10-13; no neutral line would describe it truly"
+  },
+  "882bb145c04c095454d6e0fc3ff39d38b5b728f5": {
+    "omit": true,
+    "why": "ARC-11-C6 step 6's red, reversed before release by the owner's ruling of 2026-10-13; no neutral line would describe it truly"
+  },
+  "0e5d1af916f965046d563f262bb377ee38205fb7": {
+    "line": "snowarch: two comments in the licence code are reworded (ARC-11-C6)",
+    "why": "its subject named what the owner's ruling of 2026-10-13 forbids a page to say; the line is what the commit did"
+  }
+}

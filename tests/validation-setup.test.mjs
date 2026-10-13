@@ -3,11 +3,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { planSetup, runSetup, summaryLine } from '../scripts/validation/setup-plan.mjs';
+import { licensedEnv } from '../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-09-C106 - the validation runner runs a case's design-only Setup block, refuses one that needs an
@@ -38,7 +39,7 @@ const forbidden = () => { throw new Error('a command was spawned'); };
 test('C106 - every case in the spec has a plan, and the kinds are the ones the cases are', (t) => {
   const { cases } = extract(t);
   const kinds = Object.fromEntries(cases.map((c) => [c.id, planSetup(c.setup).kind]));
-  const expected = { 'T-06': 'prose', 'T-07': 'runner', 'T-13': 'prose', 'T-19': 'instance', 'T-22': 'instance', 'T-23': 'instance', 'T-25': 'files', 'T-26': 'files', 'T-28': 'prose', 'T-29': 'instance' };
+  const expected = { 'T-06': 'prose', 'T-07': 'runner', 'T-13': 'prose', 'T-19': 'instance', 'T-22': 'instance', 'T-23': 'instance', 'T-25': 'files', 'T-26': 'files', 'T-28': 'prose', 'T-29': 'instance', 'T-31': 'no-licence' };
   for (const [id, kind] of Object.entries(kinds)) {
     assert.equal(kind, expected[id] ?? 'none', `${id} is ${kind}`);
   }
@@ -197,4 +198,75 @@ test('C106 - the command line: T-25 writes the file, T-22 writes nothing, an unc
 
   assert.equal(cli(['run', out, 'T-99', clone]).status, 2, 'an unknown case is a usage error');
   assert.match(cli(['summary', out, 'T-25', 'T-22', 'T-07', 'T-01']).stdout.trim().split('\n').join('|'), /T-25: .*\|T-22: .*\|T-07: .*\|T-01: no Setup/);
+});
+
+// ── ARC-11-C6 step 10 — the licence each case runs under ─────────────────────────────────────────────────────
+// From 2.0.13 a session with no licence in force produces no deliverable (CLAUDE.md §1), and the runner's clone has no
+// `.local/`. So every case runs as a licensed user would, under the checkout's own licence copied into the clone,
+// and T-31, whose Setup says "No licence", runs without one. The architect's ruling (2026-10-12): in a test the
+// checkout's licence is the fixture's, written through licensedEnv like every other, never a real one.
+const NO_LICENCE = '### Setup\n\nNo licence: the runner leaves `.local/licence.json` out of the clone.\n';
+/** A checkout of a test's own, holding the fixture licence where the runner reads one. */
+function checkoutWithLicence(t) {
+  const dir = tempDir('c6-s10-root-', t);
+  licensedEnv({}, { root: dir });
+  return dir;
+}
+const licenceIn = (dir) => join(dir, '.local', 'licence.json');
+
+test('ARC-11-C6 step 10 — a Setup that says "No licence" is its own kind: nothing spawns, and the summary says so', () => {
+  const plan = planSetup(NO_LICENCE);
+  assert.equal(plan.kind, 'no-licence');
+  assert.match(summaryLine('T-31', plan), /^T-31: Setup run - the licence is left out of the clone/);
+  const r = runSetup(plan, '/nowhere', { run: forbidden });
+  assert.deepEqual([r.ran, r.ok], [false, true]);
+});
+
+test('ARC-11-C6 step 10 — the checkout\'s licence is copied in for a case; a No-licence case has none; no licence, no run', async (t) => {
+  const { placeLicence } = await import('../scripts/validation/setup-plan.mjs');
+  const root = checkoutWithLicence(t);
+  const clone = tempDir('c6-s10-clone-', t);
+  const copied = placeLicence(planSetup(fence('mkdir -p clients/acme')), clone, root);
+  assert.equal(copied.ok, true, copied.line);
+  assert.equal(readFileSync(licenceIn(clone), 'utf8'), readFileSync(licenceIn(root), 'utf8'));
+  if (process.platform !== 'win32') assert.equal(statSync(licenceIn(clone)).mode & 0o777, 0o600);
+  // The clone is shared by the cases of a run: a No-licence case removes what the case before it was given.
+  const left = placeLicence(planSetup(NO_LICENCE), clone, root);
+  assert.equal(left.ok, true, left.line);
+  assert.equal(existsSync(licenceIn(clone)), false);
+  // A checkout with no licence of its own runs nothing, and says where the licence was looked for.
+  const bare = tempDir('c6-s10-bare-', t);
+  const none = placeLicence(planSetup(''), clone, bare);
+  assert.equal(none.ok, false);
+  assert.ok(none.line.includes(licenceIn(bare)), none.line);
+});
+
+test('ARC-11-C6 step 10 — the command line: licence <root> stops a checkout without one; run <…> <root> places it', (t) => {
+  const { out } = extract(t);
+  const cli = (args) => spawnSync(process.execPath, [join(root, 'scripts/validation/setup-plan.mjs'), ...args], { encoding: 'utf8' });
+  const bare = tempDir('c6-s10-cli-bare-', t);
+  const refused = cli(['licence', bare]);
+  assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+  assert.ok(`${refused.stdout}${refused.stderr}`.includes(licenceIn(bare)), refused.stdout + refused.stderr);
+  const home = checkoutWithLicence(t);
+  assert.equal(cli(['licence', home]).status, 0);
+
+  const clone = tempDir('c6-s10-cli-clone-', t);
+  const t25 = cli(['run', out, 'T-25', clone, home]);
+  assert.equal(t25.status, 0, t25.stdout + t25.stderr);
+  assert.ok(existsSync(licenceIn(clone)), 'T-25 ran without the checkout\'s licence');
+  const t31 = cli(['run', out, 'T-31', clone, home]);
+  assert.equal(t31.status, 0, t31.stdout + t31.stderr);
+  assert.equal(existsSync(licenceIn(clone)), false, 'T-31 ran with a licence');
+  assert.equal(cli(['run', out, 'T-25', clone, bare]).status, 1, 'a case ran with no licence to give it');
+});
+
+test('ARC-11-C6 step 10 — the runner checks the licence before any session, and hands every case its root', () => {
+  const sh = readFileSync(join(root, 'scripts/validation/validation-run.sh'), 'utf8');
+  const code = sh.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  const check = code.indexOf('setup-plan.mjs" licence "$ROOT"');
+  assert.ok(check !== -1, 'the runner never checks for a licence');
+  assert.ok(check < code.indexOf('for T in $SEL'), 'the licence is checked after the cases started');
+  assert.match(code, /setup-plan\.mjs" licence "\$ROOT"\)?[^\n]*\|\|[^\n]*exit/, 'a checkout without a licence does not stop the run');
+  assert.match(code, /setup-plan\.mjs" run "\$PROMPTS" "\$T" "\$C" "\$ROOT"/, 'a case is not handed the checkout\'s root');
 });

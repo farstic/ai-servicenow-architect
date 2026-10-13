@@ -228,7 +228,7 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: 'E-10 FAIL settings.local toggles match the recorded mode', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
     { at: 'Run ~ doctor --fix for the fixable ones (1).', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
     { at: 'citation counts and the corpus branch are not probed on ', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
-    { at: '~ Licence: missing · warn only Engine: snowarch ~ · cont', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
+    { at: '~ Licence: missing Engine: snowarch ~ · contract ~ Docs:', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
   ]],
   ['tests/doctor/status-command.test.mjs', [
     { at: 'E-00 FAIL a check: it did not — ~ fix-it', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },

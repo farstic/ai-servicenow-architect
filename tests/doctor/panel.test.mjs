@@ -52,8 +52,8 @@ test('the live fixture renders to exactly these bytes', () => {
   assert.equal(renderPanel(LIVE, CLI), [
     LIVE.modeLineDetailed,
     // ARC-11-C1 — the licence, second, exactly as the session-start banner prints it. The fixture's
-    // checkout has none, and enforcement is off.
-    'Licence: missing · warn only',
+    // checkout has none, and from 2.0.13 that refuses (ARC-11-C6).
+    'Licence: missing',
     `Engine: snowarch ${LIVE.engine.version} · contract ${LIVE.engine.contractSha.slice(0, 12)}`,
     `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · sparse`,
     // The roster moves when a skill is added, the way the tally moves when a check is — fso-insurance-
@@ -63,10 +63,13 @@ test('the live fixture renders to exactly these bytes', () => {
     // The tally moves when a check is added — ARC-08-C30's E-29 took it from 14 to 15 — so it is
     // read from the fixture's own summary rather than spelled, the way the version and the shas
     // are. What this assertion is for is the SHAPE of the line, not the arithmetic in it.
-    // ARC-11-C1 — E-31 warns on every checkout without a licence, the fixture's own included, so the
-    // warning is NAMED here: the shape of the line now carries one id in brackets.
-    `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn (E-31), ${LIVE.summary.fail} fail`
+    // ARC-11-C6 step 5 — E-31 FAILS on every checkout without a licence, the fixture's own included, so the
+    // failure is NAMED in the tally, and listed under it with its remedy, as every FAIL is. The remedy is the
+    // fixture's own text, which the panel prints as it was captured, so it is read from the fixture like the
+    // version: spelled with this process's launcher, it was right on a mac and wrong on all seven Windows cells.
+    `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn, ${LIVE.summary.fail} fail (E-31)`
       + ` — quick run 2026-09-20 09:00 UTC · full report: ${CLI} doctor`,
+    `E-31 FAIL the licence for this checkout: Licence: missing — ${LIVE.checks.find((c) => c.id === 'E-31').remedy}`,
     `Capability packs, citation counts and the corpus branch are not probed on a quick run — ${CLI} doctor reports them.`,
     "Instances are the store's own records; nothing was probed.",
   ].join('\n'));
@@ -86,33 +89,32 @@ const withLicence = (data) => ({
   ...LIVE, checks: LIVE.checks.map((c) => (c.id === 'E-31' ? { ...c, data } : c)),
 });
 const licenceData = (over = {}) => ({ state: 'ok', id: 'LIC-2026-0002', scope: 'live', validUntil: null,
-  perpetual: true, enforced: false, listVersion: null, ...over });
+  perpetual: true, enforced: true, listVersion: null, ...over });
 
 test('ARC-11-C1 — the Licence line is second, in the banner\'s own words, for every state', () => {
   // The owner's rc.1 sitting found the panel silent with a licence in force: E-31 is ok then, and the
   // panel lists no check that is ok. The line is now always there, rendered from E-31's data by the
-  // function the session-start banner uses, so the two cannot disagree. A state other than `ok` names
-  // enforcement; `ok` does not, under enforcement too — the banner's shape, kept.
+  // function the session-start banner uses, so the two cannot disagree. No state names enforcement: it is on
+  // every build (ARC-11-C6), so the state alone decides.
   const cases = [
     [licenceData(), 'Licence: ok · LIC-2026-0002 · perpetual'],
-    [licenceData({ id: 'LIC-2026-0003', validUntil: '2027-04-11', perpetual: false, enforced: true }),
+    [licenceData({ id: 'LIC-2026-0003', validUntil: '2027-04-11', perpetual: false }),
       'Licence: ok · LIC-2026-0003 · until 2027-04-11'],
     [licenceData({ scope: 'design-only', validUntil: '2027-04-11', perpetual: false }),
       'Licence: ok · LIC-2026-0002 · design-only · until 2027-04-11'],
     [licenceData({ state: 'expiring', validUntil: '2026-10-25', perpetual: false }),
-      'Licence: expiring · LIC-2026-0002 · until 2026-10-25 · warn only'],
-    [licenceData({ state: 'revoked', id: 'LIC-2026-0003', enforced: true }), 'Licence: revoked · enforced'],
-    [licenceData({ state: 'missing', id: null, scope: null, perpetual: false, enforced: true }),
-      'Licence: missing · enforced'],
+      'Licence: expiring · LIC-2026-0002 · until 2026-10-25'],
+    [licenceData({ state: 'revoked', id: 'LIC-2026-0003' }), 'Licence: revoked'],
+    [licenceData({ state: 'missing', id: null, scope: null, perpetual: false }), 'Licence: missing'],
   ];
   for (const [data, line] of cases) {
     const lines = renderPanel(withLicence(data), CLI).split('\n');
     assert.equal(lines[1], line, data.state);
-    assert.equal(lines[1], bannerLine(data, { enforced: data.enforced }), 'the panel and the banner disagree');
+    assert.equal(lines[1], bannerLine(data), 'the panel and the banner disagree');
     assert.equal(lines.filter((l) => l.startsWith('Licence:')).length, 1, 'the licence is said once');
   }
   // The design fixture too: design-only is not a reason to say nothing.
-  assert.equal(renderPanel(DESIGN, CLI).split('\n')[1], 'Licence: missing · warn only');
+  assert.equal(renderPanel(DESIGN, CLI).split('\n')[1], 'Licence: missing');
 });
 
 test('ARC-11-C1 — no E-31 data in the report is no Licence line, never a guessed one', () => {
@@ -252,8 +254,9 @@ test('ARC-08-C37 — the count names which check it is talking about', () => {
   assert.match(doctorLine(report, CLI), /^Doctor: 20 ok, 2 warn \(E-23, E-25\), 1 fail \(E-10\) — /);
 
   // A zero count gets no brackets at all: there is nothing to name, and `0 fail ()` is noise. Built from
-  // the live fixture without its warnings: since ARC-11-C1 the fixture itself carries E-31's.
-  const quiet = { ...LIVE, summary: { ...LIVE.summary, warn: 0 }, checks: LIVE.checks.filter((c) => c.status !== 'warn') };
+  // the live fixture without its warnings and failures: since ARC-11-C6 step 5 the fixture carries E-31's FAIL.
+  const quiet = { ...LIVE, summary: { ...LIVE.summary, warn: 0, fail: 0 },
+    checks: LIVE.checks.filter((c) => c.status !== 'warn' && c.status !== 'fail') };
   assert.match(doctorLine(quiet, CLI), /^Doctor: \d+ ok, 0 warn, 0 fail — /);
 
   // THE IDS ARE READ FROM THE REPORT, never from a remembered list. Drop a check and the line

@@ -21,7 +21,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
-import { bootstrapUser, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
+import { bootstrapUser, buildEnforcementWorld, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
 
 const isWindows = process.platform === 'win32';
 const MINUTES = 10 * 60 * 1000;
@@ -390,4 +390,60 @@ test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t
   assert.match(again.text, /\[B01\/09\][^\n]*ok \(cached\)/, 'the resume re-ran a step it had done');
   assert.match(again.text, /\[B02\/09\] docs … (ok|warn)/, 'the resume did not complete B02');
   assert.notEqual(state(w.user).steps.B02.status, 'fail');
+}, MINUTES);
+
+// ── ARC-11-C6 — a user without a licence ─────────────────────────────────────────────────────────────────
+//
+// The owner's own path: a checkout on the last release that runs without a licence, upgrading to the first that
+// refuses. U1 to U5 and finish() are 2.0.12's code, and U6 and U7 are 2.0.13's bootstrap and doctor. By the owner's
+// ruling from the rc.3 sitting (2026-10-13), "the user must not learn how to have a working Architect without a
+// licence": what U7 shows is E-31's FAIL and its remedy, and nothing that sends the reader back.
+
+test('ARC-11-C6 — 2.0.12 to 2.0.13 with no licence: E-31 FAIL at U7 with no way back; the move back refused, licensed taken', async (t) => {
+  const w = await buildEnforcementWorld(t);
+  bootstrapUser(w.user, { store: false, licence: false });
+  const up = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin, licence: false });
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.13', up.text);
+  assert.ok(up.text.includes('[U7/7]'), up.text);
+  const u7 = up.text.slice(up.text.indexOf('[U7/7]'));
+  // The line a user reads at U7, in every cell's log (the owner's rule), spelled for the shell the cell runs.
+  t.diagnostic(u7.split('\n').find((l) => l.includes('E-31')) ?? 'U7 printed no E-31 line');
+  assert.match(u7, /E-31 FAIL/, u7);
+  assert.ok(u7.includes('.local/licence.json'), u7);
+  assert.equal(u7.includes('upgrade --to'), false, u7);
+
+  // And the path is closed (the owner's ruling): with no licence in force, a move to a release at or below the last
+  // that enforces nothing is refused before anything moves, exit 3, with the code and the remedy, and no word of why.
+  const refused = snowarch(w.user, ['upgrade', '--to', 'v2.0.12', '--yes'], { bin: w.bin, licence: false });
+  t.diagnostic(refused.text.split('\n').find((l) => l.includes('LICENCE_NOT_VALID')) ?? 'no refusal line');
+  assert.equal(refused.status, 3, refused.text);
+  assert.match(refused.text, /\(Code: LICENCE_NOT_VALID\)/, refused.text);
+  assert.ok(refused.text.includes('licence check'), refused.text);
+  assert.equal(/last release that runs without|go back to|unenforced|without enforcement/i.test(refused.text), false, refused.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.13', refused.text);
+
+  // The owner's own way back stays: with a licence in force, the same move is taken.
+  const licensed = snowarch(w.user, ['upgrade', '--to', 'v2.0.12', '--yes'], { bin: w.bin });
+  assert.equal(licensed.status, 0, licensed.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.12', licensed.text);
+}, 2 * MINUTES);
+
+test('ARC-11-C6 — with no licence, U4 says what the release refuses and the remedy, with --yes and without', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user, { licence: false });
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const said = (text) => text.indexOf('Licence: missing — v9.1.0 runs no MCP tool');
+
+  // Without --yes: said before the question, and a no changes nothing.
+  const asked = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin, licence: false });
+  assert.equal(asked.status, 0, asked.text);
+  assert.ok(said(asked.text) > -1, asked.text);
+  assert.ok(said(asked.text) < asked.text.indexOf('Proceed? [Y/n]'), 'the notice comes after the question');
+  assert.equal(asked.text.includes('upgrade --to v2.0.12'), false, asked.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
+
+  // With --yes: said, and the move goes ahead, because it is still the reader's to make.
+  const moved = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin, licence: false });
+  assert.ok(said(moved.text) > -1, moved.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0', moved.text);
 }, MINUTES);

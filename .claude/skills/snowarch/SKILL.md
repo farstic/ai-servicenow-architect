@@ -41,12 +41,13 @@ Also runs when the user simply types `Status` — the same branch, the same outp
 
 ```
 Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
-Licence: missing · warn only
+Licence: missing
 Engine: snowarch 9.9.9 · contract deadbeefdead
 Docs: vendor/ServiceNowDocs @ 68c0d1123adf (australia) · sparse
 Roster: 29 skills / 9 agents
 Instances: pdi (pdi, custom)
-Doctor: 15 ok, 1 warn (E-31), 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
+Doctor: 15 ok, 0 warn, 1 fail (E-31) — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
+E-31 FAIL the licence for this checkout: Licence: missing — Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards
 Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
 Instances are the store's own records; nothing was probed.
 ```

@@ -390,9 +390,8 @@ export async function routeToolInvocation(
   name: string,
   args: Record<string, unknown>
 ): Promise<any> {
-  // ARC-11-C1, ruling R1: under SNOW_LICENCE_ENFORCE="true", no valid licence, no tool — the instance-free
-  // ones and a playbook's steps included. First, so a refused session learns nothing about any tool's
-  // arguments; a no-op when enforcement is off.
+  // ARC-11-C1, ruling R1, on every build (C6): no valid licence, no tool — the instance-free ones and a
+  // playbook's steps included. First, so a refused session learns nothing about any tool's arguments.
   assertLicensed();
   // ARC-09-C121: before anything else, so an instance-free tool and a playbook's step are checked too.
   const tool = TOOLS_BY_NAME.get(name);

@@ -1,6 +1,6 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { EXIT_CODES, labelExists } from '../../src/cli/instance.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 import { cliSpelling } from '../../src/cli/tty.js';
-import { trackTempDir } from '../helpers/server-child.js';
+import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
@@ -37,10 +38,15 @@ const SERVER_CLI = cliSpelling();
 const here = dirname(fileURLToPath(import.meta.url));
 const CLI = resolve(here, '../../dist/cli/index.js');
 
+// ARC-11-C6 — `instance` runs only with a licence in force (step 4b). The child reads the fixture licence from a
+// project directory of its own, as the server does; a case's own CLAUDE_PROJECT_DIR wins.
+const project = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-instance-spawn-')));
+afterAll(() => { removeTempDir(project); });
+
 const run = (args: readonly string[], env: NodeJS.ProcessEnv = {}) =>
   spawnSync(process.execPath, [CLI, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: project, ...env }),
   });
 
 describe('the built CLI', () => {

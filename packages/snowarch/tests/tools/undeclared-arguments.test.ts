@@ -6,6 +6,10 @@ import { dispatchWorkspaceAction } from '../../src/tools/workspace.js';
 import { FakeRestClient } from '../helpers/fake-rest.js';
 import { withPreset } from '../helpers/preset.js';
 import type { ServiceNowError } from '../../src/utils/errors.js';
+import { useLicensedSession } from '../helpers/licensed-session.js';
+
+// ARC-11-C6: this file calls the router in its own process, so it runs in a licensed session.
+useLicensedSession();
 
 withPreset('pdi-developer');
 

@@ -19,6 +19,7 @@ import { licencePath } from '../lib/local-paths.mjs';
 import { readListCache, writeListCache } from '../lib/licence/state.mjs';
 import { keyPair, listDoc, listRepo, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
+import { SLOW_GIT_SKIP, slowGitPath } from './helpers/slow-git.mjs';
 
 const primary = keyPair();
 const recovery = keyPair();
@@ -142,4 +143,39 @@ test('ARC-11-C1 — upgrade refreshes the list only when a licence is installed,
   assert.equal(r.outcome, 'none');
   assert.equal(fetched, 1);
   assert.deepEqual(lines, ['revocation list: no revocation list is published yet']);
+});
+
+// ARC-11-C11 — a `show` the deadline ends is unreachable, not "no file". The third call reads the file out of the
+// clone; when the budget runs out there, the repository never answered the question, so nothing was checked and,
+// as the refresh's own contract says of unreachable, the cache keeps even its date. A `show` that fails because the
+// path is not on the branch stays none: "a branch with no file" above.
+test('ARC-11-C11 — a show the deadline kills is unreachable, and the cache keeps its date',
+  { skip: process.platform === 'win32' ? SLOW_GIT_SKIP : false }, (t) => {
+    const PATH = slowGitPath({ dir: tempDir('snowarch-slow-git-', t), subcommand: 'show', seconds: 4 });
+    const env = { ...process.env, PATH };
+    const url = listRepo(t, { 'revocations.json': listJson(2) });
+    const got = fetchList({ url, ref: 'main', path: 'revocations.json', timeoutMs: 1_500, env });
+    assert.equal(got.status, 'unreachable', JSON.stringify(got));
+
+    const root = checkout(t);
+    writeListCache(root, { list: JSON.parse(listJson(1)), checkedAt: '2020-01-01T00:00:00.000Z', source: 'fixture' });
+    const r = refreshList(root, { config: config(url), keys: KEYS, now: NOW, env, timeoutMs: 1_500 });
+    assert.equal(r.outcome, 'unreachable', JSON.stringify(r));
+    assert.equal(r.version, 1);
+    assert.equal(readListCache(root).checkedAt, '2020-01-01T00:00:00.000Z', 'a check that timed out wrote a date');
+  });
+
+test('ARC-11-C11 — the budget spent before show runs is unreachable too', () => {
+  // A runner that answers ls-remote and clone at once, and lets the clone finish past the deadline, so `show` is
+  // the step that finds no budget left. Its own check never calls the runner for it.
+  const run = (cmd, args) => {
+    if (args.includes('ls-remote')) return { status: 0, stdout: `${'a'.repeat(40)}\trefs/heads/main\n`, stderr: '' };
+    if (args.includes('clone')) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+      return { status: 0, stdout: '', stderr: '' };
+    }
+    throw new Error(`a git call ran with no budget left: ${args.join(' ')}`);
+  };
+  const got = fetchList({ url: 'file:///nowhere/list.git', ref: 'main', path: 'revocations.json', timeoutMs: 200, run });
+  assert.deepEqual(got, { status: 'unreachable', detail: 'no answer within 200 ms' });
 });

@@ -25,8 +25,10 @@ import { makeCheckout } from './helpers/workspace.mjs';
 
 const PASSWORD = `${'Fix'}-${'ture'}-${'8821'}`;
 
+// ARC-11-C6 — a licence in force unless a case says otherwise: B06 skips without one (ruling R1), and these cases
+// are about the migration.
 const ctxFor = (root, over = {}) => ({
-  root, mode: 'live', instanceFile: null, env: {},
+  root, mode: 'live', instanceFile: null, env: {}, licence: { state: 'ok' },
   node: { present: true, version: '22.11.0', major: 22 },
   state: { hooksDisabledByBootstrap: false, registration: 'project' },
   ...over,
@@ -68,6 +70,14 @@ test('runsWhen: live mode, OR a store that is already there', (t) => {
   // `mode live` would meet a schema it cannot read, in the place least able to explain it.
   assert.equal(runsWhen(ctxFor(root, { mode: 'design-only' })), true, 'design-only WITH a store');
   assert.equal(storeExists(root), true);
+
+  // ARC-11-C6 (ruling R1) — and neither clause runs it with no licence in force: B06 starts the package CLI, which
+  // refuses `store migrate` and `instance add` then. The refused path, kept here where `runsWhen` is tested.
+  for (const state of ['missing', 'invalid', 'expired', 'revoked']) {
+    assert.equal(runsWhen(ctxFor(root, { mode: 'design-only', licence: { state } })), false, `a store, licence ${state}`);
+    assert.equal(runsWhen(ctxFor(root, { mode: 'live', licence: { state } })), false, `live, licence ${state}`);
+  }
+  assert.equal(runsWhen(ctxFor(root, { licence: { state: 'expiring' } })), true, 'an expiring licence is in force');
 });
 
 test('a store at this build\'s schema is not migrated, and nothing is spawned', async (t) => {
