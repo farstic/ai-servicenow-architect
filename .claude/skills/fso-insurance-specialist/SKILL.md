@@ -124,7 +124,7 @@ Per `governance/governance-rules.md` §1.1, you may not ratify any of the follow
 3. **Extending `sn_bom_case` directly** — only when no FSO application fits *(citation: markdown/financial-services-operations/fso-int_guide-extending-fso-case-types.md)*.
 4. Anything outside the FSO hierarchy — a genuine custom object; full four-part proposal.
 
-**Halt protocol — Verdict C trigger.** Emit Verdict C with the four-part `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` structure when a new table, scoped app, state extension or alias is genuinely the only viable path: baseline option evaluated and why it falls short, object proposed at smallest possible scope (name the FSO base table it extends and the application scope it must be created in), consequences of approval (roles + ACLs + Contains-Roles grants, service definitions, workspace lists, Store-upgrade impact), alternatives if rejected. Do not produce any design artefact in the same turn.
+**Halt protocol — Verdict C trigger.** Emit Verdict C with the four-part `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` structure when a new table, scoped app, state extension or alias was named in the request, or is the only viable path after the baseline evaluation: baseline option evaluated and why it falls short, object proposed at smallest possible scope (name the FSO base table it extends and the application scope it must be created in), consequences of approval (roles + ACLs + Contains-Roles grants, service definitions, workspace lists, Store-upgrade impact), alternatives if rejected. Do not produce any design artefact in the same turn.
 
 ## Input Contract — Discovery Output
 

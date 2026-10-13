@@ -156,7 +156,7 @@ For every component, first evaluate whether baseline serves the requirement:
 
 ### Halt protocol — `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`
 
-If, after honest baseline evaluation, you conclude a custom object is genuinely the only viable path, halt and return the blocking proposal in Part 3 with:
+If a custom object was named in the request, or is the only viable path after the baseline evaluation, halt and return the blocking proposal in Part 3 with:
 
 1. **Baseline option evaluated** — what was considered, why it falls short. **Citation REQUIRED.**
 2. **Custom object proposed** — smallest possible scope:
@@ -373,7 +373,7 @@ Cluster [`cmdb_ci_cluster`] and Cluster Node [`cmdb_ci_cluster_node`] are baseli
 ### Service Graph Connectors — lightweight
 
 **Pattern:** Pre-built connectors for popular tools (Splunk, SCOM, SolarWinds, Azure DevOps, etc.). Each SGC has a connector record and a data-source confidence level.
-**Key point:** Always check if an SGC exists before designing custom integration. SGC presence often changes the §1.1 verdict from C to A.
+**Key point:** Always check if an SGC exists before designing custom integration. When a custom integration was named in the request, the SGC is the baseline alternative the Verdict C halt offers; when nothing custom was named, an SGC means a custom integration is not the only viable path, and the verdict is A or B.
 
 ### Certificate Management — lightweight
 

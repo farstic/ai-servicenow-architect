@@ -158,7 +158,7 @@ For every component, first evaluate whether baseline serves the requirement:
 
 ### Halt protocol — `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`
 
-If, after honest baseline evaluation, you conclude a custom object is genuinely the only viable path, halt and return the blocking proposal in Part 3 with:
+If a custom object was named in the request, or is the only viable path after the baseline evaluation, halt and return the blocking proposal in Part 3 with:
 
 1. **Baseline option evaluated** — what was considered, why it falls short. **Citation REQUIRED.**
 2. **Custom object proposed** — smallest possible scope:

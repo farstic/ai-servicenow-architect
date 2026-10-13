@@ -12,7 +12,7 @@
 
 This taxonomy operates under the global architecture rules in `governance-rules.md`. The Chief Architect and every specialist must comply with all rules in that file.
 
-**§1.1 — Baseline-First / Zero Custom Objects Without Explicit Approval.** No specialist may propose, design, or create custom tables, custom scoped applications, custom state-model extensions, custom Connection & Credential Aliases, or any other major custom architectural object without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope. If a specialist concludes that a custom object is genuinely the only viable technical path, it must halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` per the halt protocol in `governance-rules.md` §1.1.
+**§1.1 — Baseline-First / Zero Custom Objects Without Explicit Approval.** No specialist may propose, design, or create custom tables, custom scoped applications, custom state-model extensions, custom Connection & Credential Aliases, or any other major custom architectural object without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope. If a custom object not approved in the dispatch envelope was named in the request, or is the only viable path after the baseline evaluation, a specialist must halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` per the halt protocol in `governance-rules.md` §1.1.
 
 §1.1 is enforced at two phases of the resolution algorithm:
 
