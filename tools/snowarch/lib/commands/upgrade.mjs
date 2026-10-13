@@ -30,7 +30,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { localDir, storePath } from '../local-paths.mjs';
 
-import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../exit.mjs';
+import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from '../exit.mjs';
 import { branchState, describe, git, isShallow } from '../git.mjs';
 import { askOnce, isYes } from '../ask.mjs';
 import { childEnv } from '../spawn-env.mjs';
@@ -592,6 +592,24 @@ export function licenceNotice({ licence, target, cli }) {
   ];
 }
 
+/**
+ * ARC-11-C6 — the owner's ruling from the rc.3 sitting (2026-10-13): with no licence in force, a move to a release at or
+ * below LAST_UNENFORCED_RELEASE is refused. A licence in force takes it, which is the owner's own way back, and a move
+ * forward is never refused, so fixes still reach an unlicensed install. A target this product cannot order is presumed
+ * to enforce, as U4's notice presumes, so it is not refused.
+ */
+export function refusesTarget({ licence, target }) {
+  if (!REFUSED.includes(licence.state)) return false;
+  try { return compareSemver(target, LAST_UNENFORCED_RELEASE) <= 0; } catch { return false; }
+}
+
+/** The refusal, in the shape of every other licence refusal: the state and the code, then the remedy, and no reason. */
+export const targetRefusalLines = ({ licence, target, cli }) => [
+  `snowarch upgrade: licence ${licence.state}${licence.signatureValid ? ` (${licence.id})` : ''} (Code: LICENCE_NOT_VALID) `
+    + `— upgrade --to ${target} does not run without a valid licence; nothing was changed`,
+  REMEDY(cli),
+];
+
 /** `[U3/7] resolve target` — the step line, in the bootstrap's own shape. */
 const stepLine = (n, title) => `[U${n}/7] ${title}`;
 
@@ -665,6 +683,13 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   if (!tagInfo?.contract) {
     log.fail(`upgrade: ${target} is not a release tag of this product`);
     return EXIT_FAIL;
+  }
+  // ARC-11-C6 — refused here, before the check's cache is written or the tree moves, so "nothing was changed" holds.
+  const licence = licenceStatus(root);
+  const cli = spellings({ platform, env }).cli;
+  if (refusesTarget({ licence, target })) {
+    for (const line of targetRefusalLines({ licence, target, cli })) log.fail(line);
+    return EXIT_PREREQ;
   }
 
   const behind = Boolean(latest && localTag !== latest);
@@ -741,7 +766,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     return EXIT_USAGE;
   }
   // ARC-11-C6 — said with --yes and without, before the question: the move is still the reader's to make.
-  const notice = licenceNotice({ licence: licenceStatus(root), target, cli: spellings({ platform, env }).cli });
+  const notice = licenceNotice({ licence, target, cli });
   if (notice) for (const line of notice) log.step(line);
 
   if (!flags.yes) {
