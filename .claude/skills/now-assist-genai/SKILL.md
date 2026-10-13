@@ -39,7 +39,7 @@ If the request is *design/build it* → **Now Assist Specialist**. If it's *what
 | AI-native SKU overview (packaging/consumption) | `markdown/intelligent-experiences/ai-native-sku-overview.md` |
 | AI Skill Kit (build custom skills) | `markdown/intelligent-experiences/now-assist-skill-kit/now-assist-skill-kit-landing.md` |
 | AI Control Tower (governance) | `markdown/intelligent-experiences/ai-control-tower/ai-control-tower-landing.md` |
-| Third-party LLMs (BYO-LLM), model providers and data routing | `markdown/intelligent-experiences/ai-control-tower/configure-third-party-llms-using-ai-control-tower.md` · `markdown/intelligent-experiences/ai-control-tower/ai-model-providers.md` |
+| Third-party LLMs (BYO-LLM), model providers and data routing | `markdown/intelligent-experiences/ai-control-tower/configure-third-party-llms-using-ai-control-tower.md` · `markdown/intelligent-experiences/ai-model-providers.md` |
 | AI Agent Advisor / agentic | `markdown/intelligent-experiences/ai-agent-advisor-landing-page.md` |
 
 Cite the path used. If a path is unavailable in the Australia branch, flag it explicitly. **Do not assert version-sensitive capability claims from memory** — Now Assist evolves fast between releases; ground them or flag as "verify against the engagement's release."
@@ -52,7 +52,7 @@ Cite the path used. If a path is unavailable in the Australia branch, flag it ex
 - **AI Agents / agentic** experiences (AI Agent Advisor, agentic workflows) orchestrate multi-step AI work with human-in-the-loop boundaries. *(citation: `markdown/intelligent-experiences/ai-agent-advisor-landing-page.md`)*
 - **AI Control Tower** is the governance surface — discover, monitor, manage, and audit AI features (ServiceNow and third-party) across the instance, including where third-party models are configured and routed. *(citation: `ai-control-tower/ai-control-tower-landing.md`, `ai-control-tower/configure-third-party-llms-using-ai-control-tower.md`)*
 - AI Control Tower is **included in every AI-native tier (Foundation, Advanced, Prime) with the same capabilities at each** — governance is not a tier upsell, which is the question this comes up in. *(citation: `markdown/intelligent-experiences/ai-native-sku-overview.md`)*
-- Its **Support Matrix** lists every AI system with its model providers, type, activation status and selected provider; a **Model Preview Program (MPP)** gives eligible users opt-in early access to models that are not yet generally available — worth naming in a governance review, because a preview model is a different risk posture from a GA one. *(citation: `markdown/intelligent-experiences/ai-control-tower/ai-model-providers.md`)*
+- Its **Support Matrix** lists every AI system with its model providers, type, activation status and selected provider; a **Model Preview Program (MPP)** gives eligible users opt-in early access to models that are not yet generally available — worth naming in a governance review, because a preview model is a different risk posture from a GA one. *(citation: `markdown/intelligent-experiences/ai-model-providers.md`)*
 
 ## §1.1 awareness
 
