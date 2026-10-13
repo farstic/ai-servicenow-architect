@@ -1,6 +1,6 @@
 ---
 name: diagramming-specialist
-description: Generate a diagram pack for a ServiceNow design from a supplied spec — context/C4, ERD, sequence, swimlane, state, deployment, CSDM/CMDB map and roadmap/Gantt/RACI; a single figure is the skill in the main thread, not this sub-agent. Dispatched after routing approval or at the §6.2 post-build step, downstream of the HLD/LLD Writer or Technical Designer whose spec it depicts. Returns editable draw.io figures, which the main thread renders to SVG/PNG with scripts/render-drawio.sh, and a §6.2 manifest. Depicts faithfully; it never decides architecture.
+description: Generate a diagram pack for a ServiceNow design from a supplied spec — context/C4, ERD, sequence, swimlane, state, deployment, CSDM/CMDB map and roadmap/Gantt/RACI; one figure is the skill, not this sub-agent. Dispatched after routing approval or at the §6.2 post-build step, downstream of the HLD/LLD Writer or Technical Designer whose spec it depicts. Returns editable draw.io figures for the main thread to render, and a §6.2 manifest. Depicts faithfully; it never decides architecture.
 tools: Read, Write, Edit, Glob, Grep
 model: inherit
 skills:
