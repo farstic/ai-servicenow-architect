@@ -20,8 +20,8 @@ A diagram is a **representation artefact** (`.md` with Mermaid, draw.io `.drawio
 **Not this skill:** HLD/LLD Writer and Technical Designer decide the architecture this skill depicts. A diagram is an artefact, not a ServiceNow object — but it must never render an unapproved custom table, scope or state as blessed; flag it PENDING instead.
 
 ## Two modes
-1. **Skill mode — inline, single diagram.** Adopted in the main thread; fires post-build per §6.2 when a design artefact returns: *"Design artefact produced. Proposing a Diagramming Specialist pass to render the architecture/process/data diagrams (editable draw.io with SVG/PNG export) before delivery — proceed?"* Use for one figure embedded in or alongside a doc.
-2. **Sub-agent mode — batch diagram pack.** Dispatched as the `diagramming-specialist` sub-agent (`.claude/agents/diagramming-specialist.md`) to produce the *full diagram set* for an HLD/LLD/programme — context + ERD + sequence + deployment + lifecycle, consistent across all figures. Returns the pack + a §6.2 manifest.
+1. **Skill mode — inline, single diagram.** Adopted in the main thread; fires post-build per §6.2 when a design artefact returns: *"Design artefact produced. Proposing a Diagramming Specialist pass to render the architecture/process/data diagrams (editable draw.io with SVG/PNG export) before delivery — proceed?"* Use for one figure embedded in or alongside a doc, and for any request for a single figure, with or without a document around it — never the sub-agent, because the main thread has the shell that renders it.
+2. **Sub-agent mode — batch diagram pack.** Dispatched as the `diagramming-specialist` sub-agent (`.claude/agents/diagramming-specialist.md`) to produce the *full diagram set* for an HLD/LLD/programme — context + ERD + sequence + deployment + lifecycle, consistent across all figures. Returns the pack + a §6.2 manifest. The sub-agent has no shell, so it writes the `.drawio` files and the main thread renders them with `scripts/render-drawio.sh` before it presents the pack.
 
 ## When invoked
 - **Automatic post-build (§6.2)** — an HLD/LLD Writer or Technical Designer artefact returns; offer to render its figures.
@@ -50,14 +50,14 @@ This is a **notation** skill, not a platform-fact skill, so it carries no Servic
 | **Decomposition / mind map** | requirement or feature breakdown | Mermaid `mindmap` |
 
 ## Notation standard (matches the engine's Artefact standard)
-- **Hand-crafted, designed draw.io (`.drawio`) is the default delivery format — always.** Author every figure as a `.drawio` (mxGraph XML) styled to the house palette via mxCell `style=` strings. It is **editable** in draw.io / diagrams.net, in VS Code (Draw.io Integration extension), and **imports into Lucidchart** — so the user can change anything. The `.drawio` is the editable source of truth.
-- **Export SVG/PNG for documents.** From the `.drawio`, export an `.svg` (or `.png`) to embed in HLD/LLD/PDD and client decks; keep the `.drawio` alongside as the editable source. The export carries the same designed look.
+- **Hand-crafted, designed draw.io (`.drawio`) is the default delivery format — always.** Author every figure as a `.drawio` (mxGraph XML) styled to the house palette via mxCell `style=` strings. It is **editable** in draw.io / diagrams.net, in VS Code (Draw.io Integration extension), and **imports into Lucidchart** — so the user can change anything. The `.drawio` is the editable source of truth. *Hand-crafted* describes the `.drawio` only: the `.svg`/`.png` is always the output of `scripts/render-drawio.sh`, never hand-authored.
+- **Render SVG/PNG for documents with the house script.** After writing the `.drawio` files, render them with `scripts/render-drawio.sh` (see **Save** below) to embed in HLD/LLD/PDD and client decks — `svg`, and `png` as well when a Word or PDF deliverable follows, because `scripts/md-to-docx.py` embeds PNG only; keep the `.drawio` alongside as the editable source. The render carries the same designed look.
 - **Mermaid is a draft tool only — never the delivered figure.** Use `.mmd` for a quick private sketch, or when a user explicitly asks for editable Mermaid; render with `scripts/render-diagrams.ps1` / `.sh` (house theme `scripts/mermaid-theme.json`). A themed Mermaid still reads as Mermaid, so it does not ship as the figure.
 - **PlantUML / ASCII** — only on explicit request, or a throwaway inline sketch in chat.
 State the chosen format and why; the default for every delivered figure is a hand-crafted, designed `.drawio` (with an SVG/PNG export for docs).
 
 ## House style — designed-first, always editable (`.drawio`)
-**Every delivered figure is a hand-crafted, designed `.drawio`** — gradient cards, a soft drop shadow, real typography, a legend, and the §1.1 dashed-PENDING treatment, all expressed in mxCell styles so the user can edit anything in draw.io / diagrams.net / Lucidchart. This is the standard for *all* diagrams, always — context, ERD, sequence, flow, deployment, project visuals alike. Match the quality of the reference, **not** a recolored Mermaid. Export an SVG/PNG from the `.drawio` for embedding; the `.drawio` is the editable source.
+**Every delivered figure is a hand-crafted, designed `.drawio`** — gradient cards, a soft drop shadow, real typography, a legend, and the §1.1 dashed-PENDING treatment, all expressed in mxCell styles so the user can edit anything in draw.io / diagrams.net / Lucidchart. This is the standard for *all* diagrams, always — context, ERD, sequence, flow, deployment, project visuals alike. Match the quality of the reference, **not** a recolored Mermaid. Render the SVG/PNG from the `.drawio` with `scripts/render-drawio.sh` for embedding; the `.drawio` is the editable source.
 
 **Reference template:** `.claude/skills/diagramming-specialist/templates/house-style-reference.drawio` — open it and reuse its mxCell `style=` strings (per-element fill/stroke/font, the `swimlane` group, dashed PENDING/manual) verbatim, then lay out the figure's nodes. Copy-paste style strings in EXAMPLES (Example 6). (A rendered `.svg` companion shows the same look.)
 
@@ -81,8 +81,9 @@ Whole packs are hand-crafted to this palette so every figure in a document looks
 The deliverable is the editable `.drawio`; an exported SVG/PNG is what gets embedded in a document.
 
 **Save**
-- Author each figure as `fig-NN-<slug>.drawio` in a `diagrams/` folder beside the document — e.g. `clients/<client>/<doc-name>/diagrams/fig-01-context.drawio`. Numbered in document order, one shared palette across the set.
-- **Export** an `.svg` (or `.png`) from each `.drawio` for embedding — via draw.io / diagrams.net, the VS Code Draw.io Integration extension, or the `drawio` CLI (`drawio -x -f svg -o out.svg in.drawio`). Keep the `.drawio` as the editable source.
+- Author each figure as `fig-NN-<slug>.drawio` in a `diagrams/` folder beside the document — e.g. `clients/<client>/<doc-name>/diagrams/fig-01-context.drawio`. Numbered in document order, one shared palette across the set. A figure with no document around it gets a folder of its own — `clients/<client>/<figure-name>/diagrams/fig-01-<slug>.drawio`, or `clients/_unfiled/<figure-name>/diagrams/` when no engagement is named — never a loose file directly under `clients/<client>/` or `clients/_unfiled/`.
+- **Render** the folder with the house script, from the checkout root: `scripts/render-drawio.sh <diagrams-dir> svg`, and again with `png` when a Word or PDF deliverable follows. It renders every `.drawio` in the folder locally and ends with a `done: N rendered, M failed` line; show that line. The `.svg`/`.png` you deliver is that output, never hand-authored. On Windows, run it from Git Bash or WSL, or use the `draw.io.exe` CLI, as `scripts/README.md` says. Keep the `.drawio` as the editable source.
+- **No draw.io Desktop** — the script stops with `draw.io Desktop not found`: say so under Export & embed, with the install line for the platform from `scripts/README.md` and the command to run after it, and deliver the `.drawio` alone — no hand-drawn SVG, no Mermaid in its place.
 - An optional `.mmd` draft may precede a figure; render Mermaid drafts locally with `scripts/render-diagrams.ps1` / `.sh`. **Confidentiality — non-negotiable:** never send a diagram to an external render service (kroki.io, mermaid.ink, …) — a ServiceNow architecture diagram can carry client-identifying structure.
 
 **Embed into the document**
@@ -109,14 +110,14 @@ The deliverable is the editable `.drawio`; an exported SVG/PNG is what gets embe
 ## Output format
 ```markdown
 # Diagram(s): <subject>
-**Mode:** single (skill) / pack (sub-agent)   **Source spec:** <ref>   **Format:** draw.io (`.drawio`) + SVG/PNG export
+**Mode:** single (skill) / pack (sub-agent)   **Source spec:** <ref>   **Format:** draw.io (`.drawio`) + SVG/PNG rendered by `scripts/render-drawio.sh`
 ## Legend   [shape + colour conventions used]
 ## <Figure 1 title>  — <one line: what this figure shows / its single message>
 ![Figure 1 — <caption>](diagrams/fig-01-<slug>.svg)  — source: `diagrams/fig-01-<slug>.drawio`
 ## <Figure N …>
 ## Fidelity notes   [each node mapped to the spec element it represents; any element omitted + why]
 ## §1.1 flags   [custom objects depicted PENDING, with what approval is missing — empty if none]
-## Export & embed   [`.drawio` source per figure + exported `.svg`/`.png` + ready-to-paste `![Figure N — caption](diagrams/fig-NN.svg)` snippets + a Diagram Sources appendix block]
+## Export & embed   [`.drawio` source per figure + the `.svg`/`.png` that `scripts/render-drawio.sh` wrote, with its `done:` line + ready-to-paste `![Figure N — caption](diagrams/fig-NN.svg)` snippets + a Diagram Sources appendix block — or, with no draw.io Desktop, the install line, the command to run after it, and the `.drawio` alone]
 ## §6.2 manifest   [handback to source author for any inconsistency found; UI/UX if product screens were requested]
 ## Open questions   [spec gaps that blocked a faithful render]
 ```
@@ -147,7 +148,7 @@ Re-adopt to validate a returned diagram (or your own before delivery):
 - **Clarity** — one message per figure; legend present; readable flow; node count sane.
 - **Consistency** — colour/shape/legend identical across a pack; naming consistent.
 - **§1.1** — no unapproved custom object drawn as accepted.
-- **Renders** — the `.drawio` opens cleanly and the exported `.svg`/`.png` renders; styles and legend consistent.
+- **Renders** — the `.drawio` opens cleanly, and the `.svg`/`.png` is the output of `scripts/render-drawio.sh` from it, never hand-authored; styles and legend consistent.
 **Verdict:** APPROVE / APPROVE-WITH-FIXES / REWORK.
 
 ## Termination
