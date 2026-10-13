@@ -1,7 +1,7 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
- * ARC-11-C1 — `./snowarch licence`: the licensee's three commands and the owner's four.
+ * ARC-11-C1 — `./snowarch licence`: the licensee's three commands and the owner's five.
  *
  *   show                   the installed licence: its fields, its signature, its term, the list it was
  *                          judged against, enforcement, and the product's public keys
@@ -12,17 +12,18 @@
  *   issue                  a signed licence, numbered from the ledger beside the key
  *   init-list              the first revocation list: version 1, empty, signed
  *   revoke <id>            the list with one more entry and a higher version
+ *   sign-release <tag>     a release's build-integrity manifest, signed into the licences repository (ARC-11-C7)
  *
  * PRIVATE KEYS LIVE OUTSIDE THE CHECKOUT, AND ONLY THERE. Every path a private key is written to or
  * read from is refused when it resolves — symlinks followed — inside this checkout or its `.local/`.
  * A key inside a working tree is one `git add -A` from a public repository, and the private keys are
  * the whole of what makes a licence mean anything. Nothing this command prints contains one.
  *
- * THE PRODUCT NEVER PUSHES. `init-list` and `revoke` write the list in the owner's clone of the list
+ * THE PRODUCT NEVER PUSHES. `init-list`, `revoke` and `sign-release` write into the owner's clone of the list
  * repository and print the git commands; the owner runs them.
  *
  * Exit codes: the three read commands exit 0 when the licence is in force (`ok` or `expiring`) and 1
- * otherwise, so a script can ask; the owner's four exit 0 when they wrote what they said; 2 is usage.
+ * otherwise, so a script can ask; the owner's five exit 0 when they wrote what they said; 2 is usage.
  */
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { generateKeyPairSync } from 'node:crypto';
@@ -37,8 +38,10 @@ import {
   signList, utcDate,
 } from '../licence/core.mjs';
 import { PRODUCT_KEYS } from '../licence/keys.mjs';
-import { listSource, manifestSays, refreshList, refreshManifest, refreshSays } from '../licence/fetch.mjs';
-import { releaseTagOf } from '../licence/manifest.mjs';
+import { listSource, manifestSays, manifestSource, refreshList, refreshManifest, refreshSays } from '../licence/fetch.mjs';
+import {
+  MANIFESTS_FROM, manifestFromArchive, readManifest, releaseTagOf, signManifest, signedRelease,
+} from '../licence/manifest.mjs';
 import {
   allowedPhrase, bannerLine, heldList, licenceStatus, listStale, readListCache, REFUSED,
 } from '../licence/state.mjs';
@@ -59,6 +62,7 @@ export const USAGE = (where) => {
     '        --key <file> [--notes <text>] [--id LIC-YYYY-NNNN] [--issuer <name>] [--out <file>]',
     '  init-list --list <dir> --key <file>',
     `  revoke <LIC-YYYY-NNNN> --reason ${REASONS.join('|')} --key <file> --list <dir>`,
+    '  sign-release <vX.Y.Z> --key <file> --list <dir>',
   ].join('\n');
 };
 
@@ -437,7 +441,61 @@ function revoke({ positional, flags, log, root, keys, now, config, where }) {
   return EXIT_OK;
 }
 
-const SUBCOMMANDS = { show, verify: verifyFile, check, keygen, issue, 'init-list': initList, revoke };
+/**
+ * ARC-11-C7 — `sign-release <tag>`: the owner signs a release's build-integrity manifest into the licences repository.
+ *
+ * It runs between the tag and its push (CONTRIBUTING's release checklist, step 3a). The manifest is the tag's tree as
+ * a checkout writes it, read from `git archive <tag>` in this checkout, and it is written to `<dir>/<tag>.json` in the
+ * clone `--list` names, beside the revocation list. An rc tag is signed as a final is.
+ *
+ * VERIFIED WITH THE SHIPPED KEYS before it is written. A manifest signed by a key no build ships verifies nowhere, so
+ * it is refused here, where the owner can still pick the right key, rather than on every machine that fetches it. The
+ * private key is only ever a signer: nothing is checked with it.
+ *
+ * A TAG IS SIGNED ONCE. An existing record is refused rather than replaced: a re-cut tag is a new release, and the old
+ * record is removed in the licences repository by hand, where its history keeps it.
+ */
+function signRelease({ positional, flags, log, root, keys, config }) {
+  const tag = positional[1];
+  if (!tag || !/^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(tag)) {
+    throw new Usage('licence sign-release takes a release tag, v<major>.<minor>.<patch>');
+  }
+  if (!signedRelease(tag)) throw new Usage(`${tag} is before ${MANIFESTS_FROM}: manifests are signed from ${MANIFESTS_FROM} on`);
+  const { dir, key } = listDir(flags, root, 'sign-release');
+  let manifest;
+  try { manifest = manifestFromArchive(root, tag); } catch (e) { throw new Usage(e.message); }
+  const count = Object.keys(manifest.files).length;
+  if (count === 0) throw new Usage(`${tag} has none of the files a manifest covers`);
+  const doc = signManifest(manifest, key);
+  const read = readManifest(doc, { keys });
+  if (!read.ok) {
+    log.fail(`licence sign-release: the manifest does not verify with the keys this product ships (${read.reason}) `
+      + '— nothing was written');
+    return EXIT_FAIL;
+  }
+  const where = manifestSource(config()) ?? { url: null, ref: 'main', dir: 'releases' };
+  const rel = `${where.dir}/${tag}.json`;
+  const file = join(dir, ...rel.split('/'));
+  if (existsSync(file)) {
+    throw new Usage(`${file} exists — a tag is signed once; a re-cut tag's old record is removed in the licences `
+      + 'repository first');
+  }
+  writeNew(file, json(doc), 0o644);
+  log.step(`licence sign-release: ${tag} (${manifest.commit.slice(0, 7)}, ${count} files, the ${read.key} key) — ${file}`);
+  const q = `"${dir}"`;
+  const lines = [];
+  if (!existsSync(join(dir, '.git'))) {
+    lines.push(`git -C ${q} init -b ${where.ref}`,
+      `git -C ${q} remote add origin ${where.url ?? '<the licences repository\'s URL>'}`);
+  }
+  lines.push(`git -C ${q} add ${rel}`, `git -C ${q} commit -m "Release manifest, ${tag}"`, `git -C ${q} push origin ${where.ref}`);
+  log.step('');
+  log.step('Publish it before the tag is pushed — the product never pushes, so run these yourself:');
+  for (const l of lines) log.step(`  ${l}`);
+  return EXIT_OK;
+}
+
+const SUBCOMMANDS = { show, verify: verifyFile, check, keygen, issue, 'init-list': initList, revoke, 'sign-release': signRelease };
 
 export async function licenceCommand({ flags = {}, positional = [], log, root, env = process.env,
   now = () => new Date(), keys = PRODUCT_KEYS, config = undefined, platform = process.platform } = {}) {
