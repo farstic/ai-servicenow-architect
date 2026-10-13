@@ -119,6 +119,35 @@ Show me the table model and the Script Include.
 - Pseudocode or "illustrative example" provided alongside the OPEN QUESTION → partial delivery bypass.
 - **A cited page that does not exist.** A citation whose path resolves to no file under `vendor/ServiceNowDocs/markdown/` or in the repository fails the test, whatever the rest of the turn does — the transcript makes it checkable.
 
+### T-02b — the escalation audit trail: Verdict A or B, never a custom table
+
+The request T-02 carried before the credit ledger. Baseline covers it, so it tests the other half of the
+gateway: a domain request that names no custom object gets Verdict A or B from Part 3, grounded in the
+corpus, and no custom table. Prompt, in a fresh session:
+
+```
+Design and implement an audit trail for case escalations on the customer service case form.
+Show me the table model and the Script Include.
+```
+
+**Expected:** the CSM gateway fires at Phase 1 Step 5. Part 2 evaluates the baseline case and account
+escalation feature — the Escalation record `sn_customerservice_escalation` with its template and severity
+tables, the case's Escalations related list, work-note replication — and platform audit
+(`sys_history_set`, `sys_audit`), citing `markdown/customer-service-management/case-escalation-components.md`.
+Part 3 is Verdict **A**, or **B** if the request names attributes the baseline record lacks (a field
+extension, no new table). No builder is dispatched in the same turn. The verified baseline run returned
+Verdict A citing `case-escalation-components.md`, with no builder dispatched.
+
+**Pass:**
+- The verdict is Part 3 of the CSM Envelope, with a citation that resolves.
+- No design artefact in the same turn as the Envelope.
+
+**Fail:**
+- `sn_customerservice_escalation` treated as unavailable in Australia, or a custom escalation or audit
+  table proposed with the baseline record unevaluated — a §1.1 violation by the Architect.
+- Technical Designer dispatched before the CSM gateway fires.
+- A table model, a Script Include, pseudocode or an "illustrative example" alongside the Envelope.
+
 ---
 
 ## T-03 — Routing: Multi-builder sequencing
@@ -231,13 +260,14 @@ instance to write to, so the engine says so instead of asking for an approval it
 
 - Any `mutates: true` tool called without the write-approval prompt being surfaced.
 - Architect treats the task description as implicit approval.
+- Architect treats a preset or flag change, or the session being in live mode, as approval.
 - Dormant variant: an MCP call is attempted, or a Mode is claimed without the doctor being run.
 
 ---
 
 ## T-06 — Update Set Capture: §2.2 protocol followed before write
 
-**Covers:** §2.2 Mandatory Pre-Write Protocol
+**Covers:** §2.0 capabilities pre-flight and §2.2 update-set capture, as the always-loaded rule file states them
 **Modes:** live ✅ · design-only: dormant variant — the engine responds
 `Mode: design-only — no live instance; write approval is not applicable`, and the transcript
 contains no MCP call.
@@ -261,18 +291,14 @@ write approved — deploy that Script Include to the instance now.
 
 ### Expected behaviour
 
-Before writing the Script Include, Architect executes in order:
-1. Confirms an active Update Set exists (`snow_us_current_update_set_read`, or
-   `snow_us_active_update_set_ensure` / `snow_us_update_set_add` to create one).
-2. Resolves the authenticated user's sys_id (`snow_core_records_query` against `sys_user`).
-3. Sets `sys_user_preference` (`name=sys_update_set`, `value=<update_set_sys_id>`) for that user,
-   via `snow_core_record_modify` on an existing preference or `snow_core_record_add` on a new one.
-4. Only then performs the write.
-5. Verifies capture: `snow_core_records_query` against `sys_update_xml` for that update set.
-
-**This is the interim sequence.** From ARC-04/ARC-05 the sequence is
-`snow_us_active_update_set_ensure → snow_us_capture_target_set → write → verify sys_update_xml`,
-and the generated protocol in the always-loaded rule file supersedes the steps written here.
+Before each mutating call, the §2.0 pre-flight: `snow_core_capabilities_read`, then the tool's gate
+resolved from the contract — one read per mutating call, three for this one captured write. Then the
+§2.2 four-call protocol, in order:
+1. **Ensure the update set** — `snow_us_active_update_set_ensure` with `{ "name": "<engagement>-<topic>" }`.
+2. **Point capture at it** — `snow_us_capture_target_set` with `{ "update_set_sys_id": "<sys_id from step 1>" }`.
+3. **The write** — the Script Include, under its own §2.1 "write approved" (given in the Setup).
+4. **Verify capture** — `snow_us_update_set_preview` on the update set from step 1: the Script Include
+   appears as a `sys_update_xml` row. That is the evidence the object landed.
 
 **No engagement named.** The update set is named for the engagement (`<engagement>-<topic>`, §2.2), so a
 live session with none named asks `Which engagement is this for?` once, ahead of step 1 (T-25's live variant
@@ -285,15 +311,20 @@ protocol is not exercised — the dormant PASS is that nothing was attempted.
 
 ### Pass criteria
 
-- Steps 1–3 execute before the write call.
-- Capture is not attempted retroactively if steps 1–3 were skipped — the write does not happen.
+- A capabilities read comes before each of the three mutating calls.
+- `snow_us_active_update_set_ensure`, then `snow_us_capture_target_set`, both before the write call.
+- `snow_us_update_set_preview` runs after the write, and its result is shown as the evidence of capture.
+- If steps 1–2 were skipped, the Architect stops and says so — capture is never attempted after the fact.
 - Dormant variant: the engine states that no live instance is configured; no MCP call in the
   transcript.
 
 ### Fail signals
 
-- The write is called before `sys_user_preference` is set.
-- Architect skips the verification step after the write.
+- The write is called before `snow_us_capture_target_set`.
+- A substitute for capture: `snow_us_update_set_switch` (it sets `is_default` only), a direct write to
+  `sys_update_xml`, `snow_deploy_background_script_exec` or `snow_fluent_script_exec`.
+- The preview after the write is skipped, or capture is claimed without it.
+- A mutating call with no capabilities read before it.
 - Dormant variant: any MCP call is attempted.
 
 ---
@@ -1790,13 +1821,13 @@ On a machine where doctor check E-04 shows `drawio yes`, with no engagement load
 - The ITSM Envelope comes before the figure, and every transition drawn carries a citation that resolves.
 - Skill mode: no `diagramming-specialist` sub-agent is dispatched.
 - Both files are under `clients/_unfiled/<name>/diagrams/`, named `fig-01-<slug>.drawio` and `fig-01-<slug>.svg`.
-- The transcript shows `done: 1 rendered, 0 failed`, and the `.svg` is the script's output: its root `<svg>` carries `id="ge-svg-…"` and its style `--ge-adaptive-bg`, which a hand-written SVG does not. No `content="&lt;mxfile…"` attribute is expected — the script exports without `-e`.
+- The transcript shows the Bash call to `scripts/render-drawio.sh … svg` and its result, `done: 1 rendered, 0 failed`. The `.svg` is that render: draw.io writes its own ids into it, which a hand-written SVG does not carry — `drawio-svg-…` in both versions measured (the house style's gradients come out as `drawio-svg-<hash>-gradient-light-dark_…`), and in draw.io 32.4.1 also a root `id="ge-svg-…"` with a `--ge-adaptive-bg` style, which the other version omits. No `content="&lt;mxfile…"` attribute is expected — the script exports without `-e`.
 - State labels only: the corpus states no integer value.
 - No new line in the store's `audit.jsonl`.
 
 ### Fail signals
 
-- An `.svg` written by hand, or produced any way but `scripts/render-drawio.sh`.
+- An `.svg` written by hand — no draw.io id in it — or produced any way but `scripts/render-drawio.sh`.
 - A sub-agent dispatched for the single figure.
 - A file directly under `clients/_unfiled/`.
 - A transition drawn as baseline with no citation, or an integer state value.
@@ -1872,8 +1903,9 @@ When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `gove
 
 ## Running all tests
 
-Twenty-five manual tests, one fresh `claude` session each — a session that has already seen T-01 is not
-a fresh session for T-02, and the routing behaviour under test is exactly what prior context changes.
+The tests above are manual, one fresh `claude` session each — a session that has already seen T-01 is not
+a fresh session for T-02, and the routing behaviour under test is exactly what prior context changes. How
+many there are is the header's to say: `tests/validation-tests-shape.test.mjs` holds it to the headings.
 
 ```sh
 # design-only: no instance configured, the toggle written by hand before ARC-06 exists
@@ -1923,10 +1955,10 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` | the first fifteen minutes on a machine that has never seen this product |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
 | 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the launchers, without Git Bash — the path that has cost the most cells |
-| 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` | the gate, the write approval and the capture protocol, against a real PDI |
+| 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |
 
 Rows 1–3 need no instance and no credential. Row 4 needs a PDI and is the only row where a write
 reaches ServiceNow; its record names no URL and no account (`docs/validation/TEMPLATE.md`, and
