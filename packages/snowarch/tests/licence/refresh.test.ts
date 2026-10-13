@@ -112,7 +112,11 @@ describe('ARC-11-C1 — the live start\'s background refresh', () => {
     expect(currentLicence().state).toBe('revoked');
     const started = Date.now();
     const pending = refreshLicenceList();
-    expect(Date.now() - started).toBeLessThan(100);
+    // ARC-09-C136 — the refresh must not hold the start: it returns before the network does. The silent URL never
+    // answers, so a refresh that waited would take the whole live budget; half of it separates the two whatever the
+    // load. 100 ms was a wall-clock budget, and a full suite on a busy machine took 214 for a return that waited on
+    // nothing (the v2.1.0-rc.1 rehearsal).
+    expect(Date.now() - started).toBeLessThan(LIVE_BUDGET_MS / 2);
     const r = await pending;
     expect(Date.now() - started).toBeLessThan(LIVE_BUDGET_MS + 1_000);
     expect(r.outcome).toBe('unreachable');
