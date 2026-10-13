@@ -22,13 +22,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { historyStartsAt } from './helpers/changelog-history.mjs';
+import { GENERIC, PRECISE } from '../scripts/lib/release/no-way-back.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** What the product said, and what would say it again. */
-const PRECISE = [/go back to the last release/i, /last release that runs without/i, /upgrade --to v2\.0\.12(?![-\w]|\.\d)/,
-  /\bWAY_BACK\b/];
-const GENERIC = [/\bway back\b/i];
+// The patterns are scripts/lib/release/no-way-back.mjs's, shared with the release's notes gate.
 
 const isShipped = (f) => /^(tools\/snowarch\/(lib|bin|hooks)\/|packages\/snowarch\/(src|dist)\/|\.claude\/)/.test(f)
   || f === 'CLAUDE.md';

@@ -1520,6 +1520,14 @@ type(scope)?: subject
 **Types.** `feat` → *Added* · `fix` → *Fixed* · `perf`, `refactor` → *Changed* · `docs`, `test`,
 `build`, `ci`, `chore`, `revert` → *Internal*.
 
+**Every subject is published**, *Internal* included: the release's section is its GitHub Release body. A
+subject that must not be (ARC-11-C6: the owner's ruling of 2026-10-13 that no page says how to have a
+working Architect without a licence) gets an entry in `scripts/lib/release/notes-overrides.json`: a full
+sha, then `{ "omit": true }` or `{ "line": "…" }`, then a `why`. The release's `notes` gate,
+`scripts/ci/release-notes-gate.mjs`, renders the section before anything is written, in the dry run too.
+It sweeps the section with the patterns of `tests/no-way-back.test.mjs` and refuses the cut while a line
+still says what the ruling forbids.
+
 **Running it locally — name the range** (ARC-09-C26):
 
 ```sh

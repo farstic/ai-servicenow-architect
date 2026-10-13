@@ -16,6 +16,8 @@
  *   `## Before 2.0.0`      the imported engine history, NEVER touched (AC 7)
  */
 import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** The conventional-commit subject, as the convention defines it. */
 export const SUBJECT = /^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\(([^)]+)\))?(!)?: (.+)$/;
@@ -56,14 +58,47 @@ const defaultGit = (root, args) =>
   execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
 /**
+ * ARC-11-C6 — the release-notes overrides: a committed map, full sha to `{ omit: true }` or `{ line }`, each with a
+ * `why`. A subject is fixed once it is committed, and some cannot be published: the v2.0.13 cut wrote step 6's,
+ * which the owner's ruling of 2026-10-13 forbids a page to say. The map is read at the cut and in the dry run, by
+ * `writeChangelog` and the release's notes gate alike, so both see the same section. A replacement line keeps the
+ * commit's sha, so the line is still the generator's shape.
+ */
+export const OVERRIDES_FILE = join('scripts', 'lib', 'release', 'notes-overrides.json');
+
+/** The committed map, validated; `{}` when there is none. A malformed entry throws: a cut must not guess. */
+export function readOverrides(root, { read = (p) => readFileSync(p, 'utf8'), exists = existsSync } = {}) {
+  const path = join(root, OVERRIDES_FILE);
+  if (!exists(path)) return {};
+  const map = JSON.parse(read(path));
+  for (const [sha, o] of Object.entries(map)) {
+    const kinds = [o?.omit === true, typeof o?.line === 'string' && o.line.trim() !== ''].filter(Boolean).length;
+    if (!/^[0-9a-f]{40}$/.test(sha) || kinds !== 1 || typeof o.why !== 'string' || o.why.trim() === '') {
+      throw new Error(`changelog: the override for ${sha} needs a full sha, exactly one of omit or line, and a why`);
+    }
+  }
+  return map;
+}
+
+/**
  * One commit becomes one bullet, or `null` when it is not this file's to describe.
  *
  * A merge and a `chore(release):` commit are both noise here: the first describes an integration,
- * the second describes the release the reader is already looking at.
+ * the second describes the release the reader is already looking at. An override (above) omits a
+ * commit, or gives it the line the notes print.
  */
-export function classify(commit) {
+export function classify(commit, { overrides = {} } = {}) {
   if (commit.parents.length > 1) return null;
+  const override = overrides[commit.sha];
+  if (override?.omit) return null;
   const short = commit.sha.slice(0, 7);
+  const entry = classifySubject(commit, short);
+  if (!entry || !override?.line) return entry;
+  const text = `${override.line} (${short})`;
+  return { group: entry.group, text, breaking: entry.breaking ? text : null };
+}
+
+function classifySubject(commit, short) {
   const m = SUBJECT.exec(commit.subject);
   if (!m) {
     // History is not rewritten to suit a parser. An unconventional subject is recorded as written
@@ -84,10 +119,10 @@ export function classify(commit) {
 }
 
 /** The generated body: the non-empty groups, in the fixed order. */
-export function renderGroups(commits) {
+export function renderGroups(commits, { overrides = {} } = {}) {
   const buckets = Object.fromEntries(GROUPS.map((g) => [g, []]));
   for (const commit of commits) {
-    const entry = classify(commit);
+    const entry = classify(commit, { overrides });
     if (!entry) continue;
     buckets[entry.group].push(entry.text);
     if (entry.breaking) buckets.Breaking.push(entry.breaking);
@@ -213,14 +248,14 @@ export function buildFile({ text, version, date, notes, carried = null, body, tr
  * different answer.
  */
 export function writeChangelog({ root, version, date, from = null, tag = {}, git = defaultGit,
-  read, write }) {
+  read, write, overrides = readOverrides(root) }) {
   const text = read('docs/CHANGELOG.md');
   const carried = extractUnreleased(text);
   if (carried === null) return { ok: false, message: 'changelog: no "## Unreleased" heading' };
 
   const commits = readCommits({ root, from, git });
   const built = buildFile({ text, version, date, carried,
-    body: renderGroups(commits), trailer: trailerLine(version, tag) });
+    body: renderGroups(commits, { overrides }), trailer: trailerLine(version, tag) });
   if (!built.ok) return built;
 
   write('docs/CHANGELOG.md', built.text);

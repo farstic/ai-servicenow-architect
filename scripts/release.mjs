@@ -201,7 +201,7 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   const commits = since
     ? gitRun(['log', '--oneline', `${since}..HEAD`]).split('\n').filter(Boolean).length
     : gitRun(['log', '--oneline']).split('\n').filter(Boolean).length;
-  const plan = gatePlan({ noInstall: flags['no-install'], platform });
+  const plan = gatePlan({ noInstall: flags['no-install'], platform, notesFrom: since });
 
   write([
     `release ${current} → ${version}`,
