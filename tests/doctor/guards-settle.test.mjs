@@ -7,7 +7,7 @@ import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
-import { REAL_ROOT } from './helpers/tree.mjs';
+import { REAL_ROOT, writeFixturePackage } from './helpers/tree.mjs';
 
 /**
  * ARC-09-C77 — the doctor runner's per-check budget and the SessionStart hook's watchdog fire, and
@@ -65,7 +65,10 @@ test('a check that answers at once leaves no budget holding the doctor', () => {
 /** A checkout the hook re-runs the doctor for: bootstrapped, and no doctor cache. */
 function staleRoot(t) {
   const root = tempDir('snowarch-c77-', t);
-  for (const f of ['engine.config.json', 'package.json']) copyFileSync(join(REAL_ROOT, f), join(root, f));
+  copyFileSync(join(REAL_ROOT, 'engine.config.json'), join(root, 'engine.config.json'));
+  // ARC-09-C137 — the version of record is the fixture's, never the checkout's: a release run must not make this a
+  // release tree with no manifest.
+  writeFixturePackage(root);
   mkdirSync(join(root, '.local'), { recursive: true });
   writeFileSync(join(root, '.local', 'bootstrap-state.json'), '{}\n');
   return root;
