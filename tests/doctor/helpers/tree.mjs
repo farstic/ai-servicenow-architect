@@ -39,6 +39,14 @@ export const WIRING = Object.freeze([
 
 const git = (dir, args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: 'pipe' });
 
+/**
+ * ARC-09-C137 — the version a fixture carries: the fixture's, never the checkout's. A release writes its version
+ * into the real package.json before its post-write suite, and a tree that copied it was a release tree with no
+ * signed manifest: E-32 FAILed, and the hook tests read an Integrity line in every banner. A dev version makes
+ * E-32 skip, exactly as on develop; a case that wants a release tree says so (`releaseTree`, or `extra`).
+ */
+export const FIXTURE_VERSION = '0.0.0-dev';
+
 export const readJson = (root, rel) => JSON.parse(readFileSync(join(root, rel), 'utf8'));
 export const writeJson = (root, rel, value) => {
   mkdirSync(dirname(join(root, rel)), { recursive: true });
@@ -65,6 +73,7 @@ export function greenTree(t, { mode = 'design', extra = {} } = {}) {
   const config = readJson(root, 'engine.config.json');
   writeJson(root, 'engine.config.json',
     { ...config, docs: { ...config.docs, upstream: join(root, 'no-upstream-in-a-fixture.git') } });
+  writeJson(root, 'package.json', { ...readJson(root, 'package.json'), version: FIXTURE_VERSION });
 
   for (const [rel, value] of Object.entries(extra)) writeJson(root, rel, value);
 
