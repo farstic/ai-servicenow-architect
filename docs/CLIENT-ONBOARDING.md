@@ -34,6 +34,8 @@ mkdir -p clients/<name>/decisions
 `clients/` is gitignored — these folders are local to your checkout. No `git add` is needed, or
 possible. Keeping generated artefacts physically separated by client *is* the confidentiality
 discipline: there is no interface-level firewall, so if you work in the wrong folder, nothing stops you.
+Git holds none of it, so back `clients/` up yourself — an encrypted drive, private cloud storage or a
+separate private repository — under your firm's data retention policy.
 
 `decisions/` is where architecture decision records go — every §1.1 ruling, approval or rejection alike,
 per the delivery-governance rules. The traceability matrix lives alongside them at
