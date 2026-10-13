@@ -432,3 +432,30 @@ test('the not-probed sentence names the branch too, and reads as a list of three
     capabilities: { docx: { present: true } } } };
   assert.equal(notProbedLine(full, CLI), null);
 });
+
+// ── ARC-11-C7 — the Integrity line ────────────────────────────────────────────────────────────────────────────────
+
+/** LIVE with E-32's result replaced by `{ status, detail }`. */
+const withE32 = (status, detail) => ({ ...LIVE, checks: LIVE.checks.map((c) => (c.id === 'E-32' ? { ...c, status, detail } : c)) });
+
+test('ARC-11-C7 — the Integrity line is third, after the Licence line, in every state E-32 reports', () => {
+  const cases = [
+    ['ok', 'Integrity: verified · v9.1.0 · 369 files'],
+    ['fail', 'Integrity: modified — 1 file differs from the signed manifest for v9.1.0: CLAUDE.md'],
+    ['fail', 'Integrity: no signed manifest for v9.1.0 — reinstall from a signed release tag'],
+    ['skip', 'Integrity: not checked — a development tree has no signed manifest'],
+  ];
+  for (const [status, detail] of cases) {
+    const lines = renderPanel(withE32(status, detail), CLI).split('\n');
+    assert.ok(lines[1].startsWith('Licence:'), lines[1]);
+    assert.equal(lines[2], detail, status);
+    assert.equal(lines.filter((l) => l.startsWith('Integrity:')).length, 1, 'the integrity is said once on its own line');
+  }
+});
+
+test('ARC-11-C7 — E-32 left out of the run, or absent, is no Integrity line, which is the fixtures\' case', () => {
+  assert.equal(LIVE.checks.find((c) => c.id === 'E-32')?.detail, 'left out of this run by name', 'the fixture leaves E-32 out');
+  assert.equal(renderPanel(LIVE, CLI).includes('Integrity:'), false);
+  const without = { ...LIVE, checks: LIVE.checks.filter((c) => c.id !== 'E-32') };
+  assert.equal(renderPanel(without, CLI).includes('Integrity:'), false);
+});

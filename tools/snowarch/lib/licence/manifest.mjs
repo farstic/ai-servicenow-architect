@@ -59,10 +59,13 @@ const safePath = (p) => typeof p === 'string' && p !== '' && !p.startsWith('/') 
 
 const isDirEntry = (c) => c.endsWith('/');
 
-/** Is `path` covered by `{ covers, excludes, ignores }`? */
+/**
+ * Is `path` covered by `{ covers, excludes, ignores }`? An entry named exactly as an excluded directory is excluded
+ * with it, so a link standing where that directory was is not an extra file.
+ */
 export function isCovered(path, { covers, excludes = [], ignores = [] }) {
   if (ignores.includes(posix.basename(path))) return false;
-  if (excludes.some((dir) => path.startsWith(dir))) return false;
+  if (excludes.some((dir) => path.startsWith(dir) || `${path}/` === dir)) return false;
   return covers.some((c) => (isDirEntry(c) ? path.startsWith(c) : path === c));
 }
 

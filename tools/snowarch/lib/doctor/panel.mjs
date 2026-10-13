@@ -133,6 +133,18 @@ export function licenceLine(checks) {
   return bannerLine(data);
 }
 
+/**
+ * `Integrity: verified · v2.1.0 · 369 files` — E-32's line (ARC-11-C7), after the Licence line.
+ *
+ * In every state E-32 reports, as the Licence line is: verified, modified, no signed manifest, or not checked on a
+ * development tree. A report in which E-32 did not run (left out by name, as the status fixtures leave it, or an older
+ * report) prints no line rather than a guessed one.
+ */
+export function integrityStatusLine(checks) {
+  const detail = (Array.isArray(checks) ? checks : []).find((c) => c?.id === 'E-32')?.detail;
+  return typeof detail === 'string' && detail.startsWith('Integrity: ') ? detail : null;
+}
+
 /** `Roster: 28 skills / 9 agents` */
 export const rosterLine = (roster) => (roster
   ? `Roster: ${roster.skills} skills / ${roster.agents} agents`
@@ -281,6 +293,8 @@ export function renderPanel(report, cli) {
     report?.modeLineDetailed ?? null,
     // Second, as the session-start banner prints it: Mode, then Licence.
     licenceLine(report?.checks),
+    // ARC-11-C7 — third: this release's files against its signed manifest.
+    integrityStatusLine(report?.checks),
     engineLine(report?.engine),
     docsLine(report?.engine?.docs, cli),
     rosterLine(report?.engine?.roster),
