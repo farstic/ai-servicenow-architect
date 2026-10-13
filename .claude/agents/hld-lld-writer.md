@@ -61,6 +61,7 @@ Return to the orchestrator a structured response containing:
    - Structured sections (HLD: 8; LLD: per-component; PDD: 9), each populated or marked "Not applicable" with rationale.
    - Baseline-first audit block — non-optional.
    - Downstream handoff manifest.
+   - **Word / PDF export** — you have no shell: write the markdown Word-ready, figures linked as `diagrams/fig-NN-<slug>.png`, never a Mermaid block, and name the commands the main thread runs — `scripts/render-drawio.sh <diagrams-dir> png`, then `python3 scripts/md-to-docx.py --src <md> --out <docx> --footer-text "<text>"` (`scripts/md-to-docx.ps1` on Windows), then `scripts/render-pdf.sh` (`scripts/render-pdf-pages.ps1` on Windows) for QA.
 2. **Coverage statement** — one sentence per document confirming which input requirements the document covers; explicit gaps called out.
 3. **Decisions made** — any non-default choices you resolved without escalating (e.g., proposed two documents instead of one hybrid; chose LLD over HLD per audience), each with rationale.
 4. **§6.2 post-build proposal manifest** — verbatim:

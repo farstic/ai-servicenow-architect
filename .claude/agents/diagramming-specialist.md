@@ -52,6 +52,7 @@ Return to the orchestrator a structured response in the SKILL's output format:
 3. **Fidelity notes** — each node mapped to the spec element it represents; any omitted element and why.
 4. **§1.1 flags** — every custom object depicted PENDING, with the approval that is missing (empty if none).
 5. **Export & embed deliverables** — an editable `.drawio` per figure (in a `diagrams/` folder, styled to the house palette), a ready-to-paste embed manifest of `![Figure N — caption](diagrams/fig-NN.svg)` links to the files the render will write, and a Diagram Sources appendix block for the HLD/LLD/PDD. No `.svg` or `.png`: the main thread renders those. Any `.mmd` is only an optional draft.
+   - **Word / PDF export** — when the pack goes into a Word deliverable, give the embed links as `.png`: `scripts/md-to-docx.py` embeds PNG only, and the main thread renders `png` with `scripts/render-drawio.sh`.
 6. **§6.2 post-build proposal manifest** — the render always, the rest as relevant:
    - **Render — the main thread runs `scripts/render-drawio.sh <diagrams-dir> svg`** from the checkout root before it presents the pack, and again with `png` when a Word or PDF deliverable follows; name the folder.
    - **Source-author handback** — when a figure surfaced an inconsistency or gap in the spec, name the author (Technical Designer / HLD-LLD Writer / Integration Specialist) to resolve it.

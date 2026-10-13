@@ -90,6 +90,7 @@ The deliverable is the editable `.drawio`; an exported SVG/PNG is what gets embe
 - Place the exported image with a numbered caption — `![Figure 3 — Case lifecycle](diagrams/fig-03-lifecycle.svg)`. The `.svg`/`.png` embeds in markdown, Word, and PDF.
 - Keep the `.drawio` source in a **Diagram Sources appendix** (the `diagrams/` folder) so every figure stays editable in draw.io / Lucidchart.
 - Use the **same numbered caption** (`Figure N — …`) in the document body and in this skill's output.
+- **Word / PDF export** — the main thread runs the house scripts from the checkout root (a sub-agent has no shell): `python3 scripts/md-to-docx.py --src <md> --out <docx> --footer-text "<text>"` (`scripts/md-to-docx.ps1` with `-FooterText` on Windows) builds the `.docx`, its figures PNGs from `scripts/render-drawio.sh <diagrams-dir> png` — never Mermaid, no client name hard-coded — and `scripts/render-pdf.sh` (`scripts/render-pdf-pages.ps1` on Windows) checks the result. Doctor check E-04 says what this machine can produce.
 
 **Handoff with the HLD/LLD Writer:** the Writer owns the document and its section numbering; this skill delivers the editable `.drawio` set + the exported `.svg`/`.png`, the ready-to-paste `![…]()` embed snippets, and the appendix block. The Writer drops them into the matching sections.
 
