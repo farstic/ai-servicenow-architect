@@ -408,7 +408,8 @@ export function exportable({ serverKey }) {
       // second. The Node-free launchers read this file, and they cannot know the reader's shell either.
       // Same form as `gen-doctor-docs.mjs` and the rules page — the platform is STATED, not inherited.
       firstRun: BANNER.firstRun(POSIX),
-      upgrade: BANNER.upgrade('v2.1.0', POSIX),
+      // A sample tag far past any real release: a sample equal to the next one would read as a real nudge.
+      upgrade: BANNER.upgrade('v9.1.0', POSIX),
       staleRegistration: BANNER.staleRegistration(POSIX),
       doctorFail: BANNER.doctorFail(2, POSIX),
       staleSuffix: BANNER.staleSuffix(POSIX),

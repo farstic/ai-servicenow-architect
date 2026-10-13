@@ -215,12 +215,12 @@ test('the upgrade nudge names the tag, and an absent file is no nudge', async (t
     'an upgrade nudge with no upgrade-check.json');
 
   writeJson(root, '.local/upgrade-check.json',
-    { behind: true, latestTag: 'v2.1.0', checkedAt: new Date().toISOString() });
+    { behind: true, latestTag: 'v9.1.0', checkedAt: new Date().toISOString() });
   const r = runHook(root);
-  assert.ok(r.lines.includes(BANNER.upgrade('v2.1.0', SPELL)), r.stdout);
+  assert.ok(r.lines.includes(BANNER.upgrade('v9.1.0', SPELL)), r.stdout);
 
   writeJson(root, '.local/upgrade-check.json',
-    { behind: false, latestTag: 'v2.1.0', checkedAt: new Date().toISOString() });
+    { behind: false, latestTag: 'v9.1.0', checkedAt: new Date().toISOString() });
   assert.equal(runHook(root).lines.some((l) => /newer release/.test(l)), false,
     'a nudge for a checkout that is not behind');
 });
@@ -376,7 +376,7 @@ test('the nudge strings the hook prints are the ones text.json exports', () => {
   const text = JSON.parse(readFileSync(join(REAL_ROOT, 'tools/snowarch/lib/text.json'), 'utf8'));
   assert.equal(text.banner.firstRun, BANNER.firstRun(POSIX));
   assert.equal(text.banner.staleRegistration, BANNER.staleRegistration(POSIX));
-  assert.equal(text.banner.upgrade, BANNER.upgrade('v2.1.0', POSIX));
+  assert.equal(text.banner.upgrade, BANNER.upgrade('v9.1.0', POSIX));
   assert.equal(text.banner.doctorFail, BANNER.doctorFail(2, POSIX));
   assert.equal(text.banner.timedOut, BANNER.timedOut(POSIX));
 
@@ -387,7 +387,7 @@ test('the nudge strings the hook prints are the ones text.json exports', () => {
   const win = spellings({ platform: 'win32', env: {} });
   for (const [name, rendered] of [
     ['staleRegistration', BANNER.staleRegistration(win)],
-    ['upgrade', BANNER.upgrade('v2.1.0', win)],
+    ['upgrade', BANNER.upgrade('v9.1.0', win)],
     ['doctorFail', BANNER.doctorFail(2, win)],
     ['timedOut', BANNER.timedOut(win)],
   ]) {
@@ -407,23 +407,23 @@ test('an upgrade check older than a week is silence, not a hedged nudge', async 
   const days = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
 
   writeJson(root, '.local/upgrade-check.json',
-    { behind: true, latestTag: 'v2.1.0', checkedAt: days(6) });
-  assert.ok(runHook(root).lines.includes(BANNER.upgrade('v2.1.0', SPELL)), 'six days old is still fresh');
+    { behind: true, latestTag: 'v9.1.0', checkedAt: days(6) });
+  assert.ok(runHook(root).lines.includes(BANNER.upgrade('v9.1.0', SPELL)), 'six days old is still fresh');
 
   writeJson(root, '.local/upgrade-check.json',
-    { behind: true, latestTag: 'v2.1.0', checkedAt: days(8) });
+    { behind: true, latestTag: 'v9.1.0', checkedAt: days(8) });
   assert.equal(runHook(root).lines.some((l) => /newer release/.test(l)), false,
     'eight days old must produce NO line — a nudge nobody has rechecked is one a reader learns to skip');
 
   // A clock that went backwards, which is a real state on a laptop that has just synced time.
   writeJson(root, '.local/upgrade-check.json',
-    { behind: true, latestTag: 'v2.1.0', checkedAt: days(-3) });
+    { behind: true, latestTag: 'v9.1.0', checkedAt: days(-3) });
   assert.equal(runHook(root).lines.some((l) => /newer release/.test(l)), false,
     'a check from the future is not fresh');
 
   // And a file with no `checkedAt` at all — the shape ARC-08-S08 fixed has three keys, and a
   // writer that omitted one must not pin the nudge on for ever.
-  writeJson(root, '.local/upgrade-check.json', { behind: true, latestTag: 'v2.1.0' });
+  writeJson(root, '.local/upgrade-check.json', { behind: true, latestTag: 'v9.1.0' });
   assert.equal(runHook(root).lines.some((l) => /newer release/.test(l)), false);
 });
 
