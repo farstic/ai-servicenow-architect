@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
 import { manifestFromArchive, signManifest, writeManifestCache } from '../../tools/snowarch/lib/licence/manifest.mjs';
 import { keyPair, productKeys } from '../../tools/snowarch/tests/helpers/licence.mjs';
-import { REAL_ROOT, greenTree, readJson } from './helpers/tree.mjs';
+import { REAL_ROOT, greenTree, readJson, releaseTree } from './helpers/tree.mjs';
 
 const NOW = new Date('2026-10-13T12:00:00Z');
 const declared = () => engineChecks().filter((c) => c.id === 'E-32');
@@ -66,8 +66,7 @@ const gitIn = (root, args) => execFileSync('git', args, { cwd: root, encoding: '
 
 /** A release tree tagged v`version` as a release is, with `version`'s manifest signed by `key` in its cache. */
 function signedTree(t, { version = '9.1.0', manifestVersion = version, key = primary } = {}) {
-  const root = treeAt(t, version);
-  gitIn(root, ['tag', '-a', `v${version}`, '-m', `v${version}`]);
+  const root = releaseTree(t, version);
   const manifest = { ...manifestFromArchive(root, `v${version}`), tag: `v${manifestVersion}` };
   writeManifestCache(root, { tag: `v${version}`, doc: signManifest(manifest, key.privateKey),
     checkedAt: NOW.toISOString(), source: 'a fixture' });

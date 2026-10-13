@@ -17,18 +17,14 @@ import { COVERAGE, isCovered, manifestFromArchive, signManifest, writeManifestCa
 import { licenceFixture, licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { readTraceImport } from '../../tools/snowarch/tests/helpers/read-trace.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
-import { LINKED, REAL_ROOT, greenTree, linkInstall, readJson } from '../doctor/helpers/tree.mjs';
+import { LINKED, REAL_ROOT, linkInstall, readJson, releaseTree } from '../doctor/helpers/tree.mjs';
 
 const SENTINEL = 'tools/snowarch/e32-sentinel.txt';
 const STDIN = '{"hook_event_name":"SessionStart","source":"startup"}';
 const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();
 
 test('ARC-11-C7 — the hook re-runs the quick doctor without E-32, so it reads no file only E-32 reads', (t) => {
-  const root = greenTree(t, { extra: { 'package.json': { ...readJson(REAL_ROOT, 'package.json'), version: '9.1.0' } } });
-  writeFileSync(join(root, SENTINEL), 'read by E-32 alone\n');
-  git(root, ['add', SENTINEL]);
-  git(root, ['commit', '-qm', 'the sentinel']);
-  git(root, ['tag', '-a', 'v9.1.0', '-m', 'v9.1.0']);
+  const root = releaseTree(t, '9.1.0', { files: { [SENTINEL]: 'read by E-32 alone\n' } });
   const manifest = manifestFromArchive(root, 'v9.1.0');
   assert.ok(SENTINEL in manifest.files, 'the manifest covers the sentinel');
   writeManifestCache(root, { tag: 'v9.1.0', doc: signManifest(manifest, licenceFixture().primary.privateKey),
@@ -60,8 +56,7 @@ const FIXTURE_COVERAGE = { ...COVERAGE,
 
 /** A release tree, v9.1.0, linked so its CLI and hook run, with its manifest signed by the fixture key. */
 function signedRelease(t) {
-  const root = greenTree(t, { extra: { 'package.json': { ...readJson(REAL_ROOT, 'package.json'), version: '9.1.0' } } });
-  git(root, ['tag', '-a', 'v9.1.0', '-m', 'v9.1.0']);
+  const root = releaseTree(t, '9.1.0');
   writeManifestCache(root, { tag: 'v9.1.0', doc: signManifest(manifestFromArchive(root, 'v9.1.0', { coverage: FIXTURE_COVERAGE }),
     licenceFixture().primary.privateKey), checkedAt: '2026-10-13T12:00:00.000Z', source: 'a fixture' });
   linkInstall(root);
