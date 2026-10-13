@@ -13,8 +13,8 @@ docs_recipe_sparse() {
 # recipe-begin sparse
   { [ -e vendor/ServiceNowDocs/.git ] || git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs ; } && \
   git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/financial-services-operations markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform legal && \
-  git -C vendor/ServiceNowDocs fetch --depth 1 origin 68c0d1123adff7b42cb3895bb987d74ab24265d6 && \
-  git -C vendor/ServiceNowDocs checkout --detach 68c0d1123adff7b42cb3895bb987d74ab24265d6 && \
+  git -C vendor/ServiceNowDocs fetch --depth 1 origin aa447ce4ea802c880af9dd365a114d3e6eb1cc19 && \
+  git -C vendor/ServiceNowDocs checkout --detach aa447ce4ea802c880af9dd365a114d3e6eb1cc19 && \
   { git submodule absorbgitdirs vendor/ServiceNowDocs || true ; } && \
   { git submodule init -- vendor/ServiceNowDocs || true ; } && \
   echo "docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE"
@@ -26,8 +26,8 @@ docs_recipe_full() {
 # recipe-begin full
   { [ -e vendor/ServiceNowDocs/.git ] || git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs ; } && \
   git -C vendor/ServiceNowDocs sparse-checkout disable && \
-  git -C vendor/ServiceNowDocs fetch --depth 1 origin 68c0d1123adff7b42cb3895bb987d74ab24265d6 && \
-  git -C vendor/ServiceNowDocs checkout --detach 68c0d1123adff7b42cb3895bb987d74ab24265d6 && \
+  git -C vendor/ServiceNowDocs fetch --depth 1 origin aa447ce4ea802c880af9dd365a114d3e6eb1cc19 && \
+  git -C vendor/ServiceNowDocs checkout --detach aa447ce4ea802c880af9dd365a114d3e6eb1cc19 && \
   { git submodule absorbgitdirs vendor/ServiceNowDocs || true ; } && \
   { git submodule init -- vendor/ServiceNowDocs || true ; } && \
   echo "docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE"
