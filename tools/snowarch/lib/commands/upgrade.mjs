@@ -267,7 +267,7 @@ export function classifyGitFetchError(stderr = '', { remote = 'origin' } = {}) {
 // the importers that already read these names from here.
 import { compareSemver, parseSemver, sortTags } from '../semver.mjs';
 import { allowedPhrase, bannerLine, licenceStatus, REFUSED, REMEDY } from '../licence/state.mjs';
-import { LAST_UNENFORCED_RELEASE, WAY_BACK } from '../doctor/checks/licence.mjs';
+import { LAST_UNENFORCED_RELEASE } from '../doctor/checks/licence.mjs';
 import { spellings } from '../launcher-spelling.mjs';
 
 export { parseSemver, sortTags };
@@ -576,10 +576,10 @@ export function failedStep(state) {
 }
 
 /**
- * ARC-11-C6 step 6 — what U4 tells a checkout with no licence in force before it moves to a release that refuses without
- * one: the state, what that release refuses, and E-31's two sentences, the remedy and the way back. `null` when a
- * licence is in force, and for the way back itself or anything older, which runs without one. A target this product
- * cannot order is presumed to enforce, so the notice errs towards being said.
+ * ARC-11-C6 — what U4 tells a checkout with no licence in force before it moves to a release that refuses without one:
+ * the state, what that release refuses, and E-31's remedy, with nothing after it (the owner's ruling from the rc.3
+ * sitting, 2026-10-13). `null` when a licence is in force, and for a target at or below LAST_UNENFORCED_RELEASE. A
+ * target this product cannot order is presumed to enforce, so the notice errs towards being said.
  */
 export function licenceNotice({ licence, target, cli }) {
   if (!REFUSED.includes(licence.state)) return null;
@@ -588,7 +588,7 @@ export function licenceNotice({ licence, target, cli }) {
   if (!enforces) return null;
   return [
     `${bannerLine(licence)} — ${target} runs no MCP tool, and no command but ${allowedPhrase()}, without a licence in force.`,
-    `${REMEDY(cli)}. ${WAY_BACK(cli)}`,
+    REMEDY(cli),
   ];
 }
 
@@ -740,7 +740,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
       + 'first, or pass --force-floor; nothing was changed');
     return EXIT_USAGE;
   }
-  // ARC-11-C6 step 6 — said with --yes and without, before the question: the move is still the reader's to make.
+  // ARC-11-C6 — said with --yes and without, before the question: the move is still the reader's to make.
   const notice = licenceNotice({ licence: licenceStatus(root), target, cli: spellings({ platform, env }).cli });
   if (notice) for (const line of notice) log.step(line);
 

@@ -97,8 +97,7 @@ and re-running resumes from that step rather than starting again.
 From 2.0.13 the product checks for a licence from the author. Copy the file you were given to `.local/licence.json`
 in the checkout, before or after the install, which runs without one, and restart Claude Code.
 `./snowarch licence check` shows its state. Without a licence in force no tool runs, and no command but `licence`,
-`doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`. `./snowarch upgrade --to v2.0.12` goes back
-to the last release that runs without one.
+`doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`.
 
 ### The dialogs
 
@@ -278,7 +277,7 @@ Nothing is touched before the plan is printed and accepted: it names the release
 will re-run, whether the store's schema moves (a migration, with a 0600 backup, announced first),
 and `credentials: untouched` — `.local/instances.json` is never read or written by an upgrade.
 Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a specific release and
-prints the way back; a diverged branch is reported, and a file in the release's way is named; a failed
+prints how to return to your branch; a diverged branch is reported, and a file in the release's way is named; a failed
 fetch prints git's error and a [proxy](TROUBLESHOOTING.md#proxy_unreachable) or [TLS](TROUBLESHOOTING.md#tls_ca_untrusted)
 remedy. The banner mentions a newer release only from a check you already ran — it never fetches.
 Full detail: [CONTRIBUTING.md](CONTRIBUTING.md#upgrading-the-product).
