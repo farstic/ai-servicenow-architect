@@ -26,18 +26,11 @@ import { fail, ok, warn } from './result.mjs';
 export const NO_LICENCE_IN_FORCE = 'no licence in force (see E-31)';
 
 /**
- * ARC-11-C6 step 6 — the last release that runs without a licence. 2.0.13 is the first that refuses (C6), so going back
- * to escape enforcement means this one, whichever release a checkout came from: "the release you came from" is the
- * wrong answer from 2.0.14 on, because that one enforces too. Named once, for E-31's remedy, U4's notice and the e2e.
+ * ARC-11-C6 — the newest release with no licence enforcement; 2.0.13 is the first that enforces. INTERNAL ONLY, and
+ * never printed: by the owner's ruling from the rc.3 sitting (2026-10-13), "the user must not learn how to have a
+ * working Architect without a licence". `upgrade` decides by it, and the upgrade e2e builds its world from its tag.
  */
 export const LAST_UNENFORCED_RELEASE = 'v2.0.12';
-
-/**
- * The way back, a sentence a reader can paste: E-31's remedy ends with it, and U4 says it before a move to a release
- * that enforces. The bootstrap's skip notes do not carry it (the architect's ruling): the way back is the doctor's
- * and the upgrade's to offer, not an install step's.
- */
-export const WAY_BACK = (cli) => `To go back to the last release that runs without a licence: ${cli} upgrade --to ${LAST_UNENFORCED_RELEASE}.`;
 
 export function licenceChecks() {
   return [
@@ -64,11 +57,11 @@ export function licenceChecks() {
         const why = s.state === 'expiring' ? daysLeftPhrase(s.daysLeft) : (s.state === 'missing' ? null : s.reason);
         const cli = cliOf(ctx);
         // `expiring` is in force, so it is a warning; the refused states are what enforcement refuses (gate.ts).
-        // A refused state's remedy ends with the way back; an expiring licence is in force, and has none to offer.
+        // Either way the remedy is the refusal's, and nothing after it (the owner's ruling, 2026-10-13).
         const refused = REFUSED.includes(s.state);
         return (refused ? fail : warn)(why ? `${line} — ${why}` : line, {
           data,
-          remedy: refused ? `${REMEDY(cli)}. ${WAY_BACK(cli)}` : REMEDY(cli),
+          remedy: REMEDY(cli),
           command: `${cli} licence check`,
         });
       },

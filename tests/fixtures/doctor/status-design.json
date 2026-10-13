@@ -285,7 +285,7 @@
       "status": "fail",
       "severity": "fail",
       "detail": "Licence: missing",
-      "remedy": "Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards. To go back to the last release that runs without a licence: ./snowarch upgrade --to v2.0.12.",
+      "remedy": "Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards",
       "command": "./snowarch licence check",
       "code": null,
       "fixable": false,

@@ -59,8 +59,7 @@ warning's remedy would be a report rather than a panel.
 The `Licence:` line is the session banner's, in every state: `Licence: missing` on a checkout with no
 licence, and `Licence: ok · LIC-… · until <date>` with one in force. From 2.0.13 a state that is not in
 force refuses every MCP tool, and every command but `licence`, `doctor`, `status`, `version`, `upgrade`,
-`bootstrap` and `mode design`, and nothing turns that off. `./snowarch licence check` says why, and
-`./snowarch upgrade --to v2.0.12` goes back to the last release that runs without a licence. A licence's
+`bootstrap` and `mode design`, and nothing turns that off. `./snowarch licence check` says why. A licence's
 `valid_until` is a calendar date in UTC: the last day counts, until 00:00 UTC of the next day, and the
 commands print it as `<date> (UTC, N days)`.
 

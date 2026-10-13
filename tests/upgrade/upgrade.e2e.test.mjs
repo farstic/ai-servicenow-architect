@@ -392,13 +392,14 @@ test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t
   assert.notEqual(state(w.user).steps.B02.status, 'fail');
 }, MINUTES);
 
-// ── ARC-11-C6 step 6 — a user without a licence ──────────────────────────────────────────────────────────
+// ── ARC-11-C6 — a user without a licence ─────────────────────────────────────────────────────────────────
 //
 // The owner's own path: a checkout on the last release that runs without a licence, upgrading to the first that
-// refuses. U1 to U5 and finish() are 2.0.12's code, and U6 and U7 are 2.0.13's bootstrap and doctor. So the way back
-// can only reach the reader through 2.0.13's E-31, which is why that remedy carries it (the architect's ruling).
+// refuses. U1 to U5 and finish() are 2.0.12's code, and U6 and U7 are 2.0.13's bootstrap and doctor. By the owner's
+// ruling from the rc.3 sitting (2026-10-13), "the user must not learn how to have a working Architect without a
+// licence": what U7 shows is E-31's FAIL and its remedy, and nothing that sends the reader back.
 
-test('ARC-11-C6 — 2.0.12 to 2.0.13 with no licence ends at U7 with E-31 FAIL, its remedy and the way back, which runs', async (t) => {
+test('ARC-11-C6 — 2.0.12 to 2.0.13 with no licence: E-31 FAIL at U7 with no way back; the move back refused, licensed taken', async (t) => {
   const w = await buildEnforcementWorld(t);
   bootstrapUser(w.user, { store: false, licence: false });
   const up = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin, licence: false });
@@ -409,15 +410,25 @@ test('ARC-11-C6 — 2.0.12 to 2.0.13 with no licence ends at U7 with E-31 FAIL, 
   t.diagnostic(u7.split('\n').find((l) => l.includes('E-31')) ?? 'U7 printed no E-31 line');
   assert.match(u7, /E-31 FAIL/, u7);
   assert.ok(u7.includes('.local/licence.json'), u7);
-  assert.ok(u7.includes('upgrade --to v2.0.12'), u7);
+  assert.equal(u7.includes('upgrade --to'), false, u7);
 
-  // The way back is always allowed: `upgrade` runs without a licence, and v2.0.12 itself needs none.
-  const back = snowarch(w.user, ['upgrade', '--to', 'v2.0.12', '--yes'], { bin: w.bin, licence: false });
-  assert.equal(back.status, 0, back.text);
-  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.12', back.text);
+  // And the path is closed (the owner's ruling): with no licence in force, a move to a release at or below the last
+  // that enforces nothing is refused before anything moves, exit 3, with the code and the remedy, and no word of why.
+  const refused = snowarch(w.user, ['upgrade', '--to', 'v2.0.12', '--yes'], { bin: w.bin, licence: false });
+  t.diagnostic(refused.text.split('\n').find((l) => l.includes('LICENCE_NOT_VALID')) ?? 'no refusal line');
+  assert.equal(refused.status, 3, refused.text);
+  assert.match(refused.text, /\(Code: LICENCE_NOT_VALID\)/, refused.text);
+  assert.ok(refused.text.includes('licence check'), refused.text);
+  assert.equal(/last release that runs without|go back to|unenforced|without enforcement/i.test(refused.text), false, refused.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.13', refused.text);
+
+  // The owner's own way back stays: with a licence in force, the same move is taken.
+  const licensed = snowarch(w.user, ['upgrade', '--to', 'v2.0.12', '--yes'], { bin: w.bin });
+  assert.equal(licensed.status, 0, licensed.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.12', licensed.text);
 }, 2 * MINUTES);
 
-test('ARC-11-C6 — with no licence, U4 says what the release refuses and the way back, with --yes and without', async (t) => {
+test('ARC-11-C6 — with no licence, U4 says what the release refuses and the remedy, with --yes and without', async (t) => {
   const w = await buildWorld(t);
   bootstrapUser(w.user, { licence: false });
   const head = git(w.user, ['rev-parse', 'HEAD']);
@@ -428,7 +439,7 @@ test('ARC-11-C6 — with no licence, U4 says what the release refuses and the wa
   assert.equal(asked.status, 0, asked.text);
   assert.ok(said(asked.text) > -1, asked.text);
   assert.ok(said(asked.text) < asked.text.indexOf('Proceed? [Y/n]'), 'the notice comes after the question');
-  assert.ok(asked.text.includes('upgrade --to v2.0.12'), asked.text);
+  assert.equal(asked.text.includes('upgrade --to v2.0.12'), false, asked.text);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
 
   // With --yes: said, and the move goes ahead, because it is still the reader's to make.
