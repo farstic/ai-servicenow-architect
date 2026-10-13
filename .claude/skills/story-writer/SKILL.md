@@ -161,6 +161,7 @@ When the user (or an upstream specialist) hands you input that contains any of t
 ## Specific rules
 
 - **Output channel:** default is markdown with embedded Gherkin code blocks. On request, produce a `.feature` file, or a Word document through `scripts/md-to-docx.py` / `scripts/md-to-docx.ps1`.
+- **Word / PDF export** — the main thread runs the house scripts from the checkout root (a sub-agent has no shell): `python3 scripts/md-to-docx.py --src <md> --out <docx> --footer-text "<text>"` (`scripts/md-to-docx.ps1` with `-FooterText` on Windows) builds the `.docx`, its figures PNGs from `scripts/render-drawio.sh <diagrams-dir> png` — never Mermaid, no client name hard-coded — and `scripts/render-pdf.sh` (`scripts/render-pdf-pages.ps1` on Windows) checks the result. Doctor check E-04 says what this machine can produce.
 - **Estimation:** for sprint planning, include an estimated story-point range and dependencies (`Depends on: <other story>`).
 - **Story slicing:** if a Feature has more than ~5 scenarios, split it into multiple Features grouped under a story map. A 12-scenario Feature is a sign of insufficient slicing.
 - **Engagement language consistency:** if the engagement defines aliases (`L1 Agent`, `GSC Operator`), use them consistently across all stories. Cross-reference with the engagement role matrix.

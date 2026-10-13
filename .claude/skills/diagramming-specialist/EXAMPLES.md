@@ -39,7 +39,7 @@ sequenceDiagram
 None new — the DLQ record lands in `x_acme_itsm_ado_dlq`, which the spec's envelope pre-approved, so it is drawn as approved, not PENDING.
 
 ### Export notes
-The Mermaid above is the draft. The delivered figure is a house-style `.drawio` (Example 6), exported to SVG for the client pack.
+The Mermaid above is the draft. The delivered figure is a house-style `.drawio` (Example 6), rendered to SVG by `scripts/render-drawio.sh` for the client pack.
 
 ---
 
@@ -105,7 +105,7 @@ stateDiagram-v2
 None — every object is baseline-confirmed in the Constraint Envelope.
 
 ### Export notes
-Three figures, one legend. For the review board deck, deliver each as a `.drawio` and export it to SVG; keep the `.drawio` sources in the HLD's Diagram Sources appendix.
+Three figures, one legend. For the review board deck, deliver each as a `.drawio` and render the folder to SVG with `scripts/render-drawio.sh`; keep the `.drawio` sources in the HLD's Diagram Sources appendix.
 
 ---
 
@@ -187,11 +187,11 @@ Takes the Figure-2 ERD from Example 2, built as a house-style `.drawio` (Example
 
 **1. Save the source** — `clients/acme/csm-escalation-hld/diagrams/fig-02-data-model.drawio`, hand-built in the house style (Example 6); the `erDiagram` block in Example 2 is only its draft.
 
-**2. Export locally** (no external service) — from the draw.io desktop app or diagrams.net (export as SVG), or with the desktop app's command line:
+**2. Render locally with the house script** (no external service), from the checkout root:
 ```
-drawio -x -f svg -o clients/acme/csm-escalation-hld/diagrams/fig-02-data-model.svg clients/acme/csm-escalation-hld/diagrams/fig-02-data-model.drawio
+scripts/render-drawio.sh clients/acme/csm-escalation-hld/diagrams svg
 ```
-→ writes `fig-02-data-model.svg` beside the source.
+→ writes `fig-02-data-model.svg` beside the source and prints `done: 1 rendered, 0 failed  (clients/acme/csm-escalation-hld/diagrams)`. That file is the export, never hand-authored. Run it again with `png` when the HLD goes to Word: `scripts/md-to-docx.py` embeds PNG only.
 
 **3. Embed into the HLD section** — place the exported image with its numbered caption:
 ```
@@ -210,7 +210,7 @@ The `.drawio` is the source of truth; the `.svg` is its export. After any edit, 
 
 ## Example 6 — house style as draw.io (`.drawio`) — copy-paste mxCell styles
 
-Every delivered figure is an editable `.drawio` styled to the house palette. Reuse these mxCell `style=` strings; the SVG/PNG you embed in a doc is just an export of the result.
+Every delivered figure is an editable `.drawio` styled to the house palette. Reuse these mxCell `style=` strings; the SVG/PNG you embed in a doc is the output of `scripts/render-drawio.sh` from the result, never hand-authored.
 
 | Element | mxCell `style=` |
 |---|---|
@@ -233,7 +233,7 @@ Minimal `.drawio` skeleton (a baseline node → a PENDING node):
 </root></mxGraphModel></diagram></mxfile>
 ```
 
-Full reference: `.claude/skills/diagramming-specialist/templates/house-style-reference.drawio` (open in draw.io / VS Code / Lucidchart). **Hand-craft every delivered figure to this standard** — labels exact-to-spec, the shared palette, one shared legend; export an SVG/PNG for the doc; never ship a recolored Mermaid as the figure.
+Full reference: `.claude/skills/diagramming-specialist/templates/house-style-reference.drawio` (open in draw.io / VS Code / Lucidchart). **Hand-craft every delivered figure to this standard** — labels exact-to-spec, the shared palette, one shared legend; render the SVG/PNG for the doc with `scripts/render-drawio.sh`; never ship a recolored Mermaid as the figure.
 
 ---
 

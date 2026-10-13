@@ -176,3 +176,27 @@ test('criterion 1 — the lint passes with an EMPTY length allow-list, and repor
   assert.ok(total <= 14000, `SK-02 total description budget ${total} > 14000 (story criterion 1)`);
   console.log(`    criterion 1: ${lens.length} skills, total ${total} chars (ceiling 14000), longest ${Math.max(...lens)}, mean ${Math.round(total / lens.length)}`);
 });
+
+// ARC-02-C5 — the owner's one-figure test came back with a hand-written SVG, and the Word test with an
+// offer of pandoc: no file the Architect reads named the house scripts, since ARC-02-S08 cut them from
+// CLAUDE.md. Each file below names its scripts again, and the diagramming pair says the export is never
+// hand-authored. A file that loses one is where those two runs started.
+const HOUSE_SCRIPTS = {
+  'CLAUDE.md': ['scripts/render-drawio.sh', 'scripts/md-to-docx.py'],
+  '.claude/skills/diagramming-specialist/SKILL.md': ['scripts/render-drawio.sh', 'never hand-authored', 'scripts/md-to-docx.py'],
+  '.claude/agents/diagramming-specialist.md': ['scripts/render-drawio.sh', 'never hand-authored'],
+  '.claude/skills/hld-lld-writer/SKILL.md': ['scripts/md-to-docx.py', 'scripts/render-drawio.sh'],
+  '.claude/agents/hld-lld-writer.md': ['scripts/md-to-docx.py', 'scripts/render-drawio.sh'],
+  '.claude/skills/operational-documentation/SKILL.md': ['scripts/md-to-docx.py', 'scripts/render-drawio.sh'],
+  '.claude/skills/story-writer/SKILL.md': ['scripts/md-to-docx.py', 'scripts/render-drawio.sh'],
+  '.claude/agents/story-writer.md': ['scripts/md-to-docx.py', 'scripts/render-drawio.sh'],
+};
+
+test('ARC-02-C5 the files that make figures and Word name the house scripts, and the export is never hand-authored', () => {
+  const missing = Object.entries(HOUSE_SCRIPTS).flatMap(([f, names]) => {
+    const text = readFileSync(join(root, f), 'utf8');
+    return names.filter((n) => !text.includes(n)).map((n) => `${f}: ${n}`);
+  });
+  assert.deepEqual(missing, [], `${missing.length} name(s) missing:\n  ${missing.join('\n  ')}`);
+  console.log(`    ARC-02-C5: ${Object.keys(HOUSE_SCRIPTS).length} files name their house scripts`);
+});
