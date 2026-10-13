@@ -200,3 +200,23 @@ test('ARC-02-C5 the files that make figures and Word name the house scripts, and
   assert.deepEqual(missing, [], `${missing.length} name(s) missing:\n  ${missing.join('\n  ')}`);
   console.log(`    ARC-02-C5: ${Object.keys(HOUSE_SCRIPTS).length} files name their house scripts`);
 });
+
+// ARC-02-C9 — the halt reads as the verdict does. The gateways' verdict tables say Verdict C applies when a
+// custom object "was NAMED in the request, or is the only viable path after the baseline evaluation", while
+// thirteen skills' halt protocols, governance §1.1 and the taxonomy said only "genuinely the only viable path":
+// read alone, they would not halt on a named object. Every line that says "only viable" now names the request too.
+test('ARC-02-C9 every "only viable" line in the roster and the governing files also says "named in the request"', () => {
+  const bad = [];
+  let seen = 0;
+  for (const f of SURFACE.filter((p) => existsSync(join(root, p)))) {
+    readFileSync(join(root, f), 'utf8').split('\n').forEach((l, i) => {
+      if (!/only viable/i.test(l)) return;
+      seen++;
+      if (/genuinely the only viable/i.test(l)) bad.push(`${f}:${i + 1} says "genuinely the only viable"`);
+      else if (!/named in the request/i.test(l)) bad.push(`${f}:${i + 1} says "only viable" without "named in the request"`);
+    });
+  }
+  assert.ok(seen > 0, 'no "only viable" line found — the sweep read nothing');
+  assert.deepEqual(bad, [], `${bad.length} halt line(s) out of step with the verdict table:\n  ${bad.join('\n  ')}`);
+  console.log(`    ARC-02-C9: ${seen} "only viable" line(s), each naming the request`);
+});
