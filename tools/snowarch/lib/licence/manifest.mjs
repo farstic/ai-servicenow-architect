@@ -248,6 +248,18 @@ export function writeManifestCache(root, { tag, doc, checkedAt, source }) {
 /** A development version: `2.1.0-dev`, and `2.1.0-dev.1` should one ever be cut. */
 export const isDevVersion = (version) => /-dev(\.\d+)?$/.test(version);
 
+/** The first release a manifest is signed for. `upgrade` allows a target before it without one (ARC-11-C7). */
+export const MANIFESTS_FROM = '2.1.0';
+
+/** Is `tag` (`v<major>.<minor>.<patch>`, a prerelease included) at or past MANIFESTS_FROM? */
+export function signedRelease(tag) {
+  const at = /^v(\d+)\.(\d+)\.(\d+)/.exec(String(tag ?? ''));
+  if (!at) return false;
+  const [from, here] = [MANIFESTS_FROM.split('.').map(Number), at.slice(1).map(Number)];
+  for (let i = 0; i < 3; i++) if (here[i] !== from[i]) return here[i] > from[i];
+  return true;
+}
+
 /** The commit this checkout's own `tag` names, or `null`: no git, no repository, or no such tag (a download). */
 export function tagCommit(root, tag, { run = spawnSync } = {}) {
   const r = run('git', ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`],
@@ -259,6 +271,12 @@ export function tagCommit(root, tag, { run = spawnSync } = {}) {
 const versionOf = (root) => {
   try { return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version ?? null; } catch { return null; }
 };
+
+/** This checkout's release tag, `v<version>`, or `null` for a development version or none. */
+export function releaseTagOf(root) {
+  const version = versionOf(root);
+  return typeof version === 'string' && version !== '' && !isDevVersion(version) ? `v${version}` : null;
+}
 
 /**
  * This checkout against its release's signed manifest, read from the cache: `{ state, version, tag, … }`.
@@ -297,7 +315,7 @@ export function integrityLine(s) {
   const short = (sha) => sha.slice(0, 7);
   switch (s.state) {
     case 'dev': return 'Integrity: not checked — a development tree has no signed manifest';
-    case 'verified': return `Integrity: verified · ${s.tag} · ${s.checked} files`;
+    case 'verified': return `Integrity: verified · ${s.tag} · ${s.checked} file${s.checked === 1 ? '' : 's'}`;
     case 'modified': {
       const n = s.modified.length;
       const first = s.modified[0].path;

@@ -13,11 +13,12 @@
  */
 import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { fingerprint, signLicence, signList } from '../../lib/licence/core.mjs';
+import { COVERAGE, signManifest } from '../../lib/licence/manifest.mjs';
 import { tempDir } from './temp.mjs';
 
 /** A fresh Ed25519 pair, as PEM, the shape `licence keygen` writes. */
@@ -71,10 +72,24 @@ export function listRepo(t, files) {
   if (files) {
     const work = join(base, 'work');
     git(['init', '-q', '--initial-branch=main', work]);
-    for (const [path, content] of Object.entries(files)) writeFileSync(join(work, path), content);
+    // A path may name a directory: a release manifest is `releases/<tag>.json` (ARC-11-C7).
+    for (const [path, content] of Object.entries(files)) {
+      mkdirSync(dirname(join(work, path)), { recursive: true });
+      writeFileSync(join(work, path), content);
+    }
     git(['-C', work, 'add', '-A']);
     git(['-C', work, 'commit', '-q', '--allow-empty', '-m', 'list']);
     git(['-C', work, 'push', '-q', bare, 'main']);
   }
   return pathToFileURL(bare).href;
 }
+
+/**
+ * ARC-11-C7 — a signed manifest document for `tag`, its body valid and small: the product's coverage and one covered
+ * file. `over` replaces fields of the body. For the transport and the commands; a tree's own manifest comes from
+ * `manifestFromArchive`.
+ */
+export const manifestDoc = (tag, key, over = {}) => signManifest({
+  tag, commit: 'a'.repeat(40), covers: [...COVERAGE.covers], excludes: [...COVERAGE.excludes],
+  ignores: [...COVERAGE.ignores], files: { 'CLAUDE.md': '0'.repeat(64) }, ...over,
+}, key.privateKey);

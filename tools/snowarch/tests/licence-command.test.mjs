@@ -16,7 +16,8 @@ import { readList } from '../lib/licence/core.mjs';
 import { readListCache } from '../lib/licence/state.mjs';
 import { licencePath, revocationsPath } from '../lib/local-paths.mjs';
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
-import { keyPair, licence, licenceText, listDoc, listRepo, productKeys } from './helpers/licence.mjs';
+import { keyPair, licence, licenceText, listDoc, listRepo, manifestDoc, productKeys } from './helpers/licence.mjs';
+import { readManifestCache } from '../lib/licence/manifest.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
 const NOW = new Date('2026-10-10T12:00:00Z');
@@ -355,4 +356,23 @@ test('ARC-11-C6 step 7 — check prints the same valid until: line after its ban
   writeFileSync(licencePath(w.root), JSON.stringify(forged));
   const invalid = await run(w, ['check'], {}, { keys });
   for (const r of [perpetual, invalid]) assert.equal(r.text.includes('valid until:'), false, r.text);
+});
+
+test('ARC-11-C7 — check --refresh also fetches this release\'s signed manifest; a development tree fetches none', async (t) => {
+  const w = world(t);
+  const g = await keygen(t, w);
+  const key = { privateKey: readFileSync(g.out, 'utf8') };
+  writeFileSync(licencePath(w.root), licenceText(licence({ id: 'LIC-2026-0005' }), key));
+  const repo = listRepo(t, { 'releases/v9.1.0.json': `${JSON.stringify(manifestDoc('v9.1.0', key))}\n` });
+  const config = { licence: { revocations: { repo, ref: 'main', path: 'revocations.json' } } };
+
+  writeFileSync(join(w.root, 'package.json'), '{ "version": "9.1.0" }\n');
+  const release = await run(w, ['check'], { refresh: true }, { keys: g.keys, config });
+  assert.equal(release.code, EXIT_OK, release.text);
+  assert.match(release.text, /^step: release manifest: v9\.1\.0 fetched \(1 file\)$/m);
+  assert.equal(readManifestCache(w.root).tag, 'v9.1.0');
+
+  writeFileSync(join(w.root, 'package.json'), '{ "version": "9.1.0-dev" }\n');
+  const dev = await run(w, ['check'], { refresh: true }, { keys: g.keys, config });
+  assert.doesNotMatch(dev.text, /release manifest/);
 });

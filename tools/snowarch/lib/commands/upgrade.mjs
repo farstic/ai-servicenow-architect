@@ -44,7 +44,8 @@ import { engineChecks } from '../doctor/checks/index.mjs';
 import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
-import { refreshWithUpgrade } from '../licence/fetch.mjs';
+import { manifestSays, refreshManifest, refreshWithUpgrade } from '../licence/fetch.mjs';
+import { signedRelease, writeManifestCache } from '../licence/manifest.mjs';
 import { hashFor, INPUTS, STEP_IDS } from '../inputs.mjs';
 
 /**
@@ -739,6 +740,12 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     log.step(UNTRACKED_REASON);
     return EXIT_USAGE;
   }
+  // ARC-11-C7 — the TARGET's signed manifest, read before anything moves and cached once the tree is the target, so
+  // the doctor at U7 checks the new tree against its own release. A target before MANIFESTS_FROM has none to read.
+  const manifest = signedRelease(target)
+    ? refreshManifest(root, { config, tag: target, env, now: now(), write: false })
+    : null;
+  if (manifest && manifest.outcome !== 'unconfigured') log.step(manifestSays(manifest));
   const ctx = { root, config };
   // ARC-08-C29 — ONE COMPUTATION. `planSteps` asks the runner's own question (hash the tag's
   // inputs, compare with the recorded state) and falls back to the file diff only when the tag
@@ -837,6 +844,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
       log.fail(`upgrade: git could not check out ${target}${reason ? ` — ${reason}` : ''}; nothing else was changed`);
       return EXIT_FAIL;
     }
+    if (manifest?.outcome === 'fetched') writeManifestCache(root, manifest.entry);
     log.step(`HEAD is detached at ${target} — return with: git checkout ${returnTo}`);
     log.step('your instance store lives in .local/, which git ignores, so no checkout touches it');
   }

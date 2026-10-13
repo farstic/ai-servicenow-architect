@@ -6,7 +6,8 @@
  *   show                   the installed licence: its fields, its signature, its term, the list it was
  *                          judged against, enforcement, and the product's public keys
  *   verify <file>          the same judgement of any licence file
- *   check [--refresh]      what the start-up check finds; `--refresh` fetches the revocation list first
+ *   check [--refresh]      what the start-up check finds; `--refresh` fetches the revocation list first, and this
+ *                          release's signed manifest (ARC-11-C7)
  *   keygen                 the owner's two key pairs, the creator's licence and the issue ledger
  *   issue                  a signed licence, numbered from the ledger beside the key
  *   init-list              the first revocation list: version 1, empty, signed
@@ -36,7 +37,8 @@ import {
   signList, utcDate,
 } from '../licence/core.mjs';
 import { PRODUCT_KEYS } from '../licence/keys.mjs';
-import { listSource, refreshList, refreshSays } from '../licence/fetch.mjs';
+import { listSource, manifestSays, refreshList, refreshManifest, refreshSays } from '../licence/fetch.mjs';
+import { releaseTagOf } from '../licence/manifest.mjs';
 import {
   allowedPhrase, bannerLine, heldList, licenceStatus, listStale, readListCache, REFUSED,
 } from '../licence/state.mjs';
@@ -48,7 +50,8 @@ export const USAGE = (where) => {
     '',
     '  show                     the installed licence, its signature and term, and the product\'s keys',
     '  verify <file>            the same for any licence file',
-    '  check [--refresh]        what the start-up check finds; --refresh fetches the revocation list first',
+    '  check [--refresh]        what the start-up check finds; --refresh fetches the revocation list first,',
+    '                           and this release\'s signed manifest',
     '',
     '  the owner\'s, with private keys kept outside this checkout:',
     '  keygen --out <file> --recovery-out <file> --to <name> --org <org>',
@@ -234,6 +237,9 @@ function check({ flags, log, root, keys, now, env, config }) {
   if (flags.refresh) {
     const r = refreshList(root, { config: config(), keys, now: now(), env });
     log.step(refreshSays(r));
+    // ARC-11-C7 — and the manifest E-32 reads, the remedy E-32 names for a missing, invalid or other one.
+    const tag = releaseTagOf(root);
+    if (tag) log.step(manifestSays(refreshManifest(root, { config: config(), tag, keys, now: now(), env })));
   }
   const s = licenceStatus(root, { keys, now: now() });
   if (flags.json) {
