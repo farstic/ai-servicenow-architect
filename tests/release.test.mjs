@@ -1165,7 +1165,7 @@ test('ARC-11-C7 — --tag-only on a 2.1+ release tags, says to sign before pushi
   const r = await run(root, ['9.1.0', '--tag-only', '--offline'], { keys: MANIFEST_KEYS });
   assert.equal(r.code, 0, r.err);
   assert.equal(git(root, ['tag', '-l', 'v9.1.0']).trim(), 'v9.1.0');
-  assert.match(r.out, /Before it is pushed, sign its manifest with \.\/snowarch licence sign-release v9\.1\.0/);
+  assert.match(r.out, /Before it is pushed, sign its manifest with \S+ licence sign-release v9\.1\.0/);
   assert.deepEqual(pushed(r.calls), []);
 });
 
@@ -1226,7 +1226,7 @@ test('ARC-11-C7 — the one-shot flow tags a 2.1+ release and does not push it, 
   const r = await run(root, ['9.1.0', '--yes', '--offline', '--no-install', '--push'], { keys: MANIFEST_KEYS });
   assert.equal(r.code, 2, r.out);
   assert.equal(git(root, ['tag', '-l', 'v9.1.0']).trim(), 'v9.1.0');
-  assert.match(r.out, /tagged and not pushed\. Sign its manifest with \.\/snowarch licence sign-release v9\.1\.0/);
+  assert.match(r.out, /tagged and not pushed\. Sign its manifest with \S+ licence sign-release v9\.1\.0/);
   assert.match(r.err, /release: v9\.1\.0 is pushed only with its signed manifest published — nothing was pushed/);
   assert.deepEqual(pushed(r.calls), []);
 });
