@@ -50,6 +50,14 @@ After rc.3, and covered by unit, parity and e2e tests rather than by the sitting
   --to` checks the licence before it takes the target (ARC-11-C6);
 - in rc.4, the banner runs the quick doctor again after a licence is installed (ARC-11-C12, under Fixed).
 
+**The next release candidate.** `v2.0.13-rc.4` is release commit `c9c6b8d`, cut from develop `a34b845`, after #427.
+Its release evidence reads as rc.3's on all three operating systems: 35 ok, 1 warn (SV-02), 1 fail (E-00) and 5 skip,
+with E-31 ok under the CI fixture licence. The owner's check on it, on 2026-10-13, passed:
+- two checkouts upgraded from rc.3 cleanly, each with its doctor at 40 ok, 2 warn (E-23, E-30) and 0 fail;
+- with a revoked licence restored, E-31 FAILs with its remedy and nothing after it, and SV-06 skips with E-31's
+  reason;
+- without a licence in force, `upgrade --to` refused the target with exit 3, and nothing changed.
+
 ### Changed
 
 - The licence line says the state alone: "warn only" and "enforced" are gone, because enforcement no longer has a
