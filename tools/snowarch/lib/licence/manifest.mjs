@@ -196,6 +196,23 @@ export function manifestFromArchive(root, tag, { coverage = COVERAGE, run = spaw
     files };
 }
 
+/**
+ * Why `manifest` is not the record of `tag`'s own tree, or `null` when it is: the same commit, files and hashes as
+ * `git archive <tag>` gives here. The release's push gate and `upgrade`'s U4 both ask it, before anything leaves or
+ * moves.
+ */
+export function archiveDiffers(root, tag, manifest, { run } = {}) {
+  const local = manifestFromArchive(root, tag, run ? { run } : {});
+  if (manifest.commit !== local.commit) {
+    return `the published manifest names ${manifest.commit.slice(0, 7)}, and ${tag} here is ${local.commit.slice(0, 7)}`;
+  }
+  const paths = [...new Set([...Object.keys(manifest.files), ...Object.keys(local.files)])].sort();
+  const differ = paths.filter((p) => manifest.files[p] !== local.files[p]);
+  if (differ.length === 0) return null;
+  return `${differ.length} file${differ.length === 1 ? '' : 's'} in the published manifest differ${differ.length === 1 ? 's' : ''} `
+    + `from ${tag}'s own, the first ${differ[0]}`;
+}
+
 // ── The user's side: a tree on disk, against a verified manifest ───────────────────────────────────────────────────
 
 /** Every file and link under `dir` (relative to `root`), as `/` paths; a linked directory is listed, not entered. */

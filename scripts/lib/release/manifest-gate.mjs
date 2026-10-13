@@ -13,23 +13,12 @@
  */
 import { manifestSays, refreshManifest } from '../../../tools/snowarch/lib/licence/fetch.mjs';
 import { PRODUCT_KEYS } from '../../../tools/snowarch/lib/licence/keys.mjs';
-import { manifestFromArchive } from '../../../tools/snowarch/lib/licence/manifest.mjs';
+import { archiveDiffers } from '../../../tools/snowarch/lib/licence/manifest.mjs';
 
 /** `{ ok: true, files }`, or `{ ok: false, reason }`: is the manifest published for `tag` the record of this tag's tree? */
 export function publishedManifestMatches(root, tag, { config, keys = PRODUCT_KEYS, env = process.env, fetcher } = {}) {
   const fetched = refreshManifest(root, { config, tag, keys, env, write: false, ...(fetcher ? { fetcher } : {}) });
   if (fetched.outcome !== 'fetched') return { ok: false, reason: manifestSays(fetched) };
-  const published = fetched.entry.doc.manifest;
-  const local = manifestFromArchive(root, tag);
-  if (published.commit !== local.commit) {
-    return { ok: false, reason: `the published manifest names ${published.commit.slice(0, 7)}, and ${tag} here is `
-      + `${local.commit.slice(0, 7)}` };
-  }
-  const paths = [...new Set([...Object.keys(published.files), ...Object.keys(local.files)])].sort();
-  const differ = paths.filter((p) => published.files[p] !== local.files[p]);
-  if (differ.length > 0) {
-    return { ok: false, reason: `${differ.length} file${differ.length === 1 ? '' : 's'} in the published manifest `
-      + `differ${differ.length === 1 ? 's' : ''} from ${tag}'s own, the first ${differ[0]}` };
-  }
-  return { ok: true, files: paths.length };
+  const reason = archiveDiffers(root, tag, fetched.entry.doc.manifest);
+  return reason ? { ok: false, reason } : { ok: true, files: fetched.files };
 }

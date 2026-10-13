@@ -447,3 +447,33 @@ test('ARC-11-C6 — with no licence, U4 says what the release refuses and the re
   assert.ok(said(moved.text) > -1, moved.text);
   assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0', moved.text);
 }, MINUTES);
+
+// ── ARC-11-C7 — a target from 2.1 on moves only with its signed manifest ─────────────────────────────────────────
+
+test('ARC-11-C7 — a target with no signed manifest, or one that is not its own, is refused at U4, and nothing moves', async (t) => {
+  const w = await buildWorld(t, { unsigned: ['v9.1.0'], altered: ['v9.2.0'] });
+  bootstrapUser(w.user);
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const status = git(w.user, ['status', '--porcelain']);
+  const none = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(none.status, 1, none.text);
+  assert.match(none.text, /upgrade: v9\.1\.0 has no verified signed manifest \(release manifest: none is published for v9\.1\.0\) — nothing was changed/);
+  const altered = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(altered.status, 1, altered.text);
+  assert.match(altered.text, /upgrade: v9\.2\.0 has no verified signed manifest \(1 file in the published manifest differs from v9\.2\.0's own, the first CLAUDE\.md\) — nothing was changed/);
+  for (const r of [none, altered]) assert.doesNotMatch(r.text, /\[U5\/7\]/, 'the refusal came after the tree started to move');
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
+  assert.equal(git(w.user, ['status', '--porcelain']), status, 'the working tree changed after a refusal');
+}, MINUTES);
+
+test('ARC-11-C7 — a covered directory with a file the release does not ship stops the upgrade after U5, before U6', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  mkdirSync(join(w.user, '.claude', 'skills', 'mine'), { recursive: true });
+  writeFileSync(join(w.user, '.claude', 'skills', 'mine', 'SKILL.md'), 'a skill nobody shipped\n');
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(r.status, 1, r.text);
+  assert.match(r.text, /release manifest: v9\.1\.0 fetched \(\d+ files\)/);
+  assert.match(r.text, /upgrade: the tree at v9\.1\.0 is not what its signed manifest records — 1 file differs, the first \.claude\/skills\/mine\/SKILL\.md \(extra\); the upgrade stops before the bootstrap — return with: git checkout /);
+  assert.doesNotMatch(r.text, /\[U6\/7\]/, 'the bootstrap ran on a tree that is not the release');
+}, MINUTES);
