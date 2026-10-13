@@ -31,20 +31,25 @@ The no-deliverable rule reads the session banner's `Licence:` line, which the Se
 that loads no local settings, has hooks off, or has the hook entry removed does not see it, and only the rule goes
 silent — the server still refuses every MCP tool. From 2.1 the doctor fails when the hook is gone (ARC-11-C10).
 
-**The release candidate, and what the owner's sitting confirms.** `v2.0.13-rc.3` is release commit `5fac74b`,
+**The release candidate, and what the owner's sitting confirmed.** `v2.0.13-rc.3` is release commit `5fac74b`,
 cut from develop `20d05f4`, after #420 (ARC-11-C6), #424 (the sweep) and #425 (ARC-07-C43, the changelog guard).
 Its release evidence reads the same on all three operating systems: 35 ok, 1 warn (SV-02), 1 fail (E-00) and
-5 skip. E-31 is ok under the CI fixture licence; 2.0.12's evidence had it as its second warn. Two rows landed
-after rc.3, in #426, and unit and parity tests cover them, not the sitting: ARC-11-C11, the list refresh's deadline
-in its third git call (under Fixed), and ARC-09-C133, two tests that waited on a slow runner. The owner's sitting
-on it runs:
-- **T-28, revised for enforcement on every build**, with no variable set anywhere. Row 1 is refused, with E-31's
-  remedy and the way back. The `valid until:` line reads in UTC, with "last day" on the last day. Row 15 takes the
-  way back, `./snowarch upgrade --to v2.0.12`;
+5 skip. E-31 is ok under the CI fixture licence; 2.0.12's evidence had it as its second warn. The owner's sitting
+on it, on 2026-10-13, confirmed every step (`docs/validation/2.0.13-rc.3-live-sitting.md`):
+- **T-28, revised for enforcement on every build**, with no variable set anywhere. With no licence, E-31 FAILs with
+  its remedy. Revoked, `./snowarch licence check` says so, with its `valid until:` line in UTC, and every tool is
+  refused with `LICENCE_NOT_VALID` and one audit line. With a new licence issued and installed, the tool answers
+  again;
+- **T-31 with a refused licence**: the Architect names the state and produces no deliverable;
 - **T-29 and T-30 under a valid licence**, against rc.2's numbers and verdicts
-  (`docs/validation/2.0.12-rc.2-live-sitting.md`);
-- **T-31 with no licence**: the Architect names `missing`, points to `./snowarch licence check`, and produces no
-  deliverable.
+  (`docs/validation/2.0.12-rc.2-live-sitting.md`): 1 min 47 s and 2 min 05 s.
+
+After rc.3, and covered by unit, parity and e2e tests rather than by the sitting:
+- in #426, ARC-11-C11, the list refresh's deadline in its third git call (under Fixed), and ARC-09-C133, two
+  tests that waited on a slow runner;
+- in rc.4, by the owner's ruling at the sitting, E-31's remedy and U4's notice end at the remedy, and `upgrade
+  --to` checks the licence before it takes the target (ARC-11-C6);
+- in rc.4, the banner runs the quick doctor again after a licence is installed (ARC-11-C12, under Fixed).
 
 ### Changed
 
