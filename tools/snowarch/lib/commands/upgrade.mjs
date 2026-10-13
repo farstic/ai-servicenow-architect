@@ -44,7 +44,8 @@ import { engineChecks } from '../doctor/checks/index.mjs';
 import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
-import { refreshWithUpgrade } from '../licence/fetch.mjs';
+import { manifestSays, refreshManifest, refreshWithUpgrade } from '../licence/fetch.mjs';
+import { MANIFESTS_FROM, archiveDiffers, checkTree, signedRelease, writeManifestCache } from '../licence/manifest.mjs';
 import { hashFor, INPUTS, STEP_IDS } from '../inputs.mjs';
 
 /**
@@ -739,6 +740,23 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     log.step(UNTRACKED_REASON);
     return EXIT_USAGE;
   }
+  // ARC-11-C7 — A TARGET FROM 2.1 ON MOVES ONLY WITH ITS SIGNED MANIFEST, and one that is the record of THIS tag: verified
+  // with the shipped keys, and the same commit, files and hashes as the tag's own `git archive` here. Refused now, before
+  // anything moves. The manifest is cached once the tree is the target, so the doctor at U7 checks the new tree against
+  // its own release. A target before 2.1 was released without one, so it moves with a note.
+  let manifest = null;
+  if (signedRelease(target)) {
+    const fetched = refreshManifest(root, { config, tag: target, env, now: now(), write: false });
+    const why = fetched.outcome === 'fetched' ? archiveDiffers(root, target, fetched.entry.doc.manifest) : manifestSays(fetched);
+    if (why) {
+      log.fail(`upgrade: ${target} has no verified signed manifest (${why}) — nothing was changed`);
+      return EXIT_FAIL;
+    }
+    log.step(manifestSays(fetched));
+    manifest = fetched;
+  } else {
+    log.step(`${target} is from before ${MANIFESTS_FROM}, when releases began to carry a signed manifest: its files are not checked`);
+  }
   const ctx = { root, config };
   // ARC-08-C29 — ONE COMPUTATION. `planSteps` asks the runner's own question (hash the tag's
   // inputs, compare with the recorded state) and falls back to the file diff only when the tag
@@ -836,6 +854,20 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
       const reason = gitReason(checkedOut.stderr ?? checkedOut.error?.message);
       log.fail(`upgrade: git could not check out ${target}${reason ? ` — ${reason}` : ''}; nothing else was changed`);
       return EXIT_FAIL;
+    }
+    // ARC-11-C7 — the tree is checked after U5 and before U6: what git checked out against what the owner signed, so a
+    // tree that differs (a file the checkout left, a filter, a covered directory with more in it) stops the upgrade
+    // before the bootstrap runs on it.
+    if (manifest) {
+      const tree = checkTree(root, manifest.entry.doc.manifest);
+      if (!tree.ok) {
+        const n = tree.modified.length;
+        log.fail(`upgrade: the tree at ${target} is not what its signed manifest records — ${n} file${n === 1 ? '' : 's'} `
+          + `differ${n === 1 ? 's' : ''}, the first ${tree.modified[0].path} (${tree.modified[0].why}); the upgrade stops before the `
+          + `bootstrap — return with: git checkout ${returnTo}`);
+        return EXIT_FAIL;
+      }
+      writeManifestCache(root, manifest.entry);
     }
     log.step(`HEAD is detached at ${target} — return with: git checkout ${returnTo}`);
     log.step('your instance store lives in .local/, which git ignores, so no checkout touches it');

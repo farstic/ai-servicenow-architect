@@ -33,6 +33,7 @@ import { join } from 'node:path';
 
 import { newerList, readList } from './core.mjs';
 import { PRODUCT_KEYS } from './keys.mjs';
+import { readManifest, writeManifestCache } from './manifest.mjs';
 import { heldList, readLicenceText, readListCache, writeListCache } from './state.mjs';
 import { which } from '../which.mjs';
 
@@ -159,3 +160,60 @@ export function refreshWithUpgrade(root, { config, env = process.env, now = new 
   if (r.outcome !== 'unconfigured') log.step(refreshSays(r));
   return r;
 }
+
+// ── ARC-11-C7 — a release's signed manifest, over the same transport ───────────────────────────────────────────────
+
+/**
+ * `{ url, ref, dir }` for the release manifests, or `null`. `licence.manifests` when the config names one; otherwise
+ * the revocation list's repository and branch with `releases/`, because the owner signs both into one repository. A
+ * manifest is `<dir>/<tag>.json`.
+ */
+export function manifestSource(config) {
+  const own = config?.licence?.manifests;
+  const named = (r) => r && typeof r === 'object' && typeof r.repo === 'string' && r.repo !== '';
+  const from = named(own) ? own : (named(config?.licence?.revocations) ? config.licence.revocations : null);
+  if (!from) return null;
+  return {
+    url: repoUrl(from.repo),
+    ref: typeof from.ref === 'string' && from.ref !== '' ? from.ref : 'main',
+    dir: from === own && typeof own.dir === 'string' && own.dir !== '' ? own.dir : 'releases',
+  };
+}
+
+/**
+ * Fetch `tag`'s signed manifest, verify it, and cache it. Never throws; every outcome is a value:
+ *
+ *   fetched      — it verifies and it is `tag`'s; it is now the cache, unless `write` is false;
+ *   none         — no manifest is published for `tag`;
+ *   refused      — one is published and it does not verify, or it is another release's: ignored, the cache untouched;
+ *   unreachable  — the cache untouched;
+ *   unconfigured — no repository in the config.
+ *
+ * `write: false` verifies without caching, and returns the entry: `upgrade` reads the TARGET's at U4, before the tree
+ * moves, and caches it once the tree is the target.
+ */
+export function refreshManifest(root, { config, tag, keys = PRODUCT_KEYS, now = new Date(), env = process.env,
+  timeoutMs = FETCH_BUDGET_MS, fetcher = fetchList, write = true } = {}) {
+  const source = manifestSource(config);
+  if (!source) return { outcome: 'unconfigured', tag };
+  const path = `${source.dir}/${tag}.json`;
+  const result = fetcher({ url: source.url, ref: source.ref, path, timeoutMs, env });
+  if (result.status === 'unreachable') return { outcome: 'unreachable', tag, detail: result.detail };
+  if (result.status === 'none') return { outcome: 'none', tag };
+  const read = readManifest(result.text, { keys });
+  if (!read.ok) return { outcome: 'refused', tag, reason: read.reason };
+  if (read.manifest.tag !== tag) return { outcome: 'refused', tag, reason: `it is ${read.manifest.tag}'s` };
+  const entry = { tag, doc: JSON.parse(result.text), checkedAt: now.toISOString(), source: `${source.url} ${source.ref}:${path}` };
+  if (write) writeManifestCache(root, entry);
+  return { outcome: 'fetched', tag, files: Object.keys(read.manifest.files).length, entry };
+}
+
+/** What a manifest refresh did, in one line: the bootstrap, `licence check --refresh` and `upgrade` print it. */
+const MANIFEST_SAYS = {
+  fetched: (r) => `release manifest: ${r.tag} fetched (${r.files} file${r.files === 1 ? '' : 's'})`,
+  none: (r) => `release manifest: none is published for ${r.tag}`,
+  refused: (r) => `release manifest: the one published for ${r.tag} does not verify (${r.reason}) — ignored`,
+  unreachable: (r) => `release manifest: could not be reached (${r.detail})`,
+  unconfigured: () => 'release manifest: none configured (engine.config.json → licence)',
+};
+export const manifestSays = (r) => MANIFEST_SAYS[r.outcome](r);

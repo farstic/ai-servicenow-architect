@@ -20,6 +20,7 @@ import { enginePrereqChecks } from './engine-prereqs.mjs';
 import { engineRepoChecks } from './engine-repo.mjs';
 import { engineRosterChecks } from './engine-roster.mjs';
 import { hostChecks } from './host.mjs';
+import { integrityChecks } from './integrity.mjs';
 import { legacyChecks } from './legacy.mjs';
 import { licenceChecks } from './licence.mjs';
 import { serverChecks } from './server.mjs';
@@ -30,6 +31,7 @@ export function engineChecks() {
     ...enginePrereqChecks(),
     ...engineRepoChecks(),
     ...licenceChecks(),
+    ...integrityChecks(),
     ...engineDocsChecks(),
     ...engineRosterChecks(),
     ...engineContractChecks(),

@@ -302,6 +302,20 @@
       }
     },
     {
+      "id": "E-32",
+      "section": "repo",
+      "title": "this release's files against its signed manifest",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "left out of this run by name",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0
+    },
+    {
       "id": "E-12",
       "section": "docs",
       "title": "docs corpus present",
@@ -737,7 +751,7 @@
     "ok": 15,
     "warn": 0,
     "fail": 1,
-    "skip": 26,
+    "skip": 27,
     "fixable": 0,
     "notInSection": 0,
     "notInQuick": 26

@@ -8,6 +8,7 @@
 // check) reads `.local/licence.json` and the cached list, and fetches only when asked to.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -16,8 +17,12 @@ import { readList } from '../lib/licence/core.mjs';
 import { readListCache } from '../lib/licence/state.mjs';
 import { licencePath, revocationsPath } from '../lib/local-paths.mjs';
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
-import { keyPair, licence, licenceText, listDoc, listRepo, productKeys } from './helpers/licence.mjs';
+import { keyPair, licence, licenceText, listDoc, listRepo, manifestDoc, productKeys } from './helpers/licence.mjs';
+import { manifestFromArchive, readManifest, readManifestCache } from '../lib/licence/manifest.mjs';
 import { tempDir } from './helpers/temp.mjs';
+import { fileURLToPath } from 'node:url';
+
+const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 
 const NOW = new Date('2026-10-10T12:00:00Z');
 
@@ -355,4 +360,99 @@ test('ARC-11-C6 step 7 — check prints the same valid until: line after its ban
   writeFileSync(licencePath(w.root), JSON.stringify(forged));
   const invalid = await run(w, ['check'], {}, { keys });
   for (const r of [perpetual, invalid]) assert.equal(r.text.includes('valid until:'), false, r.text);
+});
+
+test('ARC-11-C7 — check --refresh also fetches this release\'s signed manifest; a development tree fetches none', async (t) => {
+  const w = world(t);
+  const g = await keygen(t, w);
+  const key = { privateKey: readFileSync(g.out, 'utf8') };
+  writeFileSync(licencePath(w.root), licenceText(licence({ id: 'LIC-2026-0005' }), key));
+  const repo = listRepo(t, { 'releases/v9.1.0.json': `${JSON.stringify(manifestDoc('v9.1.0', key))}\n` });
+  const config = { licence: { revocations: { repo, ref: 'main', path: 'revocations.json' } } };
+
+  writeFileSync(join(w.root, 'package.json'), '{ "version": "9.1.0" }\n');
+  const release = await run(w, ['check'], { refresh: true }, { keys: g.keys, config });
+  assert.equal(release.code, EXIT_OK, release.text);
+  assert.match(release.text, /^step: release manifest: v9\.1\.0 fetched \(1 file\)$/m);
+  assert.equal(readManifestCache(w.root).tag, 'v9.1.0');
+
+  writeFileSync(join(w.root, 'package.json'), '{ "version": "9.1.0-dev" }\n');
+  const dev = await run(w, ['check'], { refresh: true }, { keys: g.keys, config });
+  assert.doesNotMatch(dev.text, /release manifest/);
+});
+
+// ── ARC-11-C7 — sign-release ─────────────────────────────────────────────────────────────────────────────────────
+
+const gitIn = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe',
+  env: { ...process.env, GIT_AUTHOR_NAME: 'f', GIT_AUTHOR_EMAIL: 'f@example.invalid', GIT_COMMITTER_NAME: 'f',
+    GIT_COMMITTER_EMAIL: 'f@example.invalid' } }).trim();
+
+/** The world's root as a release checkout: a few covered files, the real attributes, tagged `tag`. */
+function releaseRoot(w, tag) {
+  const files = {
+    '.gitattributes': readFileSync(join(REPO, '.gitattributes'), 'utf8'),
+    'package.json': `{ "version": "${tag.slice(1)}" }\n`,
+    'CLAUDE.md': '# a release\n',
+    'tools/snowarch/lib/a.mjs': 'export const a = 1;\n',
+    'docs/page.md': 'not covered\n',
+  };
+  for (const [rel, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(w.root, rel)), { recursive: true });
+    writeFileSync(join(w.root, rel), text);
+  }
+  gitIn(w.root, ['init', '-q', '--initial-branch=main']);
+  gitIn(w.root, ['add', '-A']);
+  gitIn(w.root, ['commit', '-qm', tag]);
+  gitIn(w.root, ['tag', '-a', tag, '-m', tag]);
+}
+
+test('ARC-11-C7 — sign-release signs the tag\'s manifest into the licences clone and prints how to publish it', async (t) => {
+  const w = world(t);
+  const g = await keygen(t, w);
+  releaseRoot(w, 'v9.1.0');
+  const dir = join(w.outside, 'licences');
+  mkdirSync(dir);
+  const r = await run(w, ['sign-release', 'v9.1.0'], { key: g.out, list: dir }, { keys: g.keys });
+  assert.equal(r.code, EXIT_OK, r.text);
+  const doc = readFileSync(join(dir, 'releases', 'v9.1.0.json'), 'utf8');
+  const read = readManifest(doc, { keys: g.keys });
+  assert.deepEqual([read.ok, read.manifest.tag, read.key], [true, 'v9.1.0', 'primary']);
+  assert.deepEqual(read.manifest.files, manifestFromArchive(w.root, 'v9.1.0').files);
+  assert.deepEqual(Object.keys(read.manifest.files).sort(), ['CLAUDE.md', 'package.json', 'tools/snowarch/lib/a.mjs']);
+  assert.match(r.text, /licence sign-release: v9\.1\.0 \([0-9a-f]{7}, 3 files, the primary key\)/);
+  assert.match(r.text, /Publish it before the tag is pushed/);
+  assert.match(r.text, /git -C ".+" add releases\/v9\.1\.0\.json/);
+  assert.match(r.text, /git -C ".+" commit -m "Release manifest, v9\.1\.0"/);
+});
+
+test('ARC-11-C7 — sign-release refuses a tag before 2.1, a tag that is not here, and a tag already signed', async (t) => {
+  const w = world(t);
+  const g = await keygen(t, w);
+  releaseRoot(w, 'v9.1.0');
+  const dir = join(w.outside, 'licences');
+  mkdirSync(dir);
+  const sign = (tag) => run(w, ['sign-release', tag], { key: g.out, list: dir }, { keys: g.keys });
+  const early = await sign('v2.0.13');
+  assert.deepEqual([early.code, /v2\.0\.13 is before 2\.1\.0/.test(early.text)], [EXIT_USAGE, true], early.text);
+  const absent = await sign('v9.2.0');
+  assert.deepEqual([absent.code, /no commit named v9\.2\.0/.test(absent.text)], [EXIT_USAGE, true], absent.text);
+  assert.equal((await sign('v9.1.0')).code, EXIT_OK);
+  const twice = await sign('v9.1.0');
+  assert.deepEqual([twice.code, /exists — a tag is signed once/.test(twice.text)], [EXIT_USAGE, true], twice.text);
+  const bare = await run(w, ['sign-release'], { key: g.out, list: dir }, { keys: g.keys });
+  assert.equal(bare.code, EXIT_USAGE);
+});
+
+test('ARC-11-C7 — sign-release with a key this product does not ship writes nothing', async (t) => {
+  const w = world(t);
+  const g = await keygen(t, w);
+  releaseRoot(w, 'v9.1.0');
+  const dir = join(w.outside, 'licences');
+  mkdirSync(dir);
+  const stranger = join(w.outside, 'stranger.pem');
+  writeFileSync(stranger, keyPair().privateKey);
+  const r = await run(w, ['sign-release', 'v9.1.0'], { key: stranger, list: dir }, { keys: g.keys });
+  assert.equal(r.code, EXIT_FAIL, r.text);
+  assert.match(r.text, /does not verify with the keys this product ships \(not signed by a key this product ships\) — nothing was written/);
+  assert.equal(existsSync(join(dir, 'releases', 'v9.1.0.json')), false);
 });

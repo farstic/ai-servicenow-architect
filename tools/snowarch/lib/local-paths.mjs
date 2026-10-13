@@ -71,3 +71,6 @@ export const licencePath = (root) => join(localDir(root), 'licence.json');
 
 /** `.local/revocations.json` — the last revocation list fetched, and when (ARC-11-C1). The banner reads it. */
 export const revocationsPath = (root) => join(localDir(root), 'revocations.json');
+
+/** `.local/release-manifest.json` — this release's signed manifest, as last fetched, and when (ARC-11-C7). E-32 reads it. */
+export const releaseManifestPath = (root) => join(localDir(root), 'release-manifest.json');

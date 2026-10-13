@@ -97,6 +97,19 @@ function nudges({ report, cache, banner, firstRun, upgrade, now = Date.now(),
 }
 
 /**
+ * ARC-11-C7 — E-32's cached line, when it FAILed: `Integrity: modified — …`, third, after the Licence line.
+ *
+ * The hook never runs E-32, which reads every covered file, so this is the verdict the last `status` or `doctor`
+ * cached, carried over the banner's own runs by the cache's writer. Read from the cache this call started with, on
+ * every path that has one. A verified tree, a development one, or one no run has checked prints nothing.
+ */
+function integrityNudge(cache) {
+  const e32 = (Array.isArray(cache?.checks) ? cache.checks : []).find((c) => c?.id === 'E-32');
+  return e32?.status === 'fail' && typeof e32.detail === 'string' && e32.detail.startsWith('Integrity: ')
+    ? e32.detail : null;
+}
+
+/**
  * The doctor, in process, under a watchdog.
  *
  * `Promise.race` rather than an `AbortController` threaded through every check: the runner has no
@@ -109,7 +122,9 @@ async function reRun({ config, watchdogMs, run }) {
   let timer;
   try {
     return await Promise.race([
-      doctor({ root: ROOT, config, quick: true, noNetwork: true, writeCache: true }),
+      // ARC-11-C7 — E-32 is the one quick check that reads every covered file, so the banner never runs it: `status`
+      // and `doctor --quick` compute it, and the banner shows the verdict they cached. The hook never hashes.
+      doctor({ root: ROOT, config, quick: true, noNetwork: true, writeCache: true, exclude: ['E-32'] }),
       new Promise((_, reject) => {
         // ARC-09-C77 — REF'D: it bounds an awaited run, and `finally` clears it, so it never holds a
         // hook whose run has answered. Unref'd, a run pending on nothing ended the hook in exit 13
@@ -200,6 +215,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   if (cache && inputs && !staleness.stale && cache.modeLine) {
     say(cache.modeLine);
     say(licence);
+    say(integrityNudge(cache));
     for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade, now, spell: spellings() })) say(line);
     phase.mark('render');
     phase.done('cache');
@@ -233,11 +249,13 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
       ? `${cache.modeLine}${BANNER.staleSuffix(spellings())}`
       : BANNER.timedOut(spellings()));
     say(licence);
+    say(integrityNudge(cache));
     return { path: 'timeout', lines: out };
   }
 
   say(report.modeLine);
   say(licence);
+  say(integrityNudge(cache));
   for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade, now, spell: spellings() })) say(line);
   phase.mark('render');
   phase.done('rerun');

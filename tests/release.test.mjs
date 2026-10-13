@@ -30,6 +30,8 @@ import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { STAGED } from '../scripts/lib/release/writers.mjs';
 import { writeGitattributes } from './helpers/gitattributes.mjs';
 import { gatePlan, makeGateRunner } from '../scripts/lib/release/gates.mjs';
+import { manifestFromArchive, signManifest } from '../tools/snowarch/lib/licence/manifest.mjs';
+import { keyPair, listRepo, productKeys } from '../tools/snowarch/tests/helpers/licence.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -160,7 +162,7 @@ function runner(root, { fail = null, code = 1, skip = 0, gen = false } = {}) {
 
 const capture = () => { const lines = []; return { stream: { write: (s) => lines.push(s) }, text: () => lines.join('') }; };
 
-async function run(root, argv, { ask = null, fail = null, skip = 0, gen = false, unstage = [] } = {}) {
+async function run(root, argv, { ask = null, fail = null, skip = 0, gen = false, unstage = [], keys = null } = {}) {
   const out = capture();
   const err = capture();
   const r = runner(root, { fail, skip, gen });
@@ -183,6 +185,7 @@ async function run(root, argv, { ask = null, fail = null, skip = 0, gen = false,
   const code = await release({ argv, root, out: out.stream, err: err.stream, ask, run: r.run,
     platform: 'linux',
     ...(unstage.length ? { staged: STAGED.filter((f) => !unstage.includes(f)) } : {}),
+    ...(keys ? { keys } : {}),
     now: () => new Date('2026-09-11T00:00:00Z') });
   return { code, out: out.text(), err: err.text(), calls: r.calls };
 }
@@ -1120,4 +1123,110 @@ test('ARC-09-C71 — every `release()` call in this file pins a platform', async
   assert.deepEqual(unpinned, [],
     'a release() call takes the host platform, so its gate spelling differs between machines — pass '
     + "platform: 'linux' unless the platform is what the case is about");
+});
+
+// ── ARC-11-C7 — a tag from 2.1 on is pushed only with its signed manifest published ──────────────────────────────
+
+const manifestKey = keyPair();
+const MANIFEST_KEYS = productKeys(manifestKey, keyPair());
+
+/** An empty licences repository, and a way to publish files on its main branch. */
+function licences(t) {
+  const url = listRepo(t, null);
+  const publish = (files) => {
+    const work = tempDir('snowarch-licences-work-', t);
+    git(work, ['init', '-q', '-b', 'main']);
+    for (const [rel, text] of Object.entries(files)) write(work, rel, text);
+    git(work, ['add', '-A']);
+    git(work, ['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'publish']);
+    git(work, ['push', '-q', '--force', url, 'main']);
+  };
+  return { url, publish };
+}
+
+/** A 9.1.0 release commit, merged as `--tag-only` expects, whose config names `url` for the manifests. */
+async function releaseCommit(t, url) {
+  const root = fixture(t, { version: '9.1.0-dev' });
+  write(root, 'engine.config.json', `${JSON.stringify({ ...CONFIG, licence: { manifests: { repo: url, ref: 'main', dir: 'releases' } } }, null, 2)}\n`);
+  git(root, ['commit', '-qam', 'the licences repository']);
+  const cut = await run(root, ['9.1.0', '--yes', '--offline', '--no-install']);
+  assert.equal(cut.code, 0, cut.err);
+  return root;
+}
+
+const signed = (root, over = {}) => `${JSON.stringify(signManifest({ ...manifestFromArchive(root, 'v9.1.0'), ...over },
+  manifestKey.privateKey), null, 2)}\n`;
+const pushed = (calls) => calls.filter((c) => c.startsWith('git push'));
+
+test('ARC-11-C7 — --tag-only on a 2.1+ release tags, says to sign before pushing, and pushes nothing', async (t) => {
+  const { url } = licences(t);
+  const root = await releaseCommit(t, url);
+  git(root, ['tag', '-d', 'v9.1.0']);
+  const r = await run(root, ['9.1.0', '--tag-only', '--offline'], { keys: MANIFEST_KEYS });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(git(root, ['tag', '-l', 'v9.1.0']).trim(), 'v9.1.0');
+  assert.match(r.out, /Before it is pushed, sign its manifest with \S+ licence sign-release v9\.1\.0/);
+  assert.deepEqual(pushed(r.calls), []);
+});
+
+test('ARC-11-C7 — --tag-only --push refuses a 2.1+ tag with no manifest published, and pushes nothing', async (t) => {
+  const { url } = licences(t);
+  const root = await releaseCommit(t, url);
+  const r = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.err, /release: v9\.1\.0 has no verified signed manifest \(release manifest: none is published for v9\.1\.0\) — nothing was pushed/);
+  assert.deepEqual(pushed(r.calls), []);
+});
+
+test('ARC-11-C7 — --tag-only --push pushes a 2.1+ tag once its signed manifest is published and is the tag\'s own', async (t) => {
+  const repo = licences(t);
+  const root = await releaseCommit(t, repo.url);
+  repo.publish({ 'releases/v9.1.0.json': signed(root) });
+  const r = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /v9\.1\.0 is already tagged, at HEAD/);
+  assert.match(r.out, /release manifest: v9\.1\.0 is signed, and it is the record of this tag's tree \(\d+ files\)/);
+  assert.deepEqual(pushed(r.calls), ['git push origin v9.1.0']);
+});
+
+test('ARC-11-C7 — a published manifest with one hash altered, for another commit, or signed by another key, is refused', async (t) => {
+  const repo = licences(t);
+  const root = await releaseCommit(t, repo.url);
+  const own = manifestFromArchive(root, 'v9.1.0');
+  repo.publish({ 'releases/v9.1.0.json': signed(root, { files: { ...own.files, 'CLAUDE.md': '0'.repeat(64) } }) });
+  const altered = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  assert.equal(altered.code, 2);
+  assert.match(altered.err, /1 file in the published manifest differs from v9\.1\.0's own, the first CLAUDE\.md/);
+  repo.publish({ 'releases/v9.1.0.json': signed(root, { commit: 'b'.repeat(40) }) });
+  const recut = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  assert.equal(recut.code, 2);
+  assert.match(recut.err, /the published manifest names bbbbbbb, and v9\.1\.0 here is [0-9a-f]{7}/);
+  repo.publish({ 'releases/v9.1.0.json': signed(root) });
+  const stranger = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: productKeys(keyPair(), keyPair()) });
+  assert.equal(stranger.code, 2);
+  assert.match(stranger.err, /does not verify \(not signed by a key this product ships\)/);
+  assert.deepEqual([...pushed(altered.calls), ...pushed(recut.calls), ...pushed(stranger.calls)], []);
+});
+
+test('ARC-11-C7 — a tag that is already here at another commit than HEAD is refused, and nothing moves', async (t) => {
+  const { url } = licences(t);
+  const root = await releaseCommit(t, url);
+  git(root, ['commit', '-q', '--allow-empty', '-m', 'chore: after the tag']);
+  const r = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  assert.equal(r.code, 2);
+  assert.match(r.err, /release: v9\.1\.0 is already a tag here, at [0-9a-f]{7}, and HEAD is [0-9a-f]{7} — nothing was changed/);
+  assert.deepEqual(pushed(r.calls), []);
+});
+
+test('ARC-11-C7 — the one-shot flow tags a 2.1+ release and does not push it, with --push or without', async (t) => {
+  const { url } = licences(t);
+  const root = fixture(t, { version: '9.1.0-dev' });
+  write(root, 'engine.config.json', `${JSON.stringify({ ...CONFIG, licence: { manifests: { repo: url, ref: 'main', dir: 'releases' } } }, null, 2)}\n`);
+  git(root, ['commit', '-qam', 'the licences repository']);
+  const r = await run(root, ['9.1.0', '--yes', '--offline', '--no-install', '--push'], { keys: MANIFEST_KEYS });
+  assert.equal(r.code, 2, r.out);
+  assert.equal(git(root, ['tag', '-l', 'v9.1.0']).trim(), 'v9.1.0');
+  assert.match(r.out, /tagged and not pushed\. Sign its manifest with \S+ licence sign-release v9\.1\.0/);
+  assert.match(r.err, /release: v9\.1\.0 is pushed only with its signed manifest published — nothing was pushed/);
+  assert.deepEqual(pushed(r.calls), []);
 });

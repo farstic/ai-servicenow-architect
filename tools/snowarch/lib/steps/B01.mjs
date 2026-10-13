@@ -1,6 +1,7 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-// B01 workspace — make `.local/`, and prove the two committed files are still the committed files.
+// B01 workspace — make `.local/`, prove the two committed files are still the committed files, and fetch the release's
+// signed manifest (ARC-11-C7).
 //
 // The verification is the interesting half. `.mcp.json` and `.claude/settings.json` ARE the
 // registration: a clone is the install, and Claude Code reads them directly. So an edit to either
@@ -12,6 +13,9 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { localDir } from '../local-paths.mjs';
+import { manifestSays, refreshManifest } from '../licence/fetch.mjs';
+import { PRODUCT_KEYS } from '../licence/keys.mjs';
+import { releaseTagOf } from '../licence/manifest.mjs';
 import { cloudSyncWarning } from '../cloud-sync.mjs';
 import { checkMcpJson, checkSettingsJson } from '../registration.mjs';
 import { FILE, TEXT } from './inputs.mjs';
@@ -93,7 +97,23 @@ export const run = async (ctx) => {
     return { status: 'fail', data, detail: problems[0], remedy: REGISTRATION_REMEDY };
   }
 
-  return cloud
-    ? { status: 'warn', detail: cloud, data }
-    : { status: 'ok', detail: `.local/ ${data.localDir} (${dir.modes})`, data };
+  // ARC-11-C7 — THE ONE FETCH AN INSTALL MAKES, through the revocation list's transport: E-32 FAILs on a release tree
+  // with no manifest held, so without this every fresh install would read as tampered until somebody refreshed. Not
+  // fetched, it warns with the reason, and E-32's remedy is the refresh; a development version has none to fetch, and
+  // a config that names no licences repository says nothing, as the revocation list's refresh does.
+  const tag = releaseTagOf(ctx.root);
+  // `licenceKeys` is the test seam E-31 and E-32 have: a suite injects the keys it generated. Nothing in the product
+  // sets it.
+  const fetched = tag ? refreshManifest(ctx.root, { config: ctx.config, tag, env: ctx.env ?? process.env,
+    keys: ctx.licenceKeys ?? PRODUCT_KEYS }) : null;
+  const manifest = fetched?.outcome === 'unconfigured' ? null : fetched;
+  if (manifest) {
+    data.manifest = { outcome: manifest.outcome, tag, files: manifest.files ?? null };
+    ctx.line?.(manifestSays(manifest));
+  }
+  const warnings = [cloud, manifest && manifest.outcome !== 'fetched' ? manifestSays(manifest) : null].filter(Boolean);
+
+  return warnings.length > 0
+    ? { status: 'warn', detail: warnings.join(' · '), data }
+    : { status: 'ok', detail: `.local/ ${data.localDir} (${dir.modes})${manifest ? ` · ${manifestSays(manifest)}` : ''}`, data };
 };

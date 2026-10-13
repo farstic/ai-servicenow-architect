@@ -193,3 +193,24 @@ export function contextFor(root, over = {}) {
 
 /** Run one check by id from a list, and return its result. */
 export const runById = (checks, id, ctx) => checks.find((c) => c.id === id).run(ctx);
+
+/**
+ * ARC-11-C7 — a green tree that is a RELEASE: `version` in its package.json, the real `.gitattributes` committed, and
+ * tagged `v<version>` as a release is, with an annotated tag.
+ *
+ * The attributes are the point. A signed manifest hashes the bytes a checkout writes, and `.gitattributes` is what
+ * makes those bytes LF on every platform: without it a Windows runner's `core.autocrlf` has `git archive` write CRLF
+ * while the copied files stay LF, and every covered text file reads as changed (#432's Windows cells, 2026-10-13).
+ */
+export function releaseTree(t, version, { extra = {}, files = {} } = {}) {
+  const root = greenTree(t, { extra: { ...extra, 'package.json': { ...readJson(REAL_ROOT, 'package.json'), version } } });
+  cpSync(join(REAL_ROOT, '.gitattributes'), join(root, '.gitattributes'));
+  for (const [rel, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), text);
+  }
+  git(root, ['add', '.gitattributes', ...Object.keys(files)]);
+  git(root, ['commit', '-qm', 'attributes']);
+  git(root, ['tag', '-a', `v${version}`, '-m', `v${version}`]);
+  return root;
+}

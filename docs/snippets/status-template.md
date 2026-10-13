@@ -34,6 +34,13 @@ rendered from E-31's data by the banner's own `bannerLine` (`tools/snowarch/lib/
 so the banner and the panel cannot word it differently. From 2.0.13 the line names the state alone:
 enforcement has no switch, so it has no word.
 
+Line 3 is E-32's `Integrity:` line (ARC-11-C7): this release's files against the manifest its owner signed,
+in every state E-32 reports — verified, modified, no signed manifest, or not checked on a development tree.
+The block above has none, because the fixtures it is rendered from leave E-32 out: what E-32 says depends on
+the commit's version and on that release's signed manifest, and a committed fixture carries no fact that differs
+between two correct commits (ARC-08-C27). The session-start banner prints the same line, from the verdict the
+last `status` or `doctor` cached, and only when E-32 failed.
+
 Where each line comes from, all of it schema-v1 JSON (`./snowarch status --json` prints that report
 unchanged — it is the same object `doctor --quick --json` prints, not a shape of its own):
 
@@ -41,6 +48,7 @@ unchanged — it is the same object `doctor --quick --json` prints, not a shape 
 |---|---|
 | `Mode:` | `modeLineDetailed` |
 | `Licence:` | `checks` — E-31's data, worded by the session-start banner's own function |
+| `Integrity:` | `checks` — E-32's detail, when E-32 ran |
 | `Engine:` | `engine.version`, `engine.tag`, `engine.contractSha` |
 | `Docs:` | `engine.docs` |
 | `Roster:` | `engine.roster` |

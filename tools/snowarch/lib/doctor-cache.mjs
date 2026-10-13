@@ -11,6 +11,7 @@
 // put a URL is a `detail` string.
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { LEFT_OUT } from './doctor/left-out.mjs';
 import { doctorCachePath, doctorInputsPath, localDir, localPathFrom } from './local-paths.mjs';
 import { isSecretKey, redact } from './redact.mjs';
 import { writeJsonAtomic } from './settings-local.mjs';
@@ -226,6 +227,22 @@ export function assertCacheStorable(value, path = 'doctor-last') {
   return value;
 }
 
+/**
+ * ARC-11-C7 — a check this run LEFT OUT by name keeps the verdict the last run that ran it cached.
+ *
+ * The SessionStart banner's re-run leaves out E-32, which reads every covered file, and the banner then prints the
+ * verdict `status` or `doctor --quick` cached. Without this, the banner's own run would overwrite that verdict with a
+ * skip, and the next session would have nothing to print. A check no earlier run cached stays the skip it is.
+ */
+function carryLeftOut(checks, previous) {
+  const before = new Map((previous?.checks ?? []).filter((c) => c?.detail !== LEFT_OUT).map((c) => [c.id, c]));
+  return checks.map((c) => (c.detail === LEFT_OUT && before.has(c.id) ? before.get(c.id) : c));
+}
+
+const readPrevious = (root) => {
+  try { return JSON.parse(readFileSync(cachePath(root), 'utf8')); } catch { return null; }
+};
+
 export function writeReportCache(root, report, { writer = 'doctor', now = new Date() } = {}) {
   const stored = forStorage(report);
   const payload = {
@@ -237,8 +254,8 @@ export function writeReportCache(root, report, { writer = 'doctor', now = new Da
     mode: report.mode ?? null,
     modeLine: report.modeLine ?? null,
     ...(stored.server ? { server: stored.server } : {}),
-    checks: (stored.checks ?? []).map(({ id, status, detail, remedy = null }) =>
-      ({ id, status, detail, ...(remedy ? { remedy } : {}) })),
+    checks: carryLeftOut((stored.checks ?? []).map(({ id, status, detail, remedy = null }) =>
+      ({ id, status, detail, ...(remedy ? { remedy } : {}) })), readPrevious(root)),
     summary: stored.summary ?? summarise(stored.checks ?? []),
     report: stored,
   };

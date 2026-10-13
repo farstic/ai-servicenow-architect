@@ -1601,7 +1601,8 @@ The checklist, verbatim — paste it into the release pull request's description
 > 1. **Rehearse it first** — see [The rehearsal](#the-rehearsal--a-standing-step-before-every-release). A throwaway branch, a `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three OSes with its seven assets, then the Release, tag and branch deleted. Every release, not only the first.
 > 2. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
 > 3. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
-> 4. `git push origin main --follow-tags` (or pass `--push`).
+> 3a. **From 2.1.0, the tag is signed before it is pushed** (ARC-11-C7). `./snowarch licence sign-release vX.Y.Z`, with `--key` the path of your primary key and `--list` your clone of the licences repository, writes `releases/vX.Y.Z.json` there and prints the git commands that publish it; run them. Then `node scripts/release.mjs X.Y.Z --tag-only --push` checks the published manifest against the tag's own tree before it pushes the tag, and refuses one that is missing, unverified or for another tree. A rehearsal's rc tag is signed the same way.
+> 4. `git push origin main --follow-tags` (or pass `--push`). From 2.1.0, 3a has already pushed the tag, so run this after it: before it, `--follow-tags` would push the tag unsigned.
 > 5. **Nothing to do for the ARC-10 tripwire — it answers itself.** `tests/architecture-history.test.mjs`
 >    (`AC — the History section names both tags, and the cross-boundary claim holds at the tag`) is
 >    CONDITIONAL: while `v<x.y.z>` does not resolve it defers, and the moment it does — which is
@@ -1901,6 +1902,13 @@ Three files, in this order, and the tests will tell you if you stop after the fi
    Applying it took the quick doctor from 776 ms of check time to **89 ms** locally, slowest check
    20 ms. The full `./snowarch doctor` is unchanged — every one of those checks still runs there,
    and the cache the banner reads FIRST is written by a full run.
+
+   **E-32 is the one exception, by the architect's ruling** (ARC-11-C7). It hashes every file the
+   release's signed manifest covers, about 7 ms warm on an Apple M3, and that is a tree's worth of
+   reads. It is quick because `status` runs the quick doctor, and `status` is where a modified copy
+   is reported. The banner's re-run leaves it out by name (`exclude: ['E-32']` in
+   `hooks/session-start.mjs`), so the cost above stays what it was, and
+   `tests/hook/integrity-banner.test.mjs` shows the hook reads no file only E-32 reads.
 2. **The three snapshots.** `tests/fixtures/doctor/snapshot-{linux,darwin,win32}.json` record what
    a design-only install answers, per check. A new id is red in `tests/doctor/snapshot.test.mjs`
    with the id named — on every cell, not only after a bootstrap. Produce the rows from a real run

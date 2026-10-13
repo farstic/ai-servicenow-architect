@@ -186,14 +186,14 @@ function storeSummaries(root, config) {
 }
 
 export async function runDoctor({ root, config, registry = engineRegistry(), sections = null,
-  quick = false, noNetwork = false, fix = false, section = null, writeCache = 'auto',
+  quick = false, noNetwork = false, fix = false, section = null, writeCache = 'auto', exclude = [],
   env = process.env, home = '', now = () => Date.now(), started = null,
   // ARC-07-W17 — the PLATFORM, so the Mode line's spelling is the one this run was TOLD about rather
   // than the machine's. A fixture capture pins it (`make-status-fixtures.mjs` passes `linux`), which is
   // what stops a committed fixture depending on the shell that captured it.
   platform = process.platform } = {}) {
   const startedAt = started ?? now();
-  const options = { quick, noNetwork: noNetwork || quick, fix, section, sections };
+  const options = { quick, noNetwork: noNetwork || quick, fix, section, sections, exclude };
 
   let contract = null;
   try {

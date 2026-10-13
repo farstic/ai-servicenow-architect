@@ -30,7 +30,8 @@ import {
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
+import { licenceFixture, licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
+import { manifestFromArchive, signManifest } from '../../tools/snowarch/lib/licence/manifest.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { writeHead, writeMarker } from '../../scripts/lib/release/writers.mjs';
 import { AREAS, buildUpstream } from '../helpers/docs-fixture.mjs';
@@ -365,8 +366,11 @@ function copyTracked(work) {
 /**
  * A tree pointed at the fixture corpus: its config's upstream, pin and family, no revocation list, the areas file, and
  * the corpus registered in `.gitmodules`. Every release a world carries needs it, whichever tree that release is.
+ *
+ * `licences`, when given, is the world's own licences repository (ARC-11-C7): the config names it for the release
+ * manifests alone, so each release's signed manifest is fetched from a path and the revocation list stays unconfigured.
  */
-function pointAtFixtureCorpus(work, upstream) {
+function pointAtFixtureCorpus(work, upstream, { licences = null } = {}) {
   const config = JSON.parse(readFileSync(join(work, 'engine.config.json'), 'utf8'));
   // No revocation list (ARC-11-C6): the cases start the CLI licensed, and a licensed `upgrade` refreshes the
   // list, so a configured one would be a fetch from the network on every case. Unconfigured, the refresh
@@ -375,7 +379,7 @@ function pointAtFixtureCorpus(work, upstream) {
     ...config,
     docs: { ...config.docs, upstream: pathToFileURL(upstream.bare).href, pin: upstream.pin,
       family: 'australia' },
-    licence: {},
+    licence: licences ? { manifests: { repo: licences, ref: 'main', dir: 'releases' } } : {},
   }, null, 2)}\n`);
   writeFileSync(join(work, 'vendor/docs-areas.txt'), `${AREAS.join('\n')}\n`);
   // The corpus REGISTERED, exactly as a cloned engine checkout carries it: a `.gitmodules` entry
@@ -387,7 +391,42 @@ function pointAtFixtureCorpus(work, upstream) {
     + `\turl = ${pathToFileURL(upstream.bare).href}\n\tbranch = australia\n\tshallow = true\n`);
 }
 
-export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null } = {}) {
+/**
+ * ARC-11-C7 — a world's licences repository: bare, with no branch yet, and its URL. A release from 2.1 on carries a
+ * signed manifest, and the bootstrap and `upgrade` fetch it from here, so the doctor after an upgrade checks the new
+ * tree against its own release exactly as a user's does.
+ */
+function licencesRepo(scratch) {
+  const bare = join(scratch, 'licences.git');
+  gitRaw(['init', '--quiet', '--bare', '--initial-branch=main', bare]);
+  return { bare, url: pathToFileURL(bare).href };
+}
+
+/**
+ * Each tag's manifest, from the bytes `git archive` writes, signed with this process's fixture key — the key every
+ * licensed child trusts — and pushed to the world's licences repository as `releases/<tag>.json`, in one commit.
+ *
+ * `unsigned` tags get none, and `altered` ones a manifest with one hash changed and signed all the same: a record that
+ * verifies and is not the tag's (ARC-11-C7's two refusals at U4).
+ */
+function publishManifests(work, licences, tags, { unsigned = [], altered = [] } = {}) {
+  const clone = join(dirname(licences.bare), 'licences-work');
+  gitRaw(['init', '--quiet', '--initial-branch=main', clone]);
+  mkdirSync(join(clone, 'releases'), { recursive: true });
+  const { primary } = licenceFixture();
+  for (const tag of tags.filter((x) => !unsigned.includes(x))) {
+    const manifest = manifestFromArchive(work, tag);
+    if (altered.includes(tag)) manifest.files['CLAUDE.md'] = '0'.repeat(64);
+    const doc = signManifest(manifest, primary.privateKey);
+    writeFileSync(join(clone, 'releases', `${tag}.json`), `${JSON.stringify(doc, null, 2)}\n`);
+  }
+  git(clone, ['add', '-A']);
+  git(clone, ['commit', '--quiet', '-m', 'the release manifests']);
+  git(clone, ['push', '--quiet', licences.bare, 'main']);
+}
+
+export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null,
+  unsigned = [], altered = [] } = {}) {
   const marks = [];
   const worldStart = process.hrtime.bigint();
   const scratch = tempDir('snowarch-upgrade-', t);
@@ -402,7 +441,8 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // and a step that cannot sync is a step that skips. `buildUpstream` is the docs suite's own
   // fixture builder, so what B02 does here is what B02 does everywhere.
   const upstream = phase('corpus-upstream', marks, () => buildUpstream(join(scratch, 'corpus')));
-  pointAtFixtureCorpus(work, upstream);
+  const licences = licencesRepo(scratch);
+  pointAtFixtureCorpus(work, upstream, { licences: licences.url });
 
   // `node_modules` — see `placeModules`. Linked by default because fixture release B rebuilds
   // `dist/`, which needs TypeScript, and copying 400 MB per run would make this harness unusable.
@@ -501,6 +541,7 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   const tB = process.hrtime.bigint();
   await tagRelease(work, '9.2.0', { claudeFloor });
   marks.push(`tag-B=${Math.round(Number(process.hrtime.bigint() - tB) / 1e6)}ms`);
+  phase('manifests', marks, () => publishManifests(work, licences, ['v9.0.0', 'v9.1.0', 'v9.2.0'], { unsigned, altered }));
 
   // ── the bare origin, and the user's clone at v9.0.0 ───────────────────────────────────────
   const origin = join(scratch, 'origin.git');

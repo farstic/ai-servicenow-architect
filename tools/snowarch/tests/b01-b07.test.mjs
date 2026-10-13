@@ -16,6 +16,8 @@ import {
 import { cloudSyncProvider, cloudSyncWarning, isUnderCloudSyncFolder } from '../lib/cloud-sync.mjs';
 import { checkMcpJson, checkSettingsJson } from '../lib/registration.mjs';
 import { tempDir } from './helpers/temp.mjs';
+import { keyPair, listRepo, manifestDoc, productKeys } from './helpers/licence.mjs';
+import { readManifestCache } from '../lib/licence/manifest.mjs';
 import { readDefaultLabel, readDefaultSummary } from '../../../packages/snowarch/dist/store/label.js';
 import { makeCheckout } from './helpers/workspace.mjs';
 
@@ -470,4 +472,48 @@ test('ARC-06-C15 — readDefaultSummary returns three non-secret keys and no mor
   assert.equal(readDefaultSummary(store), null);
   writeFileSync(store, 'not json');
   assert.equal(readDefaultSummary(store), null);
+});
+
+// ── ARC-11-C7 — B01's one fetch of the release's signed manifest ─────────────────────────────────────────────────
+
+const signer = keyPair();
+const SIGNED = productKeys(signer, keyPair());
+
+/** A checkout at `version` whose config names `repo` as the licences repository. */
+function releaseCheckout(t, version, repo) {
+  const root = makeCheckout({}, t);
+  writeFileSync(join(root, 'package.json'), `${JSON.stringify({ name: 'f', version }, null, 2)}\n`);
+  writeFileSync(join(root, 'engine.config.json'), `${JSON.stringify({ ...config(root),
+    licence: { revocations: { repo, ref: 'main', path: 'revocations.json' } } }, null, 2)}\n`);
+  return root;
+}
+
+test('ARC-11-C7 — B01 fetches a release\'s signed manifest into .local/, and says so', async (t) => {
+  const repo = listRepo(t, { 'releases/v9.1.0.json': `${JSON.stringify(manifestDoc('v9.1.0', signer))}\n` });
+  const root = releaseCheckout(t, '9.1.0', repo);
+  const lines = [];
+  const r = await runB01(ctxFor(root, { licenceKeys: SIGNED, line: (l) => lines.push(l) }));
+  assert.equal(r.status, 'ok', r.detail);
+  assert.deepEqual(lines, ['release manifest: v9.1.0 fetched (1 file)']);
+  assert.deepEqual(r.data.manifest, { outcome: 'fetched', tag: 'v9.1.0', files: 1 });
+  assert.equal(readManifestCache(root).tag, 'v9.1.0');
+});
+
+test('ARC-11-C7 — B01 warns when no manifest is published for the release, and caches nothing', async (t) => {
+  const root = releaseCheckout(t, '9.1.0', listRepo(t, { 'revocations.json': '{}' }));
+  const r = await runB01(ctxFor(root, { licenceKeys: SIGNED }));
+  assert.equal(r.status, 'warn');
+  assert.equal(r.detail, 'release manifest: none is published for v9.1.0');
+  assert.equal(readManifestCache(root), null);
+});
+
+test('ARC-11-C7 — B01 fetches nothing on a development version, or with no licences repository configured', async (t) => {
+  const repo = listRepo(t, { 'releases/v9.1.0.json': `${JSON.stringify(manifestDoc('v9.1.0', signer))}\n` });
+  const dev = await runB01(ctxFor(releaseCheckout(t, '9.1.0-dev', repo), { licenceKeys: SIGNED }));
+  const bare = await runB01(ctxFor(makeCheckout({}, t), { licenceKeys: SIGNED }));
+  for (const r of [dev, bare]) {
+    assert.equal(r.status, 'ok', r.detail);
+    assert.equal(r.data.manifest, undefined);
+    assert.match(r.detail, /^\.local\/ \w+ \([^)]+\)$/);
+  }
 });

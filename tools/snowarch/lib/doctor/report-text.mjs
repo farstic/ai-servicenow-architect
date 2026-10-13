@@ -100,6 +100,9 @@ export const NOT_IN_SECTION = 'not in --section';
  */
 export const NOT_IN_QUICK = 'not in the --quick subset';
 
+/** ...and for one a caller left out by name (ARC-11-C7), defined in a leaf so the doctor cache can match on it too. */
+export { LEFT_OUT } from './left-out.mjs';
+
 /**
  * ARC-08-C37 — `checks` is OPTIONAL, and a caller that omits it gets the line it always got.
  *
