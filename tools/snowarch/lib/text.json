@@ -4,7 +4,7 @@
   "modeDesign": "Mode: design-only",
   "banner": {
     "firstRun": "No ServiceNow instance configured — /snowarch setup-instance adds one (design-only works without it).",
-    "upgrade": "A newer release is available (v2.1.0) — run ./snowarch upgrade.",
+    "upgrade": "A newer release is available (v9.1.0) — run ./snowarch upgrade.",
     "staleRegistration": "Stale MCP registrations from the old setup found in ~/.claude.json — run ./snowarch doctor --section legacy for the removal commands.",
     "doctorFail": "Doctor: 2 FAIL — run ./snowarch doctor for remedies.",
     "staleSuffix": " (cache stale — run ./snowarch doctor)",
