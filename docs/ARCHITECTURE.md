@@ -1266,6 +1266,7 @@ about one registry rather than several:
 | `E-11` | repo | .local/ state | yes | yes |
 | `E-29` | repo | the bootstrap finished | yes | — |
 | `E-31` | repo | the licence for this checkout | yes | — |
+| `E-32` | repo | this release's files against its signed manifest | yes | — |
 | `E-12` | docs | docs corpus present | — | yes |
 | `E-13` | docs | docs pin | — | yes |
 | `E-14` | docs | docs family | — | — |
@@ -1674,5 +1675,5 @@ of `engine.config.json` |
 | D36 | `CLAUDE.md` gates on `mcp__<key>__` | E-20 | re-targeted to the generated rule file, the protocol page and both registrations |
 | D37 | tool-name currency against the rename map | E-19 | `retired-names.json` |
 
-**New checks with no old counterpart** (16): `E-06`, `E-11`, `E-29`, `E-31`, `E-15`, `E-18`, `E-21`, `E-22`, `E-30`, `E-25`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
+**New checks with no old counterpart** (17): `E-06`, `E-11`, `E-29`, `E-31`, `E-32`, `E-15`, `E-18`, `E-21`, `E-22`, `E-30`, `E-25`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
 <!-- /generated:doctor-mapping -->

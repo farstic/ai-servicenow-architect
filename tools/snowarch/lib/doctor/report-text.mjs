@@ -101,6 +101,12 @@ export const NOT_IN_SECTION = 'not in --section';
 export const NOT_IN_QUICK = 'not in the --quick subset';
 
 /**
+ * ...and for one a caller left out by name (ARC-11-C7): the SessionStart banner's run leaves out E-32, the one quick
+ * check that reads every covered file, and shows the verdict `status` and `doctor --quick` cached instead.
+ */
+export const LEFT_OUT = 'left out of this run by name';
+
+/**
  * ARC-08-C37 — `checks` is OPTIONAL, and a caller that omits it gets the line it always got.
  *
  * Three callers, and only two of them can name anything: `renderText` below has the report, and

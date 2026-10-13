@@ -29,9 +29,10 @@
  */
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { chmodSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join, posix } from 'node:path';
 
+import { releaseManifestPath } from '../local-paths.mjs';
 import { signBody, verifyBody } from './core.mjs';
 import { PRODUCT_KEYS } from './keys.mjs';
 
@@ -172,9 +173,17 @@ export function manifestFromArchive(root, tag, { coverage = COVERAGE, run = spaw
   const git = (args, opts = {}) => run('git', args, { cwd: root, maxBuffer: 1 << 28, ...opts });
   const commit = String(git(['rev-parse', '--verify', '--quiet', `${tag}^{commit}`], { encoding: 'utf8' }).stdout ?? '').trim();
   if (!COMMIT.test(commit)) throw new Error(`no commit named ${tag} here`);
-  const archive = git(['archive', '--format=tar', commit, '--', ...coverage.covers.map((c) => c.replace(/\/$/, ''))]);
-  if (archive.status !== 0) throw new Error(`git archive ${tag} failed: ${String(archive.stderr ?? '').trim()}`);
+  // Only the covered paths the tag has: `git archive` refuses a pathspec that matches nothing, and a tree may lack one.
+  const specs = coverage.covers.map((c) => c.replace(/\/$/, ''));
+  const present = String(git(['ls-tree', '--name-only', '-z', commit, '--', ...specs], { encoding: 'utf8' }).stdout ?? '')
+    .split('\0').filter(Boolean);
   const files = {};
+  if (present.length === 0) {
+    return { tag, commit, covers: [...coverage.covers], excludes: [...coverage.excludes], ignores: [...coverage.ignores],
+      files };
+  }
+  const archive = git(['archive', '--format=tar', commit, '--', ...present]);
+  if (archive.status !== 0) throw new Error(`git archive ${tag} failed: ${String(archive.stderr ?? '').trim()}`);
   for (const entry of tarEntries(archive.stdout)) {
     if (entry.type === '5' || !isCovered(entry.path, coverage)) continue;
     if (entry.type !== '0') throw new Error(`${entry.path} is not a regular file in ${tag}`);
@@ -214,4 +223,103 @@ export function checkTree(root, manifest) {
   }
   modified.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   return { ok: modified.length === 0, checked: Object.keys(manifest.files).length, modified };
+}
+
+// ── This checkout: the cached manifest, and the verdict E-32 reports ───────────────────────────────────────────────
+
+/** The cache, `{ tag, checkedAt, source, doc }`, or `null`. A malformed file is an absent one. */
+export function readManifestCache(root) {
+  try {
+    const raw = JSON.parse(readFileSync(releaseManifestPath(root), 'utf8'));
+    return raw && typeof raw === 'object' && raw.doc && typeof raw.checkedAt === 'string' ? raw : null;
+  } catch { return null; }
+}
+
+/** Write the cache whole, atomically, 0600, as the revocation list's cache is written. */
+export function writeManifestCache(root, { tag, doc, checkedAt, source }) {
+  const path = releaseManifestPath(root);
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const tmp = `${path}.tmp-${process.pid}`;
+  writeFileSync(tmp, `${JSON.stringify({ tag, checkedAt, source, doc }, null, 2)}\n`, { mode: 0o600 });
+  renameSync(tmp, path);
+  if (process.platform !== 'win32') chmodSync(path, 0o600);
+}
+
+/** A development version: `2.1.0-dev`, and `2.1.0-dev.1` should one ever be cut. */
+export const isDevVersion = (version) => /-dev(\.\d+)?$/.test(version);
+
+/** The commit this checkout's own `tag` names, or `null`: no git, no repository, or no such tag (a download). */
+export function tagCommit(root, tag, { run = spawnSync } = {}) {
+  const r = run('git', ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`],
+    { cwd: root, encoding: 'utf8', timeout: 5_000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+  const sha = String(r.stdout ?? '').trim();
+  return r.status === 0 && COMMIT.test(sha) ? sha : null;
+}
+
+const versionOf = (root) => {
+  try { return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version ?? null; } catch { return null; }
+};
+
+/**
+ * This checkout against its release's signed manifest, read from the cache: `{ state, version, tag, … }`.
+ *
+ *   dev       a development version, which no manifest is signed for;
+ *   verified  the manifest is this release's, and every covered file is as signed;
+ *   modified  the manifest is this release's, and `modified` lists what differs;
+ *   missing   no manifest is held: none was fetched, or the cache was deleted;
+ *   invalid   the cached manifest does not verify, or `package.json` names no version;
+ *   other     the manifest is another release's (`manifestTag`), or another commit's than this checkout's own tag.
+ *
+ * Every state but `dev` and `verified` is a FAIL (the architect's ruling, 2026-10-13): a deleted or swapped manifest
+ * is the cheapest tamper, and must read as one. One bounded `git` call, for the tag's commit; nothing is fetched.
+ */
+export function integrityStatus(root, { keys = PRODUCT_KEYS, commitOf = tagCommit } = {}) {
+  const version = versionOf(root);
+  if (typeof version !== 'string' || version === '') return { state: 'invalid', version: null, reason: 'package.json names no version' };
+  if (isDevVersion(version)) return { state: 'dev', version };
+  const tag = `v${version}`;
+  const cache = readManifestCache(root);
+  if (!cache) return { state: 'missing', version, tag };
+  const read = readManifest(cache.doc, { keys });
+  if (!read.ok) return { state: 'invalid', version, tag, reason: read.reason };
+  const m = read.manifest;
+  if (m.tag !== tag) return { state: 'other', version, tag, manifestTag: m.tag };
+  const local = commitOf(root, tag);
+  if (local !== null && local !== m.commit) {
+    return { state: 'other', version, tag, manifestTag: m.tag, manifestCommit: m.commit, localCommit: local };
+  }
+  const tree = checkTree(root, m);
+  return { state: tree.ok ? 'verified' : 'modified', version, tag, checked: tree.checked, modified: tree.modified };
+}
+
+/** The `Integrity:` line a status names, for every state; E-32 reports it, `status` and the banner print it. */
+export function integrityLine(s) {
+  const short = (sha) => sha.slice(0, 7);
+  switch (s.state) {
+    case 'dev': return 'Integrity: not checked — a development tree has no signed manifest';
+    case 'verified': return `Integrity: verified · ${s.tag} · ${s.checked} files`;
+    case 'modified': {
+      const n = s.modified.length;
+      const first = s.modified[0].path;
+      return n === 1
+        ? `Integrity: modified — 1 file differs from the signed manifest for ${s.tag}: ${first}`
+        : `Integrity: modified — ${n} files differ from the signed manifest for ${s.tag}, the first ${first}`;
+    }
+    case 'missing': return `Integrity: no signed manifest for ${s.tag} — reinstall from a signed release tag`;
+    case 'other': return s.localCommit
+      ? `Integrity: the signed manifest for ${s.tag} names commit ${short(s.manifestCommit)}, and this checkout's ${s.tag} names ${short(s.localCommit)}`
+      : `Integrity: the signed manifest is for ${s.manifestTag}, this checkout is ${s.tag}`;
+    default: return s.tag
+      ? `Integrity: the signed manifest for ${s.tag} does not verify — ${s.reason}`
+      : `Integrity: ${s.reason}`;
+  }
+}
+
+/** The remedy for a state that is not `verified`, spelled for `cli`; `null` for `dev` and `verified`. */
+export function integrityRemedy(s, cli) {
+  if (s.state === 'dev' || s.state === 'verified') return null;
+  if (s.state === 'modified') {
+    return `Restore the files from ${s.tag}, or reinstall from a signed release tag; ${cli} doctor --json lists every one.`;
+  }
+  return `Run ${cli} licence check --refresh to fetch it; if it says none is published, reinstall from a signed release tag.`;
 }

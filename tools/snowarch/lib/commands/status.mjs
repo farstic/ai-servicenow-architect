@@ -92,7 +92,11 @@ export async function statusCommand({ flags = {}, log, out = process.stdout, env
   // the committed fixtures stop depending on the capturing machine's shell (rule 4).
   platform = process.platform,
   // ARC-07-C33 — a seam, defaulting to the product's behaviour; see the `runDoctor` call below.
-  writeCache = 'auto' } = {}) {
+  writeCache = 'auto',
+  // ARC-11-C7 — a seam, empty for every real caller: `make-status-fixtures.mjs` leaves E-32 out, because what E-32
+  // says is the COMMIT's (a release version, and its signed manifest), and a committed fixture carries no fact that
+  // differs between two correct commits (ARC-08-C27).
+  exclude = [] } = {}) {
   const write = (text) => out.write(`${text}\n`);
 
   const checkout = resolveCheckout({ cwd, who: 'STATUS' });
@@ -115,6 +119,7 @@ export async function statusCommand({ flags = {}, log, out = process.stdout, env
       platform,
       ...(registry ? { registry } : {}),
       quick: true,
+      exclude,
       // `--quick` implies no network in `doctorCommand`, and the implication is the point rather
       // than a detail: a session must answer in under a second and a round trip is the slowest
       // thing here. Stated rather than inherited, because this call does not go through the flags.

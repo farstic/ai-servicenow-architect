@@ -1901,6 +1901,13 @@ Three files, in this order, and the tests will tell you if you stop after the fi
    Applying it took the quick doctor from 776 ms of check time to **89 ms** locally, slowest check
    20 ms. The full `./snowarch doctor` is unchanged — every one of those checks still runs there,
    and the cache the banner reads FIRST is written by a full run.
+
+   **E-32 is the one exception, by the architect's ruling** (ARC-11-C7). It hashes every file the
+   release's signed manifest covers, about 7 ms warm on an Apple M3, and that is a tree's worth of
+   reads. It is quick because `status` runs the quick doctor, and `status` is where a modified copy
+   is reported. The banner's re-run leaves it out by name (`exclude: ['E-32']` in
+   `hooks/session-start.mjs`), so the cost above stays what it was, and
+   `tests/hook/integrity-banner.test.mjs` shows the hook reads no file only E-32 reads.
 2. **The three snapshots.** `tests/fixtures/doctor/snapshot-{linux,darwin,win32}.json` record what
    a design-only install answers, per check. A new id is red in `tests/doctor/snapshot.test.mjs`
    with the id named — on every cell, not only after a bootstrap. Produce the rows from a real run

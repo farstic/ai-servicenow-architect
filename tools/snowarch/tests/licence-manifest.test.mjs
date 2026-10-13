@@ -151,8 +151,7 @@ test('ARC-11-C7 — a checkout of the tag is unmodified, and every kind of diffe
 
 test('ARC-11-C7 — on this platform, git archive writes the bytes this checkout holds, for every covered file', () => {
   // Files this checkout has changed are not the comparison's: they differ from HEAD on purpose.
-  const changed = new Set(git(REAL_ROOT, ['status', '--porcelain', '--', ...COVERAGE.covers])
-    .split('\n').filter(Boolean).map((l) => l.slice(3)));
+  const changed = new Set(git(REAL_ROOT, ['diff', '--name-only', 'HEAD', '--', ...COVERAGE.covers]).split('\n').filter(Boolean));
   const m = manifestFromArchive(REAL_ROOT, 'HEAD');
   const compared = Object.entries(m.files).filter(([path]) => !changed.has(path));
   // An instrument that compared nothing would pass: the product covers hundreds of files, and one of them is CRLF.

@@ -18,7 +18,7 @@
 import { remedyFor } from '../../../../packages/contract/lib/contract.mjs';
 
 import { redactResult } from './redact.mjs';
-import { NOT_IN_QUICK, NOT_IN_SECTION } from './report-text.mjs';
+import { LEFT_OUT, NOT_IN_QUICK, NOT_IN_SECTION } from './report-text.mjs';
 import { isServerCheck, SECTIONS } from './registry.mjs';
 import { spellings } from '../launcher-spelling.mjs';
 
@@ -38,8 +38,11 @@ export function selectSections(requested) {
  *
  * `--quick` is `quick && !spawns && !network`: a check that spawns a process is not quick however
  * fast it is, because the cost being avoided is the process, not the milliseconds.
+ *
+ * `exclude` names checks this run leaves out whatever else they are (ARC-11-C7). No flag sets it; the
+ * SessionStart banner does, for E-32.
  */
-export function planRun(checks, { quick = false, noNetwork = false, sections = null } = {}) {
+export function planRun(checks, { quick = false, noNetwork = false, sections = null, exclude = [] } = {}) {
   const selected = [];
   const skipped = [];
   for (const check of checks) {
@@ -47,6 +50,7 @@ export function planRun(checks, { quick = false, noNetwork = false, sections = n
       || sections.includes(check.section)
       || (sections.includes('server') && isServerCheck(check.id));
     if (!inSection) { skipped.push({ check, reason: NOT_IN_SECTION }); continue; }
+    if (exclude.includes(check.id)) { skipped.push({ check, reason: LEFT_OUT }); continue; }
     if (quick && (!check.quick || check.spawns || check.network)) {
       skipped.push({ check, reason: NOT_IN_QUICK });
       continue;

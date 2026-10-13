@@ -21,8 +21,8 @@ import { licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/ind
 const checks = engineChecks();
 const ids = checks.map((c) => c.id);
 
-test('E-00 … E-31 and SV-00 … SV-09, once each, in section order', () => {
-  assert.equal(checks.length, 42);
+test('E-00 … E-32 and SV-00 … SV-09, once each, in section order', () => {
+  assert.equal(checks.length, 43);
   // ARC-08-C30 — THE SET, NOT THE ORDER, and the difference is a decision worth stating.
   //
   // This asserted `deepEqual` against an ASCENDING list, which held because every check until now
@@ -40,7 +40,7 @@ test('E-00 … E-31 and SV-00 … SV-09, once each, in section order', () => {
   // below. What is no longer asserted is that definition order happens to be numeric — which was
   // never a property anyone relied on, only one that had not yet been contradicted.
   assert.deepEqual([...ids.filter((id) => id.startsWith('E-'))].sort(),
-    Array.from({ length: 32 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
+    Array.from({ length: 33 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
   assert.deepEqual(ids.filter((id) => id.startsWith('SV-')),
     Array.from({ length: 10 }, (_, i) => `SV-${String(i).padStart(2, '0')}`));
   assert.equal(new Set(ids).size, ids.length);
@@ -51,7 +51,7 @@ test('E-00 … E-31 and SV-00 … SV-09, once each, in section order', () => {
 });
 
 // S02's AC 8, extended by S03's detectors — the subset, still read from the flags.
-test('--quick is sixteen checks: the ones that cost nothing to run (ARC-09-C8, ARC-11-C1)', () => {
+test('--quick is seventeen checks: the ones that cost nothing to run, and E-32 (ARC-09-C8, ARC-11-C1, ARC-11-C7)', () => {
   const { selected } = planRun(checks, { quick: true });
   // ARC-09-C8 moved three GROUPS out — the docs checks that share `docsStatus`, the whole server
   // section (one in-process run of the server's own doctor), and the lint checks that share
@@ -68,6 +68,10 @@ test('--quick is sixteen checks: the ones that cost nothing to run (ARC-09-C8, A
     // ARC-11-C1 — E-31 reads `.local/licence.json` and the cached list and checks one signature: no
     // spawn, no network. Quick because the banner and `status` are where the licence state is read.
     'E-31',
+    // ARC-11-C7 — E-32 reads the cached manifest and hashes every covered file, with one bounded git call. That
+    // is a tree's worth of reads, so the SessionStart hook leaves it out by name; it is quick because `status`
+    // is where a modified copy is reported, and `status` runs the quick doctor.
+    'E-32',
     'E-17', 'E-18',
     'E-23', 'E-24', 'E-25', 'E-26',
   ]);
@@ -203,6 +207,10 @@ test('--quick membership is the same set in the registry and in a real run', () 
     // ARC-11-C1 — E-31 reads `.local/licence.json` and the cached list and checks one signature: no
     // spawn, no network. Quick because the banner and `status` are where the licence state is read.
     'E-31',
+    // ARC-11-C7 — E-32 reads the cached manifest and hashes every covered file, with one bounded git call. That
+    // is a tree's worth of reads, so the SessionStart hook leaves it out by name; it is quick because `status`
+    // is where a modified copy is reported, and `status` runs the quick doctor.
+    'E-32',
     'E-17', 'E-18',
     'E-23', 'E-24', 'E-25', 'E-26',
   ]);

@@ -109,7 +109,9 @@ async function reRun({ config, watchdogMs, run }) {
   let timer;
   try {
     return await Promise.race([
-      doctor({ root: ROOT, config, quick: true, noNetwork: true, writeCache: true }),
+      // ARC-11-C7 — E-32 is the one quick check that reads every covered file, so the banner never runs it: `status`
+      // and `doctor --quick` compute it, and the banner shows the verdict they cached. The hook never hashes.
+      doctor({ root: ROOT, config, quick: true, noNetwork: true, writeCache: true, exclude: ['E-32'] }),
       new Promise((_, reject) => {
         // ARC-09-C77 — REF'D: it bounds an awaited run, and `finally` clears it, so it never holds a
         // hook whose run has answered. Unref'd, a run pending on nothing ended the hook in exit 13

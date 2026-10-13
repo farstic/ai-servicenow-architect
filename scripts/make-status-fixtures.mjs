@@ -371,6 +371,10 @@ export async function capture(mode, { pin = true, onCheckout = null, asVersion =
       // ARC-07-W17 — PINNED, both here and in the comparison: a committed fixture must not depend on the
       // capturing machine's shell. Linux is the POSIX rendering the committed files hold.
       platform: 'linux',
+      // ARC-11-C7 — E-32 LEFT OUT, by the pin table's rule: it skips on a development version and FAILs on a
+      // release one with no signed manifest, so two correct commits would capture two answers (ARC-08-C27). Left
+      // out, it is a skip on both, and the counts the Mode line renders are the run's own.
+      exclude: ['E-32'],
     });
     const text = chunks.join('');
     if (!text.trimStart().startsWith('{')) die(`${mode}: status did not print a report (exit ${code})\n${text}`);
