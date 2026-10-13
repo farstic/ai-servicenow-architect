@@ -3,7 +3,7 @@
 /**
  * ARC-11-C6 — the release notes say nothing the owner's ruling forbids a page to say.
  *
- * The v2.0.13 cut of 2026-10-13 wrote, from commit subjects, an Added line "E-31 offers the way back" and three
+ * The release cut of 2026-10-13 wrote, from commit subjects, an Added line "E-31 offers the way back" and three
  * Internal lines naming it: step 6's subjects from before the owner's ruling, and one written after it. The
  * changelog's own sweep reads only its live part, so the section being cut was read by nothing. The architect
  * cancelled the publish before any Release existed, and ruled: (1) a committed override map, sha to "omit" or a
@@ -23,7 +23,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RS = '\x1e';
 const US = '\x1f';
 
-/** The four commits the v2.0.13 cut described, as `git log` gives them, and one that says nothing of it. */
+/** The four commits that cut described, as `git log` gives them, and one that says nothing of it. */
 const CUT = [
   ['f36165d84503c5e9f15fa3b36bd51aa3f0b4df72', 'feat(doctor): E-31 offers the way back, U4 says it before a move; green (ARC-11-C6)'],
   ['fb0aef03bb889ad9ad8cc338a24a3b1010cf56b4', 'test(doctor): the fixtures and the template\'s three quotes carry E-31\'s way back (ARC-11-C6)'],
@@ -51,7 +51,7 @@ test('ARC-11-C6 — an override omits a commit, or replaces its line and keeps i
   assert.match(body, /^- doctor: left as it is \(ARC-11-C6\) \(ccccccc\)$/m, body);
 });
 
-test('ARC-11-C6 — the section the v2.0.13 cut wrote, written again, says nothing the ruling forbids', () => {
+test('ARC-11-C6 — the section the 2026-10-13 cut wrote, written again, says nothing the ruling forbids', () => {
   // writeChangelog as the release calls it, fed the four commits that carried the words and one that did not. The
   // committed overrides are read from the checkout, as at the cut.
   const files = { 'docs/CHANGELOG.md': '# Changelog\n\n## Unreleased\n\n### Notes\n\nA note.\n' };
@@ -94,7 +94,7 @@ test('ARC-11-C6 — an override names a full sha, exactly one of omit or line, a
     assert.throws(at(bad), /needs a full sha, exactly one of omit or line, and a why/, JSON.stringify(bad));
   }
   assert.deepEqual(readOverrides('/nowhere', { exists: () => false }), {});
-  // The committed map holds to the same rule, and covers the four lines the v2.0.13 cut wrote.
+  // The committed map holds to the same rule, and covers the four lines that cut wrote.
   const committed = readOverrides(ROOT);
   for (const [sha4] of CUT.slice(0, 4)) assert.ok(committed[sha4], `${sha4} has no override`);
 });
