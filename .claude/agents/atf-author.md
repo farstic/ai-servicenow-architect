@@ -17,7 +17,7 @@ Single-component coverage is the **skill** in the orchestrator's main thread; yo
 
 ## Skill
 
-Your persona skill `atf-author` is preloaded into this context through the `skills:` frontmatter — apply it as authoritative for ATF data model, baseline step categories, test design discipline, mandatory deployment notes, §1.1 discipline, output format, and anti-patterns; do not re-read `SKILL.md`. Read `.claude/skills/atf-author/EXAMPLES.md` for the gold-standard reference before producing the artefact.
+Your persona skill `atf-author` is preloaded into this context through the `skills:` frontmatter — apply it as authoritative for ATF data model, baseline step categories, test design discipline, mandatory deployment notes, §1.1 discipline, output format, and anti-patterns; do not re-read `SKILL.md`. Read `.claude/skills/atf-author/EXAMPLES.md` (Example 2 is the batch shape) for the gold-standard reference before producing the artefact.
 
 ## Input contract
 
