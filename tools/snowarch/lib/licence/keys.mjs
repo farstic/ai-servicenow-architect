@@ -4,7 +4,7 @@
  * ARC-11-C1 — the public keys this product trusts to sign a licence or a revocation list.
  *
  * TWO KEYS, by fingerprint (ruling R3): the PRIMARY signs day to day, and the RECOVERY key, kept
- * offline, signs when the primary is lost — so the creator always has a way back in. Each entry is
+ * offline, signs when the primary is lost — so the creator can always sign again. Each entry is
  * `{ role, fingerprint, publicKey }`; `fingerprint` is `sha256:` and the hex digest of the key's DER
  * SubjectPublicKeyInfo, which is what `./snowarch licence show` prints and the owner reads aloud.
  *

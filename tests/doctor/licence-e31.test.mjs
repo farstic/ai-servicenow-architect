@@ -12,12 +12,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
-import { LAST_UNENFORCED_RELEASE, WAY_BACK } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 import { statusCommand } from '../../tools/snowarch/lib/commands/status.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import { greenTree } from './helpers/tree.mjs';
 import { licencePath } from '../../tools/snowarch/lib/local-paths.mjs';
-import { writeListCache } from '../../tools/snowarch/lib/licence/state.mjs';
+import { REMEDY, writeListCache } from '../../tools/snowarch/lib/licence/state.mjs';
 import { keyPair, licence, licenceText, listDoc, productKeys } from '../../tools/snowarch/tests/helpers/licence.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
@@ -49,22 +48,19 @@ test('ARC-11-C6 — no licence is a FAIL, with the line the banner prints and th
   assert.match(r.command, /licence check$/);
 });
 
-test('ARC-11-C6 step 6 — E-31\'s remedy ends with the way back, to the last release that runs without a licence', async (t) => {
-  // v2.0.12, named once: 2.0.13 is the first release that refuses without a licence (C6), so going back to escape
-  // enforcement means that one, whichever release a checkout came from.
-  assert.equal(LAST_UNENFORCED_RELEASE, 'v2.0.12');
+test('ARC-11-C6 — E-31\'s remedy is the remedy alone, by the owner\'s ruling from the rc.3 sitting', async (t) => {
+  // "The user must not learn how to have a working Architect without a licence" (the owner, 2026-10-13). Step 6 had a
+  // refused state's remedy end with a sentence that sent a reader to the last release that runs without one; the
+  // sentence is gone, and upgrade refuses that move without a licence in force.
   const ctx = ctxFor(t);
   const cli = spellings({ platform: ctx.platform, env: ctx.env }).cli;
-  assert.equal(WAY_BACK(cli), `To go back to the last release that runs without a licence: ${cli} upgrade --to v2.0.12.`);
   for (const file of [null, licenceText(licence({ valid_until: '2026-10-01' }), primary)]) {
     const r = await E31.run(ctxFor(t, { file }));
     assert.equal(r.status, 'fail');
-    assert.match(r.remedy, /^Run .+ licence check to see why, then install a valid licence as \.local\/licence\.json\./);
-    assert.ok(r.remedy.endsWith(`restart it afterwards. ${WAY_BACK(cli)}`), r.remedy);
+    assert.equal(r.remedy, REMEDY(cli), r.remedy);
   }
-  // A licence in its last month is in force: its warning has no way back to offer.
   const soon = await E31.run(ctxFor(t, { file: licenceText(licence({ valid_until: '2026-10-25' }), primary) }));
-  assert.equal(soon.remedy.includes('upgrade --to'), false, soon.remedy);
+  assert.equal(soon.remedy, REMEDY(cli), soon.remedy);
 });
 
 test('ARC-11-C1 — a licence in force is ok; one in its last month is a warning; a forged one is a FAIL that says why', async (t) => {

@@ -28,7 +28,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { LAST_UNENFORCED_RELEASE, NO_LICENCE_IN_FORCE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
+import { NO_LICENCE_IN_FORCE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -101,12 +101,12 @@ try {
   check(sv06?.status === 'skip' && sv06.detail === NO_LICENCE_IN_FORCE,
     `SV-06 skips with E-31's reason (${sv06 ? `${sv06.status}: ${sv06.detail}` : 'absent'})`);
   // The line a user reads, printed so every cell's log can be quoted (the owner's rule), and held to the launcher this
-  // shell types: E-31's remedy names `licence check` and the way back with it, `.\snowarch.cmd` on a Windows shell.
+  // shell types: E-31's remedy names `licence check`, `.\snowarch.cmd` on a Windows shell, and nothing that sends a
+  // reader to another release (the owner's ruling from the rc.3 sitting, 2026-10-13).
   if (e31) say(`     E-31 ${e31.status}: ${e31.detail} — ${e31.remedy}`);
   const cli = spellings({ platform: process.platform, env: doctorEnv }).cli;
-  check(Boolean(e31?.remedy?.includes(`${cli} licence check`))
-    && Boolean(e31?.remedy?.includes(`${cli} upgrade --to ${LAST_UNENFORCED_RELEASE}`)),
-  `E-31's remedy spells this shell's launcher, ${cli}, in licence check and in the way back`);
+  check(Boolean(e31?.remedy?.includes(`${cli} licence check`)) && !e31?.remedy?.includes('upgrade --to'),
+    `E-31's remedy spells this shell's launcher, ${cli}, in licence check, and names no other release`);
 
   // 4. The bootstrap, live, on a clone: the docs corpus skipped (it is not what this asserts), and no Claude Code.
   const clone = join(base, 'clone');

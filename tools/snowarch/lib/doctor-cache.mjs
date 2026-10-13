@@ -19,8 +19,8 @@ import { writeJsonAtomic } from './settings-local.mjs';
  * `.local/` follows `SNOWARCH_STATE_ROOT` (ARC-07-C43); everything else is a file in the repository.
  *
  * PER-ENTRY rather than per-root, because this module addresses both kinds: `INPUT_FILES` below mixes
- * the store and the recorded mode, which are state, with `.mcp.json`, the settings files and
- * `engine.config.json`, which are the checkout. Moving all six would make a redirected run compare
+ * the store, the recorded mode and the licence, which are state, with `.mcp.json`, the settings files and
+ * `engine.config.json`, which are the checkout. Moving all seven would make a redirected run compare
  * mtimes of files that are not there and re-run the doctor for ever.
  *
  * Named `pathIn` and not `at`: `cacheStale` below has a local `const at` for a parsed timestamp, and a
@@ -33,12 +33,18 @@ export const CACHE_FILE = join('.local', 'doctor-last.json');
 export const cachePath = doctorCachePath;
 
 /**
- * The six files whose mtime decides whether the cache still describes this checkout.
+ * The seven files whose mtime decides whether the cache still describes this checkout.
  *
- * MTIMES, not hashes: the banner has ~300 ms and no Node on some machines, and six `stat` calls
- * are the cheapest question that can be asked. They are the six inputs a doctor answer depends on
- * — the registration, both settings files, the store, the config and the recorded mode — so a
- * change to any of them is a reason to re-run rather than to read.
+ * MTIMES, not hashes: the banner has ~300 ms and no Node on some machines, and seven `stat` calls
+ * are the cheapest question that can be asked. They are the seven inputs a doctor answer depends on
+ * — the registration, both settings files, the store, the config, the recorded mode and the licence —
+ * so a change to any of them is a reason to re-run rather than to read.
+ *
+ * ARC-11-C12 — the licence, because it decides E-31: a licence installed after the cache was written left
+ * the banner on the cached E-31 FAIL for up to MAX_AGE_MS (the owner's rc.3 sitting). The revocation list is
+ * NOT an input, though it decides E-31 too: every live start's background refresh rewrites its cache, so it
+ * would re-run the doctor at every start. After a revocation lands, the cached Doctor line can show E-31 ok
+ * for up to a day, while the banner's Licence line, read fresh, says revoked.
  */
 export const INPUT_FILES = Object.freeze({
   mcpJsonMtime: ['.mcp.json'],
@@ -47,6 +53,7 @@ export const INPUT_FILES = Object.freeze({
   storeMtime: ['.local', 'instances.json'],
   engineConfigMtime: ['engine.config.json'],
   bootstrapStateMtime: ['.local', 'bootstrap-state.json'],
+  licenceMtime: ['.local', 'licence.json'],
 });
 
 export const INPUTS_FILE = join('.local', 'doctor-last.inputs.json');

@@ -16,13 +16,14 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  classifyGitFetchError, doctorLines, licenceNotice, parseSemver, renderPlan, returnRef, sortTags,
+  classifyGitFetchError, doctorLines, licenceNotice, parseSemver, refusesTarget, renderPlan, returnRef, sortTags,
+  targetRefusalLines,
 } from '../../tools/snowarch/lib/commands/upgrade.mjs';
+import { LAST_UNENFORCED_RELEASE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 import { branchState, describe } from '../../tools/snowarch/lib/git.mjs';
 import { git as harnessGit } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { REMEDY } from '../../tools/snowarch/lib/licence/state.mjs';
-import { WAY_BACK } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 import { failureLines } from '../../tools/snowarch/lib/doctor/panel.mjs';
 import {
   MAX_AGE_MS, REFRESH_AFTER_MS, cachePath, isFresh, needsRefresh, readUpgradeCheck,
@@ -96,23 +97,54 @@ test('the plan block says the five things a reader has to decide from', () => {
   assert.match(nothing, /claude-floor not stated/);
 });
 
-test('ARC-11-C6 step 6 — U4 says what a release that enforces refuses, and both of E-31\'s sentences', () => {
+test('ARC-11-C6 — U4 says what a release that enforces refuses, and E-31\'s remedy alone', () => {
   const cli = './snowarch';
   const lines = licenceNotice({ licence: { state: 'missing' }, target: 'v2.0.13', cli });
   assert.deepEqual(lines, [
     'Licence: missing — v2.0.13 runs no MCP tool, and no command but licence, doctor, status, version, upgrade, '
       + 'bootstrap and mode design, without a licence in force.',
-    `${REMEDY(cli)}. ${WAY_BACK(cli)}`,
+    REMEDY(cli),
   ]);
   // Every refused state, and any release after the last that runs without one, prereleases included.
   for (const state of ['invalid', 'expired', 'revoked']) {
     assert.ok(licenceNotice({ licence: { state }, target: 'v2.1.0-rc.1', cli }), state);
   }
-  // A licence in force says nothing, and nor does the way back itself, or a release older than it.
+  // A licence in force says nothing, and nor does a target at or below the last release that enforces nothing.
   for (const state of ['ok', 'expiring']) assert.equal(licenceNotice({ licence: { state }, target: 'v2.0.13', cli }), null);
   for (const target of ['v2.0.12', 'v2.0.9']) {
     assert.equal(licenceNotice({ licence: { state: 'missing' }, target, cli }), null, target);
   }
+});
+
+test('ARC-11-C6 — with no licence in force, a move at or below the boundary is refused; licensed or forward, never', () => {
+  // The owner's ruling from the rc.3 sitting (2026-10-13). The boundary is internal and never printed.
+  assert.equal(LAST_UNENFORCED_RELEASE, 'v2.0.12');
+  for (const state of ['missing', 'invalid', 'expired', 'revoked']) {
+    for (const target of ['v2.0.12', 'v2.0.12-rc.2', 'v2.0.9', 'v2.0.0']) {
+      assert.equal(refusesTarget({ licence: { state }, target }), true, `${state} ${target}`);
+    }
+    // 2.0.13's prereleases enforce, so they are not a way back; forward is never refused.
+    for (const target of ['v2.0.13-rc.3', 'v2.0.13', 'v2.1.0', 'v9.1.0']) {
+      assert.equal(refusesTarget({ licence: { state }, target }), false, `${state} ${target}`);
+    }
+  }
+  // A licence in force takes the move: the owner's own way back.
+  for (const state of ['ok', 'expiring']) assert.equal(refusesTarget({ licence: { state }, target: 'v2.0.12' }), false);
+  // A target this product cannot order is presumed to enforce, as U4's notice presumes.
+  assert.equal(refusesTarget({ licence: { state: 'missing' }, target: 'not-a-version' }), false);
+});
+
+test('ARC-11-C6 — the refusal names the state and the code, then the remedy, and says nothing of why', () => {
+  const cli = './snowarch';
+  assert.deepEqual(targetRefusalLines({ licence: { state: 'missing' }, target: 'v2.0.12', cli }), [
+    'snowarch upgrade: licence missing (Code: LICENCE_NOT_VALID) — upgrade --to v2.0.12 does not run without a valid '
+      + 'licence; nothing was changed',
+    REMEDY(cli),
+  ]);
+  const signed = targetRefusalLines({ licence: { state: 'revoked', signatureValid: true, id: 'LIC-2026-0002' },
+    target: 'v2.0.9', cli });
+  assert.match(signed[0], /^snowarch upgrade: licence revoked \(LIC-2026-0002\) \(Code: LICENCE_NOT_VALID\)/);
+  assert.equal(/runs without|go back|unenforced|without enforcement|last release/i.test(signed.join(' ')), false);
 });
 
 test('the cache is the hook\'s contract: three keys that may never be renamed', (t) => {

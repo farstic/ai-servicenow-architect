@@ -287,12 +287,12 @@ test('the page stays a page, and the tail stays a tail', () => {
   // Claude Sonnet or a more capable model, and not on smaller ones, is the first fact a reader checks
   // before installing, so it is one row in the prerequisites table. Same rule as every move above: a
   // cap is worth moving for a fact, and nothing was deleted to pay for it.
-  // 308 since ARC-11-C6: from 2.0.13 the product refuses every tool, and every command but seven, without a
+  // 307 since ARC-11-C6: from 2.0.13 the product refuses every tool, and every command but seven, without a
   // licence from the author, so a page that did not say how to install one would send a new user to a product
-  // that answers nothing. Eight lines buy the heading, where the file goes and when, how to see its state, what
-  // is refused without one, and the way back to the last release that runs without one. Same rule as every move
-  // above: a cap is worth moving for a fact, and nothing was deleted to pay for it.
-  assert.ok(install <= 308, `${install} lines of install page (criterion: 308)`);
+  // that answers nothing. Seven lines buy the heading, where the file goes and when, how to see its state, and
+  // what is refused without one. It was 308 while the section also named the release to go back to; the owner's
+  // ruling from the rc.3 sitting (2026-10-13) took that out, and the cap follows the fact both ways.
+  assert.ok(install <= 307, `${install} lines of install page (criterion: 307)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.

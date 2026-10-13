@@ -18,8 +18,7 @@ server, sees this:
 - every MCP tool answers `LICENCE_NOT_VALID` and writes one audit line, as 2.0.12 did under `SNOW_LICENCE_ENFORCE`;
 - `./snowarch` runs `licence`, `doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`. Every other
   command exits 3, naming the state and the remedy; the package CLI runs `doctor` only;
-- doctor check E-31 is a FAIL. Its remedy ends with the way back, `./snowarch upgrade --to v2.0.12`, the last
-  release that runs without a licence;
+- doctor check E-31 is a FAIL, with the remedy every refusal carries;
 - `./snowarch upgrade` says so before it moves to a release that refuses, with `--yes` and without.
 
 `SNOW_LICENCE_ENFORCE` is gone: no variable, flag or file turns enforcement off, and setting it changes nothing. With
@@ -57,6 +56,8 @@ server has 399 tools and the error registry 73 codes, as in 2.0.12. The contract
   the server and in `./snowarch licence check --refresh` and `upgrade`. It said no list was published yet, and wrote
   the cache as checked at that moment, which hid how old the cached list was. The cached list was kept either way
   (ARC-11-C11).
+- After a licence is installed, the session banner runs the quick doctor again, where its Doctor line showed E-31's
+  FAIL from before the install for up to a day (ARC-11-C12).
 
 ## 2.0.12 — 2026-10-12
 

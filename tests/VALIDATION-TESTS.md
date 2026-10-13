@@ -351,7 +351,7 @@ Create an incident on the live instance for the outage.
    Roster: 29 skills / 9 agents
    Instances: pdi (pdi, custom)
    Doctor: 15 ok, 0 warn, 1 fail (E-31) — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
-   E-31 FAIL the licence for this checkout: Licence: missing — Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards. To go back to the last release that runs without a licence: ./snowarch upgrade --to v2.0.12.
+   E-31 FAIL the licence for this checkout: Licence: missing — Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards
    Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
    Instances are the store's own records; nothing was probed.
    ```
@@ -1575,7 +1575,7 @@ returns.
 
 | # | On | Do | Expect |
 |---|---|---|---|
-| 1 | B | Before any licence: `./snowarch doctor`, `./snowarch status`, then start Claude Code and read the capabilities. | E-31 FAILs: `Licence: missing`, with the remedy `Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. … To go back to the last release that runs without a licence: ./snowarch upgrade --to v2.0.12.` The status panel's second line and the banner's second line are both `Licence: missing`. The tool count is the release's, and the tool is refused: `Error: licence missing — no tool runs without a valid licence. …`, ending `(Code: LICENCE_NOT_VALID)`. The Architect says that no deliverable is produced, and does not retry. |
+| 1 | B | Before any licence: `./snowarch doctor`, `./snowarch status`, then start Claude Code and read the capabilities. | E-31 FAILs: `Licence: missing`, with the remedy `Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards`, and nothing after it. The status panel's second line and the banner's second line are both `Licence: missing`. The tool count is the release's, and the tool is refused: `Error: licence missing — no tool runs without a valid licence. …`, ending `(Code: LICENCE_NOT_VALID)`. The Architect says that no deliverable is produced, and does not retry. |
 | 2 | A | `./snowarch licence issue --to "Sam Example" --org "Example Consulting Ltd" --scope live --key ~/snowarch-keys/primary.pem`, with `--valid-until` set to a date about six months out. Send the file to B outside any repository. | `licence issue: LIC-2026-0002 for Sam Example (Example Consulting Ltd), live, until` that date, and the file beside the key. |
 | 3 | B | Copy the file to `.local/licence.json`. Run `./snowarch licence check --refresh`, `./snowarch doctor` and `./snowarch status`. | `revocation list: version <n> fetched`, then `Licence: ok · LIC-2026-0002 · until` the date and `valid until:  <date> (UTC, N days)`. E-31 is ok. The panel's second line is the same `Licence:` line, and its `Doctor:` line no longer names E-31. |
 | 4 | B | Restart Claude Code and read the capabilities. Run `./snowarch licence check`. | The banner's second line is `Licence: ok · LIC-2026-0002 · until` the date. The tool answers, with no licence block. `check` says `nothing is refused while the licence is in force`, with `valid until:  <date> (UTC, N days)`. |
@@ -1589,7 +1589,6 @@ returns.
 | 12 | A, B | `issue --scope design-only`, with an end date, and install it on B, whose checkout is live. Run `./snowarch licence check`, then read the capabilities in a new session. | `Licence: ok · LIC-… · design-only · until` the date, and `scope: licence LIC-… covers design-only; live needs a live-scope licence, so a live server refuses every tool`. The tool answers `licence LIC-… covers design-only; live needs a live-scope licence. …`, ending `(Code: LICENCE_NOT_VALID)`, with the notice block. The Architect does not retry. |
 | 13 | A | `./snowarch licence keygen --out /tmp/x.pem --recovery-out /tmp/y.pem --to "<name>" --org "Example Consulting Ltd"`. The placeholder is deliberate. | `error: --to "<name>" is a placeholder, not a value — type the real name, without angle brackets`, and neither key file exists. |
 | 14 | A | `issue` with `--key` the recovery key, then `./snowarch licence verify` on the file. | `signature: valid — recovery key`. |
-| 15 | B | The way back: with the revoked licence installed, `./snowarch upgrade --to v2.0.12`, then restart Claude Code and read the capabilities. | `upgrade` runs, as one of the commands allowed without a licence, and lands at `v2.0.12`, the last release that runs without one. There the banner reads `Licence: revoked · warn only`, the tool answers, and the first answer carries `Licence: revoked · warn only — revoked on` the day `(ended). Nothing is refused while SNOW_LICENCE_ENFORCE is off. …`. The Architect treats it as information and goes on. |
 
 ### Pass criteria
 

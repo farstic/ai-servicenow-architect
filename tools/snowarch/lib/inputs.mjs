@@ -225,7 +225,7 @@ export const INPUTS = Object.freeze({
       { kind: 'literal', ref: 'mode', why: 'design-only skips the server section' },
     ],
     why: 'B08 calls the doctor (ARC-08-S05). This row answers "must the bootstrap run it again"; '
-      + 'the doctor CACHE answers "may the banner reuse the last report" (`cacheStale()`, six '
+      + 'the doctor CACHE answers "may the banner reuse the last report" (`cacheStale()`, seven '
       + 'mtimes). Two mechanisms for two consumers — do not merge them.',
     resolve: (ctx) => [
       TEXT(`contract=${contractSha(ctx.root) ?? 'not-built'}`),
