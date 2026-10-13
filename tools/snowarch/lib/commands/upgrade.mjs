@@ -594,7 +594,7 @@ export function licenceNotice({ licence, target, cli }) {
 
 /**
  * ARC-11-C6 — the owner's ruling from the rc.3 sitting (2026-10-13): with no licence in force, a move to a release at or
- * below LAST_UNENFORCED_RELEASE is refused. A licence in force takes it, which is the owner's own way back, and a move
+ * below LAST_UNENFORCED_RELEASE is refused. A licence in force takes it (the owner's own case), and a move
  * forward is never refused, so fixes still reach an unlicensed install. A target this product cannot order is presumed
  * to enforce, as U4's notice presumes, so it is not refused.
  */
