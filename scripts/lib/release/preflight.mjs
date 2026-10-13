@@ -80,13 +80,17 @@ export function preflight({ version, root, git, config, flags = {}, platform = p
 
   // 2. The name is free. `git tag -l` prints nothing for a tag that does not exist and the tag name
   // for one that does — an exact-match query, not a pattern search.
-  if (git(['tag', '-l', `v${version}`]).trim() !== '') {
+  //
+  // ARC-11-C7 — EXCEPT UNDER `--tag-only`, which may meet its own tag twice: a tag from 2.1 on is signed between its
+  // creation and its push, so the second run comes back to push it. That pass checks the tag names HEAD itself.
+  const own = git(['tag', '-l', `v${version}`]).trim() !== '';
+  if (own && !flags['tag-only']) {
     return { ok: false, message: `release: tag v${version} already exists` };
   }
 
   // 3. Forward, not backward. Skipped entirely when there is no tag yet, which is the 2.0.0 case
   // this script was written for: "greater than nothing" is not a question.
-  const tags = git(['tag', '-l', 'v*']).split('\n');
+  const tags = git(['tag', '-l', 'v*']).split('\n').filter((tag) => !(own && tag.trim() === `v${version}`));
   const latest = latestTag(tags);
   // ARC-09-C66 — carried separately, because the changelog's range and the version comparison are different
   // questions and a prerelease answers only one of them.

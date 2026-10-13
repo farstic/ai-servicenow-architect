@@ -43,6 +43,10 @@ import { EXIT_GATE, gatePlan, makeGateRunner, modulesAreLinked, runGates }
   from './lib/release/gates.mjs';
 import { EXIT_PREFLIGHT, preflight } from './lib/release/preflight.mjs';
 import { buildTagMessage } from './lib/release/tag.mjs';
+import { publishedManifestMatches } from './lib/release/manifest-gate.mjs';
+import { PRODUCT_KEYS } from '../tools/snowarch/lib/licence/keys.mjs';
+import { signedRelease } from '../tools/snowarch/lib/licence/manifest.mjs';
+import { spellings } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { applyWrites, rollback, STAGED } from './lib/release/writers.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -86,6 +90,9 @@ export async function release({
   staged = STAGED,
   now = () => new Date(),
   platform = process.platform,
+  // TESTS ONLY (ARC-11-C7): the keys a published manifest is verified with. Production verifies with the shipped keys,
+  // and there is no flag for it.
+  keys = PRODUCT_KEYS,
 } = {}) {
   const write = (text) => out.write(`${text}\n`);
   const fail = (text) => err.write(`${text}\n`);
@@ -123,7 +130,7 @@ export async function release({
 
   try {
     return await runRelease({ version, flags, root, out, err, write, fail, git: gitRun,
-      run: runChild, config, ask, now, platform, staged, injectedRun: run !== null });
+      run: runChild, config, ask, now, platform, staged, injectedRun: run !== null, keys });
   } catch (e) {
     // A git command that could not run is a refusal, not a crash: the maintainer needs the sentence,
     // not the stack. Anything else is a bug and keeps its stack.
@@ -133,7 +140,7 @@ export async function release({
 }
 
 async function runRelease({ version, flags, root, out, err, write, fail, git: gitRun, run: runChild,
-  config, ask, now, platform, injectedRun, staged = STAGED }) {
+  config, ask, now, platform, injectedRun, staged = STAGED, keys = PRODUCT_KEYS }) {
   // ── preflight ──────────────────────────────────────────────────────────────────────────────
   // The npm probe is skipped when the caller injected a runner: a test has no npm to find, and a
   // preflight that failed on the absence of a tool it was never going to spawn would be asserting
@@ -179,10 +186,39 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
         + `(HEAD is "${subject}")`);
       return EXIT_PREFLIGHT;
     }
+    // ARC-11-C7 — A TAG FROM 2.1 ON IS SIGNED BETWEEN ITS CREATION AND ITS PUSH (CONTRIBUTING's checklist, step 3a), so
+    // this pass may meet its tag twice: once to make it, and once, after the owner's `licence sign-release`, to push it.
+    // A tag that is already here must name HEAD; one that names anything else is a re-cut nobody asked for.
+    const tag = `v${version}`;
+    const head = gitRun(['rev-parse', 'HEAD']).trim();
+    const existing = (gitRun(['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`], { allowFail: true }) ?? '').trim();
+    if (existing && existing !== head) {
+      fail(`release: ${tag} is already a tag here, at ${existing.slice(0, 7)}, and HEAD is ${head.slice(0, 7)} — nothing was changed`);
+      return EXIT_PREFLIGHT;
+    }
     if (flags['dry-run']) { write(tagMessage); return 0; }
-    createTag({ root, version, tagMessage, sign: flags.sign });
-    write(`Tagged v${version} — push with: git push origin v${version}`);
-    if (flags.push) runChild(['git', 'push', 'origin', `v${version}`]);
+    if (existing) write(`${tag} is already tagged, at HEAD`);
+    else createTag({ root, version, tagMessage, sign: flags.sign });
+    if (!signedRelease(tag)) {
+      if (!existing) write(`Tagged ${tag} — push with: git push origin ${tag}`);
+      if (flags.push) runChild(['git', 'push', 'origin', tag]);
+      return 0;
+    }
+    const cli = spellings({ platform }).cli;
+    if (!flags.push) {
+      write(`Tagged ${tag}. Before it is pushed, sign its manifest with ${cli} licence sign-release ${tag}, giving --key `
+        + 'the path of your primary key and --list your clone of the licences repository, and publish it as that command '
+        + `prints. Then run this again with --tag-only --push.`);
+      return 0;
+    }
+    const signed = publishedManifestMatches(root, tag, { config, keys });
+    if (!signed.ok) {
+      fail(`release: ${tag} has no verified signed manifest (${signed.reason}) — nothing was pushed. Sign it with `
+        + `${cli} licence sign-release ${tag}, publish it, and run --tag-only --push again.`);
+      return EXIT_PREFLIGHT;
+    }
+    write(`release manifest: ${tag} is signed, and it is the record of this tag's tree (${signed.files} files)`);
+    runChild(['git', 'push', 'origin', tag]);
     return 0;
   }
 
@@ -311,6 +347,17 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   }
 
   createTag({ root, version, tagMessage: releaseTagMessage, sign: flags.sign });
+  // ARC-11-C7 — a tag from 2.1 on leaves this machine only with its signed manifest published, and it cannot have one
+  // yet: the manifest is signed from the tag. So this pass stops at the tag, and `--tag-only --push` pushes it.
+  if (signedRelease(`v${version}`)) {
+    write(`Released v${version} (commit ${short}), tagged and not pushed. Sign its manifest with `
+      + `${spellings({ platform }).cli} licence sign-release v${version}, publish it, then run this again with --tag-only --push.`);
+    if (flags.push) {
+      fail(`release: v${version} is pushed only with its signed manifest published — nothing was pushed`);
+      return EXIT_PREFLIGHT;
+    }
+    return 0;
+  }
   write(`Released v${version} (commit ${short}) — push with: git push origin ${pre.branch} --follow-tags`);
   if (flags.push) runChild(['git', 'push', 'origin', pre.branch, '--follow-tags']);
   return 0;
