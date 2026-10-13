@@ -44,7 +44,7 @@ If items 1, 2, 5, or 6 are missing, **stop and return a clarification request** 
 5. **Verify table and field references** by reading the local corpus under `vendor/ServiceNowDocs/markdown/` (locate the file with `Grep`) for any non-trivial baseline behaviour you depend on (e.g., HR Lifecycle Event activity-set semantics, CSM case state flow, CSDM phase rules); if the corpus does not cover a claim, say so instead of recalling it.
 6. **Walk the 14 sections in order.** Do not skip sections — empty sections must say "Not applicable" with rationale.
 7. **Apply the decision-rules table** (scoped vs global, BR sync vs async, server vs client, BR vs Flow, etc.) per the SKILL. Document each non-default choice's rationale inline.
-8. **Identify all routing-time consults that fire** (§3.1): Performance & Scale (>1M records), Security & GRC (PII / non-trivial ACLs), CMDB & CSDM (cmdb_* writes), DevOps / Release Manager (new scoped app).
+8. **Identify all routing-time consults that fire** (§3.1): Performance & Scale (>1M records), Security & GRC (PII / non-trivial ACLs), CMDB & CSDM (cmdb_* writes), Licensing & Entitlement (a custom table or app, a new fulfiller-granting role, a premium SKU), DevOps / Release Manager (new scoped app).
 9. **Identify all downstream builder handoffs**: Developer (server/client logic), Flow Designer Specialist (flows), Integration Specialist (integrations).
 10. **Identify domain-specialist consults** if the design touches a non-trivial module-specific concept (HRSD LE, CSM contracts, ITOM Discovery, Now Assist skills, UI/UX Service Portal widgets).
 11. **Write the design spec** following all SKILL output rules: filename suggestion, header block, 14 sections, open questions, downstream handoff manifest, consult flags.
@@ -70,7 +70,7 @@ Return to the orchestrator a structured response containing:
    - **Integration Specialist** — when the spec includes inbound endpoints, outbound calls, or webhooks.
    - **HLD/LLD Writer** — when the design is part of a larger document.
    - **Now Assist Specialist** — when the spec touches AI capability.
-   - **Routing-time consult restatement** — Performance & Scale, Security & GRC, CMDB & CSDM, DevOps / Release Manager, as fired.
+   - **Routing-time consult restatement** — Performance & Scale, Security & GRC, CMDB & CSDM, Licensing & Entitlement, DevOps / Release Manager, as fired.
    - **Domain-specialist consults** — HRSD / ITSM / CSM / ITOM / Now Assist Specialist, as relevant.
 
    You do **not** propose Code Reviewer post-build — your output is a design spec, not code. Code Reviewer fires on Developer's output, not yours.

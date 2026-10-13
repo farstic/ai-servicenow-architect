@@ -25,7 +25,7 @@ For every component, the specialist must first identify whether a baseline Servi
 
 ### Halt protocol when a custom object appears necessary
 
-If a specialist concludes — after honest baseline evaluation — that a custom object is genuinely the only viable technical path, the specialist **must halt before designing it** and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the Chief Architect, structured as:
+If a custom object not approved in the dispatch envelope was named in the request, or is the only viable path after the baseline evaluation, the specialist **must halt before designing it** and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the Chief Architect, structured as:
 
 1. **Baseline option evaluated** — what baseline construct was considered, and why it falls short for this specific requirement. "I didn't think of one" is not an acceptable answer; evaluation is mandatory.
 2. **Custom object proposed** — the smallest possible scope. The hierarchy of preference, from least to most invasive:

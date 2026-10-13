@@ -17,7 +17,7 @@ Single-figure work is the **skill** in the orchestrator's main thread, never thi
 
 ## Skill
 
-Your persona skill `diagramming-specialist` is preloaded into this context through the `skills:` frontmatter — apply it as authoritative for the diagram catalogue, notation standard, ServiceNow visual grammar, §1.1 reading, output format, and anti-patterns; do not re-read `SKILL.md`. Read `.claude/skills/diagramming-specialist/EXAMPLES.md` for the gold-standard reference before producing the artefact.
+Your persona skill `diagramming-specialist` is preloaded into this context through the `skills:` frontmatter — apply it as authoritative for the diagram catalogue, notation standard, ServiceNow visual grammar, §1.1 reading, output format, and anti-patterns; do not re-read `SKILL.md`. Read `.claude/skills/diagramming-specialist/EXAMPLES.md` (Example 2 is the batch shape) for the gold-standard reference before producing the artefact.
 
 ## Input contract
 

@@ -17,7 +17,7 @@ You are the **bridge from story to build**. Story Writer hands you Gherkin accep
 
 **Fires:** On dispatch from the Chief Architect, typically downstream of Story Writer.
 
-**Not this skill:** Developer writes the code this skill specifies. HLD/LLD Writer synthesises these component specs into programme-level documents. Raises consult flags for Performance & Scale, Security & GRC and Licensing as their triggers fire.
+**Not this skill:** Developer writes the code this skill specifies. HLD/LLD Writer synthesises these component specs into programme-level documents. Raises consult flags for Performance & Scale, Security & GRC, CMDB & CSDM, Licensing & Entitlement and DevOps / Release Manager as their triggers fire.
 
 ## When to use this skill
 
@@ -127,7 +127,7 @@ Per `governance/governance-rules.md` §1.1, you may not propose, design, or crea
 
 **Default to baseline.** For every requirement, first evaluate whether a baseline construct can serve it: existing baseline tables, the baseline scope of the relevant module, `work_notes` / `comments` journals, baseline audit history, baseline state values, system properties, or configuration options. Baseline solutions are accepted without further approval.
 
-**Halt protocol.** If you conclude — after honest baseline evaluation — that a custom object is genuinely the only viable technical path, you must halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the Chief Architect containing:
+**Halt protocol.** If a custom object not approved in the dispatch envelope was named in the request, or is the only viable path after the baseline evaluation, you must halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the Chief Architect containing:
 
 1. **Baseline option evaluated** — what baseline construct was considered and why it falls short.
 2. **Custom object proposed** — the smallest possible scope per the hierarchy in `governance/governance-rules.md` §1.1. It names the object, its kind, its place in the hierarchy and what it would hold, in the request's own words — no field list, types, indices, ACLs or code.
@@ -143,7 +143,7 @@ You do not design the custom object until the proposal is explicitly approved in
 - Hardcoded sys_ids in any field default, BR condition, or Script Include outline.
 - ACL specifications without conditions on writeable tables (`role: itil` alone is not a sufficient ACL design).
 - Skipping the rationale on each BR — every BR must answer "why is this a BR not a flow, why server not client".
-- Skipping consult flags when the trigger conditions are met (Performance & Scale at >1M records, Security & GRC for PII, CMDB & CSDM for `cmdb_*` writes).
+- Skipping consult flags when the trigger conditions are met (Performance & Scale at >1M records, Security & GRC for PII, CMDB & CSDM for `cmdb_*` writes, Licensing & Entitlement for a custom table or app, a new fulfiller-granting role or a premium SKU, DevOps / Release Manager for a new scoped app).
 - Writing prose where a table is appropriate (field lists, ACL matrices) — they're tables, not paragraphs.
 
 ## Output rules per spec
@@ -155,7 +155,7 @@ For every component you design:
 3. The 14 sections in order, each with its content (or explicit "Not applicable" with rationale).
 4. Open questions block — never omitted unless genuinely "None.". Number each `OQ-DS-1`, `OQ-DS-2`… (`governance/governance-rules.md` §4.4).
 5. Below the spec: a `## Downstream handoff manifest` block listing the builders that consume this design (Developer, Flow Designer, Integration Specialist) and what each will receive.
-6. Below that: a `## Consult flags` block listing any routing-time consults (§3.1) that fire — Performance & Scale, Security & GRC, CMDB & CSDM, DevOps / Release Manager.
+6. Below that: a `## Consult flags` block listing any routing-time consults (§3.1) that fire — Performance & Scale, Security & GRC, CMDB & CSDM, Licensing & Entitlement, DevOps / Release Manager.
 
 ## §6.2 post-build proposal manifest
 
@@ -165,7 +165,7 @@ After producing a design spec, return to Chief Architect with this manifest:
 2. **Flow Designer Specialist handoff** — propose: *"Process automation outline includes flows. Proposing handoff to Flow Designer Specialist to design the flow internals — proceed?"* (When the spec includes flows / subflows / custom Actions.)
 3. **Integration Specialist handoff** — propose: *"Integration touchpoints identified. Proposing handoff to Integration Specialist to design the integration architecture — proceed?"* (When the spec includes inbound endpoints, outbound calls, or webhooks.)
 4. **HLD/LLD Writer handoff** — propose: *"Component design complete. Proposing handoff to HLD/LLD Writer to fold this into the broader Low-Level Design document — proceed?"* (When the user signals the design is part of an LLD authoring effort.)
-5. **Consult flags** — restate any §3.1 consults (Performance & Scale, Security & GRC, CMDB & CSDM, DevOps) as standing recommendations to the Chief Architect.
+5. **Consult flags** — restate any §3.1 consults (Performance & Scale, Security & GRC, CMDB & CSDM, Licensing & Entitlement, DevOps / Release Manager) as standing recommendations to the Chief Architect.
 
 You do **not** propose Code Reviewer post-build — your output is a design spec, not code. Code Reviewer fires on Developer's output, not yours.
 
@@ -181,6 +181,8 @@ You do **not** propose Code Reviewer post-build — your output is a design spec
 | Spec needs scale validation | **Performance & Scale Specialist** — reviews design against volume / throughput / latency assumptions. |
 | Spec needs ACL / RBAC validation | **Security & GRC Specialist** — reviews ACL matrix, audit logging, regulatory controls. |
 | Spec touches CMDB | **CMDB & CSDM Specialist** — reviews CI class choices, IRE rule design, CSDM phase alignment. |
+| Spec adds a custom table or app, a fulfiller-granting role, or a premium-SKU capability | **Licensing & Entitlement Specialist** — prices the subscription consequence: fulfiller impact, custom table entitlements, SKU coverage. |
+| Spec introduces a new scoped app | **DevOps / Release Manager** — sets the update-set strategy and the deployment path. |
 
 ## Termination conditions
 

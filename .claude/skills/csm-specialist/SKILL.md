@@ -89,7 +89,7 @@ Per `governance/governance-rules.md` §1.1, you may not ratify any of the follow
 
 **Your bias is baseline.** CSM has rich baseline coverage — case state machine, entitlement evaluation via the baseline calculation (`global.CSManagementUtils`), account hierarchy via baseline `customer_account` parent/child relationships, special handling via baseline notes. The default answer to "do we need a custom table for X" in CSM is almost always **no**.
 
-**Halt protocol — Verdict C trigger.** Emit Verdict C with the four-part `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` structure when a custom object is genuinely the only viable technical path: baseline option evaluated and why it falls short, custom object proposed at smallest possible scope (named, with its kind, its place in the hierarchy and what it would hold — no field list, types, indices, ACLs or code), consequences of approval, alternatives if rejected.
+**Halt protocol — Verdict C trigger.** Emit Verdict C with the four-part `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` structure when a custom object was named in the request, or is the only viable path after the baseline evaluation: baseline option evaluated and why it falls short, custom object proposed at smallest possible scope (named, with its kind, its place in the hierarchy and what it would hold — no field list, types, indices, ACLs or code), consequences of approval, alternatives if rejected.
 
 ## Input Contract — Discovery Output
 
@@ -161,7 +161,7 @@ For each table:
 - **PROCEED — baseline configuration only.**
 - **PROCEED — dispatch to Technical Designer with constraints.**
 - **HALT — §1.1 custom-object proposal required.**
-- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire.
+- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire. In each co-fired Envelope, Part 3 states the verdict in full: A names the baseline construct that covers the need and B the baseline construct it extends, each with its citation; C is the halt.
 
 ## Part 5 — Anti-Patterns to Block
 [Domain-specific anti-patterns. Each anti-pattern is a one-sentence "do not do X, do Y instead" with a citation.]
@@ -223,7 +223,7 @@ The CSM customer model has three core tables:
 2. Each carries a relative weight — Account/Consumer 1, Product 2, Asset 3, Contract 4 — and the entitlement with the highest score is assigned to the case.
 3. SLA: the case's SLAs come from SLA Definitions [`contract_sla`], which carry their own conditions, duration and schedule *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*; whether a matched entitlement selects one is not documented in the bundled corpus — verify on the instance.
 
-**§1.1 hot spot:** custom entitlement-evaluation logic is the most common §1.1 violation in CSM. A request that names it is Verdict C; a custom path is rarely the only viable one, so the halt's OPEN QUESTION proposes the baseline calculation.
+**§1.1 hot spot:** custom entitlement-evaluation logic is the most common §1.1 violation in CSM. Custom entitlement logic named in the request is Verdict C; a custom path is rarely the only viable one, so the halt's OPEN QUESTION proposes the baseline calculation.
 
 ### CRM Workspace vs Customer Service Portal
 

@@ -158,7 +158,7 @@ For every component, first evaluate whether baseline serves the requirement:
 
 ### Halt protocol — `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`
 
-If, after honest baseline evaluation, you conclude a custom object is genuinely the only viable path, halt and return the blocking proposal in Part 3 with:
+If a custom object was named in the request, or is the only viable path after the baseline evaluation, halt and return the blocking proposal in Part 3 with:
 
 1. **Baseline option evaluated** — what was considered, why it falls short. **Citation REQUIRED.**
 2. **Custom object proposed** — smallest possible scope:
@@ -240,7 +240,7 @@ One of:
 - PROCEED — baseline configuration only
 - PROCEED — dispatch to Technical Designer with constraints
 - HALT — §1.1 custom-object proposal required
-- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire.
+- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire. In each co-fired Envelope, Part 3 states the verdict in full: A names the baseline construct that covers the need and B the baseline construct it extends, each with its citation; C is the halt.
 
 [Include consult flags that fire:
 - Performance & Scale (volume > 1M HR cases, large Employee Center concurrent sessions)

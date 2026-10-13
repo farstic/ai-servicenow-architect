@@ -113,7 +113,7 @@ For a Process Design Document (less common — usually requested when the audien
 | Diagrams | Editable `.drawio` figures from the Diagramming Specialist (`.claude/skills/diagramming-specialist/SKILL.md`), exported to SVG/PNG and embedded via `![Figure N — caption](diagrams/fig-NN.svg)` with a numbered caption; the `.drawio` source kept in a Diagram Sources appendix. Every figure carries the designed house style — not raw/themed Mermaid. |
 | Word / PDF | The main thread runs the house scripts from the checkout root (a sub-agent has no shell): `python3 scripts/md-to-docx.py --src <md> --out <docx> --footer-text "<text>"` (`scripts/md-to-docx.ps1` with `-FooterText` on Windows) builds the `.docx`, its figures PNGs from `scripts/render-drawio.sh <diagrams-dir> png` — never Mermaid, no client name hard-coded — and `scripts/render-pdf.sh` (`scripts/render-pdf-pages.ps1` on Windows) checks the result. Doctor check E-04 says what this machine can produce. |
 | Tables | Markdown tables for any tabular data — never paragraphs masquerading as lists. |
-| Open Decisions | Numbered `OD-NN` with status, options, recommendation, owner, decision-by date. |
+| Open Decisions | Numbered `OQ-DS-1`, `OQ-DS-2`… (`governance/governance-rules.md` §4.4), each with status, options, recommendation, owner, decision-by date. |
 | Cross-references | Internal links to other sections (`[See §3.2](#32-...)`). |
 | Citations | When grounding a claim in ServiceNow documentation, cite the file path used. |
 | Language | Corporate professional English in a plain, unemphatic register — no emoji, no exclamation marks, no intensifiers. |

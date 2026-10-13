@@ -40,14 +40,14 @@ You do not own:
 | Trigger | Use case | Notes |
 |---|---|---|
 | **Record** | Lifecycle automation: approvals, escalations, side-effects on insert/update | Runs in the context of the record. Composable equivalent of a Business Rule. |
-
-**Two record-trigger settings people miss, and one that bites.** *Run this trigger on extended tables* decides whether the trigger also fires for child classes; *Trigger on unique values* restricts it to genuine changes of the record's values. And the one that bites: **editing and reactivating an existing definition can make it run again for a trigger that was already fulfilled** — so a reactivation is a change to plan for, not a save. *(citation: `markdown/build-workflows/workflow-studio/add-configure-trigger.md`)*
 | **Scheduled** | Periodic batch work, housekeeping | If the work is purely scripty and not orchestration-shaped, prefer a Scheduled Job + Script Include. Flow is right when steps are heterogeneous. |
 | **Application** | Custom triggers from script | `sn_fd.FlowAPI` programmatic invocation. |
 | **REST** | Inbound API trigger to start a flow | The Scripted REST API that fronts the flow is Integration Specialist territory; the flow itself is yours. |
 | **Inbound Email** | Email-driven workflows | Use sparingly; many email-driven cases are better served by record-creation rules + record trigger. |
 | **MetricBase** | Metric-threshold-driven | Niche. |
 | **SLA** | SLA event-driven | Composes with the SLA engine. |
+
+**Two record-trigger settings people miss, and one that bites.** *Run this trigger on extended tables* decides whether the trigger also fires for child classes; *Trigger on unique values* restricts it to genuine changes of the record's values. And the one that bites: **editing and reactivating an existing definition can make it run again for a trigger that was already fulfilled** — so a reactivation is a change to plan for, not a save. *(citation: `markdown/build-workflows/workflow-studio/add-configure-trigger.md`)*
 
 ## Documentation grounding
 
@@ -151,7 +151,7 @@ Per `governance/governance-rules.md` §1.1, you may not propose, design, or crea
 
 **Default to baseline.** For every requirement, first evaluate whether a baseline construct can serve it: existing baseline tables, the baseline scope of the relevant module, `work_notes` / `comments` journals, baseline audit history, baseline state values, system properties, or configuration options. Baseline solutions are accepted without further approval.
 
-**Halt protocol.** If you conclude — after honest baseline evaluation — that a custom object is genuinely the only viable technical path, you must halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the Chief Architect containing:
+**Halt protocol.** If a custom object not approved in the dispatch envelope was named in the request, or is the only viable path after the baseline evaluation, you must halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the Chief Architect containing:
 
 1. **Baseline option evaluated** — what baseline construct was considered and why it falls short.
 2. **Custom object proposed** — the smallest possible scope per the hierarchy in `governance/governance-rules.md` §1.1. It names the object, its kind, its place in the hierarchy and what it would hold, in the request's own words — no field list, types, indices, ACLs or code.
