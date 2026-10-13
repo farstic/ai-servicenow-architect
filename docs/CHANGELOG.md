@@ -9,6 +9,62 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.1.0-rc.1 — 2026-10-13
+
+### Notes
+
+### Added
+
+- snowarch: upgrade takes a 2.1+ target only with its own signed manifest (ARC-11-C7) (98fa02a)
+- release: a tag from 2.1 on is pushed only with its signed manifest published (ARC-11-C7) (a1374a6)
+- snowarch: licence sign-release, the owner's signature on a release's manifest (ARC-11-C7) (0d6b10e)
+- doctor: status names this release's integrity, and the banner its cached failure (ARC-11-C7) (5c5a748)
+- snowarch: the release's signed manifest arrives at install, refresh and upgrade (ARC-11-C7) (3a43587)
+- doctor: E-32 checks this release's files against its signed manifest; green (ARC-11-C7) (30a4834)
+- snowarch: the build-integrity manifest, signed, from the bytes a checkout writes (ARC-11-C7) (9353a89)
+
+### Fixed
+
+- engine: a co-fired Envelope's Part 3 names its construct and citation, in the six gateways (836c20b)
+- engine: a split table, a broken sentence, two lost pointers and a stale taxonomy footer (e50ae87)
+- engine: the halt sentence uses the verdict table's words in 13 skills and governance (6649984)
+- technical-designer: the same five consults in the triggers, the body and the agent (6711499)
+- hld-lld-writer: one open-decision id scheme, OQ-DS-n, in the convention row and the example (a58ac18)
+- engine: CLAUDE.md asks to confirm a release family other than the corpus branch again (da22eb1)
+- diagramming-specialist: the agent description fits L04's 500-character cap (A1′) (03f9ae9)
+- engine: render-diagrams.sh is executable, as its siblings are (f68ddbb)
+- engine: the four document skills and their agents name the Word and figure scripts (5393b33)
+- diagramming-specialist: the unfiled home says no instance change is filed there (C105) (fd80935)
+- engine: CLAUDE.md makes the house scripts an instruction again, and one figure is the skill (e9b6d4b)
+- itsm-specialist: the incident state table states only what the corpus states, each row cited (2786a5b)
+- engine: taxonomy — one figure is the skill, and the main thread renders it before presenting (11f6849)
+- diagramming-specialist: export via render-drawio.sh, never by hand; one figure is the skill (369cabe)
+- now-assist-genai: two citations follow the model providers page to its aa447ce path (4c9d570)
+
+### Internal
+
+- plan: ARC-09-C136 and C137, the two tests that failed the v2.1.0-rc.1 rehearsal (cf91275)
+- tests: the background refresh's return is bounded by half the live budget, not 100 ms (628eb03)
+- tests: a fixture's version is the fixture's, so a release's own suite reads no Integrity line (ba6a6dd)
+- plan: ARC-02-C6 to C13, the residual regressions from the engine review (72784ce)
+- the onboarding guide says to back up clients/, which git does not hold (36f7751)
+- tests: T-06 runs the four-call capture, T-02b is back, T-32's tell holds across versions (9a7f8cf)
+- tests: every "only viable" halt line names the request, as the verdict table does — red, 16 (aac11b8)
+- plan: ARC-02-C5, the house scripts named where the Architect reads, as built (3215587)
+- tests: T-32 one figure and T-33 a note in Word — the house scripts, run by the Architect (26a3492)
+- tests: the files that make figures and Word name the house scripts — red, 16 missing (0cbde99)
+- plan: the C7 row as built, in six decisions, open for the signed rc sitting (ARC-11-C7) (27f7c4a)
+- release: the 2.1 cases match the sign-release line without spelling the launcher (ARC-11-C7) (e66a6d8)
+- docs: the status fixtures and the panel sample follow the corpus pin to aa447ce (c9e032f)
+- doctor: E-32's release fixtures carry the real .gitattributes, as a checkout does (ARC-11-C7) (502e74c)
+- plan: the C7 row records the rulings, the file set and the hook baselines (ARC-11-C7) (9bc87f1)
+- doctor: E-32 fails a release tree with no signed manifest; red (ARC-11-C7) (22e4f0a)
+- the Windows upgrade-e2e cell gets 45 minutes, and the other two keep 30 (ARC-09-C134) (7bb86a4)
+- engine: the upgrade nudge's sample is a far-future tag, not the next release (ARC-09-C12a) (b63a366)
+- docs: bump ServiceNowDocs to aa447ce (2026-10-08) (64bf0b9)
+
+Tag v2.1.0-rc.1 · contract 4ab2b14f8480 · docs-pin aa447ce
+
 ## 2.0.13 — 2026-10-13
 
 ### Notes
