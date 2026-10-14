@@ -34,7 +34,7 @@
  */
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, statSync, unlinkSync, writeFileSync, } from 'node:fs';
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, statSync, unlinkSync, writeFileSync, } from 'node:fs';
 import { dirname, isAbsolute, join, posix, relative, sep } from 'node:path';
 import { appendAudit } from '../audit/writer.js';
 import { verifyBody } from './core.js';
@@ -479,6 +479,31 @@ function pruneEmpty(root, path, covers) {
         dir = posix.dirname(dir);
     }
 }
+/**
+ * Is `rel` reached through a link that leaves `root`? The real path of its nearest existing parent must be inside the
+ * root's. A restore writes and moves files, and through a linked directory those would be another tree's files: a
+ * test fixture's links to the repository it came from, or a user's skills folder linked from elsewhere. Such a path
+ * is never touched; the tree cannot be restored.
+ */
+function leavesRoot(root, rel) {
+    const real = (p) => { try {
+        return realpathSync.native(p);
+    }
+    catch {
+        return null;
+    } };
+    const top = real(root) ?? root;
+    let dir = dirname(join(root, ...rel.split('/')));
+    let at = real(dir);
+    while (at === null && dir !== dirname(dir)) {
+        dir = dirname(dir);
+        at = real(dir);
+    }
+    if (at === null)
+        return true;
+    const r = relative(top, at);
+    return r.startsWith('..') || isAbsolute(r);
+}
 const gitReason = (r) => String(r.stderr || r.error?.message || `git exited ${r.status ?? 'abnormally'}`).trim().split('\n')[0];
 /** Run an audit append with the project directory the trail belongs to (one writer, the server's own). */
 function auditUnder(projectDir, entry) {
@@ -542,6 +567,10 @@ function restoreTree(root, tag, manifest, modified, { local, now, run, cli, proj
     if (tagged !== manifest.commit) {
         return refused(tag, `the signed manifest for ${tag} names commit ${manifest.commit.slice(0, 7)}, and this checkout's ${tag} `
             + `names ${tagged.slice(0, 7)}`, reinstall, hashed, null);
+    }
+    const outside = modified.find((d) => leavesRoot(root, d.path));
+    if (outside) {
+        return refused(tag, `${outside.path} is reached through a link that leaves this checkout, so nothing was restored`, repair(cli), hashed, null);
     }
     const stamp = stampFolder(now());
     const folder = join(local0, 'integrity-removed', stamp);
