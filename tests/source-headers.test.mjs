@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 //
 // ARC-11-C2 — every source file the author owns starts with the copyright header.
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const HEADER = [
-  'Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).',
+  'Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).',
   'snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.',
 ];
 const SLASHES = ['.ts', '.mjs', '.js'];
@@ -52,6 +52,34 @@ function ownedSources() {
 }
 
 const exempt = (f) => EXEMPT.some((e) => f.startsWith(e.path));
+
+// ARC-11-C5 — ONE FORM. The check below holds the owned sources, by extension. A header also travels
+// where that listing does not look: into `dist/`, which tsc builds from src, and into a declaration file
+// (`.d.mts`). So every tracked file that carries the copyright line at all carries the current one,
+// whatever its extension and wherever it is. `docs/spikes/` is history and keeps what it recorded.
+const COPYRIGHT_LINE = /^\s*(?:\/\/|#) (Copyright \d{4} Cvetomir Grigorov\. Licensed under .*)$/;
+
+/** The files, outside the exemptions, that carry the copyright line in any form but the current one. */
+function staleHeaders(files, readText) {
+  return files.filter((f) => !exempt(f)).filter((f) => {
+    const text = readText(f);
+    if (text === null) return false;
+    return text.split(/\r?\n/).some((line) => {
+      const m = COPYRIGHT_LINE.exec(line);
+      return m !== null && m[1] !== HEADER[0];
+    });
+  });
+}
+
+/** A tracked file's text, or null for the corpus gitlink (a directory) and for a binary file. */
+function trackedText(f) {
+  let buf;
+  try { buf = readFileSync(join(ROOT, f)); } catch { return null; }
+  return buf.includes(0) ? null : buf.toString('utf8');
+}
+
+const tracked = () => execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 })
+  .split('\0').filter(Boolean);
 
 test('ARC-11-C2 — every owned source file starts with the copyright header, after a shebang or a BOM', () => {
   const files = ownedSources().filter((f) => !exempt(f));
@@ -84,4 +112,26 @@ test('ARC-11-C2 — docs/CONTRIBUTING.md quotes the header the guard holds every
   const contributing = readFileSync(join(ROOT, 'docs/CONTRIBUTING.md'), 'utf8');
   for (const line of headerFor('.mjs')) assert.ok(contributing.includes(line), `CONTRIBUTING does not quote: ${line}`);
   assert.ok(contributing.includes('tests/source-headers.test.mjs'), 'CONTRIBUTING does not point to the guard');
+});
+
+test('ARC-11-C5 — every tracked file that carries the copyright line carries the current one, dist/ included', () => {
+  const files = tracked();
+  assert.ok(files.length > 1000, `only ${files.length} tracked files — the listing is wrong`);
+  assert.ok(files.some((f) => /^packages\/snowarch\/dist\/.+\.js$/.test(f)), 'the sweep sees no dist/ file');
+  const stale = staleHeaders(files, trackedText);
+  assert.deepEqual(stale, [], `${stale.length} file(s) carry an old copyright line:\n  ${stale.slice(0, 30).join('\n  ')}`);
+});
+
+test('ARC-11-C5 — the sweep sees an old line in a dist file, a declaration file and a script, and not in docs/spikes/', () => {
+  const old = 'Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).';
+  const tree = {
+    'packages/snowarch/dist/x.js': `// ${old}\nexport {};\n`,
+    'tools/snowarch/tests/helpers/x.d.mts': `// ${old}\n`,
+    'scripts/x.sh': `#!/bin/sh\n# ${old}\n`,
+    'docs/spikes/S-1/x.mjs': `// ${old}\n`,
+    'ok.mjs': `${headerFor('.mjs').join('\n')}\n`,
+    'docs/x.md': `  // ${HEADER[0]}\n`,
+  };
+  assert.deepEqual(staleHeaders(Object.keys(tree), (f) => tree[f]),
+    ['packages/snowarch/dist/x.js', 'tools/snowarch/tests/helpers/x.d.mts', 'scripts/x.sh']);
 });

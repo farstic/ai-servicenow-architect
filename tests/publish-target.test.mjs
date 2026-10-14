@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * ARC-09-S10 — the guard on what may be published, and what the tarball contains.
@@ -69,6 +69,7 @@ test('each remaining promise is refused by its own message (ARC-09-S10)', () => 
     [{ files: ['.env.example'] }, /files does not include "dist\/"/],
     [{ engines: { node: '>=18.0.0' } }, /engines\.node is ">=18\.0\.0"/],
     [{ license: 'MIT' }, /license is "MIT"/],
+    [{ license: 'Apache-2.0' }, /license is "Apache-2\.0", expected "BUSL-1\.1"/],
     [{ repository: 'github:someone-else/other' }, /repository is "github:someone-else\/other"/],
     [{ repository: undefined }, /repository is "\(missing\)"/],
     [{ publishConfig: { access: 'restricted', provenance: true } }, /publishConfig\.access is "restricted"/],
@@ -131,8 +132,9 @@ test('the published tarball carries dist/ and no sources or tests (ARC-09-S10)',
     assert.ok(files.includes(want), `${want} is missing from the tarball`);
   }
 
-  // ARC-09-C17, owner decision 2026-09-11: NOTICE SHIPS. This repository is Apache-2.0 and has a
-  // root NOTICE, and §4(d) asks a redistribution to carry its attribution text — npm includes a
+  // ARC-09-C17, owner decision 2026-09-11: NOTICE SHIPS. The repository was Apache-2.0 then, and has a
+  // root NOTICE, and §4(d) asked a redistribution to carry its attribution text (from 2.1.0 the code is
+  // BUSL-1.1, ADR-0011, and NOTICE still carries the corpus attribution and the contact) — npm includes a
   // LICENSE automatically and a NOTICE not at all, so the package needs its own copy. A copy is a
   // thing that drifts, so the test compares it with the root file rather than trusting the two to
   // stay equal: caught here, not shipped quietly.

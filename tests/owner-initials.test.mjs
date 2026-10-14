@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * ARC-00 — the owner's initials landed on 2026-09-16, and no cell may quietly go back to waiting.
@@ -137,13 +137,18 @@ test('ARC-00 — every ADR with a Decision-owner cell is initialled', () => {
   // "ratified by merging ARC-05-S11" — the owner's merge WAS the signature, so it has no initials
   // marker and never had one. Asserting a flat count of eight was my own error, caught here.
   //
+  // ARC-11-C5 added ADR-0011, the first ratified neither by initials nor by a merge: the architect
+  // merges, so its consent is "the owner's approval of this text and the four parameters set in
+  // `LICENSE`", dated in its Status row. Every cell without initials is now checked for how consent
+  // was given, not only the first.
+  //
   // ARC-05-S12 added ADR-0010 as the SECOND of that kind ("decided 2026-09-23, ratified by merging
   // ARC-05-S12"), so the two moving numbers are the total and the ratified count. **`initialled`
   // stays at 8 on purpose**: 2026-09-16 was a single signing event on the ADRs that existed then,
   // and a later ADR cannot join it. A test that let that number grow would accept a new ADR
   // claiming a signature from a day it was not written on, which is the one thing this file exists
   // to prevent.
-  assert.equal(cells.length, 10, `${cells.length} ADRs carry a Decision-owner cell`);
+  assert.equal(cells.length, 11, `${cells.length} ADRs carry a Decision-owner cell`);
 
   const initialled = cells.filter(({ line }) => line.includes('initials'));
   assert.equal(initialled.length, 8, 'eight cells are the initials kind');
@@ -152,9 +157,11 @@ test('ARC-00 — every ADR with a Decision-owner cell is initialled', () => {
   }
 
   const ratified = cells.filter(({ line }) => !line.includes('initials'));
-  assert.equal(ratified.length, 2, 'ADR-0009 and ADR-0010 record consent by merge');
-  assert.match(ratified[0].line, /ratified by merging/,
-    'a Decision-owner cell with no initials must say how consent was given instead');
+  assert.equal(ratified.length, 3, 'ADR-0009 and ADR-0010 record consent by merge, ADR-0011 by the owner\'s approval');
+  for (const { f, line } of ratified) {
+    assert.match(line, /ratified by (merging|the owner's approval)/,
+      `${f}: a Decision-owner cell with no initials must say how consent was given instead`);
+  }
 });
 
 test('ARC-00 — the allowlist has no dead entries, and every entry says which kind it is', () => {
