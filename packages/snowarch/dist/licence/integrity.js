@@ -34,8 +34,9 @@
  */
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, statSync, unlinkSync, writeFileSync, } from 'node:fs';
+import { dirname, isAbsolute, join, posix, relative, sep } from 'node:path';
+import { appendAudit } from '../audit/writer.js';
 import { verifyBody } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
 export const MANIFEST_FORMAT = 'snowarch-manifest/1';
@@ -294,4 +295,382 @@ export function integrityRemedy(s, cli) {
         return `Restore the files from ${s.tag}, or reinstall from a signed release tag; ${cli} doctor --json lists every one.`;
     }
     return `Run ${cli} licence check --refresh to fetch it; if it says none is published, reinstall from a signed release tag.`;
+}
+// ── ARC-11-C141 — restore and continue ─────────────────────────────────────────────────────────────────────────────
+//
+// THE OWNER'S RULING (2026-10-14): a licensed user may not change the AI Architect's own files (the core files, and a
+// skill, agent or rule added under .claude/), and he keeps using the product. So a change does not take effect: the
+// signed files are put back from the release's tag, a file the release does not ship is moved aside, the replaced
+// copies go with it to `.local/integrity-removed/<UTC stamp>/`, one line says so, and the run continues as verified.
+// Only a tree that CANNOT be restored refuses: no manifest held, one that does not verify, another release's, no tag
+// to restore from, or a restore that failed.
+//
+// ONE FUNCTION, four callers: the server at its start (a full hash), the launcher before any command and the
+// SessionStart hook (a stat-keyed verdict, re-hashing only what moved), and `doctor --fix`.
+/** The two lines, and nothing else, that every caller prints. The CLAUDE.md sentence keys on their first words. */
+export const RESTORED_PREFIX = 'Integrity: restored — ';
+export const CANNOT_RESTORE_PREFIX = 'Integrity: cannot restore — ';
+/** An engine checkout: the package can also run where there is no engine tree to check (Q2, 2026-10-14). */
+export const isEngineCheckout = (root) => existsSync(join(root, 'engine.config.json')) && existsSync(join(root, 'tools', 'snowarch'));
+const VERDICT_FORMAT = 'snowarch-integrity-verdict/1';
+export const verdictPath = (root, local) => join(localOf(root, local), 'integrity-verdict.json');
+export const lockPath = (root, local) => join(localOf(root, local), 'integrity.lock');
+export const LOCK_STALE_MS = 30_000;
+export const LOCK_WAIT_MS = 2_000;
+/** `mtimeMs:size`, or `null` for a path that is not there. */
+const stampOf = (p) => {
+    try {
+        const s = statSync(p);
+        return `${s.mtimeMs}:${s.size}`;
+    }
+    catch {
+        return null;
+    }
+};
+/** Every covered path on disk under `coverage`, as `/` paths: the covered directories walked, the covered files. */
+function coveredOnDisk(root, coverage) {
+    const out = [];
+    for (const c of coverage.covers) {
+        if (isDirEntry(c))
+            out.push(...walk(root, c).filter((p) => isCovered(p, coverage)));
+        else if (existsSync(join(root, ...c.split('/'))))
+            out.push(c);
+    }
+    return out.sort();
+}
+function readVerdict(root, local) {
+    try {
+        const v = JSON.parse(readFileSync(verdictPath(root, local), 'utf8'));
+        return v && v.format === VERDICT_FORMAT && typeof v.tag === 'string' && v.files && v.coverage ? v : null;
+    }
+    catch {
+        return null;
+    }
+}
+/** Record a verified tree's stamps, so the next hook or launcher run can say "verified" from `stat` alone. */
+function writeVerdict(root, local, tag, manifest) {
+    const coverage = { covers: [...manifest.covers], excludes: [...manifest.excludes], ignores: [...manifest.ignores] };
+    const files = {};
+    for (const p of coveredOnDisk(root, coverage))
+        files[p] = stampOf(join(root, ...p.split('/'))) ?? '';
+    const path = verdictPath(root, local);
+    try {
+        mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+        const tmp = `${path}.tmp-${process.pid}`;
+        writeFileSync(tmp, `${JSON.stringify({ format: VERDICT_FORMAT, tag, manifest: stampOf(manifestCachePath(root, local)) ?? '',
+            coverage, files })}\n`, { mode: 0o600 });
+        renameSync(tmp, path);
+    }
+    catch { /* a verdict that cannot be written costs the next run a hash, never a wrong answer */ }
+}
+/**
+ * The stat key's answer: `verified` when the tree's covered paths and their stamps are what the last verified run
+ * recorded, else the paths whose stamp moved, appeared or went. `null`: no usable verdict, so hash everything.
+ */
+function statDifferences(root, local, tag) {
+    const v = readVerdict(root, local);
+    if (!v || v.tag !== tag || v.manifest !== (stampOf(manifestCachePath(root, local)) ?? ''))
+        return null;
+    const now = coveredOnDisk(root, v.coverage);
+    const moved = new Set();
+    for (const p of now)
+        if (v.files[p] !== stampOf(join(root, ...p.split('/'))))
+            moved.add(p);
+    for (const p of Object.keys(v.files))
+        if (!now.includes(p))
+            moved.add(p);
+    return moved.size === 0 ? { same: true } : { same: false, paths: [...moved].sort() };
+}
+/** Only `paths` against the manifest: the stat key's re-hash. */
+function checkPaths(root, manifest, paths) {
+    const out = [];
+    for (const path of paths) {
+        const want = manifest.files[path];
+        let bytes = null;
+        try {
+            bytes = readFileSync(join(root, ...path.split('/')));
+        }
+        catch {
+            bytes = null;
+        }
+        if (want === undefined) {
+            if (bytes !== null && isCovered(path, manifest))
+                out.push({ path, why: 'extra' });
+        }
+        else if (bytes === null)
+            out.push({ path, why: 'missing' });
+        else if (hashBytes(bytes) !== want)
+            out.push({ path, why: 'changed' });
+    }
+    return out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+const sleep = (ms) => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); };
+/** Take `.local/integrity.lock` (R1): one restore at a time; a lock older than 30 s is a dead holder's. */
+function takeLock(root, local, now) {
+    const path = lockPath(root, local);
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    const deadline = Date.now() + LOCK_WAIT_MS;
+    for (;;) {
+        try {
+            const fd = openSync(path, 'wx', 0o600);
+            writeFileSync(fd, `${JSON.stringify({ pid: process.pid, at: now().toISOString() })}\n`);
+            closeSync(fd);
+            return () => { try {
+                unlinkSync(path);
+            }
+            catch { /* already gone */ } };
+        }
+        catch (e) {
+            if (e.code !== 'EEXIST')
+                return null;
+        }
+        let at = 0;
+        try {
+            at = Date.parse(JSON.parse(readFileSync(path, 'utf8')).at ?? '');
+        }
+        catch {
+            at = 0;
+        }
+        if (!Number.isFinite(at) || now().getTime() - at > LOCK_STALE_MS) {
+            try {
+                unlinkSync(path);
+            }
+            catch { /* another process took it over first */ }
+            continue;
+        }
+        if (Date.now() >= deadline)
+            return null;
+        sleep(50);
+    }
+}
+/** `20261014T120501Z`: a folder name every file system takes. */
+const stampFolder = (d) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+/** A path as the line shows it: relative to the checkout when inside it. */
+const shown = (root, p) => {
+    const rel = relative(root, p).split(sep).join('/');
+    return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel) ? rel : p.split(sep).join('/');
+};
+/** Move `from` to `to`, across file systems if it must: a state root elsewhere is a test seam, and is still honoured. */
+function moveFile(from, to) {
+    mkdirSync(dirname(to), { recursive: true });
+    try {
+        renameSync(from, to);
+    }
+    catch (e) {
+        if (e.code !== 'EXDEV')
+            throw e;
+        copyFileSync(from, to);
+        unlinkSync(from);
+    }
+}
+/** The empty directories a move left, up to (not including) the covered directory it was found in. */
+function pruneEmpty(root, path, covers) {
+    const top = covers.filter(isDirEntry).find((c) => path.startsWith(c));
+    if (!top)
+        return;
+    let dir = posix.dirname(path);
+    while (`${dir}/` !== top && dir.startsWith(top.slice(0, -1))) {
+        try {
+            rmdirSync(join(root, ...dir.split('/')));
+        }
+        catch {
+            return;
+        }
+        dir = posix.dirname(dir);
+    }
+}
+const gitReason = (r) => String(r.stderr || r.error?.message || `git exited ${r.status ?? 'abnormally'}`).trim().split('\n')[0];
+/** Run an audit append with the project directory the trail belongs to (one writer, the server's own). */
+function auditUnder(projectDir, entry) {
+    if (projectDir === undefined) {
+        appendAudit(entry);
+        return;
+    }
+    const was = process.env.CLAUDE_PROJECT_DIR;
+    process.env.CLAUDE_PROJECT_DIR = projectDir;
+    try {
+        appendAudit(entry);
+    }
+    finally {
+        if (was === undefined)
+            delete process.env.CLAUDE_PROJECT_DIR;
+        else
+            process.env.CLAUDE_PROJECT_DIR = was;
+    }
+}
+const reinstall = 'Reinstall from a signed release tag.';
+const refetch = (cli) => `Run ${cli} licence check --refresh to fetch it; if it says none is published, reinstall from a signed release tag.`;
+const repair = (cli) => `Fix what it names, then run ${cli} doctor --fix; or reinstall from a signed release tag.`;
+const refused = (tag, reason, remedy, hashed, status) => ({ state: 'refused', tag, reason, remedy, line: `${CANNOT_RESTORE_PREFIX}${reason} — ${remedy}`, hashed, status });
+/** Why a state the restore cannot act on refuses, worded for the line. */
+function refusalOf(s, cli) {
+    const short = (sha) => sha.slice(0, 7);
+    switch (s.state) {
+        case 'missing': return { reason: `no signed manifest for ${s.tag}`, remedy: refetch(cli) };
+        case 'other': return s.localCommit && s.manifestCommit
+            ? { reason: `the signed manifest for ${s.tag} names commit ${short(s.manifestCommit)}, and this checkout's ${s.tag} names ${short(s.localCommit)}`, remedy: reinstall }
+            : { reason: `the signed manifest is for ${s.manifestTag}, this checkout is ${s.tag}`, remedy: reinstall };
+        case 'invalid': return s.tag
+            ? { reason: `the signed manifest for ${s.tag} does not verify (${s.reason})`, remedy: refetch(cli) }
+            : { reason: s.reason, remedy: reinstall };
+        default: return { reason: integrityLine(s), remedy: reinstall };
+    }
+}
+/** The line a restore prints, worded by the owner's ruling (R5): the same everywhere, the hook adding its restart. */
+export function restoredLine({ restored, moved, tag, folder, staged, first }) {
+    const n = restored.length;
+    return `${RESTORED_PREFIX}The AI Architect's own files are not yours to change under this licence: `
+        + `${n} file${n === 1 ? '' : 's'} restored from ${tag}${staged ? ' (staged)' : ''}, ${moved.length} moved to ${folder}/ `
+        + `(${first}). Your own material belongs under clients/<name>/.`;
+}
+/**
+ * Put the signed files back, all or nothing (R3): copy each replaced file aside, `git checkout <tag>` the changed and
+ * missing ones, re-hash them, and only then move the extras. Any failure is a refusal with its reason, and nothing is
+ * moved; the folder made for it is removed again.
+ */
+function restoreTree(root, tag, manifest, modified, { local, now, run, cli, projectDir }, hashed) {
+    const git = (args, input) => run('git', args, { cwd: root, encoding: 'utf8', input, timeout: 60_000, windowsHide: true,
+        stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+    const local0 = localOf(root, local);
+    const head = git(['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`]);
+    if (head.error)
+        return refused(tag, `git could not run (${head.error.message})`, reinstall, hashed, null);
+    const tagged = String(head.stdout ?? '').trim();
+    if (head.status !== 0 || !COMMIT.test(tagged)) {
+        return refused(tag, `this checkout holds no ${tag} tag to restore from`, reinstall, hashed, null);
+    }
+    if (tagged !== manifest.commit) {
+        return refused(tag, `the signed manifest for ${tag} names commit ${manifest.commit.slice(0, 7)}, and this checkout's ${tag} `
+            + `names ${tagged.slice(0, 7)}`, reinstall, hashed, null);
+    }
+    const stamp = stampFolder(now());
+    const folder = join(local0, 'integrity-removed', stamp);
+    const put = modified.filter((d) => d.why !== 'extra').map((d) => d.path);
+    const extras = modified.filter((d) => d.why === 'extra').map((d) => d.path);
+    try {
+        mkdirSync(folder, { recursive: true, mode: 0o700 });
+        for (const d of modified.filter((x) => x.why === 'changed')) {
+            const to = join(folder, ...d.path.split('/'));
+            mkdirSync(dirname(to), { recursive: true });
+            copyFileSync(join(root, ...d.path.split('/')), to);
+        }
+    }
+    catch (e) {
+        rmSync(folder, { recursive: true, force: true });
+        return refused(tag, `the replaced files could not be kept in ${shown(root, folder)}/ (${e.code ?? e.message})`, repair(cli), hashed, null);
+    }
+    if (put.length > 0) {
+        const out = git(['--literal-pathspecs', 'checkout', tag, '--pathspec-from-file=-', '--pathspec-file-nul'], `${put.join('\0')}\0`);
+        if (out.status !== 0) {
+            rmSync(folder, { recursive: true, force: true });
+            return refused(tag, `git could not restore ${put.length} file${put.length === 1 ? '' : 's'}: ${gitReason(out)}`, repair(cli), hashed, null);
+        }
+        const still = checkPaths(root, manifest, put);
+        if (still.length > 0) {
+            return refused(tag, `${still[0].path} still differs from the signed manifest after git restored it`, reinstall, hashed + put.length, null);
+        }
+    }
+    for (const path of extras) {
+        try {
+            moveFile(join(root, ...path.split('/')), join(folder, ...path.split('/')));
+        }
+        catch (e) {
+            return refused(tag, `${path} could not be moved to ${shown(root, folder)}/ (${e.code ?? e.message})`, repair(cli), hashed, null);
+        }
+        pruneEmpty(root, path, manifest.covers);
+    }
+    const headNow = String(git(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']).stdout ?? '').trim();
+    const staged = put.length > 0 && headNow !== manifest.commit;
+    const shownFolder = shown(root, folder);
+    auditUnder(projectDir, { ts: now().toISOString(), gate: 'integrity', action: 'restored', tag, files: put, moved: extras,
+        folder: shownFolder });
+    writeVerdict(root, local, tag, manifest);
+    const all = [...put, ...extras];
+    return {
+        state: 'restored', tag, restored: put, moved: extras, folder: shownFolder, staged,
+        claudeChanged: all.some((p) => p === 'CLAUDE.md' || p.startsWith('.claude/')),
+        line: restoredLine({ restored: put, moved: extras, tag, folder: shownFolder, staged, first: modified[0].path }),
+        hashed: hashed + put.length,
+    };
+}
+/**
+ * THE ONE FUNCTION (C141): this checkout's integrity, restored when it can be, refused when it cannot.
+ *
+ *   exempt    a development tree, or no engine checkout here: nothing to check (Q2);
+ *   verified  every covered file is as signed — from the stat key alone when nothing moved;
+ *   restored  it was not, and now is: the line names what was put back and moved;
+ *   refused   it is not, and cannot be: no manifest, one that does not verify or is another release's, no tag, or a
+ *             restore that failed. Callers refuse as a refused licence does.
+ */
+export function ensureIntegrity(root, opts = {}) {
+    const { local, keys = PRODUCT_KEYS, full = false, cli = './snowarch', now = () => new Date(), run = spawnSync, projectDir, restore = true } = opts;
+    if (!isEngineCheckout(root)) {
+        return { state: 'exempt', why: 'not-engine', line: 'Integrity: not checked — not an engine checkout', hashed: 0 };
+    }
+    const version = versionOf(root);
+    if (typeof version === 'string' && isDevVersion(version)) {
+        return { state: 'exempt', why: 'dev', line: 'Integrity: not checked — a development tree has no signed manifest', hashed: 0 };
+    }
+    const tag = typeof version === 'string' && version !== '' ? `v${version}` : null;
+    // The stat key (the hook and the launcher): nothing moved since the last verified run, so nothing is read.
+    let quick = null;
+    if (!full && tag) {
+        quick = statDifferences(root, local, tag);
+        if (quick?.same)
+            return { state: 'verified', tag, hashed: 0 };
+    }
+    const status = integrityStatusFor(root, { keys, local, full, quick, run });
+    if (status.s.state === 'verified') {
+        writeVerdict(root, local, status.s.tag, status.manifest);
+        return { state: 'verified', tag: status.s.tag, hashed: status.hashed };
+    }
+    if (status.s.state !== 'modified') {
+        const { reason, remedy } = refusalOf(status.s, cli);
+        return refused(tag, reason, remedy, status.hashed, status.s);
+    }
+    if (!restore) {
+        return refused(status.s.tag, `${status.s.modified.length} file${status.s.modified.length === 1 ? '' : 's'} differ from the `
+            + `signed manifest for ${status.s.tag}, the first ${status.s.modified[0].path}`, repair(cli), status.hashed, status.s);
+    }
+    const release = takeLock(root, local, now);
+    if (release === null) {
+        return refused(status.s.tag, `another snowarch process is restoring this checkout (${shown(root, lockPath(root, local))})`, repair(cli), status.hashed, status.s);
+    }
+    try {
+        // Under the lock, again: the process that held it may have restored the tree already (R1).
+        const again = integrityStatus(root, { keys, local, commitOf: () => null });
+        if (again.state === 'verified') {
+            writeVerdict(root, local, again.tag, status.manifest);
+            return { state: 'verified', tag: again.tag, hashed: status.hashed + again.checked };
+        }
+        if (again.state !== 'modified') {
+            const { reason, remedy } = refusalOf(again, cli);
+            return refused(tag, reason, remedy, status.hashed, again);
+        }
+        return restoreTree(root, again.tag, status.manifest, again.modified, { local, now, run, cli, projectDir }, status.hashed + again.checked);
+    }
+    finally {
+        release();
+    }
+}
+/**
+ * The status the restore acts on, with the manifest it was judged against and how many files were hashed. The stat
+ * key re-hashes only the paths it names; a full check, or no usable verdict, hashes them all.
+ */
+function integrityStatusFor(root, { keys, local, full, quick, run }) {
+    if (!full && quick && !quick.same) {
+        const version = versionOf(root);
+        const tag = `v${version}`;
+        const held = cachedManifest(root, tag, { keys, local });
+        if (held.state === 'held') {
+            const modified = checkPaths(root, held.manifest, quick.paths);
+            const checked = Object.keys(held.manifest.files).length;
+            return { s: { state: modified.length === 0 ? 'verified' : 'modified', version, tag, checked, modified },
+                manifest: held.manifest, hashed: quick.paths.length };
+        }
+    }
+    const s = integrityStatus(root, { keys, local, commitOf: (r, t) => tagCommit(r, t, { run }) });
+    const held = s.state === 'verified' || s.state === 'modified' ? cachedManifest(root, s.tag, { keys, local }) : null;
+    return { s, manifest: held && held.state === 'held' ? held.manifest : null,
+        hashed: s.state === 'verified' || s.state === 'modified' ? s.checked : 0 };
 }

@@ -156,3 +156,74 @@ export declare function integrityStatus(root: string, { keys, commitOf, local }?
 export declare function integrityLine(s: IntegrityStatus): string;
 /** The remedy for a state that is not `verified`, spelled for `cli`; `null` for `dev` and `verified`. */
 export declare function integrityRemedy(s: IntegrityStatus, cli: string): string | null;
+/** The two lines, and nothing else, that every caller prints. The CLAUDE.md sentence keys on their first words. */
+export declare const RESTORED_PREFIX = "Integrity: restored \u2014 ";
+export declare const CANNOT_RESTORE_PREFIX = "Integrity: cannot restore \u2014 ";
+export type Ensured = {
+    state: 'exempt';
+    why: 'dev' | 'not-engine';
+    line: string;
+    hashed: number;
+} | {
+    state: 'verified';
+    tag: string;
+    hashed: number;
+} | {
+    state: 'restored';
+    tag: string;
+    restored: string[];
+    moved: string[];
+    folder: string;
+    staged: boolean;
+    claudeChanged: boolean;
+    line: string;
+    hashed: number;
+} | {
+    state: 'refused';
+    tag: string | null;
+    reason: string;
+    remedy: string;
+    line: string;
+    hashed: number;
+    status: IntegrityStatus | null;
+};
+export interface EnsureOptions {
+    /** The checkout's `.local/`; the engine passes its own, which honours SNOWARCH_STATE_ROOT. */
+    local?: string;
+    keys?: readonly ProductKey[];
+    /** Hash every covered file (the server's start, `doctor`, `status`), instead of only what the stat key says moved. */
+    full?: boolean;
+    /** The launcher's spelling, for the remedy: `./snowarch`, `.\snowarch.cmd`. */
+    cli?: string;
+    now?: () => Date;
+    run?: typeof spawnSync;
+    /** The project directory whose `.local/` holds the audit trail; the server's own when absent. */
+    projectDir?: string;
+    /** Whether to restore at all: false reports what a restore would do and changes nothing. */
+    restore?: boolean;
+}
+/** An engine checkout: the package can also run where there is no engine tree to check (Q2, 2026-10-14). */
+export declare const isEngineCheckout: (root: string) => boolean;
+export declare const verdictPath: (root: string, local?: string) => string;
+export declare const lockPath: (root: string, local?: string) => string;
+export declare const LOCK_STALE_MS = 30000;
+export declare const LOCK_WAIT_MS = 2000;
+/** The line a restore prints, worded by the owner's ruling (R5): the same everywhere, the hook adding its restart. */
+export declare function restoredLine({ restored, moved, tag, folder, staged, first }: {
+    restored: string[];
+    moved: string[];
+    tag: string;
+    folder: string;
+    staged: boolean;
+    first: string;
+}): string;
+/**
+ * THE ONE FUNCTION (C141): this checkout's integrity, restored when it can be, refused when it cannot.
+ *
+ *   exempt    a development tree, or no engine checkout here: nothing to check (Q2);
+ *   verified  every covered file is as signed — from the stat key alone when nothing moved;
+ *   restored  it was not, and now is: the line names what was put back and moved;
+ *   refused   it is not, and cannot be: no manifest, one that does not verify or is another release's, no tag, or a
+ *             restore that failed. Callers refuse as a refused licence does.
+ */
+export declare function ensureIntegrity(root: string, opts?: EnsureOptions): Ensured;

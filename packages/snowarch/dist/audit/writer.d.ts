@@ -67,6 +67,23 @@ export interface LicenceRefusalEntry {
     licence: string;
     state: 'revoked' | 'expired' | 'invalid' | 'missing' | 'scope';
 }
+/**
+ * ARC-11-C141 — the product restored its own files (the owner's ruling, 2026-10-14: a change to them does not take
+ * effect, and the user continues). Whichever process restored them writes this line: the server at its start, the
+ * launcher, the SessionStart hook, or `doctor --fix`. Paths only, never contents.
+ */
+export interface IntegrityRestoreEntry {
+    ts: string;
+    gate: 'integrity';
+    action: 'restored';
+    tag: string;
+    /** The signed files put back from the tag. */
+    files: string[];
+    /** The files the release does not ship, moved aside. */
+    moved: string[];
+    /** Where the replaced copies and the moved files are now, relative to the checkout when inside it. */
+    folder: string;
+}
 export interface CliAuditEntry {
     ts: string;
     instance: string;
@@ -99,7 +116,7 @@ export declare function resetAuditWarning(): void;
  * local disk was full or read-only — the write already happened, and telling the caller
  * otherwise would be worse than losing the audit line.
  */
-export declare function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry): void;
+export declare function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry | IntegrityRestoreEntry): void;
 /** The last `n` lines, parsed. Unparseable lines are skipped rather than throwing. */
 export declare function tailAudit(n?: number): AuditEntry[];
 /** The name ARC-07/08's `snowarch audit tail` calls. Same function, story's spelling. */
