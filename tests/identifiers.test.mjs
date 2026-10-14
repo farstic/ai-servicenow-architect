@@ -35,8 +35,9 @@ const CAPITALS = {
 // What the two C104 arms rest on in the real roster. A change is a decision made in review.
 // The fill-in (2026-10-14) took the ITSM skill's notifications and auto-close from the corpus: +3 dotted names, each in it.
 const DOTTED_REAL = { checked: 29, scriptCode: 12 };   // 12 variables in example code, on 19 sites
-// ARC-09-C144 +1 checked: the CSM notifications line cites c_Business-portal-NotifPref.md, and the corpus prints NotifPref in its URLs.
-const CAMEL_REAL = { checked: 15, excused: 3 };         // SnSysId, AceGrid, GlobalCo: names an example invents
+// ARC-09-C148 put it back to 14: C144's citation c_Business-portal-NotifPref.md had put NotifPref in sight, and a
+// backticked corpus path is now unread whole.
+const CAMEL_REAL = { checked: 14, excused: 3 };         // SnSysId, AceGrid, GlobalCo: names an example invents
 // What the C144 arm rests on: the names written as words, and the 14 an example invents (15 entries; SLA Risk Badge in two files).
 const SPACED_REAL = { checked: 72, excused: 14 };
 const kinds = (r) => r.excused.reduce((a, e) => (e.by === 'allow-list' ? a : { ...a, [e.by]: (a[e.by] ?? 0) + 1 }), {});
