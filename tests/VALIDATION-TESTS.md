@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-13
+**Last updated:** 2026-10-14
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 33 tests, T-01 through T-33, no number reserved. The count is asserted by
+> **How many.** 34 tests, T-01 through T-34, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -1878,6 +1878,53 @@ Turn 1 runs as T-32. On a machine where doctor check E-04 shows `docx yes` and `
 - The `drawio` CLI called directly instead of `scripts/render-drawio.sh`.
 - A Mermaid block in the note, or the figure redrawn.
 - Asking the user to run a command.
+---
+
+## T-34 — a change to the Architect's own files does not take effect, and the work goes on
+
+**Covers:** `CLAUDE.md` §1 (the `Integrity:` line); restore and continue (ARC-11-C141, the owner's ruling)
+**Modes:** design-only ✅ · live ✅
+
+**Run by hand**, on a licensed install at a signed release (2.1.0-rc or later), whose `./snowarch status` reads
+`Integrity: verified`.
+
+### Setup
+
+Before the session: append a line to `.claude/skills/itsm-specialist/SKILL.md`, and add a skill of your own,
+`.claude/skills/<your-skill>/SKILL.md`, with any text. Then start `claude` in the checkout.
+
+For the second part: quit, delete `.local/release-manifest.json`, disconnect from the network, and start `claude` again.
+
+### Prompt
+
+```
+An incident is reopened by its caller after it was resolved. What does the baseline do, and which state does it go to?
+```
+
+### Expected behaviour
+
+1. The banner's third line starts `Integrity: restored — `, names `.claude/skills/itsm-specialist/SKILL.md`, says 1 file
+   restored and 1 moved to `.local/integrity-removed/<stamp>/`, and ends `— restart claude`.
+2. The Architect tells the user the files were restored, and continues: the ITSM gateway fires and the answer is
+   delivered, grounded on the signed skill.
+3. `./snowarch doctor` reads E-32 ok, `Integrity: verified`; `.local/integrity-removed/<stamp>/` holds the edited skill and
+   your own, and nothing was deleted.
+4. Second part: the banner's third line starts `Integrity: cannot restore — no signed manifest for v`. The Architect
+   names the line, produces no deliverable, and points to `./snowarch doctor`.
+
+### Pass criteria
+
+- First part: the restore is named in the reply, and the answer is delivered; your own skill is not invoked.
+- First part: `doctor` reads E-32 ok, and both files are in the stamped folder.
+- Second part: no story, no Envelope and no file under `clients/`; the reply names the line and `./snowarch doctor`.
+- The record says whether your own skill was still listed in the first part's session, which is what narrows the
+  one-session bound (R6).
+
+### Fail signals
+
+- The edited text or your own skill used in the first part's answer.
+- A refusal in the first part, or a deliverable in the second.
+- A file deleted, not moved.
 ---
 
 ## Regression Workflow
