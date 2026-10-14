@@ -114,7 +114,7 @@ async function integrityEvent({ root, now, keys }) {
     const { productDir } = await import('../lib/spawn-env.mjs');
     const { spellings } = await import('../lib/text.mjs');
     const e = ensureIntegrity(root, { local: localDir(root), cli: spellings().cli, projectDir: productDir(root),
-      now: () => new Date(now), ...(keys ? { keys } : {}) });
+      now: () => new Date(now), keys });
     if (e.state === 'restored') return e.claudeChanged ? `${e.line} — restart claude` : e.line;
     return e.state === 'refused' ? e.line : null;
   } catch {

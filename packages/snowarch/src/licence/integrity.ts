@@ -41,6 +41,7 @@ import {
 import { dirname, isAbsolute, join, posix, relative, sep } from 'node:path';
 
 import { appendAudit, type IntegrityRestoreEntry } from '../audit/writer.js';
+import { cliSpelling } from '../cli/tty.js';
 import { verifyBody, type KeyRole, type ProductKey } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
 
@@ -335,7 +336,7 @@ export const RESTORED_PREFIX = 'Integrity: restored — ';
 export const CANNOT_RESTORE_PREFIX = 'Integrity: cannot restore — ';
 
 export type Ensured =
-  | { state: 'exempt'; why: 'dev' | 'not-engine'; line: string; hashed: number }
+  | { state: 'exempt'; why: 'dev' | 'no-version' | 'not-engine'; line: string; hashed: number }
   | { state: 'verified'; tag: string; hashed: number }
   | { state: 'restored'; tag: string; restored: string[]; moved: string[]; folder: string; staged: boolean;
     claudeChanged: boolean; line: string; hashed: number }
@@ -348,7 +349,7 @@ export interface EnsureOptions {
   keys?: readonly ProductKey[];
   /** Hash every covered file (the server's start, `doctor`, `status`), instead of only what the stat key says moved. */
   full?: boolean;
-  /** The launcher's spelling, for the remedy: `./snowarch`, `.\snowarch.cmd`. */
+  /** The launcher as the reader's shell spells it, for the remedy; this process's shell when absent. */
   cli?: string;
   now?: () => Date;
   run?: typeof spawnSync;
@@ -537,14 +538,15 @@ const repair = (cli: string): string => `Fix what it names, then run ${cli} doct
 const refused = (tag: string | null, reason: string, remedy: string, hashed: number, status: IntegrityStatus | null): Ensured =>
   ({ state: 'refused', tag, reason, remedy, line: `${CANNOT_RESTORE_PREFIX}${reason} — ${remedy}`, hashed, status });
 
-/** Why a state the restore cannot act on refuses, worded for the line. */
-function refusalOf(s: IntegrityStatus, cli: string): { reason: string; remedy: string } {
+/** Why a state the restore cannot act on refuses, worded for the line; E-32 reports the same two halves. */
+export function refusalOf(s: IntegrityStatus, cli: string): { reason: string; remedy: string } {
   const short = (sha: string): string => sha.slice(0, 7);
   switch (s.state) {
     case 'missing': return { reason: `no signed manifest for ${s.tag}`, remedy: refetch(cli) };
+    // Another release's manifest is fetched again for this one; a tag moved to another commit is not this release.
     case 'other': return s.localCommit && s.manifestCommit
       ? { reason: `the signed manifest for ${s.tag} names commit ${short(s.manifestCommit)}, and this checkout's ${s.tag} names ${short(s.localCommit)}`, remedy: reinstall }
-      : { reason: `the signed manifest is for ${s.manifestTag}, this checkout is ${s.tag}`, remedy: reinstall };
+      : { reason: `the signed manifest is for ${s.manifestTag}, this checkout is ${s.tag}`, remedy: refetch(cli) };
     case 'invalid': return s.tag
       ? { reason: `the signed manifest for ${s.tag} does not verify (${s.reason})`, remedy: refetch(cli) }
       : { reason: s.reason, remedy: reinstall };
@@ -647,9 +649,8 @@ function restoreTree(root: string, tag: string, manifest: ManifestBody, modified
  *   refused   it is not, and cannot be: no manifest, one that does not verify or is another release's, no tag, or a
  *             restore that failed. Callers refuse as a refused licence does.
  */
-export function ensureIntegrity(root: string, opts: EnsureOptions = {}): Ensured {
-  const { local, keys = PRODUCT_KEYS, full = false, cli = './snowarch', now = () => new Date(), run = spawnSync,
-    projectDir, restore = true } = opts;
+export function ensureIntegrity(root: string, { local, keys = PRODUCT_KEYS, full = false, cli = cliSpelling(),
+  now = () => new Date(), run = spawnSync, projectDir, restore = true }: EnsureOptions = {}): Ensured {
   if (!isEngineCheckout(root)) {
     return { state: 'exempt', why: 'not-engine', line: 'Integrity: not checked — not an engine checkout', hashed: 0 };
   }
@@ -657,7 +658,13 @@ export function ensureIntegrity(root: string, opts: EnsureOptions = {}): Ensured
   if (typeof version === 'string' && isDevVersion(version)) {
     return { state: 'exempt', why: 'dev', line: 'Integrity: not checked — a development tree has no signed manifest', hashed: 0 };
   }
-  const tag = typeof version === 'string' && version !== '' ? `v${version}` : null;
+  // No version of record: no release to name, so no tag to check against. The same class as the development tree,
+  // and the same bound: whoever edits the version escapes the check, and the manual-clone bound says so. E-32 still
+  // FAILs it (ARC-11-C7), from `integrityStatus`.
+  if (typeof version !== 'string' || version === '') {
+    return { state: 'exempt', why: 'no-version', line: 'Integrity: not checked — package.json names no version', hashed: 0 };
+  }
+  const tag = `v${version}`;
 
   // The stat key (the hook and the launcher): nothing moved since the last verified run, so nothing is read.
   let quick = null;

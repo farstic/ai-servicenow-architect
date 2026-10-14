@@ -22,6 +22,7 @@ import { licenceStatus, REFUSED, refusalLines, refusesCommand } from './licence/
 import { ensureIntegrity } from '../../../packages/snowarch/dist/licence/integrity.js';
 import { localDir } from './local-paths.mjs';
 import { productDir } from './spawn-env.mjs';
+import { PRODUCT_KEYS } from './licence/keys.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
@@ -231,8 +232,8 @@ export function helpText(where) {
  * The stat key keeps the common case at a walk and a `stat` per covered file. Exported for its cases; `main` is its
  * one caller.
  */
-export function integrityGate({ root: at, err, cli, keys }) {
-  const integrity = ensureIntegrity(at, { local: localDir(at), cli, projectDir: productDir(at), ...(keys ? { keys } : {}) });
+export function integrityGate({ root: at, err, cli, keys = PRODUCT_KEYS }) {
+  const integrity = ensureIntegrity(at, { local: localDir(at), cli, projectDir: productDir(at), keys });
   if (integrity.state === 'restored') err.write(`${integrity.line}\n`);
   return integrity;
 }

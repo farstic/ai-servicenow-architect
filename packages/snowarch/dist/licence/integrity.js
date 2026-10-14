@@ -37,6 +37,7 @@ import { spawnSync } from 'node:child_process';
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmdirSync, rmSync, statSync, unlinkSync, writeFileSync, } from 'node:fs';
 import { dirname, isAbsolute, join, posix, relative, sep } from 'node:path';
 import { appendAudit } from '../audit/writer.js';
+import { cliSpelling } from '../cli/tty.js';
 import { verifyBody } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
 export const MANIFEST_FORMAT = 'snowarch-manifest/1';
@@ -527,14 +528,15 @@ const reinstall = 'Reinstall from a signed release tag.';
 const refetch = (cli) => `Run ${cli} licence check --refresh to fetch it; if it says none is published, reinstall from a signed release tag.`;
 const repair = (cli) => `Fix what it names, then run ${cli} doctor --fix; or reinstall from a signed release tag.`;
 const refused = (tag, reason, remedy, hashed, status) => ({ state: 'refused', tag, reason, remedy, line: `${CANNOT_RESTORE_PREFIX}${reason} — ${remedy}`, hashed, status });
-/** Why a state the restore cannot act on refuses, worded for the line. */
-function refusalOf(s, cli) {
+/** Why a state the restore cannot act on refuses, worded for the line; E-32 reports the same two halves. */
+export function refusalOf(s, cli) {
     const short = (sha) => sha.slice(0, 7);
     switch (s.state) {
         case 'missing': return { reason: `no signed manifest for ${s.tag}`, remedy: refetch(cli) };
+        // Another release's manifest is fetched again for this one; a tag moved to another commit is not this release.
         case 'other': return s.localCommit && s.manifestCommit
             ? { reason: `the signed manifest for ${s.tag} names commit ${short(s.manifestCommit)}, and this checkout's ${s.tag} names ${short(s.localCommit)}`, remedy: reinstall }
-            : { reason: `the signed manifest is for ${s.manifestTag}, this checkout is ${s.tag}`, remedy: reinstall };
+            : { reason: `the signed manifest is for ${s.manifestTag}, this checkout is ${s.tag}`, remedy: refetch(cli) };
         case 'invalid': return s.tag
             ? { reason: `the signed manifest for ${s.tag} does not verify (${s.reason})`, remedy: refetch(cli) }
             : { reason: s.reason, remedy: reinstall };
@@ -631,8 +633,7 @@ function restoreTree(root, tag, manifest, modified, { local, now, run, cli, proj
  *   refused   it is not, and cannot be: no manifest, one that does not verify or is another release's, no tag, or a
  *             restore that failed. Callers refuse as a refused licence does.
  */
-export function ensureIntegrity(root, opts = {}) {
-    const { local, keys = PRODUCT_KEYS, full = false, cli = './snowarch', now = () => new Date(), run = spawnSync, projectDir, restore = true } = opts;
+export function ensureIntegrity(root, { local, keys = PRODUCT_KEYS, full = false, cli = cliSpelling(), now = () => new Date(), run = spawnSync, projectDir, restore = true } = {}) {
     if (!isEngineCheckout(root)) {
         return { state: 'exempt', why: 'not-engine', line: 'Integrity: not checked — not an engine checkout', hashed: 0 };
     }
@@ -640,7 +641,13 @@ export function ensureIntegrity(root, opts = {}) {
     if (typeof version === 'string' && isDevVersion(version)) {
         return { state: 'exempt', why: 'dev', line: 'Integrity: not checked — a development tree has no signed manifest', hashed: 0 };
     }
-    const tag = typeof version === 'string' && version !== '' ? `v${version}` : null;
+    // No version of record: no release to name, so no tag to check against. The same class as the development tree,
+    // and the same bound: whoever edits the version escapes the check, and the manual-clone bound says so. E-32 still
+    // FAILs it (ARC-11-C7), from `integrityStatus`.
+    if (typeof version !== 'string' || version === '') {
+        return { state: 'exempt', why: 'no-version', line: 'Integrity: not checked — package.json names no version', hashed: 0 };
+    }
+    const tag = `v${version}`;
     // The stat key (the hook and the launcher): nothing moved since the last verified run, so nothing is read.
     let quick = null;
     if (!full && tag) {

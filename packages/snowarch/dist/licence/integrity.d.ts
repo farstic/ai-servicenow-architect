@@ -161,7 +161,7 @@ export declare const RESTORED_PREFIX = "Integrity: restored \u2014 ";
 export declare const CANNOT_RESTORE_PREFIX = "Integrity: cannot restore \u2014 ";
 export type Ensured = {
     state: 'exempt';
-    why: 'dev' | 'not-engine';
+    why: 'dev' | 'no-version' | 'not-engine';
     line: string;
     hashed: number;
 } | {
@@ -193,7 +193,7 @@ export interface EnsureOptions {
     keys?: readonly ProductKey[];
     /** Hash every covered file (the server's start, `doctor`, `status`), instead of only what the stat key says moved. */
     full?: boolean;
-    /** The launcher's spelling, for the remedy: `./snowarch`, `.\snowarch.cmd`. */
+    /** The launcher as the reader's shell spells it, for the remedy; this process's shell when absent. */
     cli?: string;
     now?: () => Date;
     run?: typeof spawnSync;
@@ -208,6 +208,11 @@ export declare const verdictPath: (root: string, local?: string) => string;
 export declare const lockPath: (root: string, local?: string) => string;
 export declare const LOCK_STALE_MS = 30000;
 export declare const LOCK_WAIT_MS = 2000;
+/** Why a state the restore cannot act on refuses, worded for the line; E-32 reports the same two halves. */
+export declare function refusalOf(s: IntegrityStatus, cli: string): {
+    reason: string;
+    remedy: string;
+};
 /** The line a restore prints, worded by the owner's ruling (R5): the same everywhere, the hook adding its restart. */
 export declare function restoredLine({ restored, moved, tag, folder, staged, first }: {
     restored: string[];
@@ -226,4 +231,4 @@ export declare function restoredLine({ restored, moved, tag, folder, staged, fir
  *   refused   it is not, and cannot be: no manifest, one that does not verify or is another release's, no tag, or a
  *             restore that failed. Callers refuse as a refused licence does.
  */
-export declare function ensureIntegrity(root: string, opts?: EnsureOptions): Ensured;
+export declare function ensureIntegrity(root: string, { local, keys, full, cli, now, run, projectDir, restore }?: EnsureOptions): Ensured;
