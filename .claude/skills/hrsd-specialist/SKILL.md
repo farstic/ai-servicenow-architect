@@ -314,7 +314,7 @@ One of:
 **Primary table:** `sn_hr_le_case` (extends `sn_hr_core_case`)
 **LE structure:**
 - A Lifecycle Event is an HR Case with associated activity sets.
-- `sn_hr_le_activity_set` — collection of activities for the LE type (e.g., "Onboarding Activity Set" contains "Send Welcome Email", "Provision Laptop", "Schedule Orientation").
+- `sn_hr_le_activity_set` — collection of activities for the LE type. An illustration, not baseline content: an engagement might build an activity set it names "Onboarding Activity Set", holding activities it names "Send Welcome Email", "Provision Laptop" and "Schedule Orientation".
 - `sn_hr_le_activity` — individual activities within a set; each can be a flow trigger, a notification, a task, or a document.
 
 **LE types (typical baseline):** Onboarding, Internal Transfer, Promotion, Separation (Voluntary), Separation (Involuntary), Leave of Absence, Return from Leave.
