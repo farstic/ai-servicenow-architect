@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C141 (was C7's "the hook never hashes") — the SessionStart hook checks the checkout's own files at every start
 // on a STAT KEY: a `stat` per covered file when nothing moved, and only the files whose stamp moved read and hashed.

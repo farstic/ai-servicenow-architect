@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-01-S06 — one version of record.
 // P-12 counted five version counters in the engine and P-19 five more in the server. This test
@@ -94,7 +94,7 @@ test('mutation: a version token smuggled back into the heading is caught', () =>
 /**
  * The FOURTH field, learned in ARC-09-S01.
  *
- * `docs/README-head.md` opens with `**v<x.y.z>** · Apache-2.0 · …`, and `README.md` is generated
+ * `docs/README-head.md` opens with `**v<x.y.z>** · BUSL-1.1 · …`, and `README.md` is generated
  * from it — so a release that moved the three manifests and the marker and left this behind would
  * ship a README announcing the previous version, with nothing failing. The release script writes
  * it; this is what makes that a requirement rather than a courtesy.

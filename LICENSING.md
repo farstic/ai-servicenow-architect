@@ -8,9 +8,10 @@ this page and `LICENSE` differ, `LICENSE` governs.
 
 | You want to… | Status |
 |---|---|
-| Install and run snowarch for your own ServiceNow work, at your company or for your clients | **Allowed** under the code licence, with attribution (see below). |
+| Install and run snowarch for your own ServiceNow work, at your company, or as a consultancy delivering to your own clients | **Allowed** under the Additional Use Grant in `LICENSE`, with attribution (see below). |
 | Read, modify and keep a private fork | **Allowed**, with attribution. |
-| Redistribute it, modified or not | **Allowed** under the code licence, provided `LICENSE` and `NOTICE` travel with it and your changes are marked as yours. |
+| Redistribute it, modified or not | **Allowed** under the code licence, provided `LICENSE` and `NOTICE` travel with it, your changes are marked as yours, and the copy stays under the same licence. |
+| Offer snowarch to others as a hosted or managed service, or as a product or a substantial part of one | **Not allowed** without a commercial licence from the author (contact: see `NOTICE`). |
 | Call your product, service or fork "snowarch" or anything confusingly similar | **Not allowed** without a written trademark licence — see `TRADEMARKS.md`. |
 | Present snowarch as endorsed by, affiliated with, or made by ServiceNow, Inc. or Anthropic | **Not allowed.** |
 | Remove or alter copyright notices, `LICENSE` or `NOTICE` | **Not allowed.** |
@@ -19,15 +20,20 @@ this page and `LICENSE` differ, `LICENSE` governs.
 ## The code
 
 The engine — the orchestration rules, the specialist skills and agents, the MCP server, the
-scripts and the tests — is © 2026 Cvetomir Grigorov and licensed under the **Apache License,
-Version 2.0** (`LICENSE`). Apache-2.0 lets you use, modify and redistribute the software,
-including commercially, on these conditions:
+scripts and the tests — is © 2026 Cvetomir Grigorov. From 2.1.0 it is licensed under the
+**Business Source License 1.1** (`LICENSE`, SPDX `BUSL-1.1`); 2.0.x and earlier stay under the
+Apache License, Version 2.0, as the `LICENSE` in their release tags says. The Business Source
+License lets you copy, modify, redistribute and make non-production use of the software, and its
+Additional Use Grant adds the production use in the summary above, on these conditions:
 
-- you keep the copyright notices, `LICENSE` and `NOTICE` in every copy and distribution;
-- you state the changes you made to any file you modified;
-- you do not use the author's name or the project's trademarks to endorse or promote a
-  derived product without permission (Apache-2.0 §6);
-- the software is provided **"as is"**, without warranty of any kind (Apache-2.0 §7).
+- `LICENSE` is displayed with every copy, modified or not, and every copy and derivative work stays
+  under it;
+- use outside the Additional Use Grant needs a commercial licence from the author;
+- the licence grants no right in the author's trademarks or logo (`TRADEMARKS.md`);
+- the software is provided **"as is"**, without warranty of any kind.
+
+Each version also becomes available under the Apache License, Version 2.0, on its Change Date, or
+four years after it is first published if that comes first.
 
 Every release is an annotated git tag with its assets published on GitHub. From 2.1 (ARC-11-C3)
 releases are signed and ship a checked integrity manifest; a copy whose files do not match that
@@ -74,7 +80,7 @@ Nothing here grants you:
 - any right to present the software as certified, supported or warranted by its author;
 - any right to the author's services, support or future versions.
 
-Commercial support, a commercial licence for use outside Apache-2.0's conditions, and a trademark
+Commercial support, a commercial licence for use outside the Additional Use Grant, and a trademark
 licence are available by agreement. Contact: see `NOTICE`.
 
 ## Future versions
@@ -84,7 +90,7 @@ The author may release future versions under a different licence. A version's li
 
 From 2.0.13 the product checks for a valid licence from the author on every build: without one, no
 MCP tool runs, and no command runs but the few that show and repair the state (`docs/USER-GUIDE.md`).
-2.0.13 is still released under the Apache License 2.0. From 2.1.0 the code moves to the Business
-Source License 1.1, and the `LICENSE` file in that release's tag says so.
+Releases 2.0.x and earlier stay under the Apache License 2.0. From 2.1.0 the code is under the
+Business Source License 1.1, and the `LICENSE` file in each release's tag says so (ADR-0011).
 
 *This page is an explanation, not legal advice.*

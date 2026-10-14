@@ -3,7 +3,7 @@
   "version": "2.1.0-dev",
   "private": true,
   "description": "AI ServiceNow Architect — Claude Code engine + bundled ServiceNow MCP server (snowarch)",
-  "license": "Apache-2.0",
+  "license": "BUSL-1.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/farstic/ai-servicenow-architect.git"

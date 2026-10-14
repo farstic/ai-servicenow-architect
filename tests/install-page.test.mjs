@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -98,10 +98,11 @@ test('...and the two the README must contain', () => {
   const rootVersion = JSON.parse(read('package.json')).version;
   assert.ok(read('docs/README-head.md').includes(rootVersion),
     `the head does not carry the root version ${rootVersion}`);
-  // D-02. The licence line is the tail's — it is the README's statement, not an install step — and
-  // the head names it too, which is where a reader looks first.
-  assert.match(read('docs/README-tail.md'), /Apache-2\.0/);
-  assert.match(read(README), /Apache-2\.0/);
+  // ADR-0011, which supersedes D-02 from 2.1.0. The licence line is the tail's — it is the README's
+  // statement, not an install step — and the head names it too, which is where a reader looks first.
+  assert.match(read('docs/README-tail.md'), /BUSL-1\.1/);
+  assert.match(read('docs/README-head.md'), /^\*\*v\S+\*\* · BUSL-1\.1 · /m);
+  assert.match(read(README), /BUSL-1\.1/);
 });
 
 test('criterion 5 — "what you will see" is the tool\'s own text, not a copy of it', () => {

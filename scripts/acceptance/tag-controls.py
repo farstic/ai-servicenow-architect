@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+# Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 # snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 """Re-measure the release rows' controls on a tag, in a clean clone.
 

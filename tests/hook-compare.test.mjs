@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C7 — the instrument the regression proof reads, `scripts/ci/hook-compare.mjs`. STRUCTURE only: what it reads
 // from its arguments and from the hook, how it ranks, and what it calls over the margin. A duration is never asserted

@@ -17,7 +17,8 @@
 
 ## Licence and attribution
 
-Licensed under **Apache-2.0** — see `LICENSE` and `NOTICE`.
+Licensed under the **Business Source License 1.1** (`BUSL-1.1`) from 2.1.0; 2.0.x and earlier remain
+**Apache-2.0**. See `LICENSE` and `NOTICE`.
 
 What that allows, in plain language, is in [LICENSING.md](LICENSING.md); the name and logo are covered by
 [TRADEMARKS.md](TRADEMARKS.md). Contributions need the signed Contributor Licence Agreement, [CLA.md](CLA.md):

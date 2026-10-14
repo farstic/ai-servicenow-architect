@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-01-S10 — the ratchet. Old names, old paths and old licence strings may only ever DECREASE.
 //
@@ -101,6 +101,16 @@ const EXEMPT_FILES = new Set([
 ]);
 const isExempt = (f) => EXEMPT_FILES.has(f) || EXEMPT_PREFIXES.some((p) => f.startsWith(p));
 
+// ARC-11-C5. ONE line of one file, exempt from ONE pattern, by its exact text: the Business Source
+// License 1.1's own licence-text copyright, which every published copy of the licence carries and its
+// covenant 4 forbids changing. Never the file: LICENSE is scanned on purpose, so the guard keeps reading
+// every other line of it, for every pattern, this one included.
+const EXEMPT_LINES = Object.freeze([
+  { file: 'LICENSE', line: 'License text copyright (c) 2024 MariaDB plc, All Rights Reserved.', pattern: '(?i)all rights reserved' },
+]);
+const lineExempt = (f, line, p) => EXEMPT_LINES.some((e) => e.file === f && e.pattern === p
+  && e.line === line.replace(/\r$/, ''));
+
 const SCANNED = /\.(md|json|ts|mjs|sh|yml|yaml|ps1|cmd)$/;
 
 /**
@@ -131,7 +141,7 @@ function scan() {
     try { lines = readFileSync(join(root, f), 'utf8').split('\n'); } catch { continue; }
     const pats = f.endsWith('.md') ? [...FORBIDDEN, MD_ONLY] : FORBIDDEN;
     lines.forEach((line, i) => {
-      for (const p of pats) if (compile(p).test(line)) {
+      for (const p of pats) if (compile(p).test(line) && !lineExempt(f, line, p)) {
         if (!found.has(f)) found.set(f, []);
         found.get(f).push(`${f}:${i + 1}: "${p}"`);
       }
@@ -365,4 +375,16 @@ test('mutation: an allow-listed file that no longer matches is reported for remo
   const stale = Object.keys({ 'docs/IMPORT-NOTES.md': 'ARC-02' }).filter((f) => !fakeFound.has(f));
   assert.deepEqual(stale.map((f) => `no-legacy-names: allow-list entry "${f}" has no match — remove it`),
     ['no-legacy-names: allow-list entry "docs/IMPORT-NOTES.md" has no match — remove it']);
+});
+
+test('ARC-11-C5 — the LICENSE exemption is one line and one pattern, and the line is really there', () => {
+  const [e] = EXEMPT_LINES;
+  assert.equal(EXEMPT_LINES.length, 1);
+  assert.equal(lineExempt('LICENSE', e.line, e.pattern), true);
+  assert.equal(lineExempt('LICENSE', `${e.line}\r`, e.pattern), true, 'a CRLF checkout reads the same line');
+  assert.equal(lineExempt('LICENSE', 'Copyright 2026 Someone. All rights reserved.', e.pattern), false, 'another line');
+  assert.equal(lineExempt('NOTICE', e.line, e.pattern), false, 'another file');
+  assert.equal(lineExempt('LICENSE', e.line, '(?i)source.available License'), false, 'another pattern');
+  assert.ok(readFileSync(join(root, 'LICENSE'), 'utf8').split(/\r?\n/).includes(e.line),
+    'the exempt line is not in LICENSE: an exemption must name something that exists');
 });
