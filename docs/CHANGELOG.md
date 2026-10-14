@@ -9,6 +9,63 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**This release moves the product to the Business Source License 1.1, and holds the AI Architect's own files to a
+manifest the owner signs (ARC-11-C5, ARC-11-C7, ARC-11-C141).** Licence enforcement is as in 2.0.13.
+
+From 2.1.0 the product is under the Business Source License 1.1 (`BUSL-1.1`), recorded in ADR-0011. `LICENSE` and
+`packages/snowarch/LICENSE` carry its text and its four parameters, among them the Additional Use Grant, which says
+what production use it permits, and the Change Date, 2030-10-14, from which the Licensed Work is under the Apache
+License 2.0. `LICENSING.md` says what this means for a user. A release before 2.1.0 keeps the licence it was
+published under.
+
+Every release from 2.1.0 carries a manifest of the Architect's own files, signed by the owner, and a change to one
+of those files does not take effect: the file is put back, and one line says so. A user's own material belongs under
+`clients/<name>/`.
+
+**Upgrading from 2.0.13.** There is no migration step. The upgrade from 2.0.13 runs 2.0.13's own planning, which
+predates the manifest, so it cannot check a 2.1.0 target before the tree moves; the new tree's bootstrap fetches the
+manifest (B01) and E-32 then checks the checkout against it (ARC-09-C140). The server has 399 tools, as in 2.0.13,
+and the error registry gains `INTEGRITY_NOT_VERIFIED`, for 74 codes.
+
+**The release candidate, and what the owner's sitting confirmed.** [pending — the rc.3 sitting]
+
+### Added
+
+- A signed manifest of the Architect's own files (ARC-11-C7): the sha256 of each file the product ships in the engine
+  and the server, `CLAUDE.md`, and the rules, skills, agents and settings under `.claude/`, signed with the owner's
+  key (`./snowarch licence sign-release`). A release's tag is pushed only once its manifest is published. A checkout
+  fetches it at install (B01), with `./snowarch licence check --refresh`, and at upgrade, which takes a 2.1 or later
+  target only with that target's own signed manifest. Doctor check E-32 compares the checkout with it, `status` names
+  the result (`Integrity: verified · v2.1.0 · <n> files`), and the session banner names a failure.
+- A change to the Architect's own files does not take effect (ARC-11-C141). By the owner's ruling, a licensed user
+  keeps using the Architect and cannot change it. Before any command, at session start, at the server's start and
+  with `./snowarch doctor --fix`, a covered file that differs from the signed manifest is put back from the release's
+  tag, and anything replaced, or added under a covered folder, is moved to `.local/integrity-removed/<UTC stamp>/`,
+  never deleted. One line says so, `Integrity: restored — …`, with `— restart claude` when `CLAUDE.md` or
+  anything under `.claude/` was put back, and the run continues. Only a checkout that cannot be restored refuses:
+  `./snowarch` runs only the commands that show and repair the state, every MCP tool answers
+  `INTEGRITY_NOT_VERIFIED`, and `CLAUDE.md`'s rule produces no deliverable and points to `./snowarch doctor`.
+- `./snowarch docs verify` reads a name written as words, quoted, italic or backticked outside fences, and wants it
+  printed in the bundled corpus as written; the marker, or an example's own entry, answers it (ARC-09-C144).
+
+### Changed
+
+- The product is under the Business Source License 1.1 from 2.1.0 (ARC-11-C5, ADR-0011).
+- Doctor check E-10 FAILs when the SessionStart hook that prints the `Licence:` and `Integrity:` lines is missing or
+  wrong, and `./snowarch doctor --fix` registers it again (ARC-11-C10).
+- The roster says what the bundled corpus says. Skill lines that named a baseline object the corpus does not print
+  now carry the corpus's name and its citation, or say that it is not documented in the bundled corpus: the ITSM
+  notifications and auto-close, the ATF step names, the CSM and major incident notifications, Flow Designer's *Where
+  to run the flow*, and the Teams and Slack spokes' message actions (ARC-09-C144); and the engine review's corrections
+  (ARC-02-C6 to C13). Figures are exported with the house scripts (ARC-02-C5).
+
+### Fixed
+
+- An upgrade's bootstrap fetches the release's signed manifest whenever the checkout does not hold it, where an
+  upgrade from 2.0.13 ended with E-32's FAIL on a correct install, because nothing had fetched it (ARC-09-C140).
+- The server doctor's handshake reports a server that exited before it answered, "the server exited with code <n>
+  before the handshake finished", where an uncaught `EPIPE` ended the doctor (ARC-09-C130).
+
 ## 2.0.13 — 2026-10-13
 
 ### Notes
