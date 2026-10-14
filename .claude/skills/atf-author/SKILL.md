@@ -43,15 +43,15 @@ You design ServiceNow Automated Test Framework tests and suites that prove an ar
 `sys_atf_test` (Test) · `sys_atf_test_suite` (Suite; nests child suites) · `sys_atf_step` (step) · `sys_atf_step_config` (step type, baseline + custom) · `sys_atf_test_template` (parameterised template) · result tables (`sys_atf_test_result`, `sys_atf_test_suite_result`, and step results in `sys_atf_test_result_step`) *(citation: `markdown/application-development/automated-test-framework-atf/atf-edit-table-cleanup.md`)*. Tests are **metadata** — they travel in update sets, scoped to the app. *(citation: `markdown/application-development/automated-test-framework-atf/automated-test-framework.md`)*
 
 ## Baseline step categories (use these — don't script what a step type does)
-- **Server** — *Create / Update / Delete / Query a Record* (with field-value assertions), *Record Validation*, *Run Server Side Script* (assertions via `outputs.assert`).
-- **Form** — *Open a New Form* / *Open an Existing Record*, *Set Field Values*, *Field State Validation* (mandatory/read-only/visible), *UI Action*, *Form Submission*, *Field Value Validation*. (UI Policy / Client Script effects → Field State Validation steps.)
-- **Catalog** — *Add Item to Cart*, *Set Variable Values*, *Order Catalog Item*, variable/UI-policy validation.
+- **Server** — *Record Insert* / *Record Update* / *Record Delete* / *Record Query* (with field-value assertions), *Record Validation*, *Run Server Side Script* (assertions via `outputs.assert`). *(citation: `markdown/application-development/automated-test-framework-atf/test-steps-server-category.md`)*
+- **Form** — *Open a New Form* / *Open an Existing Record*, *Set Field Values*, *Field State Validation* (mandatory/read-only/visible), *Click a UI Action*, *Submit a Form*, *Field Values Validation*. (UI Policy / Client Script effects → Field State Validation steps.) *(citation: `markdown/application-development/automated-test-framework-atf/test-steps-form-category.md`)*
+- **Catalog** — *Add Item to Shopping Cart*, *Set Variable Values*, *Order Catalog Item*, variable/UI-policy validation. *(citation: `markdown/application-development/automated-test-framework-atf/test-steps-service-catalog-category.md`)*
 - **REST / Email / Application Navigation / Custom UI** — inbound REST, notifications, navigation, UIB/Workspace surfaces.
 *(citation: `markdown/application-development/automated-test-framework-atf/atf-step-categories.md`)* Only when no baseline step covers the assertion do you add a **custom step type** with a config script — and that script is what Code Reviewer reviews.
 
 ## Test design discipline
 1. **One behaviour per test** — a single, clear pass/fail (3 branches → 3 tests or one parameterised template).
-2. **Self-contained data** — set up every record with *Create a Record* steps; **never depend on pre-existing instance data** (sys_ids, specific incidents); ATF rolls back data created during a run. *(citation: `markdown/application-development/automated-test-framework-atf/automated-test-framework-design-considerations.md`)*
+2. **Self-contained data** — set up every record with *Record Insert* steps; **never depend on pre-existing instance data** (sys_ids, specific incidents); ATF rolls back data created during a run. *(citation: `markdown/application-development/automated-test-framework-atf/automated-test-framework-design-considerations.md`)*
 3. **Assert explicitly** — every test ends in a validation step; no-assertion = not a test.
 4. **Parameterise & reuse** — repeated shapes → **Test Template** / reusable test, not copy-paste. *(citation: `markdown/application-development/automated-test-framework-atf/atf-templates.md`)*
 5. **Pass data between steps** via outputs/back-reference, not hardcoded values. *(citation: `markdown/application-development/automated-test-framework-atf/atf-passing-data.md`)*
