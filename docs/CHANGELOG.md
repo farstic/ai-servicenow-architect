@@ -13,7 +13,7 @@ All notable changes to this project are documented in this file. Everything hand
 manifest the owner signs (ARC-11-C5, ARC-11-C7, ARC-11-C141).** Licence enforcement is as in 2.0.13.
 
 From 2.1.0 the product is under the Business Source License 1.1 (`BUSL-1.1`), recorded in ADR-0011. `LICENSE` and
-`packages/snowarch/LICENSE` carry its text and its four parameters, among them the Additional Use Grant, which says
+`packages/snowarch/LICENSE` carry its text and its parameters, among them the Additional Use Grant, which says
 what production use it permits, and the Change Date, 2030-10-14, from which the Licensed Work is under the Apache
 License 2.0. `LICENSING.md` says what this means for a user. A release before 2.1.0 keeps the licence it was
 published under.
