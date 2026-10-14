@@ -98,7 +98,7 @@ test('two checks touch the network, and each says which question it is asking', 
 
 test('only the checks with a repair declare fixable, and each carries a fix hint or a null', () => {
   assert.deepEqual(checks.filter((c) => c.fixable).map((c) => c.id),
-    ['E-10', 'E-11', 'E-12', 'E-13', 'E-15', 'SV-01', 'SV-02', 'SV-03']);
+    ['E-10', 'E-11', 'E-32', 'E-12', 'E-13', 'E-15', 'SV-01', 'SV-02', 'SV-03']);
 });
 
 test('--section selects exactly one section\'s checks', () => {

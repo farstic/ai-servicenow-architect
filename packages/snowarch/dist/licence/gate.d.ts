@@ -24,7 +24,14 @@ export declare const CLI_ALLOWED: readonly string[];
 export declare const CLI_ALLOWED_FORMS: Readonly<Record<string, readonly string[]>>;
 /** Does this command, with these arguments, run without a licence? */
 export declare const allowedCommand: (name: string, positional?: readonly string[]) => boolean;
-/** Is this command refused? For a refused state, every command but the allowed ones. */
+/**
+ * Is this command refused? For a refused licence, every command but the allowed ones — and the same for a checkout
+ * whose own files cannot be restored to the signed release (ARC-11-C141, the architect's ruling Q6): one door, one set.
+ * `integrity` is `ensureIntegrity`'s verdict; only `refused` refuses, because a changed file that could be put back
+ * was put back, and the command runs on the signed tree.
+ */
 export declare const refusesCommand: (name: string, s: {
     state: string;
-}, positional?: readonly string[]) => boolean;
+}, positional?: readonly string[], integrity?: {
+    state: string;
+} | null) => boolean;

@@ -25,6 +25,7 @@ import { cliSpelling, bootstrapSpelling } from '../cli/tty.js';
 import { ServiceNowError } from '../utils/errors.js';
 import type { ProductKey } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
+import { ensureIntegrity, type Ensured } from './integrity.js';
 import { refreshList, LIVE_BUDGET_MS, type RefreshResult } from './refresh.js';
 import {
   daysLeftPhrase, licenceLine, licenceStatus, projectRoot, readLicenceText, REFUSED, type CheckoutStatus,
@@ -98,6 +99,54 @@ export function takeLicenceNotice(): string | null {
   const why = noticeWhy(s);
   if (why === null) return null;
   return `${licenceLine(s)} — ${why}. Run ${spell().cli} licence check for the details.`;
+}
+
+// ── ARC-11-C141 — the checkout's own files, checked once at start ───────────────────────────────────────────────
+//
+// THE OWNER'S RULING (2026-10-14): a change to the Architect's own files does not take effect, and the user continues.
+// At its start the server checks the checkout IN FULL — every covered file hashed, about 7 ms warm — so a change whose
+// mtime and size were put back is still found here, whatever the hook's and the launcher's stat key said; and it
+// restores what it can. A restore continues: its one line rides the session's first answer, as the licence notice
+// does, because stdout is the protocol. A tree that cannot be restored refuses every tool, after the licence
+// (`assertIntegrity`, the router's second act). Computed once per process, like the licence: never per call.
+
+interface IntegritySession { ensured: Ensured; noticeTaken: boolean }
+let integrity: IntegritySession | null = null;
+
+/** Check, and restore, this checkout's own files, and hold the verdict for this process. */
+export function initIntegrity({ root = projectRoot(), keys = PRODUCT_KEYS, now = () => new Date() }: Options = {}): Ensured {
+  const ensured = ensureIntegrity(root, { keys, full: true, cli: spell().cli, now, projectDir: root });
+  integrity = { ensured, noticeTaken: false };
+  return ensured;
+}
+
+/** This process's verdict; computed on first use when `main()` has not started it (a test's import). */
+export function currentIntegrity(): Ensured {
+  return (integrity ?? { ensured: initIntegrity() }).ensured;
+}
+
+/** Test seam: forget the verdict. Never called by the server. */
+export function resetIntegrityForTests(): void { integrity = null; }
+
+/** Throws INTEGRITY_NOT_VERIFIED when this checkout's own files could not be restored. The message is the line. */
+export function assertIntegrity(): void {
+  const e = currentIntegrity();
+  if (e.state === 'refused') throw new ServiceNowError(e.line, 'INTEGRITY_NOT_VERIFIED');
+}
+
+/** The restore's line, once, for the session's first answer; `null` when nothing was restored or it was taken. */
+export function takeIntegrityNotice(): string | null {
+  const e = currentIntegrity();
+  if (!integrity || integrity.noticeTaken || e.state !== 'restored') return null;
+  integrity.noticeTaken = true;
+  return e.line;
+}
+
+/** The refusal's audit fields (Q8): what state the tree is in, and which release it claims to be. */
+export function integrityRefusalFields(): { state: string; tag: string } {
+  const e = currentIntegrity();
+  if (e.state !== 'refused') return { state: e.state, tag: 'tag' in e && e.tag ? e.tag : 'none' };
+  return { state: e.status?.state ?? 'unrestorable', tag: e.tag ?? 'none' };
 }
 
 /** `{ licence: id }` when the licence's signature holds; `{}` otherwise, so a default audit line is unchanged. */

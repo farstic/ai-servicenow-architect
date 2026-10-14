@@ -311,7 +311,7 @@
       "remedy": null,
       "command": null,
       "code": null,
-      "fixable": false,
+      "fixable": true,
       "quick": true,
       "durationMs": 0
     },

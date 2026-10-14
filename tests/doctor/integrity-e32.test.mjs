@@ -2,7 +2,12 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C7 — E-32, the build's integrity: the files a release ships, checked against the manifest the owner signs
 // for its tag. In the quick set and offline, like E-31: it reads the cached manifest and hashes the covered files as
-// they are on disk, and it never reaches the network itself. A mismatch is reported, never refused.
+// they are on disk, and it never reaches the network itself.
+//
+// ARC-11-C141 — IN THE WORDS EVERY SURFACE USES. A tree that cannot be restored FAILs with the "Integrity: cannot
+// restore — <reason>" line and its remedy, which the banner, the launcher and the server print as one line. A
+// modified tree — which the launcher restores before `doctor` runs, so E-32 sees it only from another caller — FAILs
+// fixable: `doctor --fix` puts the signed files back through the same function (integrity-restore).
 //
 // A release tree with NO manifest is a FAIL, not a warning (the architect's ruling, 2026-10-13): deleting the
 // manifest is the cheapest tamper, so it must read as one. A development tree has no signed manifest to check, and
@@ -17,6 +22,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
+import { FIXERS, TARGETS } from '../../tools/snowarch/lib/doctor/fix.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { manifestFromArchive, signManifest, writeManifestCache } from '../../tools/snowarch/lib/licence/manifest.mjs';
 import { keyPair, productKeys } from '../../tools/snowarch/tests/helpers/licence.mjs';
 import { REAL_ROOT, greenTree, readJson, releaseTree } from './helpers/tree.mjs';
@@ -38,19 +45,21 @@ function e32() {
   return check;
 }
 
-test('ARC-11-C7 — E-32 is declared once: repo section, fail, quick, offline, spawns nothing, never fixed', () => {
+test('ARC-11-C7 — E-32 is declared once: repo section, fail, quick, offline, spawns nothing, fixable (C141)', () => {
   assert.equal(declared().length, 1, `E-32 is declared ${declared().length} times`);
   const c = e32();
   assert.deepEqual(
     [c.section, c.severity, c.quick, c.network, c.spawns, c.fixable],
-    ['repo', 'fail', true, false, false, false],
+    ['repo', 'fail', true, false, false, true],
   );
 });
 
 test('ARC-11-C7 — a release tree with no signed manifest is a FAIL that names its tag', async (t) => {
   const r = await e32().run(ctxFor(treeAt(t, '9.1.0')));
   assert.equal(r.status, 'fail', r.detail);
-  assert.equal(r.detail, 'Integrity: no signed manifest for v9.1.0 — reinstall from a signed release tag');
+  assert.equal(r.detail, 'Integrity: cannot restore — no signed manifest for v9.1.0');
+  assert.match(r.remedy, /^Run .+ licence check --refresh to fetch it; if it says none is published, reinstall from a signed release tag\.$/);
+  assert.match(r.command, /licence check --refresh$/);
 });
 
 test('ARC-11-C7 — a development tree has no signed manifest to check, and skips', async (t) => {
@@ -91,8 +100,9 @@ test('ARC-11-C7 — a modified release tree FAILs, naming the file, or the count
   const one = await run(root);
   assert.equal(one.status, 'fail');
   assert.equal(one.detail, 'Integrity: modified — 1 file differs from the signed manifest for v9.1.0: CLAUDE.md');
-  assert.match(one.remedy, /^Restore the files from v9\.1\.0, or reinstall from a signed release tag; .+ doctor --json lists every one\.$/);
-  assert.equal(one.command, undefined);
+  assert.match(one.remedy, /^Put the signed files back with .+ doctor --fix; .+ doctor --json lists every one\.$/);
+  assert.match(one.command, /doctor --fix$/);
+  assert.deepEqual([one.fixable, one.data.fix], [true, { kind: 'integrity-restore' }]);
 
   mkdirSync(join(root, '.claude/agents'), { recursive: true });
   writeFileSync(join(root, '.claude/agents/dropped.md'), 'an agent nobody shipped');
@@ -105,7 +115,7 @@ test('ARC-11-C7 — another release\'s manifest FAILs, naming both, and the reme
   const { root } = signedTree(t, { manifestVersion: '9.0.0' });
   const r = await run(root);
   assert.equal(r.status, 'fail');
-  assert.equal(r.detail, 'Integrity: the signed manifest is for v9.0.0, this checkout is v9.1.0');
+  assert.equal(r.detail, 'Integrity: cannot restore — the signed manifest is for v9.0.0, this checkout is v9.1.0');
   assert.match(r.remedy, /^Run .+ licence check --refresh to fetch it; if it says none is published, reinstall from a signed release tag\.$/);
   assert.match(r.command, /licence check --refresh$/);
 });
@@ -119,8 +129,9 @@ test('ARC-11-C7 — a manifest for another commit than this checkout\'s own tag 
   const moved = gitIn(root, ['rev-parse', 'v9.1.0^{commit}']);
   const r = await run(root);
   assert.equal(r.status, 'fail');
-  assert.equal(r.detail, `Integrity: the signed manifest for v9.1.0 names commit ${manifest.commit.slice(0, 7)}, `
+  assert.equal(r.detail, `Integrity: cannot restore — the signed manifest for v9.1.0 names commit ${manifest.commit.slice(0, 7)}, `
     + `and this checkout's v9.1.0 names ${moved.slice(0, 7)}`);
+  assert.equal(r.remedy, 'Reinstall from a signed release tag.');
 });
 
 test('ARC-11-C7 — a cached manifest that does not verify FAILs with the reason, and is never used', async (t) => {
@@ -128,17 +139,51 @@ test('ARC-11-C7 — a cached manifest that does not verify FAILs with the reason
   writeFileSync(join(root, 'CLAUDE.md'), 'changed, and nobody can tell from a forged manifest\n');
   const r = await run(root);
   assert.equal(r.status, 'fail');
-  assert.equal(r.detail, 'Integrity: the signed manifest for v9.1.0 does not verify — not signed by a key this product ships');
+  assert.equal(r.detail, 'Integrity: cannot restore — the signed manifest for v9.1.0 does not verify (not signed by a key this product ships)');
   assert.deepEqual(r.data.modified, []);
 });
 
 test('ARC-11-C7 — an rc is a release, and a tree with no version of record is a FAIL', async (t) => {
   const rc = await e32().run(ctxFor(treeAt(t, '9.1.0-rc.1')));
-  assert.equal(rc.detail, 'Integrity: no signed manifest for v9.1.0-rc.1 — reinstall from a signed release tag');
+  assert.equal(rc.detail, 'Integrity: cannot restore — no signed manifest for v9.1.0-rc.1');
   const root = treeAt(t, '9.1.0');
   const pkg = readJson(root, 'package.json');
   delete pkg.version;
   writeFileSync(join(root, 'package.json'), `${JSON.stringify(pkg)}\n`);
   const none = await e32().run(ctxFor(root));
-  assert.deepEqual([none.status, none.detail], ['fail', 'Integrity: package.json names no version']);
+  assert.deepEqual([none.status, none.detail], ['fail', 'Integrity: cannot restore — package.json names no version']);
+});
+
+test('ARC-11-C141 — doctor --fix puts the signed files back (integrity-restore), keeping what it replaced', async (t) => {
+  const was = process.env.SNOW_AUDIT_FILE;
+  process.env.SNOW_AUDIT_FILE = join(tempDir('snowarch-e32-fix-audit-', t), 'audit.jsonl');
+  t.after(() => { if (was === undefined) delete process.env.SNOW_AUDIT_FILE; else process.env.SNOW_AUDIT_FILE = was; });
+  const { root } = signedTree(t);
+  const signed = readFileSync(join(root, 'CLAUDE.md'), 'utf8');
+  writeFileSync(join(root, 'CLAUDE.md'), `${signed}one more line\n`);
+  const fixer = FIXERS.find((f) => f.kind === 'integrity-restore');
+  assert.ok(fixer, 'no fixer takes integrity-restore');
+  assert.equal(TARGETS['integrity-restore'], 'the covered files E-32 names; what it replaces is kept in .local/integrity-removed/');
+  const r = await fixer.apply({ root, ctx: { ...ctxFor(root), licenceKeys: KEYS }, kind: 'integrity-restore' });
+  assert.equal(r.result, 'applied', r.detail);
+  assert.match(r.detail, /^Integrity: restored — /);
+  assert.equal(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), signed);
+  assert.equal((await run(root)).status, 'ok');
+  assert.equal((await fixer.apply({ root, ctx: { ...ctxFor(root), licenceKeys: KEYS }, kind: 'integrity-restore' })).result, 'noop');
+});
+
+test('ARC-11-C141 — only a modified tree is fixable: E-32 says so per finding, so no snapshot reads the declaration', async (t) => {
+  // The report takes the result's `fixable` and falls back to the declaration's (report-json.mjs). E-32 is declared
+  // fixable because one finding is; every other finding must say false, or a skip on a development tree reads as a
+  // repair on offer (#441's Windows bootstrap cells, E-32 "fixable false → true").
+  const dev = await e32().run(ctxFor(treeAt(t, '9.1.0-dev')));
+  const none = await e32().run(ctxFor(treeAt(t, '9.1.0')));
+  const { root } = signedTree(t);
+  const verified = await run(root);
+  writeFileSync(join(root, 'CLAUDE.md'), 'changed\n');
+  const modified = await run(root);
+  assert.deepEqual([dev.status, dev.fixable], ['skip', false]);
+  assert.deepEqual([none.status, none.fixable], ['fail', false]);
+  assert.deepEqual([verified.status, verified.fixable], ['ok', false]);
+  assert.deepEqual([modified.status, modified.fixable], ['fail', true]);
 });

@@ -135,8 +135,9 @@ function writeStore(root, store) {
 test('every kind the whitelist knows has a fixer and a target, and nothing else does', () => {
   assert.deepEqual([...new Set(FIXERS.map((f) => f.kind))].sort(), [...KINDS].sort());
   for (const kind of KINDS) assert.ok(TARGETS[kind], `${kind} has no target`);
-  // The ids are the story's seven, and F2/F6 legitimately cover two kinds each.
-  assert.deepEqual([...new Set(FIXERS.map((f) => f.id))], ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7']);
+  // The ids are the story's seven and ARC-11-C141's F8, which runs before the cache is cleared; F2/F6 legitimately
+  // cover two kinds each.
+  assert.deepEqual([...new Set(FIXERS.map((f) => f.id))], ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F8', 'F7']);
 });
 
 test('every fixable result carries a kind the whitelist knows', async (t) => {

@@ -114,14 +114,16 @@ test('AC 3 — a modified tracked file stops the upgrade before anything moves',
   const w = await buildWorld(t);
   bootstrapUser(w.user);
   const head = git(w.user, ['rev-parse', 'HEAD']);
-  writeFileSync(join(w.user, 'CLAUDE.md'), `${readFileSync(join(w.user, 'CLAUDE.md'), 'utf8')}\nedited\n`);
+  // A tracked file the release does not cover: the launcher puts a covered one back before any command runs
+  // (ARC-11-C141), so the user's own dirty tree is the one this refusal is about.
+  writeFileSync(join(w.user, 'README.md'), `${readFileSync(join(w.user, 'README.md'), 'utf8')}\nedited\n`);
 
   const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.equal(r.status, 2, r.text);
   assert.match(r.text, /tracked files are modified — commit or stash them first \(git stash\)/);
   assert.match(r.text, /nothing was changed/);
   // ARC-09-C120: and which ones.
-  assert.match(r.text, /modified: CLAUDE\.md/);
+  assert.match(r.text, /modified: README\.md/);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
 }, MINUTES);
 
@@ -471,6 +473,9 @@ test('ARC-11-C7 — a target with no signed manifest, or one that is not its own
 test('ARC-11-C7 — a covered directory with a file the release does not ship stops the upgrade after U5, before U6', async (t) => {
   const w = await buildWorld(t);
   bootstrapUser(w.user);
+  // No manifest held, so the launcher cannot put the tree back before `upgrade` runs (ARC-11-C141); `upgrade` is in
+  // the repair set and runs, and the file the checkout leaves is U5's to find.
+  rmSync(join(w.user, '.local', 'release-manifest.json'));
   mkdirSync(join(w.user, '.claude', 'skills', 'mine'), { recursive: true });
   writeFileSync(join(w.user, '.claude', 'skills', 'mine', 'SKILL.md'), 'a skill nobody shipped\n');
   const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
@@ -551,6 +556,25 @@ test('ARC-09-C140 — 2.0.13 to 2.1.0-rc.1: B01 fetches the manifest the old U4 
   assert.match(other.text, /release manifest: v2\.1\.0-rc\.1 fetched \(\d+ files\)/, other.text);
   assert.match(status(), VERIFIED_RC1);
 
+  // ARC-11-C141 — an edited skill and an added one, after the install: the next command puts the signed skill back and
+  // moves the added one aside, says so once, and runs on the signed tree. Nothing is deleted.
+  const skill = join(w.user, '.claude', 'skills', 'itsm-specialist', 'SKILL.md');
+  const signedSkill = readFileSync(skill, 'utf8');
+  writeFileSync(skill, `${signedSkill}my own rule\n`);
+  mkdirSync(join(w.user, '.claude', 'skills', 'my-skill'), { recursive: true });
+  writeFileSync(join(w.user, '.claude', 'skills', 'my-skill', 'SKILL.md'), 'my own skill\n');
+  const restored = snowarch(w.user, ['status'], { bin: w.bin });
+  t.diagnostic(`(c2) ${restored.text.split('\n').find((l) => l.startsWith('Integrity: restored')) ?? 'no restore line'}`);
+  assert.match(restored.stderr, /^Integrity: restored — The AI Architect's own files are not yours to change under this licence: 1 file restored from v2\.1\.0-rc\.1, 1 moved to \.local\/integrity-removed\/\d{8}T\d{6}Z\/ \(\.claude\/skills\/itsm-specialist\/SKILL\.md\)\. Your own material belongs under clients\/<name>\/\.$/m,
+    restored.text);
+  assert.equal(readFileSync(skill, 'utf8'), signedSkill);
+  assert.equal(existsSync(join(w.user, '.claude', 'skills', 'my-skill')), false);
+  const kept = readdirSync(join(w.user, '.local', 'integrity-removed'));
+  assert.equal(kept.length, 1, kept.join(', '));
+  assert.equal(readFileSync(join(w.user, '.local', 'integrity-removed', kept[0], '.claude', 'skills', 'my-skill', 'SKILL.md'), 'utf8'),
+    'my own skill\n');
+  assert.match(restored.stdout, VERIFIED_RC1);
+
   // (d) No network and no manifest: B01 warns with the reason, and E-32 FAILs with the remedy. Nothing crashes.
   rmSync(cache);
   renameSync(w.licences.bare, gone);
@@ -561,9 +585,14 @@ test('ARC-09-C140 — 2.0.13 to 2.1.0-rc.1: B01 fetches the manifest the old U4 
   const doctor = snowarch(w.user, ['doctor'], { bin: w.bin });
   t.diagnostic(`(d) ${doctor.text.split('\n').find((l) => l.includes('E-32')) ?? 'the doctor printed no E-32 line'}`);
   assert.match(doctor.text, /E-32\s+FAIL/, doctor.text);
-  assert.ok(doctor.text.includes('Integrity: no signed manifest for v2.1.0-rc.1'), doctor.text);
+  assert.ok(doctor.text.includes('Integrity: cannot restore — no signed manifest for v2.1.0-rc.1'), doctor.text);
   assert.ok(doctor.text.includes('licence check --refresh'), doctor.text);
   assert.doesNotMatch(`${offline.text}${doctor.text}`, /crashed|TypeError|ReferenceError/);
+  // ARC-11-C141 — and a tree that cannot be restored refuses a command outside the repair set, with the same line.
+  const refused = snowarch(w.user, ['docs', 'verify'], { bin: w.bin });
+  assert.equal(refused.status, 3, refused.text);
+  assert.ok(refused.stderr.includes("this command does not run while the AI Architect's own files cannot be restored"), refused.text);
+  assert.ok(refused.stderr.includes('Integrity: cannot restore — no signed manifest for v2.1.0-rc.1 — '), refused.text);
 }, 3 * MINUTES);
 
 test('ARC-09-C140 — 2.1 to 2.1: the plan and the run agree on B01, after an install that could not fetch and after one that did', async (t) => {

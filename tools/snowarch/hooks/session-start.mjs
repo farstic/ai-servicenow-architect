@@ -97,16 +97,29 @@ function nudges({ report, cache, banner, firstRun, upgrade, now = Date.now(),
 }
 
 /**
- * ARC-11-C7 — E-32's cached line, when it FAILed: `Integrity: modified — …`, third, after the Licence line.
+ * ARC-11-C141 — the checkout's own files, at the start of every session: `Integrity: …`, third, after the Licence line.
  *
- * The hook never runs E-32, which reads every covered file, so this is the verdict the last `status` or `doctor`
- * cached, carried over the banner's own runs by the cache's writer. Read from the cache this call started with, on
- * every path that has one. A verified tree, a development one, or one no run has checked prints nothing.
+ * THE OWNER'S RULING (2026-10-14): a change to the AI Architect's own files does not take effect. So the hook runs the
+ * one function the server and the launcher run (`ensureIntegrity`), on its stat key: a `stat` per covered file when
+ * nothing moved, the moved files hashed when something did. A change is put back and the line says so; with
+ * CLAUDE.md or anything under .claude/ among them, it adds "— restart claude", because this session read those before
+ * the hook ran (the one-session bound, R6). A tree that cannot be restored prints its "cannot restore" line, which the
+ * CLAUDE.md sentence keys on. A verified, development or non-engine tree prints nothing. Never throws: no line is the
+ * honest failure, as for the licence line.
  */
-function integrityNudge(cache) {
-  const e32 = (Array.isArray(cache?.checks) ? cache.checks : []).find((c) => c?.id === 'E-32');
-  return e32?.status === 'fail' && typeof e32.detail === 'string' && e32.detail.startsWith('Integrity: ')
-    ? e32.detail : null;
+async function integrityEvent({ root, now, keys }) {
+  try {
+    const { ensureIntegrity } = await import('../../../packages/snowarch/dist/licence/integrity.js');
+    const { localDir } = await import('../lib/local-paths.mjs');
+    const { productDir } = await import('../lib/spawn-env.mjs');
+    const { spellings } = await import('../lib/text.mjs');
+    const e = ensureIntegrity(root, { local: localDir(root), cli: spellings().cli, projectDir: productDir(root),
+      now: () => new Date(now), keys });
+    if (e.state === 'restored') return e.claudeChanged ? `${e.line} — restart claude` : e.line;
+    return e.state === 'refused' ? e.line : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -204,6 +217,8 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   // ARC-11-C1 — the licence line, second on every path that prints a Mode line. From the files as they
   // are: the licence and the cached revocation list. The hook never fetches, however old the list is.
   const licence = await licenceLine({ root, now, env, keys: licenceKeys });
+  // ARC-11-C141 — before the cache is read: a restore changes files the doctor's cache keys on.
+  const integrity = await integrityEvent({ root, now, keys: licenceKeys });
 
   const cache = readJson(cachePath(root));
   const inputs = readJson(inputsPath(root));
@@ -215,7 +230,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   if (cache && inputs && !staleness.stale && cache.modeLine) {
     say(cache.modeLine);
     say(licence);
-    say(integrityNudge(cache));
+    say(integrity);
     for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade, now, spell: spellings() })) say(line);
     phase.mark('render');
     phase.done('cache');
@@ -229,6 +244,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
     const { MODE_VARIANTS, modeLine } = await import('../lib/text.mjs');
     say(modeLine({ mode: 'unknown', qualifier: MODE_VARIANTS.notBootstrapped(spellings()) }));
     say(licence);
+    say(integrity);
     return { path: 'unbootstrapped', lines: out };
   }
 
@@ -249,13 +265,13 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
       ? `${cache.modeLine}${BANNER.staleSuffix(spellings())}`
       : BANNER.timedOut(spellings()));
     say(licence);
-    say(integrityNudge(cache));
+    say(integrity);
     return { path: 'timeout', lines: out };
   }
 
   say(report.modeLine);
   say(licence);
-  say(integrityNudge(cache));
+  say(integrity);
   for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade, now, spell: spellings() })) say(line);
   phase.mark('render');
   phase.done('rerun');
