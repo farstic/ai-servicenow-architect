@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { fetchListAsync, LIVE_BUDGET_MS } from '../../src/licence/refresh.js';
 import {
-  currentLicence, initLicence, refreshLicenceList, resetLicenceForTests, startLicence,
+  assertLicensed, currentLicence, initLicence, refreshLicenceList, resetLicenceForTests, startLicence, takeLicenceNotice,
 } from '../../src/licence/session.js';
 import { checkout, fixtureDir, keysOf, licence, licenceText, listRepo, listText, pair, removeFixtureDirs } from './fixtures.js';
 import { slowGitPath } from '../../../../tools/snowarch/tests/helpers/slow-git.mjs';
@@ -64,6 +64,14 @@ const slowEnv = (extra: Record<string, string> = {}): Record<string, string> => 
  */
 const FIXTURE_BUDGET_MS = 20_000;
 
+/**
+ * ARC-09-C145 — the no-network cases wait for the fetch to settle, however long the host takes, and then read what
+ * the cached list decides. They assert no elapsed time: `+ 1_000` on the budget failed at 4212 ms under a full gate's
+ * load, with the product right. What bounds them is their own timeout, three times the live budget: the fetch gives
+ * up at the budget whatever the load, and a stall of ten seconds planted on its path cannot finish inside it.
+ */
+const STALL_GUARD_MS = LIVE_BUDGET_MS * 3;
+
 function project(repo: string, { cache = null, licenceFile = licenceText(licence(), primary) }:
   { cache?: string | null; licenceFile?: string | null } = {}): string {
   const root = checkout();
@@ -105,7 +113,7 @@ describe('ARC-11-C1 — the live start\'s background refresh', () => {
     expect(JSON.parse(readFileSync(join(root, '.local', 'revocations.json'), 'utf8')).list.list.version).toBe(2);
   });
 
-  it('a stale cache and no network: the cached state stands, within the three seconds', async () => {
+  it('a stale cache and no network: the fetch settles unreachable, and the cached list decides what the start prints', async () => {
     const cached = listText(1, [revocation], primary);
     const root = project(silentUrl, { cache: staleCache(cached) });
     initLicence({ root, env: quietEnv(ENFORCED), keys: KEYS });
@@ -117,11 +125,19 @@ describe('ARC-11-C1 — the live start\'s background refresh', () => {
     // load. 100 ms was a wall-clock budget, and a full suite on a busy machine took 214 for a return that waited on
     // nothing (the v2.1.0-rc.1 rehearsal).
     expect(Date.now() - started).toBeLessThan(LIVE_BUDGET_MS / 2);
+    // ARC-09-C145 — then the settle itself, however long the host takes (STALL_GUARD_MS bounds the case).
     const r = await pending;
-    expect(Date.now() - started).toBeLessThan(LIVE_BUDGET_MS + 1_000);
-    expect(r.outcome).toBe('unreachable');
+    expect(r).toEqual({ outcome: 'unreachable', version: 1, detail: expect.any(String) });
+    // Nothing answered, so nothing was checked and nothing written: the cache keeps its date and its list.
+    const cache = JSON.parse(readFileSync(join(root, '.local', 'revocations.json'), 'utf8'));
+    expect(cache.checkedAt, 'an unreachable refresh wrote the cache').toBe('2020-01-01T00:00:00.000Z');
+    expect(cache.list).toEqual(JSON.parse(cached));
+    // What the start prints once the fetch has settled is the cached list's verdict — the state recomputed when the
+    // refresh landed, the first answer's notice with the cached revocation's reason, and the router's refusal.
     expect(currentLicence().state).toBe('revoked');
-  }, 15_000);
+    expect(takeLicenceNotice()).toMatch(/^Licence: revoked — .*\bended\b/);
+    expect(() => assertLicensed()).toThrow(/licence revoked/);
+  }, STALL_GUARD_MS);
 
   it('main() passes no budget, and a start without one waits the live three seconds (ARC-09-C133)', async () => {
     // The widened budget is the tests' alone: the server's one call to startLicence names none...
@@ -140,13 +156,12 @@ describe('ARC-11-C1 — the live start\'s background refresh', () => {
     expect(arg !== undefined && ts.isObjectLiteralExpression(arg), 'main() passes startLicence no object literal').toBe(true);
     const names = (arg as ts.ObjectLiteralExpression).properties.map((p) => p.name?.getText(source));
     expect(names, 'main() passes startLicence a budget').not.toContain('budgetMs');
-    // ...and without one, a live start against a list that never answers gives up within the live budget.
+    // ...and without one, a live start against a list that never answers gives up within the live budget: a start
+    // that waited the fixtures' twenty seconds, or stalled ten, would outlast STALL_GUARD_MS (ARC-09-C145).
     const root = project(silentUrl, { cache: staleCache(listText(1, [revocation], primary)) });
-    const started = Date.now();
     const r = await startLicence({ root, env: quietEnv(), keys: KEYS, live: true });
-    expect(Date.now() - started).toBeLessThan(LIVE_BUDGET_MS + 1_000);
     expect(r).toEqual({ outcome: 'unreachable', version: 1, detail: expect.any(String) });
-  }, 15_000);
+  }, STALL_GUARD_MS);
 
   it('a list older than the one held is ignored (rollback protection)', async () => {
     const held = listText(5, [revocation], primary);
