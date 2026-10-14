@@ -22,7 +22,8 @@ import '../env-sanitise.js';
 import { Command } from 'commander';
 import { argvCarriesSecret, ARGV_SECRET, bootstrapSpelling, cliSpelling, EXIT_USAGE } from './tty.js';
 import { remedyFor } from '../errors/codes.js';
-import { refusesCommand } from '../licence/gate.js';
+import { REFUSED, refusesCommand } from '../licence/gate.js';
+import { ensureIntegrity } from '../licence/integrity.js';
 import { licenceStatus, projectRoot } from '../licence/state.js';
 import { spawn } from 'child_process';
 import { existsSync, readFileSync, writeSync } from 'fs';
@@ -74,11 +75,21 @@ program
  */
 program.hook('preAction', (_program, action) => {
   const name = action.name();
-  const s = licenceStatus(projectRoot());
-  if (!refusesCommand(name, s)) return;
-  const { meaning, remedy } = remedyFor('LICENCE_NOT_VALID', { cli: cliSpelling(), bootstrap: bootstrapSpelling() });
-  writeSync(2, `snowarch ${name}: licence ${s.state}${s.signatureValid ? ` (${s.id})` : ''} (Code: LICENCE_NOT_VALID) — `
-    + `${meaning}\n${remedy}\n`);
+  const root = projectRoot();
+  const s = licenceStatus(root);
+  // ARC-11-C141 — the same door for this checkout's own files: put back where they can be, with the one line saying
+  // so, and refused with the licence's set where they cannot. The licence is asked first: one refusal, one reason.
+  const integrity = ensureIntegrity(root, { cli: cliSpelling(), projectDir: root });
+  if (integrity.state === 'restored') writeSync(2, `${integrity.line}\n`);
+  if (!refusesCommand(name, s, [], integrity)) return;
+  if (REFUSED.includes(s.state)) {
+    const { meaning, remedy } = remedyFor('LICENCE_NOT_VALID', { cli: cliSpelling(), bootstrap: bootstrapSpelling() });
+    writeSync(2, `snowarch ${name}: licence ${s.state}${s.signatureValid ? ` (${s.id})` : ''} (Code: LICENCE_NOT_VALID) — `
+      + `${meaning}\n${remedy}\n`);
+  } else if (integrity.state === 'refused') {
+    writeSync(2, `snowarch ${name}: this command does not run while the AI Architect's own files cannot be restored `
+      + `(Code: INTEGRITY_NOT_VERIFIED)\n${integrity.line}\n`);
+  }
   process.exit(EXIT_LICENCE);
 });
 

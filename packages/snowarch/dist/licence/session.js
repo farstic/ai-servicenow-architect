@@ -24,6 +24,7 @@ import { remedyFor } from '../errors/codes.js';
 import { cliSpelling, bootstrapSpelling } from '../cli/tty.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { PRODUCT_KEYS } from './keys.js';
+import { ensureIntegrity } from './integrity.js';
 import { refreshList, LIVE_BUDGET_MS } from './refresh.js';
 import { daysLeftPhrase, licenceLine, licenceStatus, projectRoot, readLicenceText, REFUSED, } from './state.js';
 let session = null;
@@ -75,6 +76,40 @@ export function takeLicenceNotice() {
     if (why === null)
         return null;
     return `${licenceLine(s)} — ${why}. Run ${spell().cli} licence check for the details.`;
+}
+let integrity = null;
+/** Check, and restore, this checkout's own files, and hold the verdict for this process. */
+export function initIntegrity({ root = projectRoot(), keys = PRODUCT_KEYS, now = () => new Date() } = {}) {
+    const ensured = ensureIntegrity(root, { keys, full: true, cli: spell().cli, now, projectDir: root });
+    integrity = { ensured, noticeTaken: false };
+    return ensured;
+}
+/** This process's verdict; computed on first use when `main()` has not started it (a test's import). */
+export function currentIntegrity() {
+    return (integrity ?? { ensured: initIntegrity() }).ensured;
+}
+/** Test seam: forget the verdict. Never called by the server. */
+export function resetIntegrityForTests() { integrity = null; }
+/** Throws INTEGRITY_NOT_VERIFIED when this checkout's own files could not be restored. The message is the line. */
+export function assertIntegrity() {
+    const e = currentIntegrity();
+    if (e.state === 'refused')
+        throw new ServiceNowError(e.line, 'INTEGRITY_NOT_VERIFIED');
+}
+/** The restore's line, once, for the session's first answer; `null` when nothing was restored or it was taken. */
+export function takeIntegrityNotice() {
+    const e = currentIntegrity();
+    if (!integrity || integrity.noticeTaken || e.state !== 'restored')
+        return null;
+    integrity.noticeTaken = true;
+    return e.line;
+}
+/** The refusal's audit fields (Q8): what state the tree is in, and which release it claims to be. */
+export function integrityRefusalFields() {
+    const e = currentIntegrity();
+    if (e.state !== 'refused')
+        return { state: e.state, tag: 'tag' in e && e.tag ? e.tag : 'none' };
+    return { state: e.status?.state ?? 'unrestorable', tag: e.tag ?? 'none' };
 }
 /** `{ licence: id }` when the licence's signature holds; `{}` otherwise, so a default audit line is unchanged. */
 export function licenceAuditField() {

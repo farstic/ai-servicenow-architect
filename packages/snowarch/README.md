@@ -349,7 +349,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (73), with what to do about it.
+Every code the server can throw (74), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -380,6 +380,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `INSTANCE_NOT_LOADED` | read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement |
 | `INSTANCE_UNUSABLE` | the message says which field is impossible |
 | `INSUFFICIENT_PRIVILEGES` | The credentials are valid but the account lacks a role for this table. Report the tool, the table and the roles the preset needs (see docs/TROUBLESHOOTING.md); do not switch instances or retry with another tool to work around it |
+| `INTEGRITY_NOT_VERIFIED` | Run <cli> doctor: its Integrity line names the reason. <cli> licence check --refresh fetches a missing manifest; a checkout that cannot be restored is reinstalled from a signed release tag. A running Claude Code session keeps what its server read at start, so restart it afterwards |
 | `INVALID_REQUEST` | the message names the argument |
 | `LABEL_EXISTS` | use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it |
 | `LABEL_NOT_FOUND` | run `instance list` to see the labels this checkout has, or `instance add <label>` to add one |

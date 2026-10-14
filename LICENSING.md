@@ -39,6 +39,17 @@ Every release is an annotated git tag with its assets published on GitHub. From 
 releases are signed and ship a checked integrity manifest; a copy whose files do not match that
 manifest is not a release of this project.
 
+From 2.1 a licensed copy is also held to that manifest (ARC-11-C141). A change to the product's own
+files — the core files, or a skill, agent or rule added under `.claude/` — does not take effect: at
+the next start or command the signed files are put back from the release's tag, and what was
+replaced or added is moved to `.local/integrity-removed/`, never deleted. Your own material belongs
+under `clients/<name>/`. A copy that cannot be put back — no signed manifest held, or no release
+tag to restore from — runs no MCP tool, and no command but those that show and repair the state.
+What this does not reach, by design: a development version, and a copy whose version has been
+edited to one or removed; a change that removes the check itself; a change made together with its
+file's time stamp, until the next full check (every server start, `doctor` and `status`); and a
+session already running, which reads a restored `CLAUDE.md` from its next start.
+
 ## The ServiceNow documentation corpus
 
 `vendor/ServiceNowDocs/` is ServiceNow product documentation, © ServiceNow, Inc., licensed by

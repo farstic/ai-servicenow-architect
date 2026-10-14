@@ -33,7 +33,10 @@ import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
 import { capResult, resolveCap } from './utils/result-size.js';
 import { appendAudit, auditDisabled, resolveAuditPath, type AuditWarning } from './audit/writer.js';
-import { currentLicence, licenceAuditField, licenceRefusalFields, startLicence, takeLicenceNotice } from './licence/session.js';
+import {
+  currentLicence, initIntegrity, integrityRefusalFields, licenceAuditField, licenceRefusalFields, startLicence, takeIntegrityNotice,
+  takeLicenceNotice,
+} from './licence/session.js';
 import { licenceLine } from './licence/state.js';
 import type { ToolDefinition } from './tools/types.js';
 
@@ -94,8 +97,10 @@ export function createServer(): Server {
    * Nothing is added when a live licence is in force.
    */
   const withNotice = (content: Array<{ type: 'text'; text: string }>): Array<{ type: 'text'; text: string }> => {
-    const notice = takeLicenceNotice();
-    return notice ? [...content, { type: 'text' as const, text: notice }] : content;
+    // ARC-11-C141 — and a restore's line, once, the same way: the start put the signed files back, and the session's
+    // first answer is where a reader of this server learns it.
+    const notices = [takeLicenceNotice(), takeIntegrityNotice()].filter((n): n is string => n !== null);
+    return [...content, ...notices.map((text) => ({ type: 'text' as const, text }))];
   };
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -187,6 +192,20 @@ export function createServer(): Server {
       });
     };
 
+    // ARC-11-C141 — the router's integrity refusal, in the licence refusal's shape (Q8): what was refused, the tree's
+    // state and the release it claims, and nothing that was sent.
+    const writeIntegrityRefusal = (): void => {
+      if (!auditTool) return;
+      appendAudit({
+        ts: new Date().toISOString(),
+        instance: startInstance?.label ?? '(none)',
+        tool: name,
+        gate: 'integrity',
+        result: 'INTEGRITY_NOT_VERIFIED',
+        ...integrityRefusalFields(),
+      });
+    };
+
     try {
       const tool = tools.find(t => t.name === name);
       if (!tool) {
@@ -259,6 +278,8 @@ export function createServer(): Server {
       auditWarnings = summariseWarnings(carriedWarnings(error));
       // Only the router's `assertLicensed` raises LICENCE_NOT_VALID, so this is the refusal and nothing else.
       if (auditResult === 'LICENCE_NOT_VALID') writeLicenceRefusal();
+      // ...and only its `assertIntegrity` raises INTEGRITY_NOT_VERIFIED.
+      else if (auditResult === 'INTEGRITY_NOT_VERIFIED') writeIntegrityRefusal();
       else writeAudit();
 
       // Includes a sentence about cut values when the tool had already written some before it threw
@@ -364,6 +385,9 @@ async function main() {
   // the revocation list at every start, in the background, on a 3-second budget: never awaited here, never
   // failing, and the state it lands applies from the next call. Without a licence it fetches nothing.
   const refresh = startLicence({ live: instanceManager.loadedCount() > 0 });
+  // ARC-11-C141 — this checkout's own files, in full and once, before the first call: restored where they can be,
+  // and every tool refused where they cannot. Synchronous and offline, about 7 ms warm; the transport is not open yet.
+  initIntegrity();
   const licence = currentLicence();
   logger.info(`licence: ${licenceLine(licence)}`);
   if (refresh) void refresh.then((r) => logger.info(`licence: revocation list ${r.outcome}`));

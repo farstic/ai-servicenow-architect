@@ -1,4 +1,5 @@
 import type { ProductKey } from './core.js';
+import { type Ensured } from './integrity.js';
 import { type RefreshResult } from './refresh.js';
 import { type CheckoutStatus } from './state.js';
 interface Options {
@@ -20,6 +21,21 @@ export declare function assertLicensed(): void;
  * parses `content[0]` as JSON reads exactly what it always read.
  */
 export declare function takeLicenceNotice(): string | null;
+/** Check, and restore, this checkout's own files, and hold the verdict for this process. */
+export declare function initIntegrity({ root, keys, now }?: Options): Ensured;
+/** This process's verdict; computed on first use when `main()` has not started it (a test's import). */
+export declare function currentIntegrity(): Ensured;
+/** Test seam: forget the verdict. Never called by the server. */
+export declare function resetIntegrityForTests(): void;
+/** Throws INTEGRITY_NOT_VERIFIED when this checkout's own files could not be restored. The message is the line. */
+export declare function assertIntegrity(): void;
+/** The restore's line, once, for the session's first answer; `null` when nothing was restored or it was taken. */
+export declare function takeIntegrityNotice(): string | null;
+/** The refusal's audit fields (Q8): what state the tree is in, and which release it claims to be. */
+export declare function integrityRefusalFields(): {
+    state: string;
+    tag: string;
+};
 /** `{ licence: id }` when the licence's signature holds; `{}` otherwise, so a default audit line is unchanged. */
 export declare function licenceAuditField(): {
     licence?: string;

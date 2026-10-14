@@ -582,6 +582,15 @@ export const ERROR_CODES = [
     command: "<cli> licence check",
     showInRule: false,
   },
+  {
+    // ARC-11-C141. Not in the always-loaded rule file, as LICENCE_NOT_VALID is not: the refusal's own message is the
+    // `Integrity: cannot restore — …` line, which names the reason and carries the remedy.
+    code: 'INTEGRITY_NOT_VERIFIED',
+    meaning: "This checkout's own files are not the signed release's, and they could not be restored: no signed manifest is held, it does not verify, it is another release's, there is no tag to restore from, or the restore failed. Every tool is refused, as for a refused licence. A change the product could restore was restored, and is not this.",
+    remedy: "Run <cli> doctor: its Integrity line names the reason. <cli> licence check --refresh fetches a missing manifest; a checkout that cannot be restored is reinstalled from a signed release tag. A running Claude Code session keeps what its server read at start, so restart it afterwards",
+    command: "<cli> doctor",
+    showInRule: false,
+  },
 ] as const satisfies readonly ErrorCode[];
 
 export const ERROR_CODE_NAMES: ReadonlySet<string> = new Set(ERROR_CODES.map((e) => e.code));

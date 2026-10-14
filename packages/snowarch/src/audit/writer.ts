@@ -104,6 +104,36 @@ export interface LicenceRefusalEntry {
   state: 'revoked' | 'expired' | 'invalid' | 'missing' | 'scope';
 }
 
+/**
+ * ARC-11-C141 — the product restored its own files (the owner's ruling, 2026-10-14: a change to them does not take
+ * effect, and the user continues). Whichever process restored them writes this line: the server at its start, the
+ * launcher, the SessionStart hook, or `doctor --fix`. Paths only, never contents.
+ */
+export interface IntegrityRestoreEntry {
+  ts: string;
+  gate: 'integrity';
+  action: 'restored';
+  tag: string;
+  /** The signed files put back from the tag. */
+  files: string[];
+  /** The files the release does not ship, moved aside. */
+  moved: string[];
+  /** Where the replaced copies and the moved files are now, relative to the checkout when inside it. */
+  folder: string;
+}
+
+/** ARC-11-C141 — a call the router refused because this checkout's own files could not be restored (Q8). */
+export interface IntegrityRefusalEntry {
+  ts: string;
+  instance: string;
+  tool: string;
+  gate: 'integrity';
+  result: 'INTEGRITY_NOT_VERIFIED';
+  /** The tree's state: `missing`, `invalid`, `other`, or `unrestorable` for a restore that failed. */
+  state: string;
+  tag: string;
+}
+
 export interface CliAuditEntry {
   ts: string;
   instance: string;
@@ -171,7 +201,7 @@ function rotate(file: string): void {
  * local disk was full or read-only — the write already happened, and telling the caller
  * otherwise would be worse than losing the audit line.
  */
-export function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry): void {
+export function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry | IntegrityRestoreEntry | IntegrityRefusalEntry): void {
   const file = resolveAuditPath();
   if (file === null) return;
 

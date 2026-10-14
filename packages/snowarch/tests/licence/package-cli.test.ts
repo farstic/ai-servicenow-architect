@@ -10,7 +10,9 @@ import { remedyFor } from '../../src/errors/codes.js';
 import { bootstrapSpelling, cliSpelling } from '../../src/cli/tty.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
-import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
+import { licenceFixture, licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
+import { releaseCheckout, removeFixtureDirs } from './fixtures.js';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 /**
  * ARC-11-C6 step 4b — the package CLI is the product's second door, and it refuses what ./snowarch refuses.
@@ -25,7 +27,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const CLI = resolve(here, '../../dist/cli/index.js');
 
 const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-package-cli-')));
-afterAll(() => { removeTempDir(base); });
+// The release checkouts the C141 cases build are the fixtures module's, swept with it, on failure too.
+afterAll(() => { removeTempDir(base); removeFixtureDirs(); });
 
 /** The fixture's keys trusted (the hook) and no licence in the project: the state is `missing`. */
 const unlicensed = (args: readonly string[]) => spawnSync(process.execPath, [CLI, ...args], {
@@ -93,5 +96,33 @@ describe('ARC-11-C6 step 4b — with a licence in force, the package CLI runs as
     expect(r.status).toBe(0);
     expect(r.stdout).toContain(NO_INSTANCE_MESSAGE(cliSpelling()));
     expect(r.stderr).not.toContain('LICENCE_NOT_VALID');
+  });
+});
+
+describe('ARC-11-C141 — the package CLI is the same door for the checkout\'s own files', () => {
+  /** A licensed release checkout whose manifest is signed by the key the child trusts (the hook's). */
+  const run = (root: string, args: readonly string[]) => spawnSync(process.execPath, [CLI, ...args], {
+    encoding: 'utf8', cwd: root, timeout: 30_000,
+    env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: root, SNOW_STORE: join(root, '.local', 'instances.json'),
+      SNOW_AUDIT_FILE: join(base, 'c141-audit.jsonl') }),
+  });
+
+  it('a tree that cannot be restored: instance list exits 3 with INTEGRITY_NOT_VERIFIED and the line; doctor runs', () => {
+    const root = releaseCheckout({ key: licenceFixture().primary, cache: false });
+    const r = run(root, ['instance', 'list']);
+    expect(r.status).toBe(3);
+    expect(r.stderr).toContain("snowarch instance: this command does not run while the AI Architect's own files cannot be restored (Code: INTEGRITY_NOT_VERIFIED)");
+    expect(r.stderr).toContain('Integrity: cannot restore — no signed manifest for v9.1.0 — ');
+    expect(r.stdout).toBe('');
+    expect(run(root, ['doctor']).stderr).not.toContain('INTEGRITY_NOT_VERIFIED');
+  });
+
+  it('a changed file is put back before the command, which then runs', () => {
+    const root = releaseCheckout({ key: licenceFixture().primary });
+    writeFileSync(join(root, 'CLAUDE.md'), 'my architect\n');
+    const r = run(root, ['instance', 'list']);
+    expect(r.status).toBe(0);
+    expect(r.stderr).toMatch(/^Integrity: restored — The AI Architect's own files are not yours to change under this licence: 1 file restored from v9\.1\.0, /m);
+    expect(readFileSync(join(root, 'CLAUDE.md'), 'utf8')).toBe('# signed\n');
   });
 });

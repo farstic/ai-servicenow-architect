@@ -20,12 +20,13 @@ import { pathToFileURL } from 'node:url';
 
 import { cachePath, cacheStale, inputsPath } from '../doctor-cache.mjs';
 import { loadStateOrReason, saveState } from '../state.mjs';
-import { spellFor } from './spell.mjs';
+import { cliOf, spellFor } from './spell.mjs';
+import { PRODUCT_KEYS } from '../licence/keys.mjs';
 
 /** The `data.fix.kind` vocabulary. A kind outside this table is never applied — it is reported. */
 export const KINDS = Object.freeze(['deps-missing', 'corpus-missing', 'sparse-mismatch',
   'head-off-pin', 'flags-incomplete', 'store-mode', 'toggles-mismatch',
-  'hooks-disabled-by-bootstrap', 'hook-absent', 'hook-wrong', 'cache-stale']);
+  'hooks-disabled-by-bootstrap', 'hook-absent', 'hook-wrong', 'integrity-restore', 'cache-stale']);
 
 /** The one place that says which file a repair is allowed to touch, for the report and the test. */
 export const TARGETS = Object.freeze({
@@ -39,6 +40,7 @@ export const TARGETS = Object.freeze({
   'hooks-disabled-by-bootstrap': '.claude/settings.local.json',
   'hook-absent': '.claude/settings.local.json',
   'hook-wrong': '.claude/settings.local.json',
+  'integrity-restore': 'the covered files E-32 names; what it replaces is kept in .local/integrity-removed/',
   'cache-stale': '.local/doctor-last.json',
 });
 
@@ -223,6 +225,22 @@ async function fixToggles({ root, ctx, kind, apply }) {
   return r?.changed === false ? result('noop', 'already correct') : result('applied', `mode ${mode}`);
 }
 
+/**
+ * F8 — ARC-11-C141: the Architect's own files put back from the release's tag, through the one function the server,
+ * the launcher and the hook run, hashing in full. It never deletes: what it replaces and what it moves are kept in
+ * `.local/integrity-removed/<UTC stamp>/`, and its line names the folder.
+ */
+async function fixIntegrity({ root, ctx }) {
+  const { ensureIntegrity } = await import('../../../../packages/snowarch/dist/licence/integrity.js');
+  const { localDir } = await import('../local-paths.mjs');
+  const { productDir } = await import('../spawn-env.mjs');
+  const e = ensureIntegrity(root, { local: localDir(root), full: true, cli: cliOf(ctx), projectDir: productDir(root),
+    keys: ctx?.licenceKeys ?? PRODUCT_KEYS });
+  if (e.state === 'restored') return result('applied', e.line);
+  if (e.state === 'refused') return result('failed', e.line);
+  return result('noop', 'the files are as signed');
+}
+
 /** F7 — a stale cache is deleted; the re-run writes a fresh one. */
 function fixCache({ root }) {
   let removed = 0;
@@ -253,6 +271,7 @@ export const FIXERS = Object.freeze([
   // replacing a wrong one, and it refuses a file that is not gitignored or does not parse, with its own reason.
   { id: 'F6', kind: 'hook-absent', title: 'register the SessionStart hook', apply: fixToggles },
   { id: 'F6', kind: 'hook-wrong', title: 'rewrite the SessionStart hook', apply: fixToggles },
+  { id: 'F8', kind: 'integrity-restore', title: 'put the signed files back', apply: fixIntegrity },
   { id: 'F7', kind: 'cache-stale', title: 'clear the stale doctor cache', apply: fixCache },
 ]);
 

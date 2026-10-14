@@ -98,6 +98,16 @@ test('ARC-09-C114 — Step 2: an Envelope for a named engagement is saved, liste
   assert.doesNotMatch(step2, /Ultracode|max effort/, 'registering an Envelope is not an Ultracode-only rule');
 });
 
+test('ARC-11-C141 — §1 keys on the session-start Integrity line: restored continues, cannot restore delivers nothing', () => {
+  // The owner's sentence, as the architect relayed it (2026-10-14). The hook prints "Integrity: restored — …" or
+  // "Integrity: cannot restore — …"; this is the rule that reads those two words, beside the licence's.
+  // Asserted around the launcher's name, which this file does not spell (the launcher audit, ARC-07-C35b).
+  const line = doc.split('\n').find((l) => l.startsWith('- **A licence gates deliverables.**')) ?? '';
+  const rule = 'An `Integrity:` line: restored → tell the user and continue; cannot restore → no deliverable, point to `';
+  assert.ok(line.includes(rule), `§1's licence rule does not read the Integrity line:\n${line}`);
+  assert.match(line.slice(line.indexOf(rule) + rule.length), /^\S+ doctor`\.$/, 'the cannot-restore remedy is not the doctor');
+});
+
 test('criterion 7 — every repository path it names resolves', () => {
   const skipped = [];
   const dead = [];

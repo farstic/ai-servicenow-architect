@@ -1,13 +1,14 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { execFileSync } from 'node:child_process';
-import { generateKeyPairSync, sign } from 'node:crypto';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canonicalJson, fingerprint, LICENCE_FORMAT, LIST_FORMAT, type ProductKey } from '../../src/licence/core.js';
 import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
+import { COVERAGE, MANIFEST_FORMAT } from '../../src/licence/integrity.js';
 
 /**
  * ARC-11-C1 — keys, licences and lists made by the test that uses them. None is ever committed: the
@@ -37,7 +38,7 @@ export const licence = (over: Record<string, unknown> = {}): Record<string, unkn
   valid_until: fromToday(365), issuer: 'Test Issuer', notes: '', ...over,
 });
 
-function signed(format: string, field: 'licence' | 'list', body: unknown, key: Pair): string {
+function signed(format: string, field: 'licence' | 'list' | 'manifest', body: unknown, key: Pair): string {
   const value = sign(null, Buffer.from(canonicalJson(body), 'utf8'), key.privateKey).toString('base64');
   return `${JSON.stringify({ format, [field]: body, signature: { alg: 'Ed25519', key: fingerprint(key.publicKey), value } }, null, 2)}\n`;
 }
@@ -92,4 +93,45 @@ export function listRepo(files: Record<string, string> | null): string {
     git(['-C', work, 'push', '-q', bare, 'main']);
   }
   return pathToFileURL(bare).href;
+}
+
+/**
+ * ARC-11-C141 — an engine checkout at a release, tagged, its signed manifest held: what a user has after an install.
+ * The manifest hashes the bytes written here, which are the bytes the tag holds (`.gitattributes` is the repository's
+ * own), so a fresh checkout verifies. `cache: false` leaves no manifest held; `key` signs it.
+ */
+export function releaseCheckout({ version = '9.1.0', key, cache = true }: { version?: string; key: Pair; cache?: boolean }): string {
+  const root = fixtureDir('snowarch-integrity-');
+  const files: Record<string, string> = {
+    'package.json': `${JSON.stringify({ name: 'f', version })}\n`,
+    'engine.config.json': '{}\n',
+    'CLAUDE.md': '# signed\n',
+    'tools/snowarch/bin/snowarch.mjs': 'export {};\n',
+    '.claude/skills/s/SKILL.md': 'signed skill\n',
+  };
+  for (const [rel, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), text);
+  }
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
+  cpSync(join(repo, '.gitattributes'), join(root, '.gitattributes'));
+  const git = (args: string[]): string => execFileSync('git', ['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', ...args],
+    { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();
+  const tag = `v${version}`;
+  git(['init', '-q', '-b', 'main']);
+  git(['add', '-A']);
+  git(['commit', '-qm', 'the release']);
+  git(['tag', '-a', tag, '-m', tag]);
+  if (cache) {
+    const covered = Object.keys(files).filter((p) => p !== 'package.json' || COVERAGE.covers.includes('package.json'));
+    const manifest = {
+      tag, commit: git(['rev-parse', 'HEAD']), covers: [...COVERAGE.covers], excludes: [...COVERAGE.excludes],
+      ignores: [...COVERAGE.ignores],
+      files: Object.fromEntries(covered.map((p) => [p, createHash('sha256').update(files[p]).digest('hex')])),
+    };
+    mkdirSync(join(root, '.local'), { recursive: true });
+    writeFileSync(join(root, '.local', 'release-manifest.json'), `${JSON.stringify({ tag, checkedAt: '2026-10-14T12:00:00.000Z',
+      source: 'fixture', doc: JSON.parse(signed(MANIFEST_FORMAT, 'manifest', manifest, key)) }, null, 2)}\n`);
+  }
+  return root;
 }

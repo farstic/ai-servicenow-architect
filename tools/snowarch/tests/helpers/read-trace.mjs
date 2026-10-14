@@ -29,5 +29,25 @@ if (out) {
   process.on('exit', () => write(out, `${seen.join('\n')}\n`));
 }
 
+/**
+ * ARC-11-C141 — and every path it `stat`s, to a file of its own (`SNOWARCH_TEST_STAT_TRACE`), for a test that counts
+ * them: the hook's stat key stats each covered file instead of reading it. Kept apart from the reads, so no case that
+ * asks "was this read" can be answered by a `stat`.
+ */
+const statOut = process.env.SNOWARCH_TEST_STAT_TRACE;
+if (statOut) {
+  const statted = [];
+  for (const name of ['statSync', 'lstatSync']) {
+    const original = fs[name];
+    fs[name] = function traced(path, ...rest) {
+      if (typeof path === 'string' || path instanceof URL) statted.push(String(path));
+      return original.call(this, path, ...rest);
+    };
+  }
+  syncBuiltinESMExports();
+  const write = fs.writeFileSync;
+  process.on('exit', () => write(statOut, `${statted.join('\n')}\n`));
+}
+
 /** The `--import` flag that preloads this file, for `NODE_OPTIONS`. */
 export const readTraceImport = () => `--import=${new URL(import.meta.url).href}`;
