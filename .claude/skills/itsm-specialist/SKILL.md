@@ -240,7 +240,7 @@ A notification on assignment, on reopening or on auto-closure is not documented 
 
 **Baseline workbench:** the MIM Workbench is the UI surface for active MIMs — accessible via the Service Operations Workspace.
 
-**Baseline notifications:** "Major Incident Proposed", "Major Incident Accepted", "Major Incident Communication".
+**Baseline notifications:** stakeholders are kept informed through communication plans, defined by the incident's type or priority or by the target audience, and the communication tasks within them *(citation: `markdown/it-service-management/incident-management/major-incident-management-process.md`)*; the link in a major incident email notification can open the record in Service Operations Workspace *(citation: `markdown/it-service-management/incident-management/email-notif-redirt-inci-major-inci.md`)*. The name of each major incident notification is not documented in the bundled corpus — verify on the instance.
 
 *Citation:* `markdown/it-service-management/incident-management/major-incident-overview.md`
 
