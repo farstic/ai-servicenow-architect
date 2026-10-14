@@ -55,6 +55,8 @@ export function plannedSteps(ctx) {
 
 const runs = (step, ctx) => step.runsWhen(ctx) !== false;
 const cacheableOf = (step) => step.cacheable !== false;
+/** ARC-09-C140 — does the step say its output is gone? Today only B01 declares `outputMissing`; a step without it is never forced. */
+export const outputMissingOf = (step, ctx) => typeof step.outputMissing === 'function' && step.outputMissing(ctx) === true;
 
 /**
  * End a child and everything it started.
@@ -132,8 +134,10 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
     // against, so a step that ran without recording its inputs would re-run for ever.
     const hash = cacheableOf(step) ? hashOf(step, ctx) : null;
     const forced = fromIndex !== -1 && i >= fromIndex;
+    // ARC-09-C140 — and a step whose OUTPUT is gone runs, whatever its inputs say: B01's signed manifest, which an
+    // upgrade from before 2.1 never fetched. Asked last, so a step already re-running costs nothing more.
     const cached = cacheableOf(step) && !forced
-      && recorded?.status === 'ok' && recorded.inputsHash === hash;
+      && recorded?.status === 'ok' && recorded.inputsHash === hash && !outputMissingOf(step, ctx);
 
     if (cached) {
       summary.cached += 1;

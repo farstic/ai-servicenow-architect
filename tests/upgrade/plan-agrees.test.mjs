@@ -176,6 +176,27 @@ test('a step whose last run did not finish is in the plan', { timeout: 120_000 }
   assert.equal(b05.why, 'last run interrupted');
 });
 
+test('ARC-09-C140 — B01 is in the plan when its release manifest is not held, and not when U5 will write it', { timeout: 120_000 }, (t) => {
+  // The target is a release, 9.9.9, whose config names the manifests (this repository's own revocations repository),
+  // and this checkout's `.local/` holds no manifest: the runner would run B01 for it, whatever its inputs say.
+  const root = clone(t, { change: (dir) => {
+    const p = join(dir, 'package.json');
+    writeFileSync(p, `${JSON.stringify({ ...JSON.parse(readFileSync(p, 'utf8')), version: '9.9.9' }, null, 2)}\n`);
+  } });
+  const ctx = ctxFor(root);
+  checkoutTag(root, 'v9.9.9-target');
+  recordCurrent(root, ctx);
+  const state = JSON.parse(readFileSync(join(root, '.local', 'bootstrap-state.json'), 'utf8'));
+
+  // A pull on a branch writes no manifest at U5, so B01 runs at U6 and the plan says so, with the reason.
+  const pulled = planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync, manifestWritten: false });
+  assert.deepEqual(pulled.steps.map((s) => [s.step, s.why]), [['B01', 'the release manifest is not held']]);
+  // A move by checkout writes the target's verified manifest at U5, so U6 finds B01's output there and caches it.
+  const checkedOut = planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync, manifestWritten: true });
+  assert.deepEqual(checkedOut.steps.map((s) => s.step), [],
+    `U5 writes the manifest, yet the plan promises to re-run ${checkedOut.steps.map((s) => s.step).join(', ')}`);
+});
+
 test('the plan says so when it could not make the runner\'s comparison', { timeout: 120_000 }, (t) => {
   // A tag that cannot be checked out means no worktree and no hash. The answer is the file diff,
   // and the plan must SAY it is an estimate rather than print a different computation under the
