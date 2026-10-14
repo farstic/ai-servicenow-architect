@@ -376,7 +376,13 @@ function createTag({ root, version, tagMessage, sign = false }) {
   }
 }
 
-const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
-if (isMain) {
-  release({ argv: process.argv.slice(2) }).then((code) => process.exit(code));
+/**
+ * The script's own exit: run the release, then end the process with its code. Exported (ARC-09-C139) so a case can run
+ * this exact path in a child whose stderr is a real pipe, which is where a release's output is read in CI.
+ */
+export function main(argv = process.argv.slice(2), options = {}) {
+  return release({ argv, ...options }).then((code) => process.exit(code));
 }
+
+const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+if (isMain) main();

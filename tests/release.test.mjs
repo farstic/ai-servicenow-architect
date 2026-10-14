@@ -15,11 +15,11 @@
 // script runs where it will be run.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { release } from '../scripts/release.mjs';
 import { allowedCloneTags, cloneTagsIn } from './lib/install-tag.mjs';
@@ -1083,6 +1083,46 @@ test('C70 — a passing gate is not silenced by the capture', () => {
   // Capturing replaced `stdio: 'inherit'`, so a passing gate's log has to be written through rather
   // than swallowed — it arrives at once instead of streaming, which for a CI log is the same thing.
   assert.match(said.join(''), /up to date/);
+});
+
+// ── ARC-09-C139 — a failing gate's output reaches the log before the release exits ─────────────────────────────
+
+/**
+ * ARC-09-C139 (C129's defect, built). `makeGateRunner` writes a gate's whole captured output to stderr in one write, and
+ * the script then exited with `process.exit`. On POSIX, stderr to a pipe is written asynchronously, so the unflushed
+ * tail was dropped: CI's release dry run on #437 stopped 101,650 bytes into the test gate's output, at
+ * "# Subtest: criterion 7 — ", with no `not ok` and no "release: gate failed" line. A file or a terminal is written
+ * synchronously, which is why a run by hand never showed it.
+ *
+ * The case runs the SCRIPT'S OWN EXIT, `main()`, in a child whose stderr is a real pipe. The real gate runner is used,
+ * with only its spawn replaced: the test gate prints 2 MB and a planted `not ok`, and fails.
+ */
+test('ARC-09-C139 — under a pipe, a failing gate\'s whole output reaches the log, and the gate-failed line is last', (t) => {
+  const root = fixture(t);
+  const child = join(tempDir('snowarch-c139-', t), 'child.mjs');
+  const url = (rel) => JSON.stringify(pathToFileURL(join(REAL_ROOT, rel)).href);
+  writeFileSync(child, [
+    `import { main } from ${url('scripts/release.mjs')};`,
+    `import { makeGateRunner } from ${url('scripts/lib/release/gates.mjs')};`,
+    'const root = process.argv[2];',
+    "const filler = 'ok - a passing line of the planted gate\\n'.repeat(50000);",
+    "const spawn = (file, args) => (file === 'npm' && args[0] === 'test'",
+    "  ? { status: 1, stdout: `${filler}not ok 1 - the planted failure\\n`, stderr: '' }",
+    "  : { status: 0, stdout: '', stderr: '' });",
+    "await main(['2.0.0', '--dry-run', '--offline', '--no-install'],",
+    "  { root, platform: 'linux', run: makeGateRunner({ root, platform: 'linux', err: process.stderr, spawn }) });",
+    '',
+  ].join('\n'));
+  // `encoding` and a large buffer: the PARENT must hold everything, so a short read is the child's loss, not ours.
+  const r = spawnSync(process.execPath, [child, root], { encoding: 'utf8', maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'pipe'] });
+  const lines = r.stderr.split('\n').filter(Boolean);
+  t.diagnostic(`stderr ${r.stderr.length} chars, ${lines.length} lines; last: ${lines.at(-1)}`);
+  assert.equal(r.status, 1, `the release did not exit with the gate's failure:\n${lines.slice(-3).join('\n')}`);
+  assert.equal(lines.filter((l) => l === 'ok - a passing line of the planted gate').length, 50000,
+    'the gate\'s output was cut on the way out');
+  assert.ok(lines.includes('not ok 1 - the planted failure'), `the planted not ok never reached the log; it ends:\n${lines.slice(-2).join('\n')}`);
+  assert.equal(lines.at(-1), 'release: gate failed: test (exit 1) — nothing was written',
+    'the gate-failed line is not the last thing in the log');
 });
 
 test('ARC-09-C71 — every `release()` call in this file pins a platform', async () => {
