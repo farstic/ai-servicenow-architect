@@ -47,7 +47,18 @@ const git = (dir, args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8
  */
 export const FIXTURE_VERSION = '0.0.0-dev';
 
+/**
+ * The file that holds the version of record. Named once, here, so a banner test asserts the product reads it without
+ * spelling it: `tests/doctor/fixture-version.test.mjs` holds that no banner test names it at all (ARC-09-C137).
+ */
+export const VERSION_OF_RECORD = 'package.json';
+
 export const readJson = (root, rel) => JSON.parse(readFileSync(join(root, rel), 'utf8'));
+
+/** A hand-built world's version of record: the checkout's package.json, carrying the fixture's version (ARC-09-C137). */
+export function writeFixturePackage(root) {
+  writeJson(root, VERSION_OF_RECORD, { ...readJson(REAL_ROOT, VERSION_OF_RECORD), version: FIXTURE_VERSION });
+}
 export const writeJson = (root, rel, value) => {
   mkdirSync(dirname(join(root, rel)), { recursive: true });
   writeFileSync(join(root, rel), `${JSON.stringify(value, null, 2)}\n`);

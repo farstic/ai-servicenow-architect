@@ -200,11 +200,19 @@ test('E-10 warns about the bootstrap\'s own disableAllHooks, and leaves the user
   assert.equal(warned.status, 'warn');
   assert.match(warned.detail, /Node is present now/);
 
-  // The same key, set by the user: their choice, reported as an ordinary pass.
+  // The same key, set by the user. ARC-11-C10 (the architect's ruling, 2026-10-14): with node on PATH it costs the
+  // session its Licence: line, so it FAILs — no fixer takes the user's key. On a machine without node it is still
+  // the supported hook-free choice (ARC-06-S05), reported as an ordinary pass.
   const byUser = copyTree(t, greenTree(t));
   const l2 = readJson(byUser, '.claude/settings.local.json');
   writeJson(byUser, '.claude/settings.local.json', { ...l2, disableAllHooks: true });
-  const okResult = await run('E-10', byUser);
+  const failed = await run('E-10', byUser);
+  assert.equal(failed.status, 'fail');
+  assert.equal(failed.data.fix, null);
+  const env = { ...process.env };
+  for (const k of Object.keys(env)) if (k.toLowerCase() === 'path') delete env[k];
+  env.PATH = copyTree(t, greenTree(t)); // a directory with no node in it
+  const okResult = await run('E-10', byUser, { env });
   assert.equal(okResult.status, 'ok');
   assert.match(okResult.detail, /by choice/);
 });
