@@ -299,6 +299,24 @@ export function releaseTagOf(root) {
 }
 
 /**
+ * What the cache holds for `tag`, the one reading of it (ARC-09-C140): E-32's verdict starts here, and B01's
+ * `outputMissing` asks the same question, so the two cannot disagree about a cache. Offline; nothing is fetched.
+ *
+ *   missing   no cache, or a file that is not one;
+ *   invalid   the cached manifest does not verify (`reason`);
+ *   other     it verifies and is another release's (`manifestTag`);
+ *   held      it verifies and is `tag`'s (`manifest`).
+ */
+export function cachedManifest(root, tag, { keys = PRODUCT_KEYS } = {}) {
+  const cache = readManifestCache(root);
+  if (!cache) return { state: 'missing' };
+  const read = readManifest(cache.doc, { keys });
+  if (!read.ok) return { state: 'invalid', reason: read.reason };
+  if (read.manifest.tag !== tag) return { state: 'other', manifestTag: read.manifest.tag };
+  return { state: 'held', manifest: read.manifest };
+}
+
+/**
  * This checkout against its release's signed manifest, read from the cache: `{ state, version, tag, … }`.
  *
  *   dev       a development version, which no manifest is signed for;
@@ -316,12 +334,11 @@ export function integrityStatus(root, { keys = PRODUCT_KEYS, commitOf = tagCommi
   if (typeof version !== 'string' || version === '') return { state: 'invalid', version: null, reason: 'package.json names no version' };
   if (isDevVersion(version)) return { state: 'dev', version };
   const tag = `v${version}`;
-  const cache = readManifestCache(root);
-  if (!cache) return { state: 'missing', version, tag };
-  const read = readManifest(cache.doc, { keys });
-  if (!read.ok) return { state: 'invalid', version, tag, reason: read.reason };
-  const m = read.manifest;
-  if (m.tag !== tag) return { state: 'other', version, tag, manifestTag: m.tag };
+  const held = cachedManifest(root, tag, { keys });
+  if (held.state === 'missing') return { state: 'missing', version, tag };
+  if (held.state === 'invalid') return { state: 'invalid', version, tag, reason: held.reason };
+  if (held.state === 'other') return { state: 'other', version, tag, manifestTag: held.manifestTag };
+  const m = held.manifest;
   const local = commitOf(root, tag);
   if (local !== null && local !== m.commit) {
     return { state: 'other', version, tag, manifestTag: m.tag, manifestCommit: m.commit, localCommit: local };

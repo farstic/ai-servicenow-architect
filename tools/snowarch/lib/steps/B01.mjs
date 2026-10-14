@@ -13,9 +13,9 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { localDir } from '../local-paths.mjs';
-import { manifestSays, refreshManifest } from '../licence/fetch.mjs';
+import { manifestSays, manifestSource, refreshManifest } from '../licence/fetch.mjs';
 import { PRODUCT_KEYS } from '../licence/keys.mjs';
-import { releaseTagOf } from '../licence/manifest.mjs';
+import { cachedManifest, releaseTagOf } from '../licence/manifest.mjs';
 import { cloudSyncWarning } from '../cloud-sync.mjs';
 import { checkMcpJson, checkSettingsJson } from '../registration.mjs';
 import { FILE, TEXT } from './inputs.mjs';
@@ -29,6 +29,21 @@ export const runsWhen = () => true;
 // inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
 // set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
 export const inputs = INPUTS.B01.resolve;
+
+/**
+ * ARC-09-C140 — B01 RUNS WHENEVER ITS MANIFEST IS NOT HELD, whatever its inputs say: on a release tree whose config
+ * names the manifests, when the cache holds no manifest that verifies and is this release's. The owner's upgrade from
+ * 2.0.13 printed `[B01/09] workspace … ok (cached)` at U6 and then E-32 FAIL, because nothing had fetched the
+ * manifest: U4 was 2.0.13's code, and B01's inputs had not moved. The cache is B01's OUTPUT, not one of its inputs —
+ * hashed, it would read "wanted" before every fetch that made it "held", and B01 would run again on the next bootstrap.
+ *
+ * The cache is read the way E-32 reads it (`cachedManifest`), offline. `licenceKeys` is the seam `run` has.
+ */
+export function outputMissing(ctx) {
+  const tag = releaseTagOf(ctx.root);
+  if (!tag || !manifestSource(ctx.config)) return false;
+  return cachedManifest(ctx.root, tag, { keys: ctx.licenceKeys ?? PRODUCT_KEYS }).state !== 'held';
+}
 
 export const REGISTRATION_REMEDY =
   'run: git checkout -- .mcp.json   (never edit this file; per-machine values belong in '
