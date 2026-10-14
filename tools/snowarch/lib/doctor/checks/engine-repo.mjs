@@ -22,6 +22,7 @@ import { spellings } from '../../text.mjs';
 import { defineCheck } from '../registry.mjs';
 import { projectEntryEnabled } from '../../settings-local.mjs';
 import { RUNNING_STEP_ENV } from '../../spawn-env.mjs';
+import { which } from '../../which.mjs';
 
 import { credentialKeys, credentialLines, CREDENTIAL_EXT } from './credential-shape.mjs';
 import { fail, ok, skip, warn } from './result.mjs';
@@ -131,25 +132,33 @@ export function configProblems(config, root) {
  * variant B). A check that looked for it in the committed file would fail every correct install.
  *
  * The shape is that writer's: ONE `command` string, `${CLAUDE_PROJECT_DIR}`-relative, `timeout: 10`.
- * @returns {{problems: string[], present: boolean}}
+ *
+ * ARC-11-C10 — what is wrong is told apart from where the cure is: `entry` holds the problems the entry itself has,
+ * which B07's writer rewrites (`doctor --fix`); `scriptMissing` is the tracked file gone, which no rewrite brings
+ * back. `problems` is both, as E-08 reports them.
+ * @returns {{problems: string[], entry: string[], scriptMissing: boolean, present: boolean}}
  */
 export function sessionStartProblems(local, root) {
-  const problems = [];
+  const entry = [];
+  let scriptMissing = false;
   const entries = local?.hooks?.SessionStart;
   const hooks = (Array.isArray(entries) ? entries : []).flatMap((e) => e.hooks ?? []);
   const hook = hooks.find((h) => /session-start\.mjs/.test(String(h?.command ?? '')));
-  if (!hook) return { problems, present: false };
+  if (!hook) return { problems: [], entry, scriptMissing, present: false };
   const command = String(hook.command ?? '');
-  if (!/^node\s/.test(command)) problems.push(`SessionStart does not run node (${command})`);
-  if (!/tools\/snowarch\/hooks\/session-start\.mjs$/.test(command)) {
-    problems.push(`SessionStart does not run tools/snowarch/hooks/session-start.mjs (${command})`);
+  if (!/^node\s/.test(command)) entry.push(`SessionStart does not run node (${command})`);
+  // B07 writes the path ${CLAUDE_PROJECT_DIR}-relative, so the entry follows the checkout wherever it moves; an
+  // absolute path to another checkout's script, or a script elsewhere in this one, is a hook at a wrong path.
+  if (!/\$\{CLAUDE_PROJECT_DIR\}\/tools\/snowarch\/hooks\/session-start\.mjs$/.test(command)) {
+    entry.push(`SessionStart does not run \${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs (${command})`);
   } else if (!existsSync(join(root, 'tools', 'snowarch', 'hooks', 'session-start.mjs'))) {
-    problems.push('tools/snowarch/hooks/session-start.mjs is not on disk');
+    scriptMissing = true;
   }
   if (!(Number(hook.timeout) <= 10)) {
-    problems.push(`SessionStart timeout is ${hook.timeout}, which is more than 10 s`);
+    entry.push(`SessionStart timeout is ${hook.timeout}, which is more than 10 s`);
   }
-  return { problems, present: true };
+  const problems = [...entry, ...(scriptMissing ? ['tools/snowarch/hooks/session-start.mjs is not on disk'] : [])];
+  return { problems, entry, scriptMissing, present: true };
 }
 
 /**
@@ -343,21 +352,34 @@ export function engineRepoChecks() {
           });
         }
         if (!settings?.env?.MCP_TIMEOUT) problems.push('env.MCP_TIMEOUT is absent');
-        // The hook's own file. Its ABSENCE is E-10's finding ("not bootstrapped"), not this one's
-        // — but a hook that is there and wrong is this one's, because nothing else looks at it.
+        // The hook's own file. Its ABSENCE is E-10's finding (ARC-11-C10: E-10 FAILs it when node is on PATH) —
+        // but a hook that is there and wrong is this one's reading too.
         let local = null;
         try { local = readJson(ctx.root, SETTINGS_LOCAL); } catch { local = null; }
         const hook = sessionStartProblems(local, ctx.root);
+        const settingsWrong = problems.length > 0;
         problems.push(...hook.problems);
-        return problems.length === 0
-          ? ok(`MCP_TIMEOUT ${settings.env.MCP_TIMEOUT} · SessionStart hook `
-            + `${hook.present ? 'present' : 'not installed (see E-10)'}`,
-            { unmodified: true, mcpTimeout: settings.env.MCP_TIMEOUT, hook: hook.present })
-          : fail(problems.join('; '), {
-            remedy: 'git checkout -- .claude/settings.json',
-            command: 'git checkout -- .claude/settings.json',
-            data: { problems, unmodified },
-          });
+        if (problems.length === 0) {
+          return ok(`MCP_TIMEOUT ${settings.env.MCP_TIMEOUT} · SessionStart hook `
+            + `${hook.present ? 'present' : 'not installed'}`,
+            { unmodified: true, mcpTimeout: settings.env.MCP_TIMEOUT, hook: hook.present });
+        }
+        // ARC-11-C10 — each cure for its own file. settings.json is checked out; the hook entry lives in
+        // settings.local.json and is rewritten by E-10's fix; the hook script is a tracked file, checked out
+        // like any other, and on a release tree E-32 names it as missing too.
+        const SCRIPT = 'tools/snowarch/hooks/session-start.mjs';
+        const cures = [
+          ...(settingsWrong ? ['git checkout -- .claude/settings.json'] : []),
+          ...(hook.scriptMissing ? [`git checkout -- ${SCRIPT} (on a release tree E-32 names it as missing too)`] : []),
+          ...(hook.entry.length > 0 ? [`${cliOf(ctx)} doctor --fix`] : []),
+        ];
+        const command = settingsWrong ? 'git checkout -- .claude/settings.json'
+          : hook.scriptMissing ? `git checkout -- ${SCRIPT}` : `${cliOf(ctx)} doctor --fix`;
+        return fail(problems.join('; '), {
+          remedy: cures.join('; then '),
+          command,
+          data: { problems, unmodified },
+        });
       },
     }),
 
@@ -444,9 +466,11 @@ export function engineRepoChecks() {
         }
         let settings;
         try { settings = readJson(ctx.root, SETTINGS_LOCAL); } catch (e) {
+          // ARC-11-C10 — the fix is planned so that `--fix` SAYS why it touches nothing: F6's writer refuses a file
+          // that does not parse, with its own reason, and the file is left as it is.
           return fail(`.claude/settings.local.json is not valid JSON — ${e.message}`, {
             remedy: `fix the JSON, then ${cliOf(ctx)} mode design or ${cliOf(ctx)} mode live`,
-            data: { mode: state?.mode ?? null },
+            data: { mode: state?.mode ?? null, fix: { kind: 'toggles-mismatch', mode: state?.mode ?? 'design' } },
           });
         }
         const serverKey = ctx.config.mcp.serverKey;
@@ -470,13 +494,43 @@ export function engineRepoChecks() {
         // it when Node was absent; that reason expires the moment Node appears, so it is a WARN
         // with a fix. A user who set it themselves is exercising a supported choice, and telling
         // them off for it would be the doctor overruling its operator.
+        // ARC-11-C10 — "Node present" is what the hook needs: `node` on PATH, as bootstrap.sh decides it
+        // (`command -v node`). The doctor itself always runs under some Node, so the process is no answer.
+        const nodeOnPath = which('node', { env: ctx.env, platform: ctx.platform }) !== null;
         if (settings.disableAllHooks === true) {
-          return state?.hooksDisabledByBootstrap === true
-            ? warn('hooks were disabled when Node was absent; Node is present now', {
+          if (state?.hooksDisabledByBootstrap === true) {
+            return warn('hooks were disabled when Node was absent; Node is present now', {
               remedy: 'remove "disableAllHooks" from .claude/settings.local.json',
               data: { ...data, fix: { kind: 'hooks-disabled-by-bootstrap' } },
+            });
+          }
+          // The user's own key, and no fixer takes it. With node on PATH it costs the session its Licence: line,
+          // which is the same gap as no hook at all; without node it is the supported hook-free state (ARC-06-S05).
+          return nodeOnPath
+            ? fail('disableAllHooks is set, so the SessionStart hook cannot print the Licence: line', {
+              remedy: 'remove "disableAllHooks" from .claude/settings.local.json',
+              data: { ...data, fix: null },
             })
             : ok(`${mode ?? 'design'} · hooks disabled by choice (disableAllHooks)`, data);
+        }
+        // ARC-11-C10 — the hook prints the Licence: line CLAUDE.md's licence rule reads. With node on PATH, no hook
+        // is a FAIL and a wrong one too, each rewritten by B07's writer under `doctor --fix`; a missing hook SCRIPT is
+        // E-08's, because no rewrite of the entry brings a tracked file back.
+        if (nodeOnPath) {
+          const hook = sessionStartProblems(settings, ctx.root);
+          if (!hook.present) {
+            return fail('.claude/settings.local.json has no SessionStart hook, so a session starts without its '
+              + 'Licence: line', {
+              remedy: `${cliOf(ctx)} doctor --fix (or re-run the bootstrap)`,
+              data: { ...data, fix: { kind: 'hook-absent' } },
+            });
+          }
+          if (hook.entry.length > 0) {
+            return fail(hook.entry.join('; '), {
+              remedy: `${cliOf(ctx)} doctor --fix (or re-run the bootstrap)`,
+              data: { ...data, fix: { kind: 'hook-wrong' } },
+            });
+          }
         }
         // The ok line SAYS WHY when "live" and "disabled" appear together, because that pair reads
         // as a contradiction to anybody who has just been told the mode is live.

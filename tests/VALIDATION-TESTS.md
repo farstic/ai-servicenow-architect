@@ -1748,12 +1748,15 @@ gateway named CSM as co-firing and deferred its Envelope.
 3. Two five-part Envelopes are written in the turn, then one reconciliation. It names the shared constructs once
    and states each layer's owner, and any one Verdict C halts both.
    Each Envelope cites as a single-gateway turn does: `(citation: markdown/<area>/<page>.md)`, never a bare file name.
-4. The verdict is B, as on rc.1.
+4. The verdicts: FSO B, as on rc.1; CSM A or B, with the construct named and cited — for A the baseline
+   construct that covers the need, for B the one it extends (ARC-02-C13).
 
 ### Pass criteria
 
 - Each co-firing gateway's skill is loaded in the one turn, by a `Skill` invocation or a Read of its `SKILL.md` (the harness counts both); a gateway with neither fails. Two five-part Envelopes are written, and reconciled once.
 - As in a single-gateway turn, every baseline claim in each Envelope is cited `(citation: markdown/<area>/<page>.md)`; a bare file name fails.
+- FSO B; CSM A or B with the construct named and cited, in Part 3 of each Envelope. A CSM letter with no construct
+  named fails, whichever letter it is.
 - The wall time is recorded beside rc.1's 1 min 07 s for the same prompt.
 
 ### Fail signals

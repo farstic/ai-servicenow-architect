@@ -18,11 +18,17 @@ test('ARC-09-C137 — a green tree carries the fixture version, a dev one, whate
   assert.equal(readJson(greenTree(t), 'package.json').version, FIXTURE_VERSION);
 });
 
-test('ARC-09-C137 — no banner test reads the checkout\'s own package.json', () => {
+test('ARC-09-C137 — no banner test names package.json: the fixture helper builds the version of record', () => {
+  // WIDENED in ARC-11-C10's PR. The first form matched `REAL_ROOT…package.json` only, which was the read its own
+  // control planted; the architect's control C read the file through `new URL('../../package.json', import.meta.url)`
+  // and stayed green. So any occurrence of the name in a banner test is a finding: a world takes its version from
+  // `greenTree`, `releaseTree` or `writeFixturePackage`, and an assertion names the file through VERSION_OF_RECORD.
+  const SELF = 'tests/doctor/fixture-version.test.mjs';
   const files = execFileSync('git', ['ls-files', 'tests', 'tools/snowarch/tests'], { cwd: REAL_ROOT, encoding: 'utf8' })
-    .trim().split('\n').filter((f) => f.endsWith('.test.mjs'));
-  const banner = files.filter((f) => /hooks\/session-start\.mjs|integrityNudge/.test(readFileSync(join(REAL_ROOT, f), 'utf8')));
+    .trim().split('\n').filter((f) => f.endsWith('.test.mjs') && f !== SELF);
+  const text = (f) => readFileSync(join(REAL_ROOT, f), 'utf8');
+  const banner = files.filter((f) => /hooks\/session-start\.mjs|integrityNudge/.test(text(f)));
   assert.ok(banner.length >= 4, `the sweep found ${banner.length} banner test(s) — it read nothing`);
-  const reads = banner.filter((f) => /REAL_ROOT[^\n]{0,40}package\.json/.test(readFileSync(join(REAL_ROOT, f), 'utf8')));
-  assert.deepEqual(reads, [], 'a banner test reads the checkout\'s package.json; build the world from FIXTURE_VERSION');
+  const named = banner.filter((f) => text(f).includes('package.json'));
+  assert.deepEqual(named, [], 'a banner test names package.json; take the version from the fixture helper');
 });

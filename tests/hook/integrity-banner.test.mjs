@@ -17,7 +17,7 @@ import { COVERAGE, isCovered, manifestFromArchive, signManifest, writeManifestCa
 import { licenceFixture, licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { readTraceImport } from '../../tools/snowarch/tests/helpers/read-trace.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
-import { LINKED, REAL_ROOT, linkInstall, readJson, releaseTree } from '../doctor/helpers/tree.mjs';
+import { LINKED, REAL_ROOT, VERSION_OF_RECORD, linkInstall, readJson, releaseTree } from '../doctor/helpers/tree.mjs';
 
 const SENTINEL = 'tools/snowarch/e32-sentinel.txt';
 const STDIN = '{"hook_event_name":"SessionStart","source":"startup"}';
@@ -41,7 +41,7 @@ test('ARC-11-C7 — the hook re-runs the quick doctor without E-32, so it reads 
   assert.match(r.stderr, /banner-phases: path=rerun /, 'the hook re-ran the quick doctor');
 
   const reads = readFileSync(trace, 'utf8').split('\n').filter(Boolean);
-  assert.ok(reads.some((p) => p.endsWith('package.json')) && reads.length > 20, `the trace saw ${reads.length} reads`);
+  assert.ok(reads.some((p) => p.endsWith(VERSION_OF_RECORD)) && reads.length > 20, `the trace saw ${reads.length} reads`);
   assert.deepEqual(reads.filter((p) => p.replace(/\\/g, '/').endsWith(SENTINEL)), [], 'the hook read a file only E-32 reads');
 });
 

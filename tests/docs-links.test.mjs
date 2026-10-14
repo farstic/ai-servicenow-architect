@@ -43,6 +43,9 @@ const DOCS = ['docs/CONTRIBUTING.md', 'docs/INSTALL.md', 'docs/ARCHITECTURE.md',
   // listed rather than exempted: an exemption says "this page may be wrong", and none of them may.
   'docs/CLIENT-ONBOARDING.md', 'docs/MODES-AND-PRESETS.md', 'docs/PLATFORM-NOTES.md',
   'docs/TROUBLESHOOTING.md',
+  // ARC-11-C8's deferral. The owner's manual path after a key compromise: its fences are the commands
+  // that make the new keys and reissue the licences, and a reader runs them on the worst day of all.
+  'docs/KEY-COMPROMISE.md',
   // ARC-09-C25. The COMPOSED copy, resolved from the repository root — the one place the link
   // defect could exist, and the one this file could not see. `README.md` is `docs/INSTALL.md`'s
   // body at a different depth, so a link that is correct in the source is wrong here unless the

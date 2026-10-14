@@ -25,7 +25,7 @@ import { spellFor } from './spell.mjs';
 /** The `data.fix.kind` vocabulary. A kind outside this table is never applied — it is reported. */
 export const KINDS = Object.freeze(['deps-missing', 'corpus-missing', 'sparse-mismatch',
   'head-off-pin', 'flags-incomplete', 'store-mode', 'toggles-mismatch',
-  'hooks-disabled-by-bootstrap', 'cache-stale']);
+  'hooks-disabled-by-bootstrap', 'hook-absent', 'hook-wrong', 'cache-stale']);
 
 /** The one place that says which file a repair is allowed to touch, for the report and the test. */
 export const TARGETS = Object.freeze({
@@ -37,6 +37,8 @@ export const TARGETS = Object.freeze({
   'store-mode': '.local/',
   'toggles-mismatch': '.claude/settings.local.json',
   'hooks-disabled-by-bootstrap': '.claude/settings.local.json',
+  'hook-absent': '.claude/settings.local.json',
+  'hook-wrong': '.claude/settings.local.json',
   'cache-stale': '.local/doctor-last.json',
 });
 
@@ -247,6 +249,10 @@ export const FIXERS = Object.freeze([
   { id: 'F6', kind: 'toggles-mismatch', title: 'rewrite the mode toggles', apply: fixToggles },
   { id: 'F6', kind: 'hooks-disabled-by-bootstrap', title: 'remove the bootstrap\'s hook toggle',
     apply: fixToggles },
+  // ARC-11-C10 — the SessionStart hook, through the same merge writer: with node present it writes B07's entry,
+  // replacing a wrong one, and it refuses a file that is not gitignored or does not parse, with its own reason.
+  { id: 'F6', kind: 'hook-absent', title: 'register the SessionStart hook', apply: fixToggles },
+  { id: 'F6', kind: 'hook-wrong', title: 'rewrite the SessionStart hook', apply: fixToggles },
   { id: 'F7', kind: 'cache-stale', title: 'clear the stale doctor cache', apply: fixCache },
 ]);
 
