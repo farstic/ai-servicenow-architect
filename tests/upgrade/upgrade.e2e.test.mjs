@@ -21,7 +21,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
-import { bootstrapUser, buildEnforcementWorld, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
+import { manifestFromArchive, signManifest, writeManifestCache } from '../../tools/snowarch/lib/licence/manifest.mjs';
+import { licenceFixture } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
+import { bootstrapUser, buildEnforcementWorld, buildManifestWorld, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
 
 const isWindows = process.platform === 'win32';
 const MINUTES = 10 * 60 * 1000;
@@ -477,3 +479,128 @@ test('ARC-11-C7 — a covered directory with a file the release does not ship st
   assert.match(r.text, /upgrade: the tree at v9\.1\.0 is not what its signed manifest records — 1 file differs, the first \.claude\/skills\/mine\/SKILL\.md \(extra\); the upgrade stops before the bootstrap — return with: git checkout /);
   assert.doesNotMatch(r.text, /\[U6\/7\]/, 'the bootstrap ran on a tree that is not the release');
 }, MINUTES);
+
+// ── ARC-09-C140 — B01 fetches the manifest whenever none is held for the release ─────────────────────────────────
+
+const BOOTSTRAP = ['bootstrap', '--mode', 'design', '--yes', '--skip-claude-check', '--docs', 'sparse'];
+const VERIFIED_RC1 = /Integrity: verified · v2\.1\.0-rc\.1 · \d+ files/;
+const between = (text, from, to = null) => {
+  const a = text.indexOf(from);
+  if (a === -1) return '';
+  const b = to === null ? -1 : text.indexOf(to, a);
+  return text.slice(a, b === -1 ? undefined : b);
+};
+/** E-32 as U7's (or the last) doctor wrote it to `.local/doctor-last.json`. */
+const e32 = (user) => (JSON.parse(readFileSync(join(user, '.local/doctor-last.json'), 'utf8')).checks ?? [])
+  .find((c) => c.id === 'E-32') ?? null;
+/** The steps the plan promised, from its one line: `steps that will re-run: B02 … (…); B06 … (…)`. */
+const planned = (text) => {
+  const line = text.split('\n').find((l) => l.includes('steps that will re-run: ')) ?? '';
+  const list = line.slice(line.indexOf('steps that will re-run: ') + 'steps that will re-run: '.length);
+  return list.startsWith('none') ? [] : list.split('; ').map((item) => item.slice(0, 3)).sort();
+};
+/** The steps that RAN in a bootstrap's output: every `[Bnn/09]` line that is not cached or skipped, but B00 and B09. */
+const ran = (text) => text.split(/\r?\n/)
+  .map((l) => /\[(B\d\d)\/09\] .* … (.+)$/.exec(l))
+  .filter((m) => m && !['B00', 'B09'].includes(m[1]) && m[2] !== 'ok (cached)' && !m[2].startsWith('skipped'))
+  .map((m) => m[1]).sort();
+
+test('ARC-09-C140 — 2.0.13 to 2.1.0-rc.1: B01 fetches the manifest the old U4 never did, U7 reads verified, and a held one is not fetched again', async (t) => {
+  const w = await buildManifestWorld(t);
+  bootstrapUser(w.user, { store: false });
+  const cache = join(w.user, '.local', 'release-manifest.json');
+  assert.equal(existsSync(cache), false, '2.0.13 wrote a manifest cache, so this is not the owner\'s starting point');
+  const gone = `${w.licences.bare}.gone`;
+  const status = () => snowarch(w.user, ['status'], { bin: w.bin }).text;
+
+  // (a) The owner's sequence: 2.0.13's U1 to U5 fetch nothing, and U6 is 2.1.0-rc.1's bootstrap with B01's inputs
+  // unchanged. Before ARC-09-C140 it printed `[B01/09] workspace … ok (cached)` and U7 ended in E-32 FAIL.
+  const up = snowarch(w.user, ['upgrade', '--to', 'v2.1.0-rc.1', '--yes'], { bin: w.bin });
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.1.0-rc.1', up.text);
+  const u6 = between(up.text, '[U6/7]', '[U7/7]');
+  t.diagnostic(`(a) ${u6.split('\n').find((l) => l.includes('[B01/09]')) ?? 'U6 printed no B01 line'}`);
+  t.diagnostic(`(a) ${u6.split('\n').find((l) => l.includes('release manifest:')) ?? 'U6 printed no manifest line'}`);
+  assert.doesNotMatch(u6, /\[B01\/09\][^\n]*\(cached\)/, u6);
+  assert.match(u6, /release manifest: v2\.1\.0-rc\.1 fetched \(\d+ files\)/, u6);
+  const u7 = between(up.text, '[U7/7]');
+  t.diagnostic(`(a) ${u7.split('\n').find((l) => l.includes('E-32')) ?? 'U7 printed no E-32 line (ok checks are not listed)'}`);
+  assert.doesNotMatch(u7, /E-32\s+FAIL/, u7);
+  assert.equal(e32(w.user)?.status, 'ok', JSON.stringify(e32(w.user)));
+  assert.match(status(), VERIFIED_RC1);
+
+  // (b) Down to 2.0.13 and back, with the licences repository gone: the cache survives both moves and is this
+  // release's, so B01 stays cached, nothing is fetched, and E-32 reads verified straight away.
+  const down = snowarch(w.user, ['upgrade', '--to', 'v2.0.13', '--yes'], { bin: w.bin });
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.13', down.text);
+  assert.ok(existsSync(cache), 'the cache did not survive the move to 2.0.13');
+  renameSync(w.licences.bare, gone);
+  const back = snowarch(w.user, ['upgrade', '--to', 'v2.1.0-rc.1', '--yes'], { bin: w.bin });
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.1.0-rc.1', back.text);
+  assert.match(between(back.text, '[U6/7]', '[U7/7]'), /\[B01\/09\][^\n]*ok \(cached\)/, back.text);
+  assert.doesNotMatch(back.text, /release manifest:/, 'a held manifest was fetched again');
+  assert.equal(e32(w.user)?.status, 'ok', JSON.stringify(e32(w.user)));
+  assert.match(status(), VERIFIED_RC1);
+
+  // (c) A cache that holds another release's manifest, signed and valid: B01 runs for it and fetches this one.
+  renameSync(gone, w.licences.bare);
+  writeManifestCache(w.user, { tag: 'v2.0.13', checkedAt: new Date().toISOString(), source: 'fixture',
+    doc: signManifest(manifestFromArchive(w.work, 'v2.0.13'), licenceFixture().primary.privateKey) });
+  const other = snowarch(w.user, BOOTSTRAP, { bin: w.bin });
+  assert.equal(other.status, 0, other.text);
+  assert.doesNotMatch(other.text, /\[B01\/09\][^\n]*\(cached\)/, other.text);
+  assert.match(other.text, /release manifest: v2\.1\.0-rc\.1 fetched \(\d+ files\)/, other.text);
+  assert.match(status(), VERIFIED_RC1);
+
+  // (d) No network and no manifest: B01 warns with the reason, and E-32 FAILs with the remedy. Nothing crashes.
+  rmSync(cache);
+  renameSync(w.licences.bare, gone);
+  const offline = snowarch(w.user, BOOTSTRAP, { bin: w.bin });
+  assert.equal(offline.status, 0, offline.text);
+  assert.match(offline.text, /\[B01\/09\][^\n]*warn/, offline.text);
+  assert.match(offline.text, /release manifest: could not be reached \(/, offline.text);
+  const doctor = snowarch(w.user, ['doctor'], { bin: w.bin });
+  t.diagnostic(`(d) ${doctor.text.split('\n').find((l) => l.includes('E-32')) ?? 'the doctor printed no E-32 line'}`);
+  assert.match(doctor.text, /E-32\s+FAIL/, doctor.text);
+  assert.ok(doctor.text.includes('Integrity: no signed manifest for v2.1.0-rc.1'), doctor.text);
+  assert.ok(doctor.text.includes('licence check --refresh'), doctor.text);
+  assert.doesNotMatch(`${offline.text}${doctor.text}`, /crashed|TypeError|ReferenceError/);
+}, 3 * MINUTES);
+
+test('ARC-09-C140 — 2.1 to 2.1: the plan and the run agree on B01, after an install that could not fetch and after one that did', async (t) => {
+  const w = await buildWorld(t);
+  const gone = `${w.licences.bare}.gone`;
+
+  // An install with no network: B01 warns, E-32 FAILs with the remedy.
+  renameSync(w.licences.bare, gone);
+  const install = bootstrapUser(w.user);
+  assert.match(install, /release manifest: could not be reached \(/, install);
+  const doctor = snowarch(w.user, ['doctor'], { bin: w.bin });
+  assert.match(doctor.text, /E-32\s+FAIL/, doctor.text);
+  assert.ok(doctor.text.includes('licence check --refresh'), doctor.text);
+  renameSync(gone, w.licences.bare);
+
+  // 9.0.0 → 9.1.0: B01's last run warned, so the plan names it and the run runs it, line for line.
+  const one = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(one.status, 0, one.text);
+  t.diagnostic(`9.0.0 → 9.1.0 plan ${planned(one.text).join(', ') || '(none)'} · ran ${ran(between(one.text, '[U6/7]', '[U7/7]')).join(', ') || '(none)'}`);
+  assert.ok(planned(one.text).includes('B01'), one.text);
+  assert.deepEqual(ran(between(one.text, '[U6/7]', '[U7/7]')), planned(one.text), one.text);
+  assert.equal(e32(w.user)?.status, 'ok', JSON.stringify(e32(w.user)));
+
+  // 9.1.0 → 9.2.0: U5 writes the target's manifest, so the plan leaves B01 out and U6 finds it cached.
+  const two = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(two.status, 0, two.text);
+  t.diagnostic(`9.1.0 → 9.2.0 plan ${planned(two.text).join(', ') || '(none)'} · ran ${ran(between(two.text, '[U6/7]', '[U7/7]')).join(', ') || '(none)'}`);
+  assert.equal(planned(two.text).includes('B01'), false, two.text);
+  assert.match(between(two.text, '[U6/7]', '[U7/7]'), /\[B01\/09\][^\n]*ok \(cached\)/, two.text);
+  assert.deepEqual(ran(between(two.text, '[U6/7]', '[U7/7]')), planned(two.text), two.text);
+  assert.equal(e32(w.user)?.status, 'ok', JSON.stringify(e32(w.user)));
+
+  // And B01's own write does not make it stale: a second bootstrap finds it cached. (What else re-runs here is not
+  // B01's: B02's recorded warn is the fixture corpus's dead citations, which every bootstrap in this world reports.)
+  const again = snowarch(w.user, BOOTSTRAP, { bin: w.bin });
+  assert.equal(again.status, 0, again.text);
+  t.diagnostic(`second bootstrap ran ${ran(again.text).join(', ') || 'B00 and B09 only'}`);
+  assert.match(again.text, /\[B01\/09\][^\n]*ok \(cached\)/, again.text);
+  assert.equal(ran(again.text).includes('B01'), false, again.text);
+}, 3 * MINUTES);
