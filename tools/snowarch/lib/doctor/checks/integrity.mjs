@@ -15,6 +15,7 @@
 // the banner shows the verdict they cached.
 import { integrityLine, integrityRemedy, integrityStatus } from '../../licence/manifest.mjs';
 import { PRODUCT_KEYS } from '../../licence/keys.mjs';
+import { localDir } from '../../local-paths.mjs';
 import { defineCheck } from '../registry.mjs';
 import { cliOf } from '../spell.mjs';
 import { fail, ok, skip } from './result.mjs';
@@ -33,7 +34,7 @@ export function integrityChecks() {
       fixable: false,
       run: async (ctx) => {
         // `licenceKeys` is the test seam E-31 has: a suite injects the keys it generated. Nothing in the product sets it.
-        const s = integrityStatus(ctx.root, { keys: ctx.licenceKeys ?? PRODUCT_KEYS });
+        const s = integrityStatus(ctx.root, { keys: ctx.licenceKeys ?? PRODUCT_KEYS, local: localDir(ctx.root) });
         const line = integrityLine(s);
         const data = { state: s.state, tag: s.tag ?? null, checked: s.checked ?? null,
           modified: s.modified ?? [], manifestTag: s.manifestTag ?? null };

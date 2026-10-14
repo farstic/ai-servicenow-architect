@@ -42,7 +42,7 @@ export const inputs = INPUTS.B01.resolve;
 export function outputMissing(ctx) {
   const tag = releaseTagOf(ctx.root);
   if (!tag || !manifestSource(ctx.config)) return false;
-  return cachedManifest(ctx.root, tag, { keys: ctx.licenceKeys ?? PRODUCT_KEYS }).state !== 'held';
+  return cachedManifest(ctx.root, tag, { keys: ctx.licenceKeys ?? PRODUCT_KEYS, local: localDir(ctx.root) }).state !== 'held';
 }
 
 export const REGISTRATION_REMEDY =
