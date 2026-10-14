@@ -3,10 +3,10 @@ License text copyright (c) 2024 MariaDB plc, All Rights Reserved.
 
 Parameters
 
-Licensor:             [TO BE FILLED BY THE OWNER: Licensor]
-Licensed Work:        [TO BE FILLED BY THE OWNER: Licensed Work]
-Additional Use Grant: [TO BE FILLED BY THE OWNER: Additional Use Grant]
-Change Date:          [TO BE FILLED BY THE OWNER: Change Date]
+Licensor:             Cvetomir Grigorov
+Licensed Work:        snowarch 2.1.0 and later
+Additional Use Grant: You may make production use of the Licensed Work, including use for internal purposes and for consulting or implementation services delivered by You to Your own clients, provided such use does not include offering the Licensed Work, or a product or service that is substantially based on it, to third parties as a hosted, managed or competing product or service.
+Change Date:          2030-10-14
 Change License:       Apache License, Version 2.0
 
 For information about alternative licensing arrangements for the Licensed Work,

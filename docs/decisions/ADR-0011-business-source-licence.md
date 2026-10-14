@@ -9,7 +9,7 @@
 |---|---|
 | **ADR ID** | ADR-0011 |
 | **Title** | The Business Source License 1.1 from 2.1.0 |
-| **Status** | **Proposed** (2026-10-14). It moves to Accepted, with that day's date, when the owner sets the four parameters in `LICENSE`, by editing only this row |
+| **Status** | **Accepted** (2026-10-14): the owner set the four parameters in `LICENSE` that day |
 | **Date** | 2026-10-14 (recorded) · decision taken 2026-10-11 |
 | **Decision owner** | Cvetomir Grigorov (owner), ruled 2026-10-11, relayed by the architect; ratified by the owner's approval of this text and the four parameters set in `LICENSE` (the date is the Status row's) |
 | **Engagement** | AI ServiceNow Architect — product |
