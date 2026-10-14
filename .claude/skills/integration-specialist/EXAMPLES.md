@@ -91,7 +91,7 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 #### Performance
 - **TPS target:** 30 sustained (well above 100/day requirement).
 - **Latency target:** p50 <500ms, p95 <2s, p99 <5s per Create Work Item action run, retries included — measured from the action's duration, which the flow execution details record for every action run *(citation: `markdown/build-workflows/workflow-studio/flow-execution-details.md`)*.
-- **Concurrency model:** Async fire-and-forget from the calling flow's perspective; the flow's "Run in Background" handles the wait.
+- **Concurrency model:** Async fire-and-forget from the calling flow's perspective; the calling flow runs in the background (its trigger's *Run flow in background*, the default), which handles the wait *(citation: `markdown/build-workflows/workflow-studio/flow-triggers.md`)*.
 
 #### Security
 - **TLS:** 1.2+ enforced (Azure DevOps requires this anyway).
