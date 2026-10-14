@@ -245,8 +245,14 @@ test('the real allow-list holds against the real roster, on every cell, with the
   assert.equal(allow.length, Object.values(EXPECTED).reduce((a, b) => a + b, 0));
 });
 
+// ARC-09-C144's plant: an invented baseline notification. The one real-corpus index asks for it too, so the
+// plant reads the corpus once with everything else.
+const PLANTED = 'Major Incident Escalated to Duty Manager';
 let realIndex;
-const realIndexOnce = () => (realIndex ??= corpusIndex(CORPUS, rosterWants(scanRoster(ROOT))));
+const realIndexOnce = () => (realIndex ??= (() => {
+  const wants = rosterWants(scanRoster(ROOT));
+  return corpusIndex(CORPUS, { ...wants, spaced: new Set([...(wants.spaced ?? []), PLANTED]) });
+})());
 
 test('the real roster against the bundled corpus: nothing unexcused, nothing stale, every prefix live', () => {
   const r = verifyIdentifiers({ root: ROOT, ...(HAS_CORPUS ? { index: realIndexOnce() } : {}) });
@@ -405,6 +411,78 @@ test('an index built without the roster\'s names refuses to answer for them, rat
   assert.throws(() => run(dir, { index: blind }), /corpus index was built without 2 name\(s\)/);
   const asked = corpusIndex(join(dir, 'vendor', 'ServiceNowDocs'), rosterWants(scanRoster(dir)));
   assert.equal(run(dir, { index: asked }).status, 'ok', 'the same roster, asked properly, is clean');
+});
+
+// ── ARC-09-C144 — a name written as words ────────────────────────────────────────────────────────
+// "Major Incident Communication" was a baseline notification the corpus does not print, read by a model as
+// a fact, and no arm could see it: it has no underscore, no dot and no humps. The spaced arm looks a quoted,
+// italic or backticked Title-Case name of two or more words up whole, case and all, in the corpus.
+
+const spacedNames = (r) => r.spaced.unexcused.map((u) => u.identifier);
+
+test('spaced arm: a quoted, italic or backticked name the corpus does not print fails; the corpus or the marker answers it', (t) => {
+  const line = '**Baseline notifications:** "Major Incident Communication".\n';
+  const bad = run(fixture(t, line));
+  assert.deepEqual(spacedNames(bad), ['Major Incident Communication']);
+  assert.equal(bad.status, 'fail');
+  assert.match(formatIdentifiers(bad).text,
+    /^UNEXCUSED \.claude\/skills\/fx\/SKILL\.md:1 Major Incident Communication — a name the corpus does not print/m);
+  assert.equal(formatIdentifiers(bad).code, 1);
+  for (const shape of ['*Major Incident Communication*', '_Major Incident Communication_', '`Major Incident Communication`',
+    '“Major Incident Communication”']) {
+    assert.deepEqual(spacedNames(run(fixture(t, `The notification ${shape} fires.\n`))), ['Major Incident Communication'], shape);
+  }
+  assert.deepEqual(spacedNames(run(fixture(t, line, { corpus: `${PAGE}\nThe **Major Incident Communication** notification.\n` }))), [],
+    'the corpus prints it');
+  assert.deepEqual(spacedNames(run(fixture(t, `${line.trim()} (${MARKER})\n`))), [], 'the marker on its line');
+  assert.deepEqual(spacedNames(run(fixture(t, `(${MARKER})\n${line}`))), ['Major Incident Communication'], 'the marker on another line');
+  assert.deepEqual(spacedNames(run(fixture(t, line, { corpus: `${PAGE}\nA major incident communication plan.\n` }))),
+    ['Major Incident Communication'], 'the phrase in lower case is not the name');
+});
+
+test('spaced arm: one word, all capitals, bold, a fence and a phrase in plain prose are not looked at', (t) => {
+  const r = run(fixture(t, [
+    'The "Incident" table, and the `OPEN QUESTIONS` block.',
+    '**Baseline Notifications** below, and Major Incident Communication in plain prose.',
+    '```\n"Major Incident Communication"\n```',
+  ].join('\n')));
+  assert.deepEqual(spacedNames(r), []);
+  assert.equal(r.spaced.checked, 0, 'nothing in that text is a candidate');
+});
+
+test('spaced arm: an example\'s own name takes an example-name entry, and the entry is checked', (t) => {
+  const text = 'Flow name: `Daily Feedback Request Sweep`.\n';
+  const dir = fixture(t, text);
+  const entry = (extra = {}) => ({ file: FILE, identifier: 'Daily Feedback Request Sweep', reason: 'example-name', ...extra });
+  const ok = run(dir, { allow: [entry()] });
+  assert.deepEqual(spacedNames(ok), []);
+  assert.deepEqual(ok.allowErrors, []);
+  assert.ok(ok.excused.some((e) => e.by === 'allow-list' && e.identifier === 'Daily Feedback Request Sweep'));
+  assert.equal(ok.spaced.excused, 1);
+  assert.deepEqual(spacedNames(run(dir)), ['Daily Feedback Request Sweep'], 'without it the name fails');
+  assert.match(run(fixture(t, 'No name here.\n'), { allow: [entry()] }).allowErrors[0].why, /does not write this name/);
+  assert.match(run(dir, { allow: [entry({ reason: 'script-variable' })] }).allowErrors[0].why, /a name written as words takes example-name/);
+  const stale = run(fixture(t, text, { corpus: `${PAGE}\nDaily Feedback Request Sweep is printed.\n` }), { allow: [entry()] });
+  assert.match(stale.stale[0].why, /corpus has this name/);
+});
+
+test('spaced arm: its counts follow the other two lines, and an index built without its names refuses', (t) => {
+  const dir = fixture(t, 'Use `sys_user`, and the "Incident Resolved Notice".\n',
+    { corpus: `${PAGE}\nThe Incident Resolved Notice is sent.\n` });
+  const text = formatIdentifiers(run(dir)).text;
+  assert.match(text, /^camelcase names: checked \d+ \| unexcused 0 \| excused 0\nspaced names: checked 1 \| unexcused 0 \| excused 0$/m);
+  assert.throws(() => run(dir, { index: corpusIndex(join(dir, 'vendor', 'ServiceNowDocs'), {}) }),
+    /corpus index was built without 1 name\(s\) this roster asks about \(Incident Resolved Notice\)/);
+});
+
+test('the regression this guards: an invented baseline notification in the ITSM skill fails', (t) => {
+  if (!HAS_CORPUS) { t.skip('the plant needs the bundled corpus; this cell has none'); return; }
+  const dir = tempDir('c144-plant-', t);
+  cpSync(join(ROOT, '.claude'), join(dir, '.claude'), { recursive: true });
+  const skill = join(dir, '.claude', 'skills', 'itsm-specialist', 'SKILL.md');
+  writeFileSync(skill, `${readFileSync(skill, 'utf8')}\n**Baseline notifications:** "${PLANTED}".\n`);
+  const r = verifyIdentifiers({ root: dir, corpusDir: CORPUS, index: realIndexOnce() });
+  assert.deepEqual(r.spaced.unexcused.map((u) => `${u.file} ${u.identifier}`), [`.claude/skills/itsm-specialist/SKILL.md ${PLANTED}`]);
 });
 
 test('the real roster: both arms hold, and what they rest on is pinned', () => {
