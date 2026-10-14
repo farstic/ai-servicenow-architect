@@ -20,7 +20,7 @@ import { COVERAGE, isCovered, manifestFromArchive, signManifest, writeManifestCa
 import { licenceFixture, licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { readTraceImport } from '../../tools/snowarch/tests/helpers/read-trace.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
-import { LINKED, REAL_ROOT, linkInstall, readJson, releaseTree } from '../doctor/helpers/tree.mjs';
+import { LINKED, REAL_ROOT, VERSION_OF_RECORD, linkInstall, readJson, releaseTree } from '../doctor/helpers/tree.mjs';
 
 const SENTINEL = 'tools/snowarch/e32-sentinel.txt';
 const STDIN = '{"hook_event_name":"SessionStart","source":"startup"}';
@@ -64,9 +64,9 @@ function traced(t, root) {
     .map((p) => (p.startsWith(`${real}/`) ? p.slice(real.length + 1) : null))
     .filter((p) => p !== null && isCovered(p, FIXTURE_COVERAGE));
   // A READ here is a covered file's bytes. Two reads are not that, and are left out by name: a covered directory's
-  // listing (the stat key's walk, which is how an added file is seen), and package.json, the version of record, which
-  // every start reads to know which release this is.
-  const content = (p) => !p.endsWith('/') && p !== 'package.json';
+  // listing (the stat key's walk, which is how an added file is seen), and the version of record, which every start
+  // reads to know which release this is.
+  const content = (p) => !p.endsWith('/') && p !== VERSION_OF_RECORD;
   return { r, reads: [...new Set(covered(reads))].filter(content).sort(), stats: [...new Set(covered(stats))].sort(),
     traced: readFileSync(reads, 'utf8').split('\n').filter(Boolean).length };
 }

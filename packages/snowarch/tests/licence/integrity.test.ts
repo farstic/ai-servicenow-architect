@@ -9,6 +9,7 @@ import {
   resetLicenceForTests, takeIntegrityNotice,
 } from '../../src/licence/session.js';
 import { ERROR_CODE_NAMES } from '../../src/errors/codes.js';
+import { cliSpelling } from '../../src/cli/tty.js';
 import { checkout, fixtureDir, keysOf, licence, licenceText, pair, releaseCheckout, removeFixtureDirs } from './fixtures.js';
 
 /**
@@ -84,7 +85,7 @@ describe('ARC-11-C141 — the server restores at its start, and refuses only wha
     writeFileSync(join(root, '.local', 'licence.json'), licenceText(licence(), primary));
     initLicence({ root, keys: KEYS });
     initIntegrity({ root, keys: KEYS });
-    const line = 'Integrity: cannot restore — no signed manifest for v9.1.0 — Run ./snowarch licence check --refresh to fetch it; '
+    const line = `Integrity: cannot restore — no signed manifest for v9.1.0 — Run ${cliSpelling()} licence check --refresh to fetch it; `
       + 'if it says none is published, reinstall from a signed release tag.';
     await expect(route('snow_core_instances_index')).rejects.toMatchObject({ code: 'INTEGRITY_NOT_VERIFIED', message: line });
     expect(integrityRefusalFields()).toEqual({ state: 'missing', tag: 'v9.1.0' });

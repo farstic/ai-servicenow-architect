@@ -178,7 +178,9 @@ test('C141 — no manifest held, one that does not verify, or another release\'s
     + 'if it says none is published, reinstall from a signed release tag.');
   assert.equal(f.line, `${CANNOT_RESTORE_PREFIX}the signed manifest for ${TAG} does not verify (not signed by a key this product ships) — `
     + 'Run <cli> licence check --refresh to fetch it; if it says none is published, reinstall from a signed release tag.');
-  assert.equal(o.line, `${CANNOT_RESTORE_PREFIX}the signed manifest is for v9.0.0, this checkout is ${TAG} — Reinstall from a signed release tag.`);
+  // Another release's manifest is fetched again for this one (C7's remedy); only a moved tag means a reinstall.
+  assert.equal(o.line, `${CANNOT_RESTORE_PREFIX}the signed manifest is for v9.0.0, this checkout is ${TAG} — Run <cli> licence check `
+    + '--refresh to fetch it; if it says none is published, reinstall from a signed release tag.');
   for (const root of [missing, forged, other]) assert.equal(read(root, 'CLAUDE.md'), 'edited\n');
 });
 
@@ -270,10 +272,15 @@ test('C141 — a stale lock (older than 30 s) is a dead holder\'s: taken over, a
 
 // ── exempt ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
-test('C141 — a development tree, or a folder that is not an engine checkout, is not checked', (t) => {
+test('C141 — a development tree, one with no version of record, or a folder that is not an engine checkout, is not checked', (t) => {
   const dev = release(t);
   put(dev, 'package.json', `${JSON.stringify({ name: 'f', version: '9.1.0-dev' })}\n`);
   assert.deepEqual([ensure(dev).state, ensure(dev).why], ['exempt', 'dev']);
+  // No version, no release to name: the same class, and the same bound, as the development tree. E-32 still FAILs it.
+  const none = release(t);
+  put(none, 'package.json', `${JSON.stringify({ name: 'f' })}\n`);
+  assert.deepEqual([ensure(none).state, ensure(none).why, ensure(none).line],
+    ['exempt', 'no-version', 'Integrity: not checked — package.json names no version']);
   const elsewhere = tempDir('snowarch-c141-not-engine-', t);
   const r = ensure(elsewhere);
   assert.deepEqual([r.state, r.why, r.line], ['exempt', 'not-engine', 'Integrity: not checked — not an engine checkout']);

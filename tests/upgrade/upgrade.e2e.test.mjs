@@ -561,7 +561,7 @@ test('ARC-09-C140 — 2.0.13 to 2.1.0-rc.1: B01 fetches the manifest the old U4 
   const doctor = snowarch(w.user, ['doctor'], { bin: w.bin });
   t.diagnostic(`(d) ${doctor.text.split('\n').find((l) => l.includes('E-32')) ?? 'the doctor printed no E-32 line'}`);
   assert.match(doctor.text, /E-32\s+FAIL/, doctor.text);
-  assert.ok(doctor.text.includes('Integrity: no signed manifest for v2.1.0-rc.1'), doctor.text);
+  assert.ok(doctor.text.includes('Integrity: cannot restore — no signed manifest for v2.1.0-rc.1'), doctor.text);
   assert.ok(doctor.text.includes('licence check --refresh'), doctor.text);
   assert.doesNotMatch(`${offline.text}${doctor.text}`, /crashed|TypeError|ReferenceError/);
 }, 3 * MINUTES);
