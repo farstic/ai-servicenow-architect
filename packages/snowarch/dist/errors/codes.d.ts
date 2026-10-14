@@ -464,6 +464,12 @@ export declare const ERROR_CODES: readonly [{
     readonly remedy: "Run <cli> licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards";
     readonly command: "<cli> licence check";
     readonly showInRule: false;
+}, {
+    readonly code: "INTEGRITY_NOT_VERIFIED";
+    readonly meaning: "This checkout's own files are not the signed release's, and they could not be restored: no signed manifest is held, it does not verify, it is another release's, there is no tag to restore from, or the restore failed. Every tool is refused, as for a refused licence. A change the product could restore was restored, and is not this.";
+    readonly remedy: "Run <cli> doctor: its Integrity line names the reason. <cli> licence check --refresh fetches a missing manifest; a checkout that cannot be restored is reinstalled from a signed release tag. A running Claude Code session keeps what its server read at start, so restart it afterwards";
+    readonly command: "<cli> doctor";
+    readonly showInRule: false;
 }];
 export declare const ERROR_CODE_NAMES: ReadonlySet<string>;
 /**

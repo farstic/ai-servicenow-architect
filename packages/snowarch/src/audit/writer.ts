@@ -122,6 +122,18 @@ export interface IntegrityRestoreEntry {
   folder: string;
 }
 
+/** ARC-11-C141 — a call the router refused because this checkout's own files could not be restored (Q8). */
+export interface IntegrityRefusalEntry {
+  ts: string;
+  instance: string;
+  tool: string;
+  gate: 'integrity';
+  result: 'INTEGRITY_NOT_VERIFIED';
+  /** The tree's state: `missing`, `invalid`, `other`, or `unrestorable` for a restore that failed. */
+  state: string;
+  tag: string;
+}
+
 export interface CliAuditEntry {
   ts: string;
   instance: string;
@@ -189,7 +201,7 @@ function rotate(file: string): void {
  * local disk was full or read-only — the write already happened, and telling the caller
  * otherwise would be worse than losing the audit line.
  */
-export function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry | IntegrityRestoreEntry): void {
+export function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry | IntegrityRestoreEntry | IntegrityRefusalEntry): void {
   const file = resolveAuditPath();
   if (file === null) return;
 

@@ -84,6 +84,17 @@ export interface IntegrityRestoreEntry {
     /** Where the replaced copies and the moved files are now, relative to the checkout when inside it. */
     folder: string;
 }
+/** ARC-11-C141 — a call the router refused because this checkout's own files could not be restored (Q8). */
+export interface IntegrityRefusalEntry {
+    ts: string;
+    instance: string;
+    tool: string;
+    gate: 'integrity';
+    result: 'INTEGRITY_NOT_VERIFIED';
+    /** The tree's state: `missing`, `invalid`, `other`, or `unrestorable` for a restore that failed. */
+    state: string;
+    tag: string;
+}
 export interface CliAuditEntry {
     ts: string;
     instance: string;
@@ -116,7 +127,7 @@ export declare function resetAuditWarning(): void;
  * local disk was full or read-only — the write already happened, and telling the caller
  * otherwise would be worse than losing the audit line.
  */
-export declare function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry | IntegrityRestoreEntry): void;
+export declare function appendAudit(entry: AuditEntry | CliAuditEntry | LicenceRefusalEntry | IntegrityRestoreEntry | IntegrityRefusalEntry): void;
 /** The last `n` lines, parsed. Unparseable lines are skipped rather than throwing. */
 export declare function tailAudit(n?: number): AuditEntry[];
 /** The name ARC-07/08's `snowarch audit tail` calls. Same function, story's spelling. */

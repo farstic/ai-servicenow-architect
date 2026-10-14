@@ -1,6 +1,6 @@
 import { ServiceNowError } from '../utils/errors.js';
 import { closeTool, refuseUndeclared } from './arguments.js';
-import { assertLicensed } from '../licence/session.js';
+import { assertIntegrity, assertLicensed } from '../licence/session.js';
 // Core (existing 15 tools)
 import { coreToolManifest, dispatchCoreAction } from './core.js';
 // ITSM
@@ -360,6 +360,8 @@ export async function routeToolInvocation(client, name, args) {
     // ARC-11-C1, ruling R1, on every build (C6): no valid licence, no tool — the instance-free ones and a
     // playbook's steps included. First, so a refused session learns nothing about any tool's arguments.
     assertLicensed();
+    // ARC-11-C141: second, so one refusal names one reason; a tree whose own files could not be restored runs no tool.
+    assertIntegrity();
     // ARC-09-C121: before anything else, so an instance-free tool and a playbook's step are checked too.
     const tool = TOOLS_BY_NAME.get(name);
     if (tool)
