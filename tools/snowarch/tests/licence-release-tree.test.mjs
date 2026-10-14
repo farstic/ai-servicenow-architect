@@ -70,7 +70,8 @@ function releaseBase() {
   git(root, [...by, 'add', '-A']);
   git(root, [...by, 'commit', '-qm', 'release']);
   git(root, [...by, 'tag', '-a', `v${VERSION}`, '-m', `v${VERSION}`]);
-  // A clone carries what is committed, so every copied file must be: none left untracked or ignored.
+  // A clone carries only what is committed, so every copied file must be: none left untracked or ignored. This guard is
+  // the only witness: a clone that lacks a covered file still verifies, because its manifest is hashed from that clone.
   assert.equal(git(root, ['status', '--porcelain', '--ignored']), '', 'a copied file is not committed, so a clone lacks it');
   base = root;
   return base;
