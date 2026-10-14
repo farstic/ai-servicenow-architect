@@ -40,8 +40,10 @@ export function integrityChecks() {
         const s = integrityStatus(ctx.root, { keys: ctx.licenceKeys ?? PRODUCT_KEYS, local: localDir(ctx.root) });
         const data = { state: s.state, tag: s.tag ?? null, checked: s.checked ?? null,
           modified: s.modified ?? [], manifestTag: s.manifestTag ?? null };
-        if (s.state === 'dev') return skip(integrityLine(s), data);
-        if (s.state === 'verified') return ok(integrityLine(s), data);
+        // `fixable` per finding: the report falls back to the declaration's `true` (report-json.mjs), and only a
+        // modified tree has a repair on offer.
+        if (s.state === 'dev') return { ...skip(integrityLine(s), data), fixable: false };
+        if (s.state === 'verified') return { ...ok(integrityLine(s), data), fixable: false };
         const cli = cliOf(ctx);
         if (s.state === 'modified') {
           return fail(integrityLine(s), {
@@ -54,7 +56,7 @@ export function integrityChecks() {
         const { reason, remedy } = refusalOf(s, cli);
         const refetch = remedy.startsWith(`Run ${cli} licence check --refresh`);
         return fail(`Integrity: cannot restore — ${reason}`, {
-          data, remedy, ...(refetch ? { command: `${cli} licence check --refresh` } : {}),
+          data, fixable: false, remedy, ...(refetch ? { command: `${cli} licence check --refresh` } : {}),
         });
       },
     }),
