@@ -1092,9 +1092,9 @@ rule is strict by design: any word the corpus contains counts as a corpus name o
 so `payload.error_class` is refused when `error_class` is absent, even though `payload` is a variable.
 The refusal is the rule, not a bug — write the field without the dot, or give it the example's prefix.
 
-Two shapes the underscore check cannot see have an arm each (ARC-09-C104), each printing its own line
-beside the first: `dotted names: checked N | unexcused M | script-code S` and
-`camelcase names: checked N | unexcused M | excused E`.
+Three shapes the underscore check cannot see have an arm each (ARC-09-C104, and ARC-09-C144 for the
+third), each printing its own line beside the first: `dotted names: checked N | unexcused M | script-code S`,
+`camelcase names: checked N | unexcused M | excused E` and `spaced names: checked N | unexcused M | excused E`.
 
 - **Dotted** — `hr_case.opened`: a left half that is a corpus table token, or a word the check has
   learned from a field written on it, and a right half with no underscore. Outside fences, the whole
@@ -1107,8 +1107,15 @@ beside the first: `dotted names: checked N | unexcused M | script-code S` and
   out-of-the-box, OOB, ships or built-in. The corpus must print it, or the line carries the marker or a
   `proposed — not baseline` declaration. A name an example invents on such a line (`AceGrid`, a client's
   product) takes an `example-name` or `payload-key` entry.
+- **Spaced** — "Major Incident Communication": a quoted, italic or backticked run of two or more
+  Title-Case words, small joining words allowed, outside fences. The corpus must print it as written,
+  case and all: a phrase in lower case is not the name. It passes with the marker on the line, or — for a
+  name an example invents, a flow, an action or an alias (`Daily Feedback Request Sweep`) — an
+  `example-name` entry keyed by its spelling. One word, a run all in capitals (`OPEN QUESTIONS`), bold
+  and plain prose are not looked at. A platform name written as words is the corpus's name or marked,
+  never an entry.
 
-Both read the index `corpusIndex` builds, which has to be asked for the roster's names:
+All three read the index `corpusIndex` builds, which has to be asked for the roster's names:
 `corpusIndex(corpus, rosterWants(scanRoster(root)))`. An index built without a name refuses to answer for
 it, because "not asked" would read as "not there".
 

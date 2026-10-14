@@ -191,7 +191,7 @@ For each table:
 
 **Related tables:** `task_sla`, `sn_customerservice_task`, `sys_journal_field`, `sys_history_set`, `sn_shn_notes`.
 
-**Baseline notifications:** "Case Assigned to Agent", "Case Resolved", "Case Reopened", "Case Awaiting Customer Info".
+**Baseline notifications:** the case notifications a customer can switch on or off from the business portal — "Case opened for customer", "Case commented for customer", "Case resolved for customer", "Case closed for customer", "Case escalated for customer" and "Case assigned to a new group" *(citation: `markdown/customer-service-management/c_Business-portal-NotifPref.md`)*. A notification on assignment to an agent, on reopening, or while a case awaits the customer's information is not documented in the bundled corpus — verify on the instance.
 
 **Role gates:** `sn_customerservice_agent` for write; `sn_customerservice_manager` for terminal-state transitions; `sn_customerservice.partner` for partner-managed cases.
 

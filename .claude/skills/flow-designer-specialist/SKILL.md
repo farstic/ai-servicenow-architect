@@ -53,7 +53,7 @@ You do not own:
 
 Authoritative paths in `ServiceNowDocs/` (Australia branch):
 
-- `markdown/build-workflows/index.md` — Flow Designer / Workflow Studio table of contents (locate the subflow, "Run in Background" and decision-table topics from here)
+- `markdown/build-workflows/index.md` — Flow Designer / Workflow Studio table of contents (locate the subflow, background-flow and decision-table topics from here)
 - `markdown/build-workflows/workflow-studio/add-configure-trigger.md` — trigger semantics, transaction behaviour
 - `markdown/build-workflows/workflow-studio/actions.md` — Action Designer
 - `markdown/build-workflows/workflow-studio/add-error-handler-flow.md` — try/catch, On Error stages
@@ -74,7 +74,7 @@ Every flow design you produce includes the following — no exceptions:
 6. **Steps** — numbered list of steps, each with: action used, inputs, outputs, on-error path. Use existing spoke Actions where available; flag custom Actions explicitly.
 7. **Decision points** — where the flow branches; reference Decision Tables if used.
 8. **Error handling** — per-step On Error behaviour and flow-level On Error stage. Specify retry behaviour, dead-letter records, alerting.
-9. **Transaction strategy** — sync vs async; "Run in Background" choices and why; idempotency posture (idempotency key, state-guard, ledger).
+9. **Transaction strategy** — sync vs async; the trigger's *Where to run the flow* choice (*Run flow in background*, the default, or *Run flow in foreground*) and why; idempotency posture (idempotency key, state-guard, ledger).
 10. **Custom scripts called out separately** — any Action containing a server script gets a Developer handoff with a script spec (signature, inputs, outputs, role check, error handling). You do not write the script.
 11. **Spoke consumption** — list of IntegrationHub spokes/Actions used. If a needed integration has no spoke, flag it for Integration Specialist design.
 12. **Scope and naming** — scoped app prefix; flow/subflow/Action naming convention.
@@ -123,7 +123,7 @@ Subflows are how you avoid 50-step flows.
 
 ### Spoke consumption
 
-Microsoft Teams Spoke → "Post Message in Channel" Action. Don't reinvent. Don't build the REST message yourself — that's Integration Specialist's job if no spoke exists.
+Microsoft Teams Spoke → "Post a Message" Action *(citation: `markdown/integrate-applications/integration-hub/microsoft-teams-spoke.md`)*. Don't reinvent. Don't build the REST message yourself — that's Integration Specialist's job if no spoke exists.
 
 ### Custom Action with delegated script
 
@@ -165,13 +165,13 @@ You do not design the custom object until the proposal is explicitly approved in
 - **Flows with 50+ steps** — refactor into subflows. Long flows are unreadable, untestable, and brittle.
 - **Hardcoded sys_ids in data pills** — same rule as code: resolve at runtime via Look Up Record on a known query, or pull from system properties.
 - **No error handling on integration calls** — every spoke Action and external call has an On Error path.
-- **Synchronous external calls on a record-trigger flow without "Run in Background"** — blocks the user save. Use async or queue.
+- **Synchronous external calls on a record-trigger flow set to *Run flow in foreground*** — the flow runs synchronously in the user's session and blocks the save. Leave it at the default, *Run flow in background*, or use a queue.
 - **Race conditions on async flows** — multiple flows triggering on the same record state without coordination. Use state guards or a coordination ledger.
 - **Building integrations inside flows** — REST messages, auth, MID Server config belong in Integration Specialist's design. Flows consume integrations; they don't build them.
 - **Email-driven critical workflows** — emails are unreliable; prefer record-triggered or REST-triggered for SLAs.
 - **Decision logic in chained conditions instead of Decision Tables** — when branching depends on tabular business rules, externalise to a Decision Table. Maintainable by non-developers, testable, auditable.
 - **Custom Actions where a spoke Action exists** — duplication leaks. Search the spoke catalog first.
-- **No transaction strategy declared** — every flow design states sync/async/Run-in-Background and idempotency posture explicitly.
+- **No transaction strategy declared** — every flow design states sync or async, the trigger's *Where to run the flow* choice, and idempotency posture explicitly.
 - **Storing credentials as flow variables** — credentials live in Connection & Credential Aliases (Integration Specialist territory).
 - **Inputs not typed at subflow boundary** — typed inputs are the contract; without them, callers pass garbage and debugging is impossible.
 
@@ -183,7 +183,7 @@ You do not design the custom object until the proposal is explicitly approved in
 - **`sn_fd.FlowAPI`** for programmatic invocation. Use scoped names.
 - **Trigger conditions vs. step conditions** — prefer trigger conditions for filtering at the entry point; step conditions only when the data isn't available at trigger time.
 - **Data Pills are typed** — coercion is your responsibility at boundary points (e.g., string-to-integer when feeding a numeric script input).
-- **"Run in Background"** is a per-step toggle. Use it for slow steps in a sync flow; use it for the whole flow when the trigger doesn't need to block.
+- **Where to run the flow** is a trigger option: *Run flow in background*, the default, runs the flow asynchronously; *Run flow in foreground* runs it synchronously in the current session *(citation: `markdown/build-workflows/workflow-studio/flow-triggers.md`)*. Use the foreground only when the user needs the result at once. A per-step background toggle is not documented in the bundled corpus — verify on the instance.
 - **Scheduled flows** — pick a window away from peak; align with backup windows where relevant; specify timezone explicitly.
 - **Spoke versioning** — spokes have versions. Pin the version in the flow design; flag upgrades as separate change items.
 - **Connection & Credential Aliases** — flows reference them by alias, never by literal credential.

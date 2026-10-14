@@ -43,7 +43,7 @@ This flow takes a `change_request` transition into "Authorize" and drives it to 
 | Table | `change_request` |
 | Condition | `state` changes to `-3` (Authorize) *(citation: `markdown/it-service-management/change-management/state-model-activate-tasks.md`)* |
 | Run as | System |
-| Run in Background | Yes (approval flows are long-running; do not block the save) |
+| Where to run the flow | Run flow in background, the default (approval flows are long-running; do not block the save) *(citation: `markdown/build-workflows/workflow-studio/flow-triggers.md`)* |
 
 #### Inputs
 | Name | Type | Source |
@@ -88,7 +88,7 @@ None (side-effects only: state transitions, notifications, audit entries).
 - Notification subflow failures are non-blocking — the state transition completes even if Teams is unreachable; the failure is logged.
 
 #### Transaction strategy
-- **Async with "Run in Background" at flow level** — approvals are long-running (days), the user save must not block.
+- **Async: the trigger's *Where to run the flow* left at *Run flow in background*** — approvals are long-running (days), the user save must not block.
 - **Idempotency via state guard** — Step 1 prevents duplicate approvals on re-trigger (e.g., admin manually re-saving the record while the flow is in flight).
 - **Compensating actions** — none needed; failures are logged by the error handler for manual recovery rather than auto-rollback (state transitions are recoverable manually).
 
@@ -96,7 +96,7 @@ None (side-effects only: state transitions, notifications, audit entries).
 None directly in this flow. The notification subflow may use a script step — see Example 2.
 
 #### Spoke consumption
-- **Microsoft Teams Spoke** → "Post Message in Channel" Action (used inside `notifyChangeStakeholders` subflow, not directly).
+- **Microsoft Teams Spoke** → "Post a Message" Action (used inside `notifyChangeStakeholders` subflow, not directly) *(citation: `markdown/integrate-applications/integration-hub/microsoft-teams-spoke.md`)*.
 - **Approvals** — baseline platform Action (no spoke needed).
 
 #### Scope and naming
@@ -186,9 +186,9 @@ None (subflow).
 3. **Resolve message** — call custom Action `x_acme_platform.ResolveNotificationMessage` (server-script Action; Developer-owned). Inputs: target_record, message_template (optional). Output: resolved message text + subject.
 4. **For Each channel in `channels`** — `max_iterations: 10` (defensive cap; channel list is short).
    - **Decision: channel type**
-     - **teams branch** → Microsoft Teams Spoke `Post Message in Channel`. Capture spoke result.
+     - **teams branch** → Microsoft Teams Spoke `Post a Message`. Capture spoke result.
      - **email branch** → baseline `Send Email` Action targeting recipient_group members. Capture result.
-     - **slack branch** → Slack Spoke `Post Message in Channel`. Capture result.
+     - **slack branch** → Slack Spoke `Post Message` *(citation: `markdown/integrate-applications/integration-hub/slack-spoke.md`)*. Capture result.
      - **default branch** (unknown channel value) → record `{channel, status:skipped, error_detail:'unknown channel type'}`.
    - **On Error (per-channel)** — capture error, append `{channel, status:failure, error_detail:<error>}` to results. Do NOT abort the loop — other channels still attempt.
 5. **Aggregate results** — count success/failure, build the `results` output list.

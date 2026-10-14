@@ -38,12 +38,12 @@ This request touches three core baseline ITSM processes: incident lifecycle, on-
 
 - The on-call engineer for an assignment group at any point in time is resolved via `cmn_rota_roster` (active member of the rotation defined in `cmn_rota`).
 - The baseline `OnCallRotation` Script Include's `whoIsOnCall(groupSysIds, rotaSysIds, rosterSysIds, gdt)`, called on an instance (`new OnCallRotation()`), gets the users on call at a given time *(citation: `markdown/api-reference/server-api-reference/c_OnCallRotationAPI.md`)*.
-- The duty manager role in baseline `cmn_rota` is typically configured as a separate rotation member type — "On-Call Engineer" and "On-Call Manager" can coexist in the same rotation with different escalation tiers.
+- In baseline on-call scheduling a shift typically has one roster per escalation level (primary, secondary, tertiary), so the duty manager sits on a later level's roster; the shift manager (`rota_manager` role) may or may not be a roster member. Names such as "On-Call Engineer" and "On-Call Manager" are the engagement's own, not baseline values.
 - *(citation: `markdown/it-service-management/on-call-scheduling/c_OnCallSchedulingConcepts.md`)*
 
 ### Baseline notifications
 
-- Baseline ServiceNow notification records on `incident` include "Incident Assigned", "Incident Resolved", "Major Incident Communication". The escalation notification in this request is **not** in the baseline set — but the mechanism (a notification record with a condition and a `Send to` resolution script) is baseline.
+- Baseline ServiceNow notification records on `incident` include "Incident Opened", "Incident Commented", "Incident Resolved" and "Incident Closed" *(citation: `markdown/platform-administration/r_BaselineEmailNotifications.md`)*; a major incident notification's name is not documented in the bundled corpus — verify on the instance. The escalation notification in this request is **not** in the baseline set — but the mechanism (a notification record with a condition and a `Send to` resolution script) is baseline.
 - *(citation: `markdown/platform-administration/c_EmailNotifications.md`)*
 
 ## Part 2 — Data Model Alignment

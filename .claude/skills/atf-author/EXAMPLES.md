@@ -30,20 +30,20 @@ Developer returned a Script Include `SLABreachRiskCalculator` with method `calcu
 ### Test 1 — High-priority incident with breached SLA scores ≥ 80
 - **Type:** Server
 - **Setup steps:**
-  - *Create a Record* on `incident`: priority=1, impact=1, urgency=1.
-  - *Create a Record* on `task_sla` referencing that incident: has_breached=true, business_percentage=100.
+  - *Record Insert* on `incident`: priority=1, impact=1, urgency=1.
+  - *Record Insert* on `task_sla` referencing that incident: has_breached=true, business_percentage=100.
 - **Action + Assertion:** *Run Server Side Script* — instantiate `new x_acme_itsm.SLABreachRiskCalculator()`, call `calculate()` with the created incident, `assert(score >= 80, 'expected high risk')`.
 - **Covers:** LLD §4.2 high-risk rule.
 
 ### Test 2 — Low-priority, healthy SLA scores low
 - **Type:** Server
-- **Setup:** *Create a Record* incident priority=4; *Create a Record* task_sla has_breached=false, business_percentage=20.
+- **Setup:** *Record Insert* incident priority=4; *Record Insert* task_sla has_breached=false, business_percentage=20.
 - **Assertion:** *Run Server Side Script* — `assert(score < 40, 'expected low risk')`.
 - **Covers:** §4.2 baseline scoring.
 
 ### Test 3 — No active SLA returns 0
 - **Type:** Server
-- **Setup:** *Create a Record* incident with no related task_sla.
+- **Setup:** *Record Insert* incident with no related task_sla.
 - **Assertion:** *Run Server Side Script* — `assert(score === 0, 'no SLA → 0')`.
 - **Covers:** §4.2 boundary.
 
@@ -66,10 +66,10 @@ Developer returned a Script Include `SLABreachRiskCalculator` with method `calcu
 - **Environment:** run on a **sub-production** instance; ATF is disabled on prod by default — do not point at prod with real data. *(citation: markdown/application-development/automated-test-framework-atf/automated-test-framework-design-considerations.md)*
 - **Scope / update set:** tests belong to `x_acme_itsm`, captured as metadata in the app's update set.
 - **Roles:** `atf_test_designer` to author, `atf_test_admin` to run. *(citation: markdown/application-development/automated-test-framework-atf/atf-roles.md)*
-- **Data strategy:** all data created by Create-a-Record steps and rolled back automatically; no dependence on existing records.
+- **Data strategy:** all data created by Record Insert steps and rolled back automatically; no dependence on existing records.
 
 ## §6.2 manifest
-No custom step config script produced (baseline *Run Server Side Script* + *Create a Record* cover it) → no Code Reviewer pass required for the tests themselves.
+No custom step config script produced (baseline *Run Server Side Script* + *Record Insert* cover it) → no Code Reviewer pass required for the tests themselves.
 
 ## Open questions
 OQ-DS-1. Does `calculate()` throw or return null on an unauthorised caller? Test 4's assertion adapts to whichever the spec defines — confirm.
