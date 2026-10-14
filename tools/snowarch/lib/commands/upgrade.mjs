@@ -37,7 +37,7 @@ import { childEnv } from '../spawn-env.mjs';
 import { loadConfig, root as defaultRoot } from '../config.mjs';
 import { loadState } from '../state.mjs';
 // ARC-08-C29 — the runner's own step list, so the plan and the run are one computation.
-import { STEPS } from '../steps/index.mjs';
+import { STEPS, outputMissingOf } from '../steps/index.mjs';
 import { makeExec } from '../steps/B00.mjs';
 import { nodeInfo, stepContext } from '../bootstrap.mjs';
 import { engineChecks } from '../doctor/checks/index.mjs';
@@ -388,7 +388,13 @@ export function planContext({ root, config, ctx = {}, state = null }) {
   };
 }
 
-export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktree = null } = {}) {
+/**
+ * ARC-09-C140 — `manifestWritten`: U5 will write the target's verified manifest into the cache before U6, so B01's
+ * output is not missing when the bootstrap asks, though the cache still holds the old release's while the plan is
+ * made. Without it the plan would list B01 and the run would find it cached (ARC-08-C29). A move that does not write
+ * it — a pull on a branch — leaves the question to the cache, as the runner will.
+ */
+export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktree = null, manifestWritten = false } = {}) {
   const scratch = keepWorktree ? null : mkdtempSync(join(tmpdir(), 'snowarch-plan-'));
   const at = keepWorktree ?? join(scratch, 'at-tag');
   const added = keepWorktree !== null
@@ -440,7 +446,10 @@ export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktre
       let hash = null;
       try { hash = hashFor(step.id, tagCtx); } catch { hash = null; }
       if (hash === null) { out.set(step.id, 'inputs could not be read'); continue; }
-      if (hash !== recorded.inputsHash) out.set(step.id, 'inputs changed');
+      if (hash !== recorded.inputsHash) { out.set(step.id, 'inputs changed'); continue; }
+      if (!(manifestWritten && step.id === 'B01') && outputMissingOf(step, tagCtx)) {
+        out.set(step.id, 'the release manifest is not held');
+      }
     }
     return out;
   } finally {
@@ -464,10 +473,10 @@ export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktre
  * change explains, and a step stale for any other reason carries the hash's own word instead of
  * vanishing from the line.
  */
-export function planSteps(root, tag, { ctx, state, opts = {}, run = spawnSync } = {}) {
+export function planSteps(root, tag, { ctx, state, opts = {}, run = spawnSync, manifestWritten = false } = {}) {
   const byFile = new Map(stepsThatWillRun(root, tag, { ctx, opts })
     .map((s) => [s.step, s]));
-  const decided = rerunAtTag(root, tag, { ctx, state, run });
+  const decided = rerunAtTag(root, tag, { ctx, state, run, manifestWritten });
 
   // No worktree, no runner comparison: fall back to the file diff and SAY it is an estimate.
   if (decided === null) {
@@ -758,11 +767,16 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     log.step(`${target} is from before ${MANIFESTS_FROM}, when releases began to carry a signed manifest: its files are not checked`);
   }
   const ctx = { root, config };
+  // Read here rather than at U5, because the plan depends on it: a move by checkout writes the target's manifest at
+  // U5, and a pull on a branch does not (ARC-09-C140).
+  const branch = branchState(root, opts);
+  const onBranch = Boolean(branch.branch) && !branch.detached;
   // ARC-08-C29 — ONE COMPUTATION. `planSteps` asks the runner's own question (hash the tag's
   // inputs, compare with the recorded state) and falls back to the file diff only when the tag
   // cannot be checked out — in which case the plan says so rather than printing the other answer
   // under the same heading.
-  const { steps, estimate } = planSteps(root, target, { ctx, state, opts });
+  const { steps, estimate } = planSteps(root, target, { ctx, state, opts,
+    manifestWritten: manifest !== null && !(!flags.to && onBranch) });
   const store = storePlan(root, target, { opts, spell: spellings({ platform, env }) });
   const floor = floorCheck(tagInfo, { exec: probe });
   const commits = Number(git(root, ['rev-list', '--count', `HEAD..${target}`], { ...opts, allowFail: true }) ?? '');
@@ -815,8 +829,6 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
 
   // ── U5 move the tree ──────────────────────────────────────────────────────────────────────
   log.step(stepLine(5, `move the checkout to ${target}`));
-  const branch = branchState(root, opts);
-  const onBranch = Boolean(branch.branch) && !branch.detached;
   if (!flags.to && onBranch) {
     const pulled = run('git', ['pull', '--ff-only', remote, branch.branch],
       { cwd: root, encoding: 'utf8', env: childEnv(root, env), stdio: 'pipe' });

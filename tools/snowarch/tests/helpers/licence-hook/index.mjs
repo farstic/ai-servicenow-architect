@@ -33,15 +33,26 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { PRODUCT_KEYS as SHIPPED_KEYS } from '../../../lib/licence/keys.mjs';
 import { keyPair, licenceText, productKeys } from '../licence.mjs';
 import { remove, tempDir } from '../temp.mjs';
 
 const HOOKS_URL = new URL('./hooks.mjs', import.meta.url).href;
 const REPO = resolve(fileURLToPath(new URL('../../../../../', import.meta.url)));
 
+/**
+ * ARC-09-C138 — the module trusts the fixture keys AND the shipped ones. A test signs its licence with a key
+ * made for the run, and a release's manifest is signed with the owner's primary; under the hook both must
+ * verify. With the fixture keys alone, the first signed release failed E-32 in CI's evidence step (run
+ * 38515024672: "not signed by a key this product ships") while every real install verified it.
+ *
+ * This widens nothing an install trusts: the hook is loaded only through `--import`, by tests and CI, never
+ * by a product start, and `licence-keys-guard` holds the shipped modules to exactly their two keys.
+ */
 export function fixtureKeysHook(dir, keys) {
   const keysFile = join(dir, 'fixture-keys.mjs');
-  writeFileSync(keysFile, `export const PRODUCT_KEYS = Object.freeze(${JSON.stringify(keys, null, 2)}.map((k) => Object.freeze(k)));\n`);
+  const trusted = [...keys, ...SHIPPED_KEYS.filter((s) => !keys.some((k) => k.fingerprint === s.fingerprint))];
+  writeFileSync(keysFile, `export const PRODUCT_KEYS = Object.freeze(${JSON.stringify(trusted, null, 2)}.map((k) => Object.freeze(k)));\n`);
   const keysUrl = pathToFileURL(keysFile).href;
   const registerFile = join(dir, 'register-hook.mjs');
   writeFileSync(registerFile, "import { register } from 'node:module';\n"

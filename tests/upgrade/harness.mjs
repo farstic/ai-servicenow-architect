@@ -570,7 +570,7 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // ARC-09-C28 instrument, removed when the chore closes. One line per world, stdout only.
   marks.push(`TOTAL=${Math.round(Number(process.hrtime.bigint() - worldStart) / 1e6)}ms`);
   writeSync(1, `    world[${process.platform}] ${marks.join(' ')}\n`);
-  return { scratch, work, origin, user, bin };
+  return { scratch, work, origin, user, bin, licences };
 }
 
 /**
@@ -581,13 +581,32 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
  * `fetch-depth: 0`, and a shallow clone is told how to fetch it.
  */
 export async function buildEnforcementWorld(t, { modules = 'link' } = {}) {
+  return buildTwoReleaseWorld(t, { from: LAST_UNENFORCED_RELEASE, to: '2.0.13', label: 'enforcement', modules });
+}
+
+/**
+ * ARC-09-C140 — the world the owner upgraded in on 2026-10-14: a checkout on v2.0.13, whose U4 fetches no manifest
+ * (2.0.13 predates ARC-11-C7), upgrading to this tree at 2.1.0-rc.1, the first release signed with one. The new
+ * release's manifest is published to the world's own licences repository, as the owner's is, so U6's bootstrap can
+ * fetch it, and `licences` is returned so a case can take it away (no network).
+ */
+export async function buildManifestWorld(t, { modules = 'link' } = {}) {
+  return buildTwoReleaseWorld(t, { from: 'v2.0.13', to: '2.1.0-rc.1', label: 'manifest', modules, manifests: true });
+}
+
+/**
+ * Two releases: `from`, a REAL tag of this repository, from its own tree, and this tree at version `to`. So an upgrade
+ * between them runs `from`'s U1 to U5 and its finish(), and `to`'s bootstrap and doctor. The tag has to be in this
+ * clone: CI's upgrade-e2e job checks out with `fetch-depth: 0`, and a shallow clone is told how to fetch it.
+ * `manifests`: the world gets a licences repository, and `to`'s signed manifest is published in it.
+ */
+async function buildTwoReleaseWorld(t, { from, to, label, modules = 'link', manifests = false }) {
   const marks = [];
   const worldStart = process.hrtime.bigint();
-  const from = LAST_UNENFORCED_RELEASE;
   try { gitRaw(['rev-parse', '--verify', '-q', `${from}^{commit}`], { cwd: REAL_ROOT }); } catch {
     throw new Error(`harness: ${from} is not in this clone — run git fetch --tags, then run again`);
   }
-  const scratch = tempDir('snowarch-enforce-', t);
+  const scratch = tempDir(`snowarch-${label}-`, t);
   const work = join(scratch, 'work');
   mkdirSync(work, { recursive: true });
 
@@ -600,7 +619,8 @@ export async function buildEnforcementWorld(t, { modules = 'link' } = {}) {
     execFileSync('tar', ['-xf', 'old.tar', '-C', 'work'], { cwd: scratch, stdio: 'pipe' });
   });
   const upstream = phase('corpus-upstream', marks, () => buildUpstream(join(scratch, 'corpus')));
-  pointAtFixtureCorpus(work, upstream);
+  const licences = manifests ? licencesRepo(scratch) : null;
+  pointAtFixtureCorpus(work, upstream, { licences: licences?.url ?? null });
   phase(`modules-${modules}`, marks, () => placeModules(work, modules));
   phase('gen-all-old', marks, () => regenerate(work));
   phase('git-init', marks, () => git(work, ['init', '-q', '-b', 'main']));
@@ -609,17 +629,18 @@ export async function buildEnforcementWorld(t, { modules = 'link' } = {}) {
   commit(work, from, upstream.pin);
   await tagRelease(work, from.slice(1));
 
-  // This tree at 2.0.13. Everything the old one held goes first, so a file deleted since is not carried over.
+  // This tree at `to`. Everything the old one held goes first, so a file deleted since is not carried over.
   phase('tree-new', marks, () => {
     for (const e of readdirSync(work)) {
       if (e !== '.git' && e !== 'node_modules') rmSync(join(work, e), { recursive: true, force: true });
     }
     marks.push(`files=${copyTracked(work)}`);
   });
-  pointAtFixtureCorpus(work, upstream);
-  phase('rewrite-version-new', marks, () => rewriteVersion(work, '2.0.13'));
-  commit(work, 'v2.0.13', upstream.pin);
-  await tagRelease(work, '2.0.13');
+  pointAtFixtureCorpus(work, upstream, { licences: licences?.url ?? null });
+  phase('rewrite-version-new', marks, () => rewriteVersion(work, to));
+  commit(work, `v${to}`, upstream.pin);
+  await tagRelease(work, to);
+  if (licences) phase('manifests', marks, () => publishManifests(work, licences, [`v${to}`]));
 
   const origin = join(scratch, 'origin.git');
   phase('clone-bare', marks, () => gitRaw(['clone', '--quiet', '--bare', work, origin]));
@@ -634,8 +655,8 @@ export async function buildEnforcementWorld(t, { modules = 'link' } = {}) {
   const bin = fakeClaude(join(scratch, 'bin'), '2.1.258 (Claude Code)');
 
   marks.push(`TOTAL=${Math.round(Number(process.hrtime.bigint() - worldStart) / 1e6)}ms`);
-  writeSync(1, `    enforcement world[${process.platform}] ${marks.join(' ')}\n`);
-  return { scratch, work, origin, user, bin };
+  writeSync(1, `    ${label} world[${process.platform}] ${marks.join(' ')}\n`);
+  return { scratch, work, origin, user, bin, licences };
 }
 
 /** The user's clone, bootstrapped design-only, with a v1 store beside it. */
