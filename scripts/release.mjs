@@ -379,9 +379,14 @@ function createTag({ root, version, tagMessage, sign = false }) {
 /**
  * The script's own exit: run the release, then end the process with its code. Exported (ARC-09-C139) so a case can run
  * this exact path in a child whose stderr is a real pipe, which is where a release's output is read in CI.
+ *
+ * `process.exitCode`, never `process.exit` (ARC-09-C139, C129's defect). A gate's output is written in one large
+ * write, and on POSIX a write to a pipe is asynchronous: `process.exit` ended the process with the tail unwritten, so
+ * CI's log stopped mid-line, without the `not ok` and without "release: gate failed". With the code set, Node writes
+ * everything queued, then exits with it.
  */
 export function main(argv = process.argv.slice(2), options = {}) {
-  return release({ argv, ...options }).then((code) => process.exit(code));
+  return release({ argv, ...options }).then((code) => { process.exitCode = code; });
 }
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
