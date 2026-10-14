@@ -292,7 +292,10 @@ test('the page stays a page, and the tail stays a tail', () => {
   // that answers nothing. Seven lines buy the heading, where the file goes and when, how to see its state, and
   // what is refused without one. It was 308 while the section also named the release to go back to; the owner's
   // ruling from the rc.3 sitting (2026-10-13) took that out, and the cap follows the fact both ways.
-  assert.ok(install <= 307, `${install} lines of install page (criterion: 307)`);
+  // 308 since ARC-09-C140: from 2.1, B01 prints the signed manifest it fetched, on its own line before B01's, and
+  // the transcript shows the tool's lines (criterion 5). Its explanation was folded into the sentence above the
+  // transcript, so the fact costs that one line and no prose.
+  assert.ok(install <= 308, `${install} lines of install page (criterion: 308)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.

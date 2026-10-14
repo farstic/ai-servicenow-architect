@@ -52,8 +52,8 @@ Then `claude` in the same folder.
 
 ### What you will see
 
-The bootstrap shows its plan before it does anything, and every step prints one line. A real
-design-only run, start to finish:
+The bootstrap shows its plan before it does anything, and every step prints one line; from 2.1, B01 adds the signed
+manifest it fetched (your release's tag and file count; this one on 2.1.0-rc.1). A real design-only run:
 
 Five preflight checks print a line each on every path — git, Claude Code, disk, network, Node. The Node path adds two more lines, the checkout root and the platform, so a Node install prints seven and a Node-free one prints five. *(The root is checked on both; the Node-free launcher only speaks when it fails.)* Then:
 
@@ -65,7 +65,8 @@ Plan — Enter runs it as shown · type a number to choose that line's value · 
   1  Mode   design-only          live needs a ServiceNow instance (wizard runs in this terminal); Node 24.16.0 found
   2  Docs   sparse (20 areas)    full = whole corpus · skip = none (the doctor will report FAIL)
   Steps  B01 workspace · B02 docs · B05 tool list · B07 Claude settings · B09 summary
-[B01/09] workspace … ok (0.1 s)
+release manifest: v2.1.0-rc.1 fetched (372 files)
+[B01/09] workspace … ok (2 s)
 [docs] 31.5 s · pin 11b39be · sparse · complete
 [B02/09] docs … ok (32 s)
 [B03/09] mode … ok (0.0 s)
