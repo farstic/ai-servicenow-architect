@@ -3,13 +3,25 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
-## Unreleased (2.0.11-dev)
+## Unreleased (2.1.0-dev)
 
 **Relicensed to the Business Source License 1.1 (`BUSL-1.1`) from 2.1.0** (ADR-0011). Versions 2.0.x and
 earlier stay under Apache-2.0, to which `2.0.0` below relicensed the package.
 
-**Known gaps, raised not closed: the cut-value check (ARC-09-C93) does not see every write, and the
-refusal before the write (ARC-09-C97) sees two methods.** `snow_*` tools return `warnings[].code =
+**The checkout's own files, checked at start (ARC-11-C7, ARC-11-C141).** From 2.1.0 each release carries a
+`snowarch-manifest/1` signed with the owner's key, and `src/licence/integrity.ts` reads it, the one verifier
+the engine re-exports. At its start the server hashes every file the manifest covers, once. A file that
+differs from the signed one is put back from the release's tag, what it replaced or what was added is moved
+to `.local/integrity-removed/<UTC stamp>/`, and one `Integrity: restored — …` line rides the session's first
+answer. A checkout that cannot be restored refuses every tool with `INTEGRITY_NOT_VERIFIED`, after the
+licence and with one audit line, and the package CLI refuses through the same door. The error registry has
+74 codes; the server still has 399 tools.
+
+**Fixed: the doctor's handshake with a server that has exited (ARC-09-C130).** `src/doctor/checks.ts` hears
+an `error` on the server child's stdin and the child's `exit`, and reports "the server exited with code
+<n> before the handshake finished" instead of dying on an uncaught `EPIPE`.
+
+**What the cut-value check covers, and what it does not (ARC-09-C93, C97 to C101).** `snow_*` tools return `warnings[].code =
 VALUE_TRUNCATED` when the platform's answer to a write holds a shorter prefix of a string that was sent:
 `createRecord` and `updateRecord`, the Batch API (`snow_fluent_request_batch`), attachment file names,
 `createChangeRequest` and a client copy made with `withUser` (ARC-09-C100). Not checked, so an absent
@@ -26,12 +38,6 @@ ARC-09-C97 to C101 in the ARC-09 plan.
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
-
-**Known gap, raised not closed: the doctor's handshake with a server that has exited (ARC-09-C130).** The
-server doctor's handshake (`src/doctor/checks.ts`) writes `initialize` to the server child's stdin right
-after spawning it, and listens for neither an `error` on that stdin nor the child's `exit`. A server that
-exits before it reads turns that write into an uncaught `EPIPE`, so the doctor dies instead of saying the
-server exited. Seen on one macOS CI cell, with every test passing.
 
 ## 2.0.0 — 2026-09-24
 
