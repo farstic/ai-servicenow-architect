@@ -4,7 +4,8 @@
  * ARC-09-C146 — the suite on a release-versioned tree. A release writes its version, then runs `npm test` before it
  * commits; from C141 every launcher start on that tree asked for a signed manifest no state root held, and the rc.2
  * cut refused 34 cases. `licensedEnv` now seeds the state root it makes with a manifest of the checkout, so these cases
- * run the class on every push, on a scratch copy at 0.0.0-rc.1, rather than waiting for the next cut:
+ * run the class on every push, on a scratch copy at 0.0.0-rc.1, rather than waiting for the next cut (one tagged copy
+ * per process, and a clone of it per case, ARC-09-C147):
  * - the seeded state root lets the launcher run, and `status` reads the tree as verified; the control, in the same
  *   case, is the same start with the seeded manifest removed, refused;
  * - with a commit past the tag, the copy still verifies: the manifest names the tag's commit, as the product compares;
@@ -45,12 +46,16 @@ function cleanEnv(t) {
 /** What the copy leaves out: the corpus, the documentation, and what the coverage itself leaves out. */
 const LEFT_OUT = ['vendor/ServiceNowDocs', 'docs/', ...COVERAGE.excludes];
 
+let base = null;
+
 /**
- * A scratch engine checkout at 0.0.0-rc.1, committed and tagged: this checkout's files as they are on disk, tracked
- * and not ignored (the engine reads well beyond what the manifest covers), less LEFT_OUT.
+ * The scratch engine checkout at 0.0.0-rc.1, committed and tagged, made once per process: this checkout's files as
+ * they are on disk, tracked and not ignored (the engine reads well beyond what the manifest covers), less LEFT_OUT.
+ * ARC-09-C147: copying and committing some 1,100 files once per case cost 60 to 110 seconds a Windows cell.
  */
-function releaseCopy(t) {
-  const root = tempDir('snowarch-c146-', t);
+function releaseBase() {
+  if (base) return base;
+  const root = tempDir('snowarch-c146-base-');
   const files = git(REPO, ['ls-files', '-z', '--cached', '--others', '--exclude-standard']).split('\0').filter(Boolean);
   for (const rel of new Set(files)) {
     if (rel === 'package.json' || LEFT_OUT.some((p) => rel === p || rel.startsWith(p))) continue;
@@ -65,6 +70,20 @@ function releaseCopy(t) {
   git(root, [...by, 'add', '-A']);
   git(root, [...by, 'commit', '-qm', 'release']);
   git(root, [...by, 'tag', '-a', `v${VERSION}`, '-m', `v${VERSION}`]);
+  // A clone carries only what is committed, so every copied file must be: none left untracked or ignored. This guard is
+  // the only witness: a clone that lacks a covered file still verifies, because its manifest is hashed from that clone.
+  assert.equal(git(root, ['status', '--porcelain', '--ignored']), '', 'a copied file is not committed, so a clone lacks it');
+  base = root;
+  return base;
+}
+
+/**
+ * A case's own scratch checkout: a local clone of the base, its objects linked, its working tree fresh, its tag with
+ * it. What one case changes, no other case sees.
+ */
+function releaseCopy(t) {
+  const root = tempDir('snowarch-c146-', t);
+  execFileSync('git', ['clone', '--local', '--quiet', releaseBase(), root], { stdio: 'pipe' });
   return root;
 }
 
