@@ -21,8 +21,8 @@
  * - a fixture licence signed with that key, at `.local/licence.json` under every root the child reads one
  *   from: `root` when given, and `SNOWARCH_STATE_ROOT` and `CLAUDE_PROJECT_DIR` when `env` sets them. With
  *   none of the three, a new temp directory becomes `SNOWARCH_STATE_ROOT`, which is where the CLI reads it;
- * - in that new temp directory, and only there, when the checkout is a release version, a signed manifest of it
- *   at `.local/release-manifest.json` (ARC-09-C146, below).
+ * - when the checkout is a release version, a signed manifest of it at `.local/release-manifest.json` in a state
+ *   root a helper made, and in no other (ARC-09-C146, below).
  *
  * `licence: false` writes none, for a test of a checkout without one; the child still runs under the fixture
  * keys. An object replaces fields of the licence (`{ scope: 'design-only' }`). The default is live and
@@ -33,17 +33,27 @@
  *
  * ARC-09-C146 — A RELEASE-VERSIONED TREE. A release writes its version before its post-write suite, and from C141 a
  * launcher on a release version restores against that release's signed manifest, which is signed only after the tag:
- * the rc.2 cut's suite refused 34 cases on a manifest no state root held. So the state root this helper makes holds
- * a `snowarch-manifest/1` of the checkout:
+ * the rc.2 cut's suite refused 34 cases on a manifest no state root held. So a state root a helper made holds a
+ * `snowarch-manifest/1` of the checkout:
  * - over its working tree when the fixture is made, never `git archive` (a release's written tree is uncommitted):
  *   the checkout's bytes, the files the product's own walk finds, the coverage the signer uses (`COVERAGE`);
- * - tagged `v<version>`, naming the tag's commit when the tag is here and HEAD when it is not;
+ * - tagged `v<version>`, naming the tag's commit when the tag is here and HEAD when it is not. Never HEAD alone:
+ *   `integrityStatus` compares the manifest's commit to `tagCommit(root, tag)`, never to HEAD
+ *   (`packages/snowarch/src/licence/integrity.ts:282-285`), and a real signed manifest carries the tag's commit, so
+ *   a fixture carrying HEAD would refuse where the product verifies. The fixture mirrors the product, never stricter;
  * - signed with this process's fixture primary, and made once per process and checkout, so a tree changed after it
  *   reads as changed.
+ * Three kinds of root, two seeded and one never:
+ * - the state root licensedEnv makes, with none given: seeded;
+ * - this test file's `useStateRoot()` directory (`state-root.mjs`, ARC-07-C43; the suites that run the launcher set it
+ *   at import), recognised by identity — its resolved path is `stateRootInUse()` and it is the only root: seeded, as
+ *   a helper made it too;
+ * - a root a case passes or sets itself (`root`, or a `SNOWARCH_STATE_ROOT` or `CLAUDE_PROJECT_DIR` in `env` that is
+ *   not that directory): never, because a case that asserts a missing, stale or changed manifest builds its own.
+ * The file is written on a licensedEnv call only, for a child that trusts the fixture key, and not again when its text
+ * is the same, as the licence is not: a doctor's cache keys on its inputs' times.
  * `checkout` (default this repository) changes only which tree is hashed, never which root is seeded:
- * - a root the caller passes (`root`, or `SNOWARCH_STATE_ROOT` or `CLAUDE_PROJECT_DIR` in `env`) is never seeded, so a
- *   case that asserts a missing, stale or changed manifest builds its own; with one, or with `licence: false`,
- *   `checkout` throws, as nothing would be seeded;
+ * - with a root a case passed, or with `licence: false`, it throws, as nothing would be seeded;
  * - a `checkout` that is not a release version throws: a case that asks for a release tree and is handed a
  *   development one would pass on the development exemption, not on its manifest.
  * Without `checkout`, a development version seeds nothing, exempt as it is on develop.
@@ -58,6 +68,7 @@ import {
   COVERAGE, checkTree, hashBytes, releaseTagOf, signManifest, tagCommit,
 } from '../../../lib/licence/manifest.mjs';
 import { keyPair, licenceText, productKeys } from '../licence.mjs';
+import { stateRootInUse } from '../state-root.mjs';
 import { remove, tempDir } from '../temp.mjs';
 
 const HOOKS_URL = new URL('./hooks.mjs', import.meta.url).href;
@@ -170,12 +181,15 @@ export function licensedEnv(env = process.env, { root, licence = {}, checkout } 
   out.NODE_OPTIONS = flags.join(' ');
 
   const roots = new Set([root, out.SNOWARCH_STATE_ROOT, out.CLAUDE_PROJECT_DIR].filter(Boolean).map((r) => resolve(r)));
-  if (checkout !== undefined && (licence === false || roots.size > 0)) {
-    throw new Error('licensedEnv: checkout names the tree hashed for a state root this helper makes, and '
+  // The test file's useStateRoot() directory, by its path and as the only root: a root that merely differs from it
+  // is a case's own.
+  const suite = stateRootInUse();
+  let seeded = suite && roots.size === 1 && roots.has(resolve(suite)) ? resolve(suite) : null;
+  if (checkout !== undefined && (licence === false || (roots.size > 0 && !seeded))) {
+    throw new Error('licensedEnv: checkout names the tree hashed for a state root a helper made, and '
       + `${licence === false ? 'licence: false makes none' : 'a root of the caller\'s is never seeded'} — drop one of the two`);
   }
   if (licence === false) return out;
-  let seeded = null;
   if (roots.size === 0) {
     out.SNOWARCH_STATE_ROOT = tempDir('snowarch-licensed-state-');
     made.push(out.SNOWARCH_STATE_ROOT);
@@ -198,6 +212,10 @@ export function licensedEnv(env = process.env, { root, licence = {}, checkout } 
     writeFileSync(file, text);
   }
   const manifest = seeded && fixtureManifestText(resolve(checkout ?? REPO), checkout !== undefined);
-  if (manifest) writeFileSync(join(seeded, '.local', 'release-manifest.json'), manifest, { mode: 0o600 });
+  const manifestFile = seeded && join(seeded, '.local', 'release-manifest.json');
+  // Not written again when the text is the same, as the licence is not.
+  if (manifest && !(existsSync(manifestFile) && readFileSync(manifestFile, 'utf8') === manifest)) {
+    writeFileSync(manifestFile, manifest, { mode: 0o600 });
+  }
   return out;
 }
