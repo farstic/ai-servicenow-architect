@@ -107,8 +107,11 @@ const SPACED = [
 ];
 // How a page and a name are compared: the corpus's escapes and bold gone, one apostrophe, one space.
 const spacedText = (s) => s.replace(/\\_/g, '_').replace(/\*\*|__/g, '').replace(/’/g, "'").replace(/[ \t]+/g, ' ');
+// ARC-09-C148 — a backticked corpus path, `markdown/…/c_Business-portal-NotifPref.md`: every segment of it is a file
+// name, never a claim, wherever it breaks (`-`, `_`, `/`).
+const CORPUS_PATH = /`(?:vendor\/)?(?:ServiceNowDocs\/)?markdown\/[^`\s]+?\.md`/g;
 // The words that turn a sentence into a claim about what the platform ships.
-const BASELINE_LINE =/baseline|out[- ]of[- ]the[- ]box|\boob\b|\bships\b|built-in/i;
+const BASELINE_LINE = /baseline|out[- ]of[- ]the[- ]box|\boob\b|\bships\b|built-in/i;
 // A dotted run that ends in one of these is a file or a host, not a platform name.
 const NOT_A_NAME = new Set(['md', 'json', 'mjs', 'js', 'ts', 'yml', 'html', 'css', 'csv', 'txt', 'png', 'svg', 'drawio', 'xml',
   'sh', 'pdf', 'docx', 'py', 'io', 'net', 'ink', 'com', 'org']);
@@ -196,8 +199,10 @@ export function scanRoster(root) {
       }
       if (prose && BASELINE_LINE.test(text)) {
         const marked = text.toLowerCase().includes(MARKER) || text.toLowerCase().includes(PROPOSED);
+        const paths = [...text.matchAll(CORPUS_PATH)].map((p) => [p.index, p.index + p[0].length]);
         for (const m of text.matchAll(CAMEL)) {
           if (text[m.index - 1] === '/') continue;                     // a path segment, `elsewhere/PageName.md`
+          if (paths.some(([from, to]) => m.index >= from && m.index < to)) continue;   // inside a corpus path (C148)
           if (!camel.has(m[0])) camel.set(m[0], []);
           const seen = camel.get(m[0]);
           if (!seen.some((x) => x.file === file && x.line === line)) seen.push({ file, line, text, marked });
