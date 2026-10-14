@@ -382,7 +382,12 @@ export async function handshake(serverPath: string, timeoutMs: number = HANDSHAK
     let initializeMs: number | undefined;
     let buffer = '';
     const seen: Record<number, unknown> = {};
+    // Once: the answer, the deadline, a spawn error and the child's exit can each end the handshake, and the exit
+    // also follows the `kill` below.
+    let settled = false;
     const finish = (h: Handshake): void => {
+      if (settled) return;
+      settled = true;
       child.kill();
       done({ ...h, ...(initializeMs === undefined ? {} : { initializeMs }) });
     };
@@ -400,6 +405,15 @@ export async function handshake(serverPath: string, timeoutMs: number = HANDSHAK
     };
 
     child.on('error', (e) => { clearTimeout(timer); finish({ tools: [], capabilities: null, error: e.message }); });
+    // ARC-09-C130 — A SERVER THAT STOPS READING IS A SERVER THAT EXITED. A write to its stdin after that is an EPIPE,
+    // which with no listener was an uncaught exception that killed the doctor run. Heard here and left to the exit
+    // below, which says why: the exit code is the reason a reader can act on, and an EPIPE is only its echo.
+    child.stdin.on('error', () => {});
+    child.on('exit', (code, signal) => {
+      clearTimeout(timer);
+      finish({ tools: [], capabilities: null,
+        error: `the server exited with ${code === null ? `signal ${signal}` : `code ${code}`} before the handshake finished` });
+    });
 
     child.stdout.on('data', (chunk: Buffer) => {
       buffer += chunk.toString();
