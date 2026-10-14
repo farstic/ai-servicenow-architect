@@ -18,7 +18,10 @@ import { USAGE as STORE_USAGE } from './store.mjs';
 import { USAGE as UPGRADE_USAGE } from './commands/upgrade.mjs';
 import { USAGE as STATUS_USAGE } from './commands/status.mjs';
 import { USAGE as LICENCE_USAGE } from './commands/licence.mjs';
-import { licenceStatus, refusalLines, refusesCommand } from './licence/state.mjs';
+import { licenceStatus, REFUSED, refusalLines, refusesCommand } from './licence/state.mjs';
+import { ensureIntegrity } from '../../../packages/snowarch/dist/licence/integrity.js';
+import { localDir } from './local-paths.mjs';
+import { productDir } from './spawn-env.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
@@ -221,6 +224,25 @@ export function helpText(where) {
   return lines.join('\n');
 }
 
+/**
+ * ARC-11-C141 — BEFORE ANY COMMAND, the Architect's own files are put back if they were changed (the owner's ruling,
+ * 2026-10-14): the command then runs on the signed tree, and the one line saying so goes to stderr. A checkout whose
+ * files cannot be put back is returned `refused`, and `main` refuses outside the repair set as a refused licence does.
+ * The stat key keeps the common case at a walk and a `stat` per covered file. Exported for its cases; `main` is its
+ * one caller.
+ */
+export function integrityGate({ root: at, err, cli, keys }) {
+  const integrity = ensureIntegrity(at, { local: localDir(at), cli, projectDir: productDir(at), ...(keys ? { keys } : {}) });
+  if (integrity.state === 'restored') err.write(`${integrity.line}\n`);
+  return integrity;
+}
+
+/** What a refused command prints: the licence's refusal when it is refused, which is asked first (Q6), else the tree's. */
+export function refusalFor(name, licence, integrity, cli) {
+  if (REFUSED.includes(licence.state)) return refusalLines(name, licence, cli);
+  return [`snowarch ${name}: this command does not run while the AI Architect's own files cannot be restored`, integrity.line];
+}
+
 export async function main(argv, { out = process.stdout, err = process.stderr, home = '',
   platform = process.platform, env = process.env } = {}) {
   // ARC-07-C31 — ONE `where`, built once and threaded, so the help, the usage and the
@@ -269,8 +291,9 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
    * two small files, which the session hook reads at every start anyway.
    */
   const licence = licenceStatus(root);
-  if (refusesCommand(name, licence, positional)) {
-    for (const line of refusalLines(name, licence, spellings(where).cli)) err.write(`${line}\n`);
+  const integrity = integrityGate({ root, err, cli: spellings(where).cli });
+  if (refusesCommand(name, licence, positional, integrity)) {
+    for (const line of refusalFor(name, licence, integrity, spellings(where).cli)) err.write(`${line}\n`);
     return EXIT_PREREQ;
   }
 

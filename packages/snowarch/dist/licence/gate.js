@@ -27,5 +27,10 @@ export const CLI_ALLOWED_FORMS = Object.freeze({ mode: Object.freeze(['design'])
 /** Does this command, with these arguments, run without a licence? */
 export const allowedCommand = (name, positional = []) => CLI_ALLOWED.includes(name)
     || (Object.hasOwn(CLI_ALLOWED_FORMS, name) && CLI_ALLOWED_FORMS[name].includes(positional[0]));
-/** Is this command refused? For a refused state, every command but the allowed ones. */
-export const refusesCommand = (name, s, positional = []) => REFUSED.includes(s.state) && !allowedCommand(name, positional);
+/**
+ * Is this command refused? For a refused licence, every command but the allowed ones — and the same for a checkout
+ * whose own files cannot be restored to the signed release (ARC-11-C141, the architect's ruling Q6): one door, one set.
+ * `integrity` is `ensureIntegrity`'s verdict; only `refused` refuses, because a changed file that could be put back
+ * was put back, and the command runs on the signed tree.
+ */
+export const refusesCommand = (name, s, positional = [], integrity = null) => (REFUSED.includes(s.state) || integrity?.state === 'refused') && !allowedCommand(name, positional);
