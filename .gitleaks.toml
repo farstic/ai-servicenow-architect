@@ -3,7 +3,7 @@
 useDefault = true
 
 [allowlist]
-description = "ARC-01: one path exclusion for a corpus that does not exist yet, and four fingerprints for documented benign findings."
+description = "ARC-01: one path exclusion for the vendored documentation corpus, four fingerprints for documented benign findings; ARC-09-C138: one path exclusion for signed release-manifest fixtures."
 
 # vendor/ServiceNowDocs is ServiceNow's own documentation corpus, vendored as a submodule by ARC-03
 # and attributed in NOTICE. Measured in ARC-01-S02: it trips 592 default rules, of which 526 are
@@ -12,7 +12,17 @@ description = "ARC-01: one path exclusion for a corpus that does not exist yet, 
 # are published examples. For contrast the same scan over the engine's history (59 commits) and over
 # the server import artefact (57 commits) each returned NO leaks, so this corpus is the entire
 # source of the noise. The path is listed BEFORE it exists so ARC-03's merge cannot turn CI red.
-paths = ['''^vendor/ServiceNowDocs/''']
+#
+# ARC-09-C138: tests/fixtures/release-manifest-v<tag>.json is a signed release manifest as published
+# with its release: public sha256 hashes of public files, and an Ed25519 signature over them. Measured
+# on v2.1.0-rc.1: generic-api-key x5, each a covered file whose name holds one of the rule's keywords
+# (keys.js, credential-shape.mjs, probe-auth.mjs) followed by its 64-hex hash. None is a secret. The
+# pattern is anchored to that one directory and that one file-name shape; a key-shaped value anywhere
+# else is still scanned.
+paths = [
+  '''^vendor/ServiceNowDocs/''',
+  '''^tests/fixtures/release-manifest-v.*\.json$''',
+]
 
 # The four remaining findings in the imported server documentation are allow-listed ONE BY ONE BY
 # FINGERPRINT in .gitleaksignore, not here: gitleaks takes fingerprints from that file
