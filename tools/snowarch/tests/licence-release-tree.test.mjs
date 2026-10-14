@@ -8,6 +8,7 @@
  * - the seeded state root lets the launcher run, and `status` reads the tree as verified; the control, in the same
  *   case, is the same start with the seeded manifest removed, refused;
  * - a manifest gone stale restores the scratch copy it was made from, never the real checkout;
+ * - the test file's `useStateRoot()` directory, where 31 of the 34 ran, is seeded, and a case's own root beside it is not;
  * - `checkout` hashes another tree and never seeds a root of the caller's, and a development tree named as one throws.
  */
 import { test } from 'node:test';
@@ -21,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import { COVERAGE } from '../lib/licence/manifest.mjs';
 import { licensedEnv } from './helpers/licence-hook/index.mjs';
+import { useStateRoot } from './helpers/state-root.mjs';
 import { tempDir } from './helpers/temp.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -69,6 +71,15 @@ const launch = (root, args, env) => spawnSync(process.execPath, [join(root, BIN)
   { encoding: 'utf8', cwd: root, env, timeout: 120_000 });
 const RECIPE = ['docs', 'sync', '--print-recipe', '--mode', 'sparse'];
 
+/** `git status` of what a restore could touch: the paths the manifest covers. Another file's churn is not this case's. */
+const covered = (root) => git(root, ['status', '--porcelain', '--', ...COVERAGE.covers]);
+
+/** What `.local/integrity-removed/` holds under `root`, or nothing. */
+function removedAt(root) {
+  const dir = join(root, '.local', 'integrity-removed');
+  return existsSync(dir) ? readdirSync(dir).sort() : [];
+}
+
 test('ARC-09-C146 — a release-versioned copy runs under the state root licensedEnv seeds, and refuses without its manifest', (t) => {
   const root = releaseCopy(t);
   const env = licensedEnv(cleanEnv(t), { checkout: root });
@@ -87,7 +98,7 @@ test('ARC-09-C146 — a release-versioned copy runs under the state root license
 });
 
 test('ARC-09-C146 — a manifest made before a change restores the copy it was made from, never the real checkout', (t) => {
-  const before = { status: git(REPO, ['status', '--porcelain']), removed: removedAt(REPO) };
+  const before = { status: covered(REPO), removed: removedAt(REPO) };
   const root = releaseCopy(t);
   const skill = join(root, '.claude', 'skills', 'itsm-specialist', 'SKILL.md');
   const signed = readFileSync(skill);
@@ -101,15 +112,25 @@ test('ARC-09-C146 — a manifest made before a change restores the copy it was m
   assert.match(r.stderr, new RegExp(`^Integrity: restored — .*1 file restored from v${VERSION.replace(/\./g, '\\.')}`, 'm'));
   assert.deepEqual(readFileSync(skill), signed, 'the scratch copy was not put back');
   assert.ok(removedAt(env.SNOWARCH_STATE_ROOT).length > 0, 'the replaced copy was not kept under the state root');
-  assert.deepEqual({ status: git(REPO, ['status', '--porcelain']), removed: removedAt(REPO) }, before,
+  assert.deepEqual({ status: covered(REPO), removed: removedAt(REPO) }, before,
     'a test restored or moved something in the real checkout');
 });
 
-/** What `.local/integrity-removed/` holds under `root`, or nothing. */
-function removedAt(root) {
-  const dir = join(root, '.local', 'integrity-removed');
-  return existsSync(dir) ? readdirSync(dir).sort() : [];
-}
+test('ARC-09-C146 — the test file\'s useStateRoot() directory is seeded, and a case\'s own root beside it never is', (t) => {
+  const root = releaseCopy(t);
+  // The suites that run the launcher set it at import (ARC-07-C43), and their cases pass process.env on.
+  const suite = useStateRoot();
+  const env = licensedEnv({ ...cleanEnv(t), SNOWARCH_STATE_ROOT: suite }, { checkout: root });
+  const r = launch(root, RECIPE, env);
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  assert.equal(existsSync(join(suite, '.local', 'release-manifest.json')), true);
+
+  // A root that merely differs from it, while it is in use, is a case's own: never seeded.
+  const own = tempDir('snowarch-c146-own-', t);
+  assert.throws(() => licensedEnv({ ...cleanEnv(t), SNOWARCH_STATE_ROOT: own }, { checkout: root }),
+    /a root of the caller's is never seeded/);
+  assert.equal(existsSync(join(own, '.local', 'release-manifest.json')), false);
+});
 
 test('ARC-09-C146 — checkout hashes another tree, never seeds a root of the caller\'s, and refuses a development one', (t) => {
   const release = tempDir('snowarch-c146-bound-', t);
