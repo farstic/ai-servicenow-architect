@@ -18,7 +18,8 @@ const CORPUS = join(ROOT, 'vendor', 'ServiceNowDocs');
 const HAS_CORPUS = existsSync(join(CORPUS, 'markdown'));
 
 // The allow-list's size by reason. A change here is a decision about the roster, made in review.
-const EXPECTED = { 'example-field': 9, 'payload-key': 23, 'example-role': 3, 'script-variable': 5, 'example-name': 48, 'script-code': 12 };
+// ARC-09-C144 added 15 example-name entries: names an example invents, written as words (a flow, an action, an alias).
+const EXPECTED = { 'example-field': 9, 'payload-key': 23, 'example-role': 3, 'script-variable': 5, 'example-name': 63, 'script-code': 12 };
 // The excuses the real roster rests on, by kind (sites), and the absent names written only in capitals
 // or in mixed case. A new member of either is a decision made in review, as a new allow-list entry is:
 // the marker covers its whole line, and a platform name retyped in capitals is never looked at.
@@ -34,7 +35,10 @@ const CAPITALS = {
 // What the two C104 arms rest on in the real roster. A change is a decision made in review.
 // The fill-in (2026-10-14) took the ITSM skill's notifications and auto-close from the corpus: +3 dotted names, each in it.
 const DOTTED_REAL = { checked: 29, scriptCode: 12 };   // 12 variables in example code, on 19 sites
-const CAMEL_REAL = { checked: 14, excused: 3 };         // SnSysId, AceGrid, GlobalCo: names an example invents
+// ARC-09-C144 +1 checked: the CSM notifications line cites c_Business-portal-NotifPref.md, and the corpus prints NotifPref in its URLs.
+const CAMEL_REAL = { checked: 15, excused: 3 };         // SnSysId, AceGrid, GlobalCo: names an example invents
+// What the C144 arm rests on: the names written as words, and the 14 an example invents (15 entries; SLA Risk Badge in two files).
+const SPACED_REAL = { checked: 72, excused: 14 };
 const kinds = (r) => r.excused.reduce((a, e) => (e.by === 'allow-list' ? a : { ...a, [e.by]: (a[e.by] ?? 0) + 1 }), {});
 
 // A fixture corpus small enough to read: two `cmdb_ci_cloud_` names (a family), one `cmdb_ci_lone_`
@@ -485,11 +489,13 @@ test('the regression this guards: an invented baseline notification in the ITSM 
   assert.deepEqual(r.spaced.unexcused.map((u) => `${u.file} ${u.identifier}`), [`.claude/skills/itsm-specialist/SKILL.md ${PLANTED}`]);
 });
 
-test('the real roster: both arms hold, and what they rest on is pinned', () => {
+test('the real roster: the three arms hold, and what they rest on is pinned', () => {
   if (!HAS_CORPUS) return;
   const r = verifyIdentifiers({ root: ROOT, index: realIndexOnce() });
   assert.deepEqual(r.dotted.unexcused, []);
   assert.deepEqual(r.camel.unexcused, []);
+  assert.deepEqual(r.spaced.unexcused, []);
   assert.deepEqual({ checked: r.dotted.checked, scriptCode: r.dotted.scriptCode }, DOTTED_REAL);
   assert.deepEqual({ checked: r.camel.checked, excused: r.camel.excused }, CAMEL_REAL);
+  assert.deepEqual({ checked: r.spaced.checked, excused: r.spaced.excused }, SPACED_REAL);
 });
