@@ -382,6 +382,15 @@ test('camelcase arm: a brand the corpus holds, a name off a claim line, a fence,
   assert.equal(r.camel.checked, 2, 'GlideRecord and ServiceNow share the one claim line that names a CamelCase word, and the corpus holds both');
 });
 
+test('camelcase arm: every segment of a backticked corpus path is unread, and a name beside the path is still read', (t) => {
+  // ARC-09-C148 — `c_Business-portal-NotifPref.md` put NotifPref in the arm's sight: it skipped a segment only after `/`.
+  const cite = '*(citation: `markdown/area/c_Business-portal-NotifZzz.md`)*';
+  const r = run(fixture(t, `**Baseline notifications** ${cite}.\n`));
+  assert.deepEqual(camelNames(r), [], 'a path segment the corpus does not print is not a claim');
+  assert.equal(r.camel.checked, 0);
+  assert.deepEqual(camelNames(run(fixture(t, `The baseline \`ChangeSchedule\` ${cite}.\n`))), ['ChangeSchedule'], 'beside the path');
+});
+
 test('camelcase arm: an invented name takes an ordinary entry, and the entry is checked', (t) => {
   const text = 'The baseline cluster class, and the client product `AceGrid` beside it.\n';
   const dir = fixture(t, text);
