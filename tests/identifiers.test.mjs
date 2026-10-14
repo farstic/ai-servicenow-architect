@@ -32,7 +32,8 @@ const CAPITALS = {
   mixed: ['Discovery_Custom', 'System_Ext'],
 };
 // What the two C104 arms rest on in the real roster. A change is a decision made in review.
-const DOTTED_REAL = { checked: 26, scriptCode: 12 };   // 12 variables in example code, on 19 sites
+// The fill-in (2026-10-14) took the ITSM skill's notifications and auto-close from the corpus: +3 dotted names, each in it.
+const DOTTED_REAL = { checked: 29, scriptCode: 12 };   // 12 variables in example code, on 19 sites
 const CAMEL_REAL = { checked: 14, excused: 3 };         // SnSysId, AceGrid, GlobalCo: names an example invents
 const kinds = (r) => r.excused.reduce((a, e) => (e.by === 'allow-list' ? a : { ...a, [e.by]: (a[e.by] ?? 0) + 1 }), {});
 

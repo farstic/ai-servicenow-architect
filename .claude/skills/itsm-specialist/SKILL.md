@@ -221,13 +221,16 @@ Three entries are stated without the state they leave: an incident is set to Res
 
 **Related tables:** `task_sla` (SLA progress per incident), `incident_alert` (link to Event Management alerts), `sys_journal_field` (work_notes / comments stream), `sys_history_set` / `sys_history_line` (field-level audit).
 
-**Baseline notification records:**
-- "Incident Assigned" — to assignee on `assigned_to` field change
-- "Incident Resolved" — to caller on state transition to Resolved
-- "Incident Reopened" — to assignee on Resolved → In Progress
-- "Incident Auto-Closed" — to caller on grace-period auto-closure
+**Baseline notification records** *(citation: `markdown/platform-administration/r_BaselineEmailNotifications.md`)*:
+- "Incident Opened" — to the caller, when someone else opens an incident for them (`incident.inserted`)
+- "Incident Opened & Unassigned" — to ITIL users, when an incident is opened with no assignee (`incident.inserted`)
+- "Incident Commented" — two records, to the caller and to the assignee, when comments are added (`incident.commented`)
+- "Incident Resolved" — to the caller, asking for the feedback that decides whether it is closed (`incident.updated`)
+- "Incident Closed" — to the caller, when it is closed (`incident.updated`)
 
-**Baseline business rules:** `Incident State Change`, `Calculate Inactivity`, `Auto-Close Incident` (Scheduled Job), `Notify Watchlist`.
+A notification on assignment, on reopening or on auto-closure is not documented in the bundled corpus — verify on the instance.
+
+**Auto-close:** the **Autoclose Incidents** scheduled job runs the **Incident Autoclose** business rule, which closes a resolved incident after `glide.ui.autoclose.time` days *(citation: `markdown/it-service-management/incident-management/configure-incident-auto-close.md`)*. Other incident business rules are not documented in the bundled corpus by name — verify on the instance.
 
 **Role gates:** resolving takes `itil`, `list_updater`, `sn_incident_write` or `admin`, and closing takes `itil_admin` or `admin` *(citation: `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`)*; reopening a resolved incident takes `sn_incident_write`, or being its caller or requester *(citation: `markdown/it-service-management/incident-management/reopening-incident.md`)*. Any other gate, cancelling included, is not documented in the bundled corpus — verify on the instance.
 
