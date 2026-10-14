@@ -7,6 +7,7 @@
  * run the class on every push, on a scratch copy at 0.0.0-rc.1, rather than waiting for the next cut:
  * - the seeded state root lets the launcher run, and `status` reads the tree as verified; the control, in the same
  *   case, is the same start with the seeded manifest removed, refused;
+ * - with a commit past the tag, the copy still verifies: the manifest names the tag's commit, as the product compares;
  * - a manifest gone stale restores the scratch copy it was made from, never the real checkout;
  * - the test file's `useStateRoot()` directory, where 31 of the 34 ran, is seeded, and a case's own root beside it is not;
  * - `checkout` hashes another tree and never seeds a root of the caller's, and a development tree named as one throws.
@@ -95,6 +96,23 @@ test('ARC-09-C146 — a release-versioned copy runs under the state root license
   const refused = launch(root, RECIPE, env);
   assert.equal(refused.status, 3, `${refused.stdout}${refused.stderr}`);
   assert.match(refused.stderr, new RegExp(`^Integrity: cannot restore — no signed manifest for v${VERSION.replace(/\./g, '\\.')} — `, 'm'));
+});
+
+test('ARC-09-C146 — with a commit past the tag, the manifest names the tag\'s commit, which is what the product compares', (t) => {
+  // The product compares the manifest's commit to the tag's, never to HEAD (integrity.ts:282-285). Everywhere else
+  // in this file HEAD is the tag, so only this case sees a fixture that named HEAD instead.
+  const root = releaseCopy(t);
+  writeFileSync(join(root, 'tests', 'after-the-tag.txt'), 'a commit past the tag, outside what the manifest covers\n');
+  git(root, [...by, 'add', '-A']);
+  git(root, [...by, 'commit', '-qm', 'after the tag']);
+  assert.notEqual(git(root, ['rev-parse', 'HEAD']), git(root, ['rev-parse', `v${VERSION}^{commit}`]));
+  const env = licensedEnv(cleanEnv(t), { checkout: root });
+
+  const docs = launch(root, RECIPE, env);
+  assert.equal(docs.status, 0, `${docs.stdout}${docs.stderr}`);
+  const status = launch(root, ['status'], env);
+  assert.match(`${status.stdout}`, new RegExp(`Integrity: verified · v${VERSION.replace(/\./g, '\\.')} · \\d+ files`),
+    `${status.stdout}${status.stderr}`);
 });
 
 test('ARC-09-C146 — a manifest made before a change restores the copy it was made from, never the real checkout', (t) => {
