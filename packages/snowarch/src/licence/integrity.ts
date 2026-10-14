@@ -685,18 +685,22 @@ export function ensureIntegrity(root: string, opts: EnsureOptions = {}): Ensured
       repair(cli), status.hashed, status.s);
   }
   try {
-    // Under the lock, again: the process that held it may have restored the tree already (R1).
-    const again = integrityStatus(root, { keys, local, commitOf: () => null });
-    if (again.state === 'verified') {
-      writeVerdict(root, local, again.tag, status.manifest as ManifestBody);
-      return { state: 'verified', tag: again.tag, hashed: status.hashed + again.checked };
+    // Under the lock, again, and the same question: the process that held it may have restored the tree already (R1),
+    // and then it rewrote the stat key, which answers here without a read. A stat-keyed caller re-reads only what moved.
+    const requick = !full && tag ? statDifferences(root, local, tag) : null;
+    if (requick?.same) return { state: 'verified', tag: tag as string, hashed: status.hashed };
+    const again = integrityStatusFor(root, { keys, local, full, quick: requick, run });
+    const hashed = status.hashed + again.hashed;
+    if (again.s.state === 'verified') {
+      writeVerdict(root, local, again.s.tag, again.manifest as ManifestBody);
+      return { state: 'verified', tag: again.s.tag, hashed };
     }
-    if (again.state !== 'modified') {
-      const { reason, remedy } = refusalOf(again, cli);
-      return refused(tag, reason, remedy, status.hashed, again);
+    if (again.s.state !== 'modified') {
+      const { reason, remedy } = refusalOf(again.s, cli);
+      return refused(tag, reason, remedy, hashed, again.s);
     }
-    return restoreTree(root, again.tag, status.manifest as ManifestBody, again.modified,
-      { local, now, run, cli, projectDir }, status.hashed + again.checked);
+    return restoreTree(root, again.s.tag, again.manifest as ManifestBody, again.s.modified,
+      { local, now, run, cli, projectDir }, hashed);
   } finally {
     release();
   }
