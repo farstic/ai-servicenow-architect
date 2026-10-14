@@ -11,7 +11,7 @@ import { bootstrapSpelling, cliSpelling } from '../../src/cli/tty.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 import { licenceFixture, licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
-import { releaseCheckout } from './fixtures.js';
+import { releaseCheckout, removeFixtureDirs } from './fixtures.js';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 /**
@@ -27,7 +27,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const CLI = resolve(here, '../../dist/cli/index.js');
 
 const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-package-cli-')));
-afterAll(() => { removeTempDir(base); });
+// The release checkouts the C141 cases build are the fixtures module's, swept with it, on failure too.
+afterAll(() => { removeTempDir(base); removeFixtureDirs(); });
 
 /** The fixture's keys trusted (the hook) and no licence in the project: the state is `missing`. */
 const unlicensed = (args: readonly string[]) => spawnSync(process.execPath, [CLI, ...args], {
