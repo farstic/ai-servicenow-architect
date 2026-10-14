@@ -476,7 +476,8 @@ See `docs/CONTRIBUTING.md` at the repository root.
 
 ## Licence
 
-Apache-2.0. See `LICENSE` and `NOTICE` at the repository root.
+BUSL-1.1, the Business Source License 1.1, from 2.1.0; 2.0.x and earlier are Apache-2.0. See `LICENSE` and
+`NOTICE` at the repository root.
 Repository: <https://github.com/farstic/ai-servicenow-architect>
 
 ## The invariants

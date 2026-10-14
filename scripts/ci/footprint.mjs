@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-01-S11 — the production install's footprint, in the ONE metric the gate names.
 // `du` block-rounds and its semantics differ per OS (72 MB vs 57.3 MB on the same tree, measured in

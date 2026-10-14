@@ -1,6 +1,6 @@
 # AI ServiceNow Architect
 
-**v2.1.0-dev** · Apache-2.0 · Claude Code ≥ 2.1.214
+**v2.1.0-dev** · BUSL-1.1 · Claude Code ≥ 2.1.214
 
 ![version](https://img.shields.io/badge/version-2.1.0--dev-blue)
 

@@ -25,10 +25,11 @@ contributor; without it, a pull request cannot be merged.
   gitignored and must stay out).
 - Every new source file carries the copyright header: these two lines, first in the file or right after its
   shebang, with `#` in place of `//` for `.sh`, `.py` and `.ps1`. `tests/source-headers.test.mjs` holds every
-  owned source file to them.
+  owned source file to them, and every other tracked file that carries the first line, `dist/` included, to
+  its current form.
 
   ```
-  // Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+  // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
   // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
   ```
 

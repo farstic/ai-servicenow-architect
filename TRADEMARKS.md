@@ -2,8 +2,8 @@
 
 **snowarch** and the snowarch logo are trademarks of Cvetomir Grigorov (the "Marks"). A
 trademark application for *snowarch* has been filed with the Patent Office of the Republic of
-Bulgaria (classes 9 and 42); further registrations may follow. The code licence (`LICENSE`,
-Apache-2.0) grants **no** trademark rights (Apache-2.0 §6).
+Bulgaria (classes 9 and 42); further registrations may follow. The code licence (`LICENSE`: the
+Business Source License 1.1 from 2.1.0, Apache-2.0 before it) grants **no** trademark rights.
 
 ## You may, without asking
 
@@ -29,7 +29,7 @@ Apache-2.0) grants **no** trademark rights (Apache-2.0 §6).
 ## Attribution line
 
 When you refer to the project, use: *snowarch — AI ServiceNow Architect, © Cvetomir Grigorov,
-Apache-2.0*.
+BUSL-1.1*.
 
 ## Requesting a licence
 

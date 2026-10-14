@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C7 — the SessionStart hook never hashes. E-32 is the one quick check that reads every covered file, and the
 // hook's re-run of the quick doctor leaves it out by name, so a session start costs what it cost before C7.

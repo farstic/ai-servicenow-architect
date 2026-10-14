@@ -11,7 +11,7 @@
 ai-servicenow-architect/                      farstic/ai-servicenow-architect · one git tag per release
 ├── CLAUDE.md                                 ≤200 lines: identity, routing protocol (Phase 1/2), §1.1 summary, the `Status` trigger (→ `/snowarch status`); imports nothing large
 ├── README.md                                 the ONE install page (2 commands, 2 dialogs, what you will see)
-├── LICENSE · NOTICE                          single licence (D-02); Apache-2.0 attribution for ServiceNow/ServiceNowDocs
+├── LICENSE · NOTICE                          single licence (BUSL-1.1 from 2.1.0, ADR-0011; Apache-2.0 before, D-02); Apache-2.0 attribution for ServiceNow/ServiceNowDocs
 ├── engine.config.json                        product name, server key, floors (claude/node/git), docs family+pin, roster expectations
 ├── package.json · package-lock.json          ROOT = version of record; workspaces ["packages/*", "tools/snowarch"]; scripts {bootstrap, doctor, test, lint, release}
 ├── bootstrap.sh · bootstrap.ps1 · bootstrap.cmd   launchers (bash 3.2 / PowerShell 5.1 / cmd → PowerShell with -ExecutionPolicy Bypass)

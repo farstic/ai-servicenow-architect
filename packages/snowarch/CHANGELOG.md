@@ -5,6 +5,9 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased (2.0.11-dev)
 
+**Relicensed to the Business Source License 1.1 (`BUSL-1.1`) from 2.1.0** (ADR-0011). Versions 2.0.x and
+earlier stay under Apache-2.0, to which `2.0.0` below relicensed the package.
+
 **Known gaps, raised not closed: the cut-value check (ARC-09-C93) does not see every write, and the
 refusal before the write (ARC-09-C97) sees two methods.** `snow_*` tools return `warnings[].code =
 VALUE_TRUNCATED` when the platform's answer to a write holds a shorter prefix of a string that was sent:

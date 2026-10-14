@@ -1,6 +1,9 @@
 AI ServiceNow Architect
 Copyright 2026 Cvetomir Grigorov
 
+From version 2.1.0 this product is licensed under the Business Source License 1.1 (see LICENSE);
+versions 2.0.x and earlier remain under the Apache License, Version 2.0.
+
 This product includes documentation from the ServiceNowDocs corpus
 (https://github.com/ServiceNow/ServiceNowDocs), licensed under the Apache License, Version 2.0,
 checked out as a git submodule at vendor/ServiceNowDocs. ServiceNow and Now Platform are

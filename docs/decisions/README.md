@@ -8,9 +8,11 @@ folder into `farstic/ai-servicenow-architect` as `docs/decisions/` as-is — the
 level (ARC-00 `STORIES.md` conventions: "ARC-01 imports `spikes/` into the new repository as `docs/spikes/`
 and `docs/decisions/` as-is") and **no ARC-01 story currently owns it**; see §4.5.
 
-**Status: COMPLETE.** **Ten** ADRs, all Accepted: ADR-0001 to ADR-0007 and ADR-0009 (Accepted
+**Status:** **Eleven** ADRs. Ten are Accepted: ADR-0001 to ADR-0007 and ADR-0009 (Accepted
 2026-09-08, the owner ratifying it by merging ARC-05-S11), plus ADR-0008 (2026-09-07, option A) and
 ADR-0010 (Accepted 2026-09-23 — the owner's decision that day; wired by ARC-05-S12).
+ADR-0011, the Business Source License 1.1 from 2.1.0, is **Proposed** (2026-10-14): it supersedes ADR-0002
+for 2.1.0 and later, and moves to Accepted when the owner sets the four parameters in `LICENSE`.
 ADR-0006 moved to Accepted on 2026-09-08 — *"monorepo path confirmed"* — when ARC-00-S12's S-14
 verdict arrived. **The owner's initials landed on 2026-09-16 (`CG`)** on the eight that carry a
 Decision-owner cell. Details in §3.
@@ -43,6 +45,7 @@ since is recorded here rather than by editing them:
 | [`ADR-0006-distribution-channel.md`](ADR-0006-distribution-channel.md) | D-06 — monorepo and bootstrap now, plugin channel spiked in parallel | **Proposed** — ARC-00-S12 accepts it or supersedes it with ADR-0008 |
 | [`ADR-0007-post-decision-rulings.md`](ADR-0007-post-decision-rulings.md) | Q-A, Q-B, R-1, R-2, R-3, R-4 | **Accepted** |
 | [`ADR-0008-git-floor.md`](ADR-0008-git-floor.md) | The git floor, and the sparse-checkout root-file repair that keeps it low — **supersedes ADR-0001's `floors.git` row only** | **Accepted (2026-09-07)** — option A: recipe repair step + `floors.git` = `2.34.1` |
+| [`ADR-0011-business-source-licence.md`](ADR-0011-business-source-licence.md) | The Business Source License 1.1 from 2.1.0 — **supersedes ADR-0002 for 2.1.0 and later** | **Proposed (2026-10-14)** — Accepted when the owner sets the four parameters in `LICENSE` |
 
 Values these ADRs fix are mirrored in [`../../spikes/engine.config.seed.json`](../spikes/engine.config.seed.json),
 which ARC-01-S04 starts `engine.config.json` from.

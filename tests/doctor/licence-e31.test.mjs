@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C1 — E-31, the licence: in the quick set, offline. From ARC-11-C6 step 5 a refused state (missing, invalid,
 // expired, revoked) is a FAIL, the one cause a doctor names for a licence that is not in force; expiring is a warning.

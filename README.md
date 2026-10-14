@@ -1,6 +1,6 @@
 # AI ServiceNow Architect
 
-**v2.1.0-dev** · Apache-2.0 · Claude Code ≥ 2.1.214
+**v2.1.0-dev** · BUSL-1.1 · Claude Code ≥ 2.1.214
 
 ![version](https://img.shields.io/badge/version-2.1.0--dev-blue)
 
@@ -327,7 +327,8 @@ a path that no longer exists.
 
 ## Licence and attribution
 
-Licensed under **Apache-2.0** — see `LICENSE` and `NOTICE`.
+Licensed under the **Business Source License 1.1** (`BUSL-1.1`) from 2.1.0; 2.0.x and earlier remain
+**Apache-2.0**. See `LICENSE` and `NOTICE`.
 
 What that allows, in plain language, is in [LICENSING.md](LICENSING.md); the name and logo are covered by
 [TRADEMARKS.md](TRADEMARKS.md). Contributions need the signed Contributor Licence Agreement, [CLA.md](CLA.md):

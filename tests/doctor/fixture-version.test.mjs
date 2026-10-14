@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C137 — a fixture's version is the fixture's. The v2.1.0-rc.1 rehearsal's post-write suite failed the
 // three hook tests of AC 1: `greenTree` copied the checkout's package.json, which a release had by then written to

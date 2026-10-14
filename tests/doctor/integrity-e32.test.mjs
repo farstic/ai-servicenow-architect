@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-11-C7 — E-32, the build's integrity: the files a release ships, checked against the manifest the owner signs
 // for its tag. In the quick set and offline, like E-31: it reads the cached manifest and hashes the covered files as

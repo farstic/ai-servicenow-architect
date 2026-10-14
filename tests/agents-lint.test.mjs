@@ -1,4 +1,4 @@
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-02-S02 — the agent roster, checked against the rules in tests/lib/lint-rules.mjs.
 // ARC-02-S04 made the content change AG-04/AG-05 required and flipped ENFORCE_S04 to true, so every

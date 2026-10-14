@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+# Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 # snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 # The launcher. Two jobs: hand over to Node when it is here, and finish design-only when it is not.
 #

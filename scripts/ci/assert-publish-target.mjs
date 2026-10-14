@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Copyright 2026 Cvetomir Grigorov. Licensed under the Apache License, Version 2.0 (see LICENSE).
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 /**
  * The publish workflow may publish ONE package, and this is what says so.
@@ -72,8 +72,8 @@ export function problems(pkg, tag) {
   if (!node || !/>=\s*(2[0-9]|[3-9][0-9])/.test(node)) {
     out.push(`refusing — engines.node is "${node}", expected at least ">=20"`);
   }
-  if (pkg?.license !== 'Apache-2.0') {
-    out.push(`refusing — license is "${pkg?.license}", expected "Apache-2.0"`);
+  if (pkg?.license !== 'BUSL-1.1') {
+    out.push(`refusing — license is "${pkg?.license}", expected "BUSL-1.1"`);
   }
 
   // Both shapes npm accepts: the object with a `url`, and the `github:owner/repo` shorthand. What
