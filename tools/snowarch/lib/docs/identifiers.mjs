@@ -33,6 +33,13 @@
 // corpus's own words or marked. CamelCase: an absent name of two or more humps, outside fences, on a
 // line that says baseline, out-of-the-box, OOB, ships or built-in, with no marker or declaration on
 // the line; an invented name takes an ordinary tier-2 entry.
+//
+// ARC-09-C144 — a name written as words: "Major Incident Communication", a baseline notification the corpus
+// does not print, had no underscore, no dot and no humps, so no arm saw it. The spaced arm reads a quoted,
+// italic or backticked run of two or more Title-Case words (small joining words allowed) outside fences, and
+// wants it printed in the corpus as written, case and all — a phrase in lower case is not the name. The
+// marker on its line answers it, and an example's own name takes an `example-name` entry. One word, a run
+// all in capitals (the roster's own `OPEN QUESTIONS`), bold and plain prose are not looked at.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { loadContract, toolNames } from '../../../../packages/contract/lib/contract.mjs';
@@ -89,8 +96,19 @@ const CUSTOM = /^(x|u)_/;
 const CAMEL_NAME = /^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+$/;
 // Two or more humps: `ChangeSchedule`, not `Account` or `ITSM`.
 const CAMEL = /\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+\b/g;
+// A name written as words: two or more Title-Case words, small joining words between them.
+const WORD = "[A-Z][A-Za-z0-9&'’-]*";
+const SPACED_NAME = `${WORD}(?:\\s+(?:${WORD}|of|and|the|for|to|on|in|a|an|by|with|or|from|at|via|per))*\\s+${WORD}`;
+// The three ways the roster sets one off: quoted, italic (one `*` or `_`, never bold), backticked.
+const SPACED = [
+  new RegExp(`["“](${SPACED_NAME})["”]`, 'g'),
+  new RegExp(`(?<![*\\w])[*_](${SPACED_NAME})[*_](?![*\\w])`, 'g'),
+  new RegExp(`\`(${SPACED_NAME})\``, 'g'),
+];
+// How a page and a name are compared: the corpus's escapes and bold gone, one apostrophe, one space.
+const spacedText = (s) => s.replace(/\\_/g, '_').replace(/\*\*|__/g, '').replace(/’/g, "'").replace(/[ \t]+/g, ' ');
 // The words that turn a sentence into a claim about what the platform ships.
-const BASELINE_LINE = /baseline|out[- ]of[- ]the[- ]box|\boob\b|\bships\b|built-in/i;
+const BASELINE_LINE =/baseline|out[- ]of[- ]the[- ]box|\boob\b|\bships\b|built-in/i;
 // A dotted run that ends in one of these is a file or a host, not a platform name.
 const NOT_A_NAME = new Set(['md', 'json', 'mjs', 'js', 'ts', 'yml', 'html', 'css', 'csv', 'txt', 'png', 'svg', 'drawio', 'xml',
   'sh', 'pdf', 'docx', 'py', 'io', 'net', 'ink', 'com', 'org']);
@@ -134,6 +152,7 @@ export function scanRoster(root) {
   const placeholders = [];      // names written straight after the x_<vendor>_<app>_ placeholder
   const plainDotted = new Map();  // lower-cased `left.word` (no underscore on the right) → [{ file, line, text }]
   const camel = new Map();        // `ChangeSchedule` on a line that claims baseline → [{ file, line, text, marked }]
+  const spaced = new Map();       // "Major Incident Communication", as written → [{ file, line, text, marked }]
   for (const abs of rosterFiles(root)) {
     const file = relative(root, abs).split(sep).join('/');
     const body = readFileSync(abs, 'utf8');
@@ -184,9 +203,21 @@ export function scanRoster(root) {
           if (!seen.some((x) => x.file === file && x.line === line)) seen.push({ file, line, text, marked });
         }
       }
+      if (prose) {
+        const marked = text.toLowerCase().includes(MARKER);
+        for (const re of SPACED) {
+          for (const m of text.matchAll(re)) {
+            const name = spacedText(m[1]);
+            if (name === name.toUpperCase()) continue;                 // all capitals: the roster's own markers
+            if (!spaced.has(name)) spaced.set(name, []);
+            const seen = spaced.get(name);
+            if (!seen.some((x) => x.file === file && x.line === line)) seen.push({ file, line, text, marked });
+          }
+        }
+      }
     });
   }
-  return { tokens, qualified, texts, proposed, placeholders, plainDotted, camel };
+  return { tokens, qualified, texts, proposed, placeholders, plainDotted, camel, spaced };
 }
 
 /**
@@ -203,11 +234,13 @@ function plainShape(whole, text, m) {
   return text[m.index - 1] !== '/' && text[m.index + m[0].length] !== '/';
 }
 
-/** What the index must answer for this roster: the plain words a field is written on, and the two arms' names. */
+/** What the index must answer for this roster: the plain words a field is written on, and the three arms' names. */
 export function rosterWants(roster) {
   const words = new Set();
   for (const t of roster.tokens.values()) for (const s of t.sites) if (s.on && !s.on.includes('_')) words.add(s.on);
-  return { words, dotted: new Set(roster.plainDotted.keys()), camel: new Set(roster.camel.keys()) };
+  return {
+    words, dotted: new Set(roster.plainDotted.keys()), camel: new Set(roster.camel.keys()), spaced: new Set(roster.spaced.keys()),
+  };
 }
 
 /**
@@ -215,12 +248,17 @@ export function rosterWants(roster) {
  * dotted names under `com.`, `glide.` and `sn_*.`. One pass over every page; the `\_` escape the
  * corpus writes is removed before tokenising, or `sys\_user` would never match `sys_user`.
  */
-export function corpusIndex(corpus, { words = new Set(), dotted: wantDotted = new Set(), camel: wantCamel = new Set() } = {}) {
+export function corpusIndex(corpus, { words = new Set(), dotted: wantDotted = new Set(), camel: wantCamel = new Set(),
+  spaced: wantSpaced = new Set() } = {}) {
   const tokens = new Set();
   const seen = new Set();
   const names = new Set();
   const foundDotted = new Set();  // of the plain dotted names asked about, those the corpus prints
   const foundCamel = new Set();   // of the CamelCase names asked about, those the corpus prints
+  const foundSpaced = new Set();  // of the names written as words asked about, those the corpus prints
+  // One pass for all of them, the longest first, so a name is not hidden by a shorter one it begins with.
+  const spacedRe = wantSpaced.size ? new RegExp([...wantSpaced].sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g') : null;
   for (const f of walk(join(corpus, 'markdown'))) {
     const text = readFileSync(f, 'utf8').replace(/\\_/g, '_');
     for (const m of text.matchAll(/[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*/g)) {
@@ -237,6 +275,7 @@ export function corpusIndex(corpus, { words = new Set(), dotted: wantDotted = ne
       }
     }
     if (wantCamel.size) for (const m of text.matchAll(CAMEL)) if (wantCamel.has(m[0])) foundCamel.add(m[0]);
+    if (spacedRe) for (const m of spacedText(text).matchAll(spacedRe)) foundSpaced.add(m[0]);
   }
   const namespaces = new Map();
   for (const d of names) {
@@ -245,7 +284,7 @@ export function corpusIndex(corpus, { words = new Set(), dotted: wantDotted = ne
   }
   return {
     tokens, words: seen, dotted: names, namespaces, has: (t) => tokens.has(t) || seen.has(t),
-    foundDotted, foundCamel, asked: { dotted: wantDotted, camel: wantCamel },
+    foundDotted, foundCamel, foundSpaced, asked: { dotted: wantDotted, camel: wantCamel, spaced: wantSpaced },
   };
 }
 
@@ -269,6 +308,13 @@ export function checkAllowList(list, roster, { prefixes = PLATFORM_PREFIXES, glu
     if (keys.has(key)) { fail('listed twice'); continue; }
     keys.add(key);
     if (!Object.hasOwn(REASONS, e.reason)) { fail(`reason "${e.reason}" is not one of ${Object.keys(REASONS).join(', ')}`); continue; }
+    if (/\s/.test(e.identifier)) {
+      // ARC-09-C144's one excuse: a name an example invents, written as words in the file the entry names.
+      if (e.reason !== 'example-name') { fail('a name written as words takes example-name: a flow, an action, a script an example invents'); continue; }
+      if (e.table) { fail('only an example-field entry names a table'); continue; }
+      if (!roster.spaced?.get(e.identifier)?.some((x) => x.file === e.file)) fail('the file does not write this name');
+      continue;
+    }
     const dottedId = e.identifier.includes('.');
     const camelId = !dottedId && CAMEL_NAME.test(e.identifier);
     if (e.reason === 'script-code' && !dottedId) { fail('a script-code entry names a dotted name: current.approval, not a bare word'); continue; }
@@ -339,14 +385,15 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
   const corpus = resolve(root, corpusDir);
   const none = () => ({ checked: 0, unexcused: [], scriptCode: 0, excused: 0 });
   if (!index && !existsSync(join(corpus, 'markdown'))) {
-    return { status: 'missing', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [], deadPrefixes: [], allowErrors, reasons, dotted: none(), camel: none() };
+    return { status: 'missing', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [], deadPrefixes: [], allowErrors, reasons, dotted: none(), camel: none(), spaced: none() };
   }
   const wants = rosterWants(roster);
   const idx = index ?? corpusIndex(corpus, wants);
   // An index built for another roster cannot say whether THIS roster's names are in the corpus, and
   // "not asked" would read as "not there". Refuse rather than report a wall of false misses.
-  const asked = idx.asked ?? { dotted: new Set(), camel: new Set() };
-  const unasked = [...wants.dotted].filter((n) => !asked.dotted.has(n)).concat([...wants.camel].filter((n) => !asked.camel.has(n)));
+  const asked = idx.asked ?? { dotted: new Set(), camel: new Set(), spaced: new Set() };
+  const unasked = [...wants.dotted].filter((n) => !asked.dotted.has(n)).concat([...wants.camel].filter((n) => !asked.camel.has(n)))
+    .concat([...wants.spaced].filter((n) => !asked.spaced?.has(n)));
   if (unasked.length) {
     throw new Error(`the corpus index was built without ${unasked.length} name(s) this roster asks about (${unasked.slice(0, 3).join(', ')}): build it with corpusIndex(corpus, rosterWants(scanRoster(root)))`);
   }
@@ -465,19 +512,36 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
     }
   }
   camelArm.excused = camelExcused.size;
+  const spacedArm = none();
+  const spacedExcused = new Set();
+  for (const [name, sites] of roster.spaced) {
+    spacedArm.checked += 1;
+    if (idx.foundSpaced.has(name)) continue;
+    for (const s of sites) {
+      if (s.marked) { pass(s, name, 'marker'); spacedExcused.add(name); }
+      else if (entries.has(`${s.file}\0${name}`)) { pass(s, name, 'allow-list'); spacedExcused.add(name); }
+      else {
+        spacedArm.unexcused.push({ file: s.file, line: s.line, identifier: name,
+          why: 'a name the corpus does not print, as written: use the corpus\'s name, the marker, or — for a name an example invents — an example-name entry' });
+      }
+    }
+  }
+  spacedArm.excused = spacedExcused.size;
   for (const e of list) {
-    const found = e.identifier.includes('.') ? idx.foundDotted.has(e.identifier)
-      : (CAMEL_NAME.test(e.identifier) ? idx.foundCamel.has(e.identifier) : idx.has(e.identifier));
+    const found = /\s/.test(e.identifier) ? idx.foundSpaced.has(e.identifier)
+      : e.identifier.includes('.') ? idx.foundDotted.has(e.identifier)
+        : (CAMEL_NAME.test(e.identifier) ? idx.foundCamel.has(e.identifier) : idx.has(e.identifier));
     if (found) stale.push({ file: e.file, identifier: e.identifier, why: 'the corpus has this name: remove the entry' });
   }
   const firsts = new Set([...idx.tokens].map((t) => t.split('_')[0]));
   const deadPrefixes = prefixes.filter((p) => !firsts.has(p));
-  const bad = unexcused.length + dottedArm.unexcused.length + camelArm.unexcused.length + stale.length + deadPrefixes.length + allowErrors.length;
+  const bad = unexcused.length + dottedArm.unexcused.length + camelArm.unexcused.length + spacedArm.unexcused.length
+    + stale.length + deadPrefixes.length + allowErrors.length;
   return {
     status: bad ? 'fail' : 'ok',
     checked: classes.found + classes.custom + classes.constant + classes.mixed + classes.absent + classes.qualified,
     classes, capitals: { constant: [...new Set(capitals.constant)].sort(), mixed: [...new Set(capitals.mixed)].sort() },
-    unexcused, excused, stale, deadPrefixes, allowErrors, reasons, dotted: dottedArm, camel: camelArm,
+    unexcused, excused, stale, deadPrefixes, allowErrors, reasons, dotted: dottedArm, camel: camelArm, spaced: spacedArm,
   };
 }
 
@@ -488,10 +552,13 @@ export function formatIdentifiers(r) {
     return { text: lines.join('\n'), code: r.allowErrors.length ? 1 : 0 };
   }
   for (const p of r.deadPrefixes) lines.push(`PREFIX ${p} — begins no corpus name; remove it from PLATFORM_PREFIXES`);
-  for (const u of [...r.unexcused, ...r.dotted.unexcused, ...r.camel.unexcused]) lines.push(`UNEXCUSED ${u.file}:${u.line} ${u.identifier} — ${u.why}`);
+  for (const u of [...r.unexcused, ...r.dotted.unexcused, ...r.camel.unexcused, ...r.spaced.unexcused]) {
+    lines.push(`UNEXCUSED ${u.file}:${u.line} ${u.identifier} — ${u.why}`);
+  }
   for (const s of r.stale) lines.push(`STALE ${s.file} ${s.identifier} — ${s.why}`);
   lines.push(`identifiers: checked ${r.checked} | unexcused ${r.unexcused.length}`);
   lines.push(`dotted names: checked ${r.dotted.checked} | unexcused ${r.dotted.unexcused.length} | script-code ${r.dotted.scriptCode}`);
   lines.push(`camelcase names: checked ${r.camel.checked} | unexcused ${r.camel.unexcused.length} | excused ${r.camel.excused}`);
+  lines.push(`spaced names: checked ${r.spaced.checked} | unexcused ${r.spaced.unexcused.length} | excused ${r.spaced.excused}`);
   return { text: lines.join('\n'), code: r.status === 'ok' ? 0 : 1 };
 }
