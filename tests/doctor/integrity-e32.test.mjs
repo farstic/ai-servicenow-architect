@@ -171,3 +171,19 @@ test('ARC-11-C141 — doctor --fix puts the signed files back (integrity-restore
   assert.equal((await run(root)).status, 'ok');
   assert.equal((await fixer.apply({ root, ctx: { ...ctxFor(root), licenceKeys: KEYS }, kind: 'integrity-restore' })).result, 'noop');
 });
+
+test('ARC-11-C141 — only a modified tree is fixable: E-32 says so per finding, so no snapshot reads the declaration', async (t) => {
+  // The report takes the result's `fixable` and falls back to the declaration's (report-json.mjs). E-32 is declared
+  // fixable because one finding is; every other finding must say false, or a skip on a development tree reads as a
+  // repair on offer (#441's Windows bootstrap cells, E-32 "fixable false → true").
+  const dev = await e32().run(ctxFor(treeAt(t, '9.1.0-dev')));
+  const none = await e32().run(ctxFor(treeAt(t, '9.1.0')));
+  const { root } = signedTree(t);
+  const verified = await run(root);
+  writeFileSync(join(root, 'CLAUDE.md'), 'changed\n');
+  const modified = await run(root);
+  assert.deepEqual([dev.status, dev.fixable], ['skip', false]);
+  assert.deepEqual([none.status, none.fixable], ['fail', false]);
+  assert.deepEqual([verified.status, verified.fixable], ['ok', false]);
+  assert.deepEqual([modified.status, modified.fixable], ['fail', true]);
+});
