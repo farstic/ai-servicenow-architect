@@ -81,11 +81,17 @@ together in 2.1.0. The owner deferred C8 and C9 on 2026-10-14, so 2.1.0 carries 
 3. ARC-11-C3's design (done: the split into C6 to C9, 2026-10-12).
 4. ARC-11-C6 (#420), then a release candidate of 2.0.13 and the owner's two-machine test on it (T-28).
 5. ARC-11-C11 with ARC-09-C133 (#426); then the owner's ruling from the rc.3 sitting and C12, in rc.4; then 2.0.13.
-6. The rest of ARC-11-C3's code: C7, then C10. C8 and C9 are deferred (the owner, 2026-10-14).
-7. ARC-11-C5.
-8. A release candidate of 2.1.
-9. The owner's two-machine test on it (T-28).
-10. 2.1.0.
+6. The rest of ARC-11-C3's code: C7 (#432), then C10 (#436), both done. C8 and C9 are deferred (the owner,
+   2026-10-14). On C7's manifest, ARC-11-C141, the owner's ruling that a change to the Architect's own files does not
+   take effect (#441), done.
+7. ARC-11-C5 (#437), done.
+8. A release candidate of 2.1: `v2.1.0-rc.1` and `v2.1.0-rc.2` are tagged, and rc.3 is cut from develop `a9384f93`
+   (2026-10-15), after ARC-09-C144 to C148 (#445, #446).
+9. The owner's two-machine test on it (T-28): on rc.3, pending.
+10. 2.1.0, with its changelog section, which merges after the rc.3 sitting's findings.
+
+The ARC-09 rows that ship in 2.1.0: C129, C130, C134, C136 to C140, and C144 to C148; with them ARC-02-C5 to C13 (the
+D and E rows) and ARC-11-C141. C135 was closed by measurement, with no code; C142 and C143 stay open.
 
 ## Rows
 
