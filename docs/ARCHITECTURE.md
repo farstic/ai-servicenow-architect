@@ -740,6 +740,7 @@ hashed:
   that is exactly when B05 and B08 must run again.
 
 <!-- generated:bootstrap-input-notes -->
+- **`B01` workspace and registration files.** ALSO RUNS WHEN ITS OUTPUT IS GONE (ARC-09-C140): on a release tree, when `.local/release-manifest.json` holds no signed manifest that verifies and is this release's, B01 runs and fetches it, whatever its inputs say. The cache is what B01 writes, so it is not hashed here: a hash taken before the fetch would differ from the one after it, and B01 would run again on the next bootstrap.
 - **`B06` the instance store.** MIGRATE, DON'T RE-WIZARD: a store whose schema is behind makes this step stale so the migration runs — and a store whose CONTENTS changed does not, because re-running the wizard over somebody's credentials is never the right answer to "something moved".
 - **`B08` the doctor.** B08 calls the doctor (ARC-08-S05). This row answers "must the bootstrap run it again"; the doctor CACHE answers "may the banner reuse the last report" (`cacheStale()`, seven mtimes). Two mechanisms for two consumers — do not merge them.
 <!-- /generated:bootstrap-input-notes -->
