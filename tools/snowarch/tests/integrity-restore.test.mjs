@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
-  chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, unlinkSync, utimesSync, writeFileSync,
+  chmodSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, unlinkSync, utimesSync, writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -227,6 +227,19 @@ test('C141 — an extra that cannot be moved refuses with the reason', { skip: i
   const r = ensure(root);
   assert.equal(r.state, 'refused');
   assert.match(r.line, /^Integrity: cannot restore — \.claude\/skills\/my-skill\/SKILL\.md could not be moved to \.local\/integrity-removed\/20261014T120501Z\/ \(EACCES\) — /);
+});
+
+test('C141 — a covered folder linked from outside the checkout is never written through: refused, the outside untouched', { skip: isWindows ? 'a directory link needs privileges on Windows' : false }, (t) => {
+  const root = release(t);
+  const outside = tempDir('snowarch-c141-outside-', t);
+  put(outside, 'their-skill/SKILL.md', 'not this checkout\'s\n');
+  rmSync(join(root, '.claude', 'skills'), { recursive: true, force: true });
+  symlinkSync(outside, join(root, '.claude', 'skills'), 'dir');
+  const r = ensure(root);
+  assert.equal(r.state, 'refused', r.line);
+  assert.match(r.line, /^Integrity: cannot restore — \.claude\/skills\/\S+ is reached through a link that leaves this checkout, so nothing was restored — /);
+  assert.equal(read(outside, 'their-skill/SKILL.md'), 'not this checkout\'s\n');
+  assert.equal(existsSync(join(root, '.local', 'integrity-removed')), false);
 });
 
 // ── the lock (R1) ────────────────────────────────────────────────────────────────────────────────────────────────
