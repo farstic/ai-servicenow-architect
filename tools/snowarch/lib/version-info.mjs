@@ -22,7 +22,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { branchState, describe, gitlink, isShallow, tagMessage } from './git.mjs';
+import { branchState, describe, gitlink, isShallow, tagMessage, versionTag } from './git.mjs';
 import { loadConfig, version as readVersion } from './config.mjs';
 import { parseTagMessage } from '../../../scripts/lib/release/tag.mjs';
 import { spellings } from './launcher-spelling.mjs';
@@ -65,14 +65,17 @@ export function versionInfo(root, { env = process.env, platform = process.platfo
   // commit state are for the human lines, and each costs a `git` process. The doctor is what the
   // SessionStart banner runs before a session's first word, and a process spawn on Windows is not
   // cheap: five of them took the banner's median from 910 ms to 1188 ms, then to 1010 ms against a
-  // 1000 ms budget. Two remain on this path — `describe` and `ls-tree`.
-  const found = describe(root, opts);
+  // 1000 ms budget. Two remain on this path — `describe` and `ls-tree`. ARC-09-C154 keeps the count: on a released
+  // checkout `v<version>` at HEAD answers in one process instead of `describe`, which is the fallback, unchanged; a
+  // development version goes straight to `describe`, as before.
+  const version = readVersion(root);
+  const found = versionTag(root, version, opts) ?? describe(root, opts);
   const raw = found && full ? tagMessage(root, found.name, opts) : null;
   const parsed = raw ? parseTagMessage(raw) : null;
 
   return {
     // ── ARC-06-S02's five keys, unchanged in name and type ──────────────────────────────────
-    version: readVersion(root),
+    version,
     contractSha,
     docsPin: docsPinConfig,
     docsFamily: config.docs.family,

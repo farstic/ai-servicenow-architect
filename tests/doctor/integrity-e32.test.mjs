@@ -111,6 +111,29 @@ test('ARC-11-C7 — a modified release tree FAILs, naming the file, or the count
   assert.deepEqual(two.data.modified, [{ path: '.claude/agents/dropped.md', why: 'extra' }, { path: 'CLAUDE.md', why: 'changed' }]);
 });
 
+test('ARC-09-C149 — a modified tree with no local release tag: E-32 names the tag, never a doctor --fix that cannot run', async (t) => {
+  // Seen live in the owner's rc.3 sitting, Part B: the launcher refused this tree with "this checkout holds no <tag> tag
+  // to restore from", and E-32 offered `doctor --fix`, which the same restore refuses. One source: the reason the
+  // restore computes before it tries.
+  const { root } = signedTree(t);
+  writeFileSync(join(root, 'CLAUDE.md'), `${readFileSync(join(root, 'CLAUDE.md'), 'utf8')}one more line\n`);
+  gitIn(root, ['tag', '-d', 'v9.1.0']);
+  const r = await run(root);
+  assert.equal(r.status, 'fail');
+  assert.equal(r.detail, 'Integrity: cannot restore — this checkout holds no v9.1.0 tag to restore from');
+  assert.equal(r.remedy, 'Reinstall from a signed release tag.');
+  assert.equal(r.fixable, false);
+  assert.equal(r.command, undefined);
+  assert.equal(r.data.fix, undefined);
+  assert.deepEqual(r.data.modified, [{ path: 'CLAUDE.md', why: 'changed' }], 'doctor --json no longer lists what differs');
+  // The control: the tag back where it was, and `doctor --fix` is the repair on offer again.
+  gitIn(root, ['tag', 'v9.1.0']);
+  const back = await run(root);
+  assert.equal(back.detail, 'Integrity: modified — 1 file differs from the signed manifest for v9.1.0: CLAUDE.md');
+  assert.match(back.command, /doctor --fix$/);
+  assert.equal(back.fixable, true);
+});
+
 test('ARC-11-C7 — another release\'s manifest FAILs, naming both, and the remedy fetches the right one', async (t) => {
   const { root } = signedTree(t, { manifestVersion: '9.0.0' });
   const r = await run(root);
