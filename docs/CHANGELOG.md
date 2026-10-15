@@ -29,7 +29,8 @@ and the error registry gains `INTEGRITY_NOT_VERIFIED`, for 74 codes.
 
 **The release candidate, and what the owner's sitting confirmed.** `v2.1.0-rc.3` is release commit `a983c98`, cut
 from develop `a9384f9`. The owner's sitting on it, on 2026-10-15, confirmed:
-- the upgrade from 2.0.13, the Business Source License's text, and a second install;
+- the upgrade path — 2.0.13 → rc.1 on 2026-10-14, rc.1 → rc.3 and rc.3 → rc.4 on 2026-10-15 — the Business Source
+  License's text, and a second install;
 - a change to the Architect's own files put back with the session continuing, and a checkout that cannot be restored
   refusing, with its manifest missing and with its release's tag deleted;
 - T-01, T-02, T-04 to T-10, T-14, T-15, T-22, T-24, T-27, T-32 and T-33. The remaining tests were skipped by design.
