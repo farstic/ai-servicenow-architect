@@ -27,7 +27,20 @@ predates the manifest, so it cannot check a 2.1.0 target before the tree moves; 
 manifest (B01) and E-32 then checks the checkout against it (ARC-09-C140). The server has 399 tools, as in 2.0.13,
 and the error registry gains `INTEGRITY_NOT_VERIFIED`, for 74 codes.
 
-**The release candidate, and what the owner's sitting confirmed.** [pending — the owner's rc.4 check]
+**The release candidate, and what the owner's sitting confirmed.** `v2.1.0-rc.3` is release commit `a983c98`, cut
+from develop `a9384f9`. The owner's sitting on it, on 2026-10-15, confirmed:
+- the upgrade from 2.0.13, the Business Source License's text, and a second install;
+- a change to the Architect's own files put back with the session continuing, and a checkout that cannot be restored
+  refusing, with its manifest missing and with its release's tag deleted;
+- T-01, T-02, T-04 to T-10, T-14, T-15, T-22, T-24, T-27, T-32 and T-33. The remaining tests were skipped by design.
+
+Two did not pass on rc.3. In T-02b a request for a table model was read as naming a custom table (ARC-09-C150). In
+T-03 the Architect let a gateway's routing recommendation decide its routing (ARC-09-C151). `v2.1.0-rc.4` is release
+commit `ca5212c`, cut from develop `8422895` after #448, which carries both fixes. The owner's check on it, the same
+day, passed:
+- T-02b gave Verdict A: the request names no custom object, so the verdict follows the baseline evaluation;
+- T-03 proposed the Integration Specialist first, then the Flow Designer Specialist, with the Security & GRC consult,
+  in the Architect's own `Proposal:` line.
 
 ### Added
 
