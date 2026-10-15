@@ -22,7 +22,7 @@ const ctxFor = (root, over = {}) => ({
 
 test('B09 returns the block rather than printing it — the step line comes first', async () => {
   // The runner prints a step's line AFTER `run()` returns, so a block written from inside would be
-  // followed by `[B09/09] summary … ok` and the closing five lines would not be the last five.
+  // followed by `[B09/09] summary … ok` and the closing six lines would not be the last six.
   const root = makeCheckout();
   const lines = [];
   const r = await runB09(ctxFor(root, { line: (l) => lines.push(l) }));
@@ -233,7 +233,7 @@ test('AC 3 — --json.next is the same string the human run printed', async () =
   assert.match(printed, /^DOCTOR: /);
 });
 
-test('AC 1 — the last five lines of a real run are the block', async () => {
+test('AC 1 — the last six lines of a real run are the block', async () => {
   const root = makeCheckout();
   const log = recorder();
   const code = await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }),
