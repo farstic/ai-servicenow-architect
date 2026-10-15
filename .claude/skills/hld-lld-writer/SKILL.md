@@ -27,6 +27,7 @@ You consume Technical Designer output — the component specs with table models,
 - "Draft the LLD for the Major Incident notification process."
 - "Create the design document for the Workday integration."
 - "Write a Process Design Document for the Customer Service operations team."
+- "Write a short process design note, 3 to 4 pages." — a design note is a design document however short, so the Architect proposes the HLD/LLD Writer for it and dispatches the sub-agent after approval; it is never written in the main thread.
 - After Technical Designer has produced one or more component specs and the engagement needs a programme-level document.
 - Before a project review board meeting — convert prior design artefacts into a coherent narrative.
 
