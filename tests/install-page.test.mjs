@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compose, dialogsParagraph } from '../scripts/gen-readme.mjs';
+import { ROOT_SLOT, SAMPLE_ROOT } from '../tools/snowarch/lib/text.mjs';
 import { allowedCloneTags } from './lib/install-tag.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
@@ -110,7 +111,8 @@ test('criterion 5 — "what you will see" is the tool\'s own text, not a copy of
   const region = /<!-- generated:closing-block -->\n([\s\S]*?)<!-- \/generated:closing-block -->/
     .exec(read(INSTALL));
   assert.ok(region, 'no closing-block region');
-  for (const line of [text.doctorUnavailable, text.modeDesign, text.posix.nextDesign]) {
+  // ARC-09-C157 — the Next line carries the folder as a slot the launchers fill; the page shows a sample folder.
+  for (const line of [text.doctorUnavailable, text.modeDesign, text.posix.nextDesign.replace(ROOT_SLOT, SAMPLE_ROOT)]) {
     assert.ok(region[1].includes(line), `the page's block is missing: ${line.split('\n')[0]}`);
   }
 });

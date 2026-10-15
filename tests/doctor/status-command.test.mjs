@@ -30,6 +30,7 @@ import { fallbackPanel, statusCommand } from '../../tools/snowarch/lib/commands/
 import { maskForJson } from '../../tools/snowarch/lib/doctor/json-boundary.mjs';
 import { BANNER } from '../../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { root as installRoot } from '../../tools/snowarch/lib/config.mjs';
 import { greenTree, linkInstall } from './helpers/tree.mjs';
 
 /** A collector standing in for stdout, so nothing in a test reaches a terminal. */
@@ -112,7 +113,8 @@ test('outside a checkout it exits 3 and says cd, with its own name on the line',
   const code = await statusCommand({ out, cwd: outside });
 
   assert.equal(code, 3);
-  assert.equal(out.text().trimEnd(), 'STATUS: not at the repository root — run: cd <the checkout>');
+  // ARC-09-C157 — the install this command was launched from, by path, not a placeholder.
+  assert.equal(out.text().trimEnd(), `STATUS: not at the repository root — run: cd ${installRoot}`);
 });
 
 test('inside the checkout but not at it, the remedy names the root', async (t) => {

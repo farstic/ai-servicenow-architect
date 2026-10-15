@@ -123,10 +123,11 @@ test('ARC-08-C37 — B09\'s DOCTOR line names the checks it counted', () => {
     'DOCTOR: 1 ok, 0 warn (E-23), 0 fail (E-29)');
 });
 
-test('the summary block is five lines, and the warnings recap comes after them', () => {
+test('the summary block is six lines, and the warnings recap comes after them', () => {
   const clean = summaryBlock({ mode: 'design-only', counts: { ok: 7, warn: 0, fail: 0 },
     serverKey: KEY, platform: 'linux', env: {} });
-  assert.equal(clean.split('\n').length, 5);
+  // ARC-09-C157 — six: the Next line names the folder, and the dialog sentence has its own line.
+  assert.equal(clean.split('\n').length, 6);
   assert.match(clean.split('\n')[0], /^DOCTOR: /);
   assert.equal(clean.split('\n')[1], 'Mode: design-only');
 
@@ -134,8 +135,8 @@ test('the summary block is five lines, and the warnings recap comes after them',
     serverKey: KEY, platform: 'linux', env: {},
     warnings: ['a cloud-synced folder (Dropbox)', '2 dead citation(s)'] });
   const lines = warned.split('\n');
-  assert.equal(lines[5], 'Warnings: 2');
-  assert.deepEqual(lines.slice(6), ['      a cloud-synced folder (Dropbox)', '      2 dead citation(s)']);
+  assert.equal(lines[6], 'Warnings: 2');
+  assert.deepEqual(lines.slice(7), ['      a cloud-synced folder (Dropbox)', '      2 dead citation(s)']);
 });
 
 test('AC 5 — text.json is generated from these strings and is current', () => {
@@ -313,7 +314,7 @@ test('ARC-07-W12 — the design-only ending is unchanged, and the asymmetry is d
   // design-only, and they stay green untouched, which is the evidence that nothing moved there.
   const design = summaryBlock({ mode: 'design-only', counts: { ok: 7, warn: 0, fail: 0 },
     serverKey: KEY, platform: 'linux', env: {} });
-  assert.equal(design.split('\n').length, 5);
+  assert.equal(design.split('\n').length, 6);
   assert.doesNotMatch(design, /Change later/);
 });
 

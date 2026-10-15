@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { licenceCommand } from '../lib/commands/licence.mjs';
@@ -455,4 +455,79 @@ test('ARC-11-C7 — sign-release with a key this product does not ship writes no
   assert.equal(r.code, EXIT_FAIL, r.text);
   assert.match(r.text, /does not verify with the keys this product ships \(not signed by a key this product ships\) — nothing was written/);
   assert.equal(existsSync(join(dir, 'releases', 'v9.1.0.json')), false);
+});
+
+// ── ARC-09-C156 — a licence copied into .local/ under its own name ───────────────────────────────────────────────
+//
+// The Windows colleague's 2.1.0 install (2026-10-15): `issue` said to copy the file "to .local/licence.json", the file
+// went into .local/ under its own name, and every surface read `Licence: missing — no licence is installed`. `issue`
+// now prints the two commands that install it under the one name the product reads, and `check` names a licence that
+// sits in .local/ under any other name, with the command that renames it — the file's name, never its contents.
+
+test('ARC-09-C156 — issue prints the two ready commands that install the file as .local/licence.json, by its real name', async (t) => {
+  const w = world(t);
+  const g = await keygen(t, w);
+  const issue = (over = {}) => run(w, ['issue'], { to: 'Test Licensee', org: 'Test Org', scope: 'live',
+    'valid-until': '2027-10-10', key: g.out, ...over }, { keys: g.keys });
+  const after = (r) => r.lines.slice(r.lines.findIndex((l) => l.includes('Send this file to the licensee')) + 1);
+  const a = await issue();
+  assert.equal(a.code, EXIT_OK, a.text);
+  assert.deepEqual(after(a), [
+    'step:   It must be named licence.json there: a copy under its own name is not read. From their checkout folder, with the file in Downloads:',
+    'step:     macOS or Linux:      cp ~/Downloads/LIC-2026-0002.json .local/licence.json',
+    'step:     Windows PowerShell:  Copy-Item "$HOME\\Downloads\\LIC-2026-0002.json" .local\\licence.json',
+    'step:   Saved somewhere else, that folder replaces Downloads. Then ./snowarch licence check (Windows: .\\snowarch.cmd licence check).',
+  ]);
+  // --out names the file, and the commands name what was written, not the default.
+  const b = await issue({ out: join(w.outside, 'acme-licence.json') });
+  assert.equal(b.code, EXIT_OK, b.text);
+  assert.ok(after(b).includes('step:     macOS or Linux:      cp ~/Downloads/acme-licence.json .local/licence.json'), b.text);
+});
+
+test('ARC-09-C156 — check names a licence in .local/ under another name, with the rename command, and never its contents', async (t) => {
+  const w = world(t);
+  const g = await keygen(t, w);
+  const issued = await run(w, ['issue'], { to: 'Test Licensee', org: 'Test Org', scope: 'live',
+    'valid-until': '2027-10-10', key: g.out }, { keys: g.keys });
+  assert.equal(issued.code, EXIT_OK, issued.text);
+  const dir = join(w.root, '.local');
+  // The colleague's exact state: the file in .local/ under the name it was sent with, and no licence.json.
+  copyFileSync(join(w.outside, 'LIC-2026-0002.json'), join(dir, 'LIC-2026-0002.json'));
+  // ...beside the JSON the product keeps there, which is not a licence and is never named.
+  writeFileSync(join(dir, 'instances.json'), '{"instances":[]}\n');
+
+  const posix = await run(w, ['check'], {}, { keys: g.keys, platform: 'darwin' });
+  assert.equal(posix.code, EXIT_FAIL, posix.text);
+  assert.match(posix.text, /Licence: missing/);
+  assert.ok(posix.lines.includes('step:   found: LIC-2026-0002.json in .local/ is a licence under another name, and only '
+    + 'licence.json is read. Rename it, then run ./snowarch licence check again:'), posix.text);
+  assert.ok(posix.lines.includes(`step:     mv "${dir}/LIC-2026-0002.json" "${dir}/licence.json"`), posix.text);
+  assert.doesNotMatch(posix.text, /instances\.json/);
+  for (const content of ['Test Licensee', 'Test Org', 'LIC-2026-0002 ·', 'licensee']) {
+    assert.equal(posix.text.includes(content), false, `check printed the licence's ${content}`);
+  }
+
+  const windows = await run(w, ['check'], {}, { keys: g.keys, platform: 'win32' });
+  assert.ok(windows.lines.includes(`step:     Move-Item "${dir}\\LIC-2026-0002.json" "${dir}\\licence.json"`), windows.text);
+  assert.match(windows.text, /then run \.\\snowarch\.cmd licence check again:/);
+
+  // Control: the command it printed, run — the licence reads ok, and nothing is "found" any more.
+  renameSync(join(dir, 'LIC-2026-0002.json'), licencePath(w.root));
+  const after = await run(w, ['check'], {}, { keys: g.keys, platform: 'darwin' });
+  assert.equal(after.code, EXIT_OK, after.text);
+  assert.match(after.text, /Licence: ok · LIC-2026-0002/);
+  assert.doesNotMatch(after.text, /found:/);
+});
+
+test('ARC-09-C156 — a JSON in .local/ that does not verify as a licence is not named, and with no licence nothing is found', async (t) => {
+  const w = world(t);
+  const g = await keygen(t, w);
+  const dir = join(w.root, '.local');
+  writeFileSync(join(dir, 'doctor-last.json'), '{"checks":[]}\n');
+  writeFileSync(join(dir, 'forged.json'), JSON.stringify({ format: 'snowarch-licence/1', licence: { id: 'LIC-2026-0099' },
+    signature: 'AAAA' }));
+  writeFileSync(join(dir, 'broken.json'), '{ not json');
+  const r = await run(w, ['check'], {}, { keys: g.keys, platform: 'darwin' });
+  assert.equal(r.code, EXIT_FAIL, r.text);
+  assert.doesNotMatch(r.text, /found:/);
 });
