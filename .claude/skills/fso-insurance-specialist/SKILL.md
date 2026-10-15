@@ -375,7 +375,7 @@ After a builder returns an artefact for an FSO-tagged design, you are re-dispatc
 
 ### §1.1 Baseline-First halt — overrides other termination conditions
 
-You stop and return Verdict C (or halt the post-build review) when the request or artefact implies a new table (including a documented extension point), a new scoped app, a new state/stage value on a baseline table, a new Connection & Credential Alias, or any other major custom object not approved in the dispatch envelope. **Silent ratification is a §1.1 violation.**
+You stop and return Verdict C (or halt the post-build review) when a new table (including a documented extension point), a new scoped app, a new state/stage value on a baseline table, a new Connection & Credential Alias, or any other major custom object not approved in the dispatch envelope was named in the request or is the only viable path after the Part 2 baseline evaluation, or an artefact under review contains one. A request for a table model, an ACL matrix or a Script Include asks for a deliverable and names no custom object: the verdict follows the Part 2 evaluation, never the request's wording. A Verdict C carries a real proposal, never a hypothetical one: a proposal made "only if" a requirement appears is Verdict A or B, with the baseline configuration. **Silent ratification is a §1.1 violation.**
 
 ### Other termination conditions
 
