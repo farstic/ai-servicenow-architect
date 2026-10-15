@@ -3,7 +3,13 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
-## Unreleased (2.1.0-dev)
+## Unreleased (2.1.1-dev)
+
+**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
+then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
+with credentials the instance has just refused.
+
+## 2.1.0 — 2026-10-15
 
 **Relicensed to the Business Source License 1.1 (`BUSL-1.1`) from 2.1.0** (ADR-0011). Versions 2.0.x and
 earlier stay under Apache-2.0, to which `2.0.0` below relicensed the package.
@@ -34,10 +40,6 @@ ARC-09-C97, `createRecord` and `updateRecord` refuse a string longer than its co
 before the write (`VALUE_TOO_LONG`) when the account can read `sys_dictionary`; the other writes above
 are not checked before they are made. The long form is `docs/PLATFORM-NOTES.md` PN-10, and the rows are
 ARC-09-C97 to C101 in the ARC-09 plan.
-
-**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
-then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
-with credentials the instance has just refused.
 
 ## 2.0.0 — 2026-09-24
 
