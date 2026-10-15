@@ -90,9 +90,10 @@ together in 2.1.0. The owner deferred C8 and C9 on 2026-10-14, so 2.1.0 carries 
    the owner's rc.3 sitting found.
 9. The owner's two-machine test on it (T-28): done. The rc.3 sitting (2026-10-15) passed but for T-02b and T-03, whose
    fixes, C150 and C151, passed on rc.4 the same day.
-10. 2.1.0, with its changelog section, which merges on the owner's word on its notes.
+10. 2.1.0: RELEASED 2026-10-15, tag `v2.1.0` (`17c17c2`) at release commit `1d28d5a`, cut from develop `09391c2` after the changelog
+    section (#447).
 
-The ARC-09 rows that ship in 2.1.0: C129, C130, C134, C136 to C140, C144 to C148, C150 and C151; with them ARC-02-C5 to C13 (the
+The ARC-09 rows that shipped in 2.1.0: C129, C130, C134, C136 to C140, C144 to C148, C150 and C151; with them ARC-02-C5 to C13 (the
 D and E rows) and ARC-11-C141. C135 was closed by measurement, with no code; C142 and C143 stay open.
 
 ## Rows
