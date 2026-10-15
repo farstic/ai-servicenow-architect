@@ -232,7 +232,7 @@ When the user's task contains certain keywords or phrases, the router has a stro
 | Keyword/phrase | Primary specialist | Secondary specialist |
 |---|---|---|
 | "Gherkin", "user story", "acceptance criteria", "sprint-ready" | Story Writer | — |
-| "HLD", "LLD", "design document", "architecture document" | HLD/LLD Writer | — |
+| "HLD", "LLD", "design document", "architecture document", "design note", "process design note" | HLD/LLD Writer (sub-agent, after approval) | — |
 | "PDD", "process design document" | HLD/LLD Writer (PDD format) | — |
 | "runbook", "KBA", "knowledge article", "training material", "user guide" | Operational Documentation | — |
 | "workshop", "elicit requirements", "current state", "target state", "gap analysis", "transcript", "extract from this transcript" | Discovery Specialist | Story Writer (if convergence to stories is the next step) |

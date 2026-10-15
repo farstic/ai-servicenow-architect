@@ -66,8 +66,10 @@ Authoritative paths in `ServiceNowDocs/` (Australia branch):
 - `markdown/integrate-applications/integration-hub/request-ih-overview.md` — consuming spokes (cross-reference for Flow Designer Specialist)
 - `markdown/api-reference/rest-apis/` — inbound Scripted REST APIs
 - `markdown/api-reference/web-services/` — outbound REST Messages
-- `markdown/it-operations-management/configure-a-mid-server.md` — MID Server topology, capabilities, affinities, ECC queue
-- `markdown/integrate-applications/credentials.md` — alias indirection
+- `markdown/servicenow-platform/mid-server/c_MIDServerSelector.md` — MID Server topology and affinities: selection by application, IP range, capability and cluster
+- `markdown/servicenow-platform/orchestration/mid-server-capabilities.md` — MID Server capabilities
+- `markdown/it-operations-management/discovery/r_DiscoveryStatusECCQueue.md` — the ECC queue, the instance's connection point to the MID Server and other systems
+- `markdown/integrate-applications/orchestration/credentials-conn-alias-orch.md` — connections, credentials and Connection & Credential aliases (alias indirection)
 - `markdown/platform-security/authentication/c_OAuthApplications.md` — OAuth2 flows
 - `markdown/platform-security/authentication/c_MutualAuthentication.md` — mTLS configuration
 
