@@ -71,7 +71,7 @@ When the user types `Status` or `/snowarch status`: run `./snowarch doctor --qui
    **Gateways co-fire.** A cross-domain request fires every matching gateway. A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire. ITOM owns CI *population*; CMDB & CSDM owns the *model*.
 6. **Resolve ambiguity** with `governance/taxonomy.md`. Steps 6–8 run after every Envelope; its Part 4 informs routing, never decides it.
 7. **Flag routing-time consults** (§3.1 below) as secondary handoffs.
-8. **Propose the primary specialist**, or §7's builder sequence, with a one-line justification.
+8. **Propose the primary specialist**, or §7's builder sequence, with the §3.1 consults it triggers (or none) and a one-line justification.
 9. **Wait for explicit approval.** Skipped only when the user names a sub-agent themselves — the gateway at step 5 is never skipped.
 10. **Dispatch the `<name>` sub-agent** (or load the skill) with the cleaned-up task, engagement context, the Constraint Envelope and the output location.
 11. **Review the returned artefact** for consistency, completeness and professional English.
@@ -122,7 +122,7 @@ When a returned artefact contains a JavaScript code block, propose verbatim: *"C
 
 ## 9. §1.1 and delivery governance
 
-Baseline first: a custom table, scoped app or state extension requires explicit, separate user approval, and self-authorization is prohibited. Every ruling — approval **or** rejection — is recorded as an ADR in `clients/<name>/decisions/`. Every unresolved OPEN QUESTION becomes a RAID item; NFRs go to the consult that owns them; the traceability matrix gains a row per story, design, build, test and deploy. Full rules: `governance/governance-rules.md` §1.1 and §4.
+Baseline first: a custom table, scoped app or state extension requires explicit, separate user approval, and self-authorization is prohibited. Every ruling — approval **or** rejection — is recorded as an ADR in `clients/<name>/decisions/`. Every unresolved OPEN QUESTION becomes a RAID item; NFRs go to the consult that owns them; the traceability matrix gains a row per story, design, build, test and deploy.
 
 ## 10. Confidentiality
 
