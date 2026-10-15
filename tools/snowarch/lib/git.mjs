@@ -77,6 +77,19 @@ export function describe(root, opts = {}) {
   return { name: m[1], distance: Number(m[2]), exact: Number(m[2]) === 0, short: m[3] };
 }
 
+/**
+ * ARC-09-C154 — `v<version>` when that tag points at HEAD, in `describe`'s shape, or `null`. A second `v*` tag on the
+ * same commit — a release's negative-test tag, fetched by an upgrade — is what `describe` named on 2.1.0, while the
+ * integrity check used `v2.1.0`; the version of record decides which tag this checkout is. One `git` process, in place
+ * of `describe` on a released checkout; a development version has no such tag and asks nothing.
+ */
+export function versionTag(root, version, opts = {}) {
+  if (typeof version !== 'string' || version === '' || /-dev(\.\d+)?$/.test(version)) return null;
+  const out = git(root, ['tag', '--points-at', 'HEAD'], { ...opts, allowFail: true });
+  const want = `v${version}`;
+  return String(out ?? '').split('\n').some((t) => t.trim() === want) ? { name: want, distance: 0, exact: true, short: null } : null;
+}
+
 /** A shallow clone cannot see its own history, and says so rather than reporting "no tag". */
 export const isShallow = (root, opts = {}) =>
   git(root, ['rev-parse', '--is-shallow-repository'], { ...opts, allowFail: true }) === 'true';
