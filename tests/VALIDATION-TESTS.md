@@ -1839,7 +1839,7 @@ On a machine where doctor check E-04 shows `drawio yes`, with no engagement load
 
 ## T-33 — a short design note in Word, built by the house scripts
 
-**Covers:** `CLAUDE.md` §3 (`scripts/`); `.claude/skills/hld-lld-writer/SKILL.md` (the Word / PDF row); `.claude/agents/hld-lld-writer.md` (the Word-ready handback) (ARC-02-C5)
+**Covers:** `CLAUDE.md` §3 (`scripts/`); `.claude/skills/hld-lld-writer/SKILL.md` (the Word / PDF row); `.claude/agents/hld-lld-writer.md` (the Word-ready handback) (ARC-02-C5); `CLAUDE.md` §8 (a document is a builder's, however short), the skill's "When to use" (the short design note) and `governance/taxonomy.md` §4 (the design-document trigger row) (ARC-09-C152)
 **Modes:** design-only ✅ · live: not run (live mode reads the instance for what the corpus leaves open, so the Envelope differs)
 
 ### Prompt
