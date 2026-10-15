@@ -24,10 +24,15 @@ test('ARC-09-C151 — CLAUDE.md runs Steps 6 to 8 after every Envelope, and Step
   const step6 = /^6\. \*\*Resolve ambiguity\*\*[^\n]*$/m.exec(claude)?.[0] ?? '';
   assert.match(step6, /Steps 6–8 run after every Envelope; its Part 4 informs routing, never decides it\./);
   const step8 = /^8\. \*\*Propose the primary specialist\*\*[^\n]*$/m.exec(claude)?.[0] ?? '';
-  assert.match(step8, /§7's builder sequence/);
+  assert.match(step8, /§7's sequence in order/);
   // The rework after the first sitting: the sequence came back, the Security & GRC consult did not. Step 7 was
   // still skipped in practice, so the proposal itself names the consults (ARC-09-C151, the architect's ruling).
   assert.match(step8, /with the §3\.1 consults it triggers \(or none\)/);
+  // The second rework: the order came back 2 of 4, Integration last or second. The proposal is the Architect's own
+  // line after Part 4, and §7 rule 4 states the order the sequence takes.
+  assert.match(step8, /in your own `Proposal:` line after Part 4\./);
+  const rule4 = /^4\. \*\*Multi-jurisdiction tasks are sequenced, not collapsed[^\n]*$/m.exec(claude)?.[0] ?? '';
+  assert.match(rule4, /Integration Specialist → Flow Designer Specialist → Developer/);
 });
 
 test('ARC-09-C151 — every gateway\'s Part 4 lists the builders the request crosses, ties an integration to Security & GRC, and is an input to routing', () => {
@@ -36,8 +41,8 @@ test('ARC-09-C151 — every gateway\'s Part 4 lists the builders the request cro
     const from = text.indexOf('## Part 4 — Routing Recommendation');
     assert.ok(from > 0, `${g}: no Part 4`);
     const part4 = text.slice(from, text.indexOf('## Part 5', from));
-    assert.match(part4, /\*\*Builders the request crosses:\*\* the Integration Specialist[^\n]*the Flow Designer Specialist[^\n]*the Developer/,
-      `${g}: Part 4 does not list the builders the request crosses`);
+    assert.match(part4, /\*\*Builders the request crosses:\*\* the Integration Specialist first[^\n]*, then the Flow Designer Specialist[^\n]*, then the Developer[^\n]*; the Architect proposes them in that order \(CLAUDE\.md §7\)/,
+      `${g}: Part 4 does not list the builders in their order`);
     assert.match(part4, /an outbound or inbound integration among them triggers the Security & GRC consult \(§3\.1\)/,
       `${g}: Part 4 does not tie an integration to the Security & GRC consult`);
     assert.match(part4, /This Part 4 is an input to the Architect's routing, never the routing\./, `${g}: Part 4 reads as the routing`);
