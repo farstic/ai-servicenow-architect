@@ -27,7 +27,7 @@ predates the manifest, so it cannot check a 2.1.0 target before the tree moves; 
 manifest (B01) and E-32 then checks the checkout against it (ARC-09-C140). The server has 399 tools, as in 2.0.13,
 and the error registry gains `INTEGRITY_NOT_VERIFIED`, for 74 codes.
 
-**The release candidate, and what the owner's sitting confirmed.** [pending — the rc.3 sitting]
+**The release candidate, and what the owner's sitting confirmed.** [pending — the owner's rc.4 check]
 
 ### Added
 
@@ -58,6 +58,11 @@ and the error registry gains `INTEGRITY_NOT_VERIFIED`, for 74 codes.
   notifications and auto-close, the ATF step names, the CSM and major incident notifications, Flow Designer's *Where
   to run the flow*, and the Teams and Slack spokes' message actions (ARC-09-C144); and the engine review's corrections
   (ARC-02-C6 to C13). Figures are exported with the house scripts (ARC-02-C5).
+- Verdict C only when a custom object is named in the request, or is the only viable path after the baseline
+  evaluation; a request for a table model, an ACL matrix or a Script Include names none, and the verdict follows the
+  evaluation (ARC-09-C150). The Architect proposes the builders in order — the Integration Specialist, then the Flow
+  Designer Specialist, then the Developer — with the §3.1 consults the task triggers, in its own `Proposal:` line
+  (ARC-09-C151).
 
 ### Fixed
 
