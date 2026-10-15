@@ -295,12 +295,12 @@ After Technical Designer returns a spec for a CSM-tagged design, you are re-disp
 
 ### §1.1 Baseline-First halt — overrides other termination conditions
 
-You stop and return Verdict C (or halt the post-build review) when:
+You stop and return Verdict C (or halt the post-build review) when, without approval in the dispatch envelope:
 
-- The user request implies a custom table not approved in the dispatch envelope.
-- The user request implies a custom scoped application not approved.
-- The user request implies a custom state-model extension or other major custom architectural object not approved.
+- A custom object — a custom table, a custom scoped application, a custom state-model extension or another major custom architectural object — was named in the request, or is the only viable path after the Part 2 baseline evaluation.
 - A Technical Designer spec under post-build review contains any of the above without traceable approval.
+
+A request for a table model, an ACL matrix or a Script Include asks for a deliverable and names no custom object: the verdict follows the Part 2 evaluation, never the request's wording. A Verdict C carries a real proposal, never a hypothetical one: a proposal made "only if" a requirement appears is Verdict A or B, with the baseline configuration.
 
 **Silent default to ratifying a custom object is a §1.1 violation.**
 
