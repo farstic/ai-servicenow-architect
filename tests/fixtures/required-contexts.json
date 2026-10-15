@@ -7,6 +7,12 @@
     "e2e-live.yml": "manual, and it needs a real instance and a credential",
     "publish-npm.yml": "manual dispatch only; never a pull request, never a tag — and a dry run unless the dispatcher says otherwise (ARC-09-S10)"
   },
+  "_notRequiredJobs": {
+    "upgrade-e2e-windows-shard": {
+      "aggregator": "upgrade-e2e-windows",
+      "why": "the two Windows shards of upgrade-e2e; `upgrade-e2e (windows-latest)` needs both and is the context main's protection names, so a red shard blocks through it and protection is unchanged by the split"
+    }
+  },
   "count": 54,
   "contexts": [
     "actionlint",

@@ -49,6 +49,24 @@ const NOT_REQUIRED = Object.freeze({
     + 'unless the dispatcher says otherwise (ARC-09-S10)',
 });
 
+/**
+ * Jobs of the gating workflow whose own contexts are NOT required, each with the AGGREGATOR that is
+ * required in their place (ARC-09-C158).
+ *
+ * The rule this file keeps is that a job CI runs is a job something blocks on. An exempt job keeps
+ * it only through its aggregator, so the exemption holds only when that aggregator `needs:` the
+ * job, runs `if: always()` (a skipped aggregator after a failed shard is not a red check), and is
+ * itself required. Anything less is a hard failure here, not an omission.
+ */
+const NOT_REQUIRED_JOBS = Object.freeze({
+  'upgrade-e2e-windows-shard': Object.freeze({
+    aggregator: 'upgrade-e2e-windows',
+    why: 'the two Windows shards of upgrade-e2e; `upgrade-e2e (windows-latest)` needs both and is '
+      + "the context main's protection names, so a red shard blocks through it and protection is "
+      + 'unchanged by the split',
+  }),
+});
+
 /** The one workflow that gates a pull request. */
 const GATING = 'ci.yml';
 
@@ -132,7 +150,23 @@ function contextsFor(job) {
   });
 }
 
-const contexts = jobBlocks(text).flatMap(contextsFor).sort();
+const jobs = jobBlocks(text);
+
+// The exemptions, each held to the aggregator that stands for it — before any context is counted.
+for (const [id, { aggregator }] of Object.entries(NOT_REQUIRED_JOBS)) {
+  if (!jobs.some((j) => j.id === id)) die(`${id} is exempted, but ${GATING} has no such job`);
+  const agg = jobs.find((j) => j.id === aggregator);
+  if (!agg) die(`${id}'s aggregator ${aggregator} is not a job in ${GATING}`);
+  if (aggregator in NOT_REQUIRED_JOBS) die(`${id}'s aggregator ${aggregator} is itself exempt, so nothing required stands for it`);
+  const needs = /^ {4}needs:\s*(?:\[([^\]]*)\]|(\S+))\s*$/m.exec(agg.body);
+  const needed = needs ? (needs[1] ?? needs[2]).split(',').map((s) => s.trim()) : [];
+  if (!needed.includes(id)) die(`${aggregator} does not need ${id}, so ${id}'s result reaches nothing required`);
+  if (!/^ {4}if:\s*always\(\)\s*$/m.test(agg.body)) {
+    die(`${aggregator} has no \`if: always()\`: a failed ${id} would leave it skipped, and a skipped check is not a red one`);
+  }
+}
+
+const contexts = jobs.filter((j) => !(j.id in NOT_REQUIRED_JOBS)).flatMap(contextsFor).sort();
 if (contexts.length === 0) die(`${GATING} produced no contexts — the parser is wrong, not the file`);
 
 const body = `${JSON.stringify({
@@ -142,6 +176,7 @@ const body = `${JSON.stringify({
     + 'hard failure rather than an omission, because an omitted name is a required check nobody '
     + 'ever notices is missing.',
   _notRequired: NOT_REQUIRED,
+  _notRequiredJobs: NOT_REQUIRED_JOBS,
   count: contexts.length,
   contexts,
 }, null, 2)}\n`;

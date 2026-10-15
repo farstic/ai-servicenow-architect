@@ -810,7 +810,8 @@ jobs:
     # THREE required contexts, exactly as a check run prints them:
     #   upgrade-e2e (ubuntu-latest) · upgrade-e2e (macos-latest) · upgrade-e2e (windows-latest)
     # `tests/workflows.test.mjs` enumerates them beside the other 46, because a renamed cell is a
-    # required check that silently stops being required.
+    # required check that silently stops being required. The first two are this job's cells; the
+    # third is `upgrade-e2e-windows` below, which stands for the two Windows shards (ARC-09-C158).
     #
     # Node 22 only: the harness compiles a server for fixture B, and the question this job asks is
     # about an operating system's git and filesystem rather than about a Node major. The Windows
@@ -819,15 +820,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    # ARC-09-C134 — 45 minutes on Windows, 30 on the other two. Across 55 Windows attempts on
-    # 2026-10-12/13, 47 passed in 13–29 min and 4 ran into a 30-minute limit, one of them 7 s after
-    # its suite printed 58 of 58 passed. ARC-09-C28's `world[win32]` lines say where the time goes:
-    # committing and tagging each world's first release, 19–23 s on a fast runner and 35–64 s on a
-    # slow one, nineteen times a job. At the slowest rate seen the suite runs about 39 min. Linux
-    # and macOS take 5 and 6–8 min, so they keep the limit that catches a hang soonest.
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 45 || 30 }}
+    # Linux and macOS take 6–11 min, so they keep the limit that catches a hang soonest.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -863,6 +859,81 @@ jobs:
             tests/upgrade/tag-order.test.mjs
       - name: ...and the checkout under test is exactly as it was
         run: node scripts/ci/assert-clean.mjs
+
+  upgrade-e2e-windows-shard:
+    # ARC-09-C158 — the Windows leg of `upgrade-e2e`, as two shards. One Windows cell ran the whole
+    # set in 29–34 min and twice reached ARC-09-C134's 45-minute limit on a slow runner (2026-10-15),
+    # while Linux and macOS took 6–11. Raising the limit would hide the suite's growth, so the set is
+    # split instead, and each shard keeps 45 minutes.
+    #
+    # The cut is by SUBJECT, never by seconds: `upgrade-licence.e2e.test.mjs` holds the cases whose
+    # subject is the licence or the signed manifest, and its header states the rule. Shard 1 runs
+    # every other end-to-end case; shard 2 runs the licence cases and the four smaller files. The two
+    # lists together are exactly the list `upgrade-e2e` runs on Linux and macOS, and
+    # `tests/workflows.test.mjs` holds them to it.
+    #
+    # Not required contexts on their own: `upgrade-e2e-windows` needs both and is the context main's
+    # protection names, so a red shard blocks through it (`scripts/gen-required-contexts.mjs`).
+    name: upgrade-e2e shard (windows-latest, ${{ matrix.shard }} of 2)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { shard: 1, files: 'tests/upgrade/upgrade.e2e.test.mjs' }
+          - { shard: 2, files: 'tests/upgrade/upgrade-licence.e2e.test.mjs tests/upgrade/upgrade-unit.test.mjs tests/upgrade/harness-shape.test.mjs tests/upgrade/plan-agrees.test.mjs tests/upgrade/tag-order.test.mjs' }
+    runs-on: windows-latest
+    # ARC-09-C134's 45 minutes, per shard. ARC-09-C28's `world[win32]` lines say where the time
+    # goes: committing and tagging each world's first release, 19–23 s on a fast runner and 35–64 s
+    # on a slow one.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - name: git identity (the harness commits fixture releases)
+        run: |
+          git config --global user.email "f@example.com"
+          git config --global user.name "f"
+      - name: The upgrade, end to end, this shard's files
+        shell: bash
+        run: node --test --test-concurrency=2 ${{ matrix.files }}
+      - name: ...and the checkout under test is exactly as it was
+        run: node scripts/ci/assert-clean.mjs
+
+  upgrade-e2e-windows:
+    # ARC-09-C158 — the required context `upgrade-e2e (windows-latest)`, kept by name so main's
+    # protection is unchanged. It passes only when both shards passed. `if: always()` makes it run,
+    # and FAIL, when a shard failed or was cancelled: without it a failed shard would leave this job
+    # skipped, and a skipped required check is not a red one.
+    name: upgrade-e2e (windows-latest)
+    needs: upgrade-e2e-windows-shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Each shard's result, read from this run
+        # Informational: the verdict is the next step's, from `needs`, so an API hiccup here can
+        # neither pass nor fail the job.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/jobs" \
+            --paginate --jq '.jobs[] | select(.name | startswith("upgrade-e2e shard (windows-latest")) | "\(.name): \(.conclusion) (\(.started_at) → \(.completed_at))"' \
+            || echo "could not read the shards' results from the API; the verdict below does not depend on it"
+      - name: Both Windows shards passed
+        env:
+          RESULT: ${{ needs.upgrade-e2e-windows-shard.result }}
+        run: |
+          echo "upgrade-e2e shard (windows-latest, 1 of 2) and (2 of 2): ${RESULT}"
+          test "${RESULT}" = success
 
   launcher:
     # `bootstrap.sh` is the one file that runs on a machine with NO Node — which means none of the
