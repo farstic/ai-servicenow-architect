@@ -301,7 +301,7 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
 /**
  * What the run ends with: B09's block, plus the one sentence that is specific to a mode SWITCH.
  *
- * A fresh install ends with "run `claude` here"; a switch ends with "restart the one you have
+ * A fresh install ends with "run `claude` in this folder: <root>"; a switch ends with "restart the one you have
  * open", because the session that is already running has read its MCP configuration and nothing
  * this command did reached it.
  */

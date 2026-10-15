@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 34 tests, T-01 through T-34, no number reserved. The count is asserted by
+> **How many.** 35 tests, T-01 through T-35, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -1928,6 +1928,40 @@ An incident is reopened by its caller after it was resolved. What does the basel
 - A file deleted, not moved.
 ---
 
+## T-35 — Claude Code starts in the folder the install names, and a launcher run from outside names it too
+
+**Covers:** ARC-09-C157 — the bootstrap's Next line (`tools/snowarch/lib/text.mjs`, filled in `bootstrap.sh` and `bootstrap.ps1`), `docs/INSTALL.md`'s line after the Windows commands, and the doctor's and status's "not at the repository root" line from outside any checkout
+**Modes:** design-only ✅ · live ✅ (the same lines)
+
+**Run by hand**, on Windows in PowerShell and on macOS or Ubuntu, on a fresh install of the release under test —
+the path a Windows colleague's install took on 2.1.0, starting `claude` one folder above the checkout.
+
+### Setup
+
+A machine with no checkout of this product. Install with the commands on `docs/INSTALL.md` (`.\bootstrap.cmd`
+on Windows), design-only.
+
+### Expected behaviour
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | Read the end of the install. | The block's Next line is ``Next: run `claude` in this folder:`` followed by the checkout's absolute path (`C:\Users\…\ai-servicenow-architect` on Windows), and the line under it is `You will see one workspace-trust dialog — answer Yes.` Nothing says `here`, and no `{root}` is printed. A machine without Node, through the Node-free launcher, prints the same two lines. |
+| 2 | Go to the folder above the checkout, start `claude`, run `/mcp`, then exit. | No `Mode:` banner, and `/mcp` lists no `servicenow` server: started outside the checkout, Claude Code loads none of this product. |
+| 3 | From that folder, run the launcher by its path: `.\ai-servicenow-architect\snowarch.cmd doctor`, then `status` (`./ai-servicenow-architect/snowarch` elsewhere). | Each exits 3 with one line, `DOCTOR: not at the repository root — run: cd ` (`STATUS:` for status) and the checkout's absolute path. |
+| 4 | Run that `cd`, start `claude`, and run `/mcp`. | The banner's `Mode: design-only` line prints, and `/mcp` shows the `servicenow` server as the install left it. |
+
+### Pass criteria
+
+- Every row as written. The path in rows 1 and 3 is the same folder, and the `cd` in row 3 works pasted as printed.
+- Row 1 holds on both launchers: the Node path and the Node-free one.
+
+### Fail signals
+
+- `claude` here, `{root}` or `<the checkout>` anywhere in rows 1 and 3.
+- A path with the other platform's separator, or a `cd` that does not reach the checkout.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -2006,9 +2040,9 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
-| 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the launchers, without Git Bash — the path that has cost the most cells |
+| 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` `T-35` | the launchers, without Git Bash — the path that has cost the most cells |
 | 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |
 
 Rows 1–3 need no instance and no credential. Row 4 needs a PDI and is the only row where a write

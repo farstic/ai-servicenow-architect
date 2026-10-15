@@ -150,8 +150,9 @@ test('AC 1 — the design-only block, and the Node-absent first line', async () 
   const r = await runB09(ctxFor(root));
   // Built from `text.mjs`, never spelled twice: a snapshot typed out here would be a second
   // definition of the thing this story exists to have one of.
+  // ARC-09-C157 — with the root the run was in, which the Next line now names.
   assert.equal(r.next, summaryBlock({ mode: 'design-only', counts: { ok: 3, warn: 0, fail: 0 },
-    serverKey: config(root).mcp.serverKey, platform: 'linux', env: {} }));
+    serverKey: config(root).mcp.serverKey, root, platform: 'linux', env: {} }));
 
   const noNode = await runB09(ctxFor(root, { node: { present: false } }));
   assert.equal(noNode.next.split('\n')[0],

@@ -39,7 +39,8 @@ const forbidden = () => { throw new Error('a command was spawned'); };
 test('C106 - every case in the spec has a plan, and the kinds are the ones the cases are', (t) => {
   const { cases } = extract(t);
   const kinds = Object.fromEntries(cases.map((c) => [c.id, planSetup(c.setup).kind]));
-  const expected = { 'T-06': 'prose', 'T-07': 'runner', 'T-13': 'prose', 'T-19': 'instance', 'T-22': 'instance', 'T-23': 'instance', 'T-25': 'files', 'T-26': 'files', 'T-28': 'prose', 'T-29': 'instance', 'T-31': 'no-licence', 'T-34': 'prose' };
+  const expected = { 'T-06': 'prose', 'T-07': 'runner', 'T-13': 'prose', 'T-19': 'instance', 'T-22': 'instance', 'T-23': 'instance', 'T-25': 'files', 'T-26': 'files', 'T-28': 'prose', 'T-29': 'instance', 'T-31': 'no-licence', 'T-34': 'prose',
+    'T-35': 'prose' };
   for (const [id, kind] of Object.entries(kinds)) {
     assert.equal(kind, expected[id] ?? 'none', `${id} is ${kind}`);
   }

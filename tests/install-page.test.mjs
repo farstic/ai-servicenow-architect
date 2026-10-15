@@ -298,7 +298,11 @@ test('the page stays a page, and the tail stays a tail', () => {
   // 308 since ARC-09-C140: from 2.1, B01 prints the signed manifest it fetched, on its own line before B01's, and
   // the transcript shows the tool's lines (criterion 5). Its explanation was folded into the sentence above the
   // transcript, so the fact costs that one line and no prose.
-  assert.ok(install <= 308, `${install} lines of install page (criterion: 308)`);
+  // 313 since ARC-09-C156 and C157, from the Windows colleague's 2.1.0 install (2026-10-15). Four lines are the two
+  // commands that install a licence under its one name, in a fence so they paste — the file had gone into .local/
+  // under its own name and read as missing. One is the Next block's folder: the line names it now, and the dialog
+  // sentence moved to a line of its own. The prose around both was rewrapped rather than grown.
+  assert.ok(install <= 313, `${install} lines of install page (criterion: 313)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.

@@ -28,6 +28,14 @@ import { POSIX, isWindowsShell, needSpell, spellings } from './launcher-spelling
 export const EXPECTED_DIALOGS = 1;
 
 /**
+ * ARC-09-C157 — the folder Claude Code has to start in, as a SLOT in the shared text. The Node bootstrap fills it with
+ * the root it ran in; the Node-free launchers print the generated text with their own root in its place; the install
+ * page shows SAMPLE_ROOT, so a reader sees what the line looks like rather than a placeholder.
+ */
+export const ROOT_SLOT = '{root}';
+export const SAMPLE_ROOT = '/Users/you/ai-servicenow-architect';
+
+/**
  * The spelling itself lives in `launcher-spelling.mjs` — ARC-07-C31, and the move is the row.
  *
  * RE-EXPORTED, not re-implemented, because some seventy call sites import `spellings` from here and
@@ -350,9 +358,12 @@ export function changeLaterBlock({ label, platform, env } = {}) {
  * One sentence per dialog, always. The alternative — one sentence saying "you may see one or two" —
  * is the sort of hedge that makes a user distrust every other line in the summary.
  */
-export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, platform, env } = {}) {
+export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, root = ROOT_SLOT, platform, env } = {}) {
   const s = spellings({ platform, env });
-  const lines = ['Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.'];
+  // ARC-09-C157 — the folder by name, on a line of its own so it copies cleanly: "here" sent the Windows colleague's
+  // `claude` one folder up (2026-10-15), where it loads none of this product and /mcp shows nothing.
+  const lines = [`Next: run \`claude\` in this folder: ${root}`,
+    '      You will see one workspace-trust dialog — answer Yes.'];
   if (dialogs >= 2) {
     lines.push(`      …and one approval for the "${serverKey}" MCP server — answer Yes.`);
   }
@@ -367,7 +378,7 @@ export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, platfor
 
 /** The whole closing block, as one string — what `--json`'s `next` field carries verbatim. */
 export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = true,
-  dialogs = EXPECTED_DIALOGS, serverKey, platform, env, warnings = [], failures = [] } = {}) {
+  dialogs = EXPECTED_DIALOGS, serverKey, root = ROOT_SLOT, platform, env, warnings = [], failures = [] } = {}) {
   const lines = [
     doctorLine({ ...counts, nodeUsable, platform, env }),
     // ARC-08-C? (Sitting A) — every FAIL, in full, directly under the count that announced it.
@@ -376,7 +387,7 @@ export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = 
     // on, and the one run that saw the failure is the one run that should have said what it was.
     ...failures.map((f) => `      ${f}`),
     modeLine({ mode, instance }),
-    nextBlock({ mode, dialogs, serverKey, platform, env }),
+    nextBlock({ mode, dialogs, serverKey, root, platform, env }),
   ];
   // ARC-07-W12 — LIVE ONLY, and not for tidiness: four of the five rows name an instance, and in
   // design-only there is none. The design ending already carries its own change line, which is the
@@ -398,6 +409,8 @@ export function exportable({ serverKey }) {
   });
   return {
     expectedDialogs: EXPECTED_DIALOGS,
+    // ARC-09-C157 — the slot both Next blocks carry, which each launcher fills with its own root when it prints.
+    rootSlot: ROOT_SLOT,
     modeDesign: modeLine({ mode: 'design-only' }),
     // The banner's fixed strings, as data: the hook prints them and `/snowarch status` (S09) says
     // the same words. The two that take an argument are rendered with an example one, so the file
