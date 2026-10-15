@@ -240,6 +240,7 @@ One of:
 - PROCEED — baseline configuration only
 - PROCEED — dispatch to Technical Designer with constraints
 - HALT — §1.1 custom-object proposal required
+- **Builders the request crosses:** the Integration Specialist first, for the connection, spoke, alias and auth, then the Flow Designer Specialist for the orchestration, then the Developer for any script; the Architect proposes them in that order (CLAUDE.md §7), and an outbound or inbound integration among them triggers the Security & GRC consult (§3.1). This Part 4 is an input to the Architect's routing, never the routing.
 - **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire. In each co-fired Envelope, Part 3 states the verdict in full: A names the baseline construct that covers the need and B the baseline construct it extends, each with its citation; C is the halt.
 
 [Include consult flags that fire:
