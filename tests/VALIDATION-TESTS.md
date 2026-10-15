@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-15
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -1607,7 +1607,7 @@ returns.
 | # | On | Do | Expect |
 |---|---|---|---|
 | 1 | B | Before any licence: `./snowarch doctor`, `./snowarch status`, then start Claude Code and read the capabilities. | E-31 FAILs: `Licence: missing`, with the remedy `Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards`, and nothing after it. The status panel's second line and the banner's second line are both `Licence: missing`. The tool count is the release's, and the tool is refused: `Error: licence missing — no tool runs without a valid licence. …`, ending `(Code: LICENCE_NOT_VALID)`. The Architect says that no deliverable is produced, and does not retry. |
-| 2 | A | `./snowarch licence issue --to "Sam Example" --org "Example Consulting Ltd" --scope live --key ~/snowarch-keys/primary.pem`, with `--valid-until` set to a date about six months out. Send the file to B outside any repository. | `licence issue: LIC-2026-0002 for Sam Example (Example Consulting Ltd), live, until` that date, and the file beside the key. |
+| 2 | A | `./snowarch licence issue --to "Sam Example" --org "Example Consulting Ltd" --scope live --key ~/snowarch-keys/primary.pem`, with `--valid-until` set to a date about six months out. Send the file to B outside any repository. | `licence issue: LIC-2026-0002 for Sam Example (Example Consulting Ltd), live, until` that date, and the file beside the key. Then the two commands that install it under its one name, with the file's name in them: `cp ~/Downloads/LIC-2026-0002.json .local/licence.json` and `Copy-Item "$HOME\Downloads\LIC-2026-0002.json" .local\licence.json` (ARC-09-C156). |
 | 3 | B | Copy the file to `.local/licence.json`. Run `./snowarch licence check --refresh`, `./snowarch doctor` and `./snowarch status`. | `revocation list: version <n> fetched`, then `Licence: ok · LIC-2026-0002 · until` the date and `valid until:  <date> (UTC, N days)`. E-31 is ok. The panel's second line is the same `Licence:` line, and its `Doctor:` line no longer names E-31. |
 | 4 | B | Restart Claude Code and read the capabilities. Run `./snowarch licence check`. | The banner's second line is `Licence: ok · LIC-2026-0002 · until` the date. The tool answers, with no licence block. `check` says `nothing is refused while the licence is in force`, with `valid until:  <date> (UTC, N days)`. |
 | 5 | A | `./snowarch licence revoke LIC-2026-0002 --reason ended --key ~/snowarch-keys/primary.pem --list ~/snowarch-licences`, then the git commands it prints. | The list's version goes up by one, and the owner's push puts it on `main`. |
@@ -1620,6 +1620,7 @@ returns.
 | 12 | A, B | `issue --scope design-only`, with an end date, and install it on B, whose checkout is live. Run `./snowarch licence check`, then read the capabilities in a new session. | `Licence: ok · LIC-… · design-only · until` the date, and `scope: licence LIC-… covers design-only; live needs a live-scope licence, so a live server refuses every tool`. The tool answers `licence LIC-… covers design-only; live needs a live-scope licence. …`, ending `(Code: LICENCE_NOT_VALID)`, with the notice block. The Architect does not retry. |
 | 13 | A | `./snowarch licence keygen --out /tmp/x.pem --recovery-out /tmp/y.pem --to "<name>" --org "Example Consulting Ltd"`. The placeholder is deliberate. | `error: --to "<name>" is a placeholder, not a value — type the real name, without angle brackets`, and neither key file exists. |
 | 14 | A | `issue` with `--key` the recovery key, then `./snowarch licence verify` on the file. | `signature: valid — recovery key`. |
+| 15 | B | With no `.local/licence.json`, put the file from row 2 in `.local/` under its own name, `LIC-2026-0002.json`, as the Windows colleague did (ARC-09-C156). Run `./snowarch licence check`, then the command it prints, then `check` again. | The first `check`: `Licence: missing`, then `found: LIC-2026-0002.json in .local/ is a licence under another name, and only licence.json is read. Rename it, then run ./snowarch licence check again:`, and a `mv` line with this checkout's `.local/` path (`Move-Item` in Windows PowerShell). Nothing from inside the file is printed. After the rename: `Licence: ok · LIC-2026-0002 · until` the date. |
 
 ### Pass criteria
 

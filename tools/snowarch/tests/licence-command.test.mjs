@@ -21,6 +21,7 @@ import { keyPair, licence, licenceText, listDoc, listRepo, manifestDoc, productK
 import { manifestFromArchive, readManifest, readManifestCache } from '../lib/licence/manifest.mjs';
 import { tempDir } from './helpers/temp.mjs';
 import { fileURLToPath } from 'node:url';
+import { spellings } from '../lib/text.mjs';
 
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -457,6 +458,10 @@ test('ARC-11-C7 — sign-release with a key this product does not ship writes no
   assert.equal(existsSync(join(dir, 'releases', 'v9.1.0.json')), false);
 });
 
+// The launcher's two spellings, from the one place that spells them — never typed here (the launcher audit, ARC-07-C35b).
+const POSIX_CLI = spellings({ platform: 'darwin', env: {} }).cli;
+const WINDOWS_CLI = spellings({ platform: 'win32', env: {} }).cli;
+
 // ── ARC-09-C156 — a licence copied into .local/ under its own name ───────────────────────────────────────────────
 //
 // The Windows colleague's 2.1.0 install (2026-10-15): `issue` said to copy the file "to .local/licence.json", the file
@@ -476,7 +481,7 @@ test('ARC-09-C156 — issue prints the two ready commands that install the file 
     'step:   It must be named licence.json there: a copy under its own name is not read. From their checkout folder, with the file in Downloads:',
     'step:     macOS or Linux:      cp ~/Downloads/LIC-2026-0002.json .local/licence.json',
     'step:     Windows PowerShell:  Copy-Item "$HOME\\Downloads\\LIC-2026-0002.json" .local\\licence.json',
-    'step:   Saved somewhere else, that folder replaces Downloads. Then ./snowarch licence check (Windows: .\\snowarch.cmd licence check).',
+    'step:   Saved somewhere else, that folder replaces Downloads. Then they restart Claude Code, whose banner names the licence.',
   ]);
   // --out names the file, and the commands name what was written, not the default.
   const b = await issue({ out: join(w.outside, 'acme-licence.json') });
@@ -500,7 +505,7 @@ test('ARC-09-C156 — check names a licence in .local/ under another name, with 
   assert.equal(posix.code, EXIT_FAIL, posix.text);
   assert.match(posix.text, /Licence: missing/);
   assert.ok(posix.lines.includes('step:   found: LIC-2026-0002.json in .local/ is a licence under another name, and only '
-    + 'licence.json is read. Rename it, then run ./snowarch licence check again:'), posix.text);
+    + `licence.json is read. Rename it, then run ${POSIX_CLI} licence check again:`), posix.text);
   assert.ok(posix.lines.includes(`step:     mv "${dir}/LIC-2026-0002.json" "${dir}/licence.json"`), posix.text);
   assert.doesNotMatch(posix.text, /instances\.json/);
   for (const content of ['Test Licensee', 'Test Org', 'LIC-2026-0002 ·', 'licensee']) {
@@ -509,7 +514,7 @@ test('ARC-09-C156 — check names a licence in .local/ under another name, with 
 
   const windows = await run(w, ['check'], {}, { keys: g.keys, platform: 'win32' });
   assert.ok(windows.lines.includes(`step:     Move-Item "${dir}\\LIC-2026-0002.json" "${dir}\\licence.json"`), windows.text);
-  assert.match(windows.text, /then run \.\\snowarch\.cmd licence check again:/);
+  assert.ok(windows.text.includes(`then run ${WINDOWS_CLI} licence check again:`), windows.text);
 
   // Control: the command it printed, run — the licence reads ok, and nothing is "found" any more.
   renameSync(join(dir, 'LIC-2026-0002.json'), licencePath(w.root));
