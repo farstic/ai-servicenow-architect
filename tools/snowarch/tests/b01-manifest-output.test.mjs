@@ -8,7 +8,7 @@
  * for v2.1.0-rc.1`. The cache is B01's OUTPUT, so the runner asks B01 whether it is there (`outputMissing`), the way
  * E-32 reads it (`cachedManifest`), and runs B01 when it is not.
  *
- * The end-to-end proof, the owner's own sequence, is in `tests/upgrade/upgrade.e2e.test.mjs`.
+ * The end-to-end proof, the owner's own sequence, is in `tests/upgrade/upgrade-licence.e2e.test.mjs`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

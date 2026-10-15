@@ -149,6 +149,10 @@ const KNOWN_JOBS = [
   // ARC-09-S07, three more (47–49): the upgrade moves a tree, and a tree is the one thing a unit
   // test cannot move. The three cells are three operating systems' git and filesystems.
   'upgrade-e2e',
+  // ARC-09-C158: the Windows leg as two shards, and the job that keeps its required context
+  // `upgrade-e2e (windows-latest)` by needing both. No new required context: the shards are exempt
+  // through it (`scripts/gen-required-contexts.mjs`), so main's protection is unchanged.
+  'upgrade-e2e-windows-shard', 'upgrade-e2e-windows',
   'launcher',
   // ARC-09-S08, three more (50–52): a Windows machine driven entirely through `.cmd`, with no Git
   // Bash on PATH, on three Node majors. ARC-06-S14's `no-gitbash` cell keeps its own name and its
@@ -288,11 +292,15 @@ test('commitlint runs on pull requests only, with the history it needs (ARC-09-S
 
 test('upgrade-e2e runs the harness on three OSes, and adds three named contexts (ARC-09-S07)', () => {
   const ci = wf('ci.yml');
-  const job = ci.slice(ci.indexOf('\n  upgrade-e2e:'), ci.indexOf('\n  launcher:'));
+  const job = ci.slice(ci.indexOf('\n  upgrade-e2e:'), ci.indexOf('\n  upgrade-e2e-windows-shard:'));
 
+  // Two of the three contexts are this job's cells; the third is the Windows aggregator's
+  // (ARC-09-C158, asserted with the shards below).
   const list = /^\s*os: \[([^\]]+)\]$/m.exec(job);
   assert.ok(list, 'the matrix is not one os list');
-  assert.deepEqual(list[1].split(',').map((o) => `upgrade-e2e (${o.trim()})`), UPGRADE_E2E_CONTEXTS);
+  const aggregator = ci.slice(ci.indexOf('\n  upgrade-e2e-windows:'), ci.indexOf('\n  launcher:'));
+  const windows = /^ {4}name: (.+)$/m.exec(aggregator)?.[1];
+  assert.deepEqual([...list[1].split(',').map((o) => `upgrade-e2e (${o.trim()})`), windows], UPGRADE_E2E_CONTEXTS);
   assert.match(job, /name: upgrade-e2e \(\$\{\{ matrix\.os \}\}\)/);
 
   // `fetch-depth: 0`: the harness tags fixture releases and reads their messages back, and a
@@ -314,6 +322,44 @@ test('upgrade-e2e runs the harness on three OSes, and adds three named contexts 
   // The checkout under test must be exactly as it was: the harness builds its world in TMPDIR,
   // and an upgrade test that moved this tree would be the worst possible kind of side effect.
   assert.match(job, /assert-clean\.mjs/);
+});
+
+test('ARC-09-C158 — Windows runs the upgrade set as two shards, and one required context stands for both', () => {
+  const ci = wf('ci.yml');
+  const linux = ci.slice(ci.indexOf('\n  upgrade-e2e:'), ci.indexOf('\n  upgrade-e2e-windows-shard:'));
+  const shards = ci.slice(ci.indexOf('\n  upgrade-e2e-windows-shard:'), ci.indexOf('\n  upgrade-e2e-windows:'));
+  const aggregator = ci.slice(ci.indexOf('\n  upgrade-e2e-windows:'), ci.indexOf('\n  launcher:'));
+
+  assert.match(shards, /^ {4}name: upgrade-e2e shard \(windows-latest, \$\{\{ matrix\.shard \}\} of 2\)$/m);
+  assert.match(shards, /^ {4}runs-on: windows-latest$/m);
+  // ARC-09-C134's 45 minutes, per shard: the split is the fix, and a raised limit would hide growth.
+  assert.match(shards, /^ {4}timeout-minutes: 45$/m);
+  const rows = [...shards.matchAll(/^ {10}- \{ shard: (\d), files: '([^']+)' \}$/gm)];
+  assert.deepEqual(rows.map((r) => r[1]), ['1', '2'], 'not exactly shards 1 and 2');
+  assert.match(shards, /node --test --test-concurrency=2 \$\{\{ matrix\.files \}\}/);
+  // By subject: the general cases in shard 1, the licence and manifest cases leading shard 2.
+  assert.equal(rows[0][2], 'tests/upgrade/upgrade.e2e.test.mjs');
+  assert.match(rows[1][2], /^tests\/upgrade\/upgrade-licence\.e2e\.test\.mjs /);
+  // The two lists together are the Linux and macOS list, file for file and once each: a file in one
+  // and not the other would run on two operating systems and be believed to run on three.
+  const windowsFiles = rows.flatMap((r) => r[2].split(/\s+/));
+  assert.equal(new Set(windowsFiles).size, windowsFiles.length, 'a file runs in both shards');
+  assert.deepEqual([...windowsFiles].sort(), (testFilesInJob(linux, 'node --test --test-concurrency=2') ?? []).sort());
+  for (const needed of [/fetch-depth: 0/, /git config --global user\.email/, /assert-clean\.mjs/]) {
+    assert.match(shards, needed);
+  }
+  assert.equal(/secrets\./.test(shards + aggregator), false, 'an upgrade shard reads a secret');
+
+  // The aggregator keeps the required context's name, and fails unless both shards passed.
+  assert.match(aggregator, /^ {4}name: upgrade-e2e \(windows-latest\)$/m);
+  assert.match(aggregator, /^ {4}needs: upgrade-e2e-windows-shard$/m);
+  assert.match(aggregator, /^ {4}if: always\(\)$/m);
+  assert.match(aggregator, /RESULT: \$\{\{ needs\.upgrade-e2e-windows-shard\.result \}\}/);
+  assert.match(aggregator, /test "\$\{RESULT\}" = success/);
+
+  // The licence file states the rule that put its cases there, so the next case is placed by it.
+  assert.match(readFileSync(join(root, 'tests/upgrade/upgrade-licence.e2e.test.mjs'), 'utf8').slice(0, 2000),
+    /THE RULE, by subject and never by seconds: a case belongs here when what it measures is the licence\n \* gate or the signed manifest/);
 });
 
 test('release-dryrun runs the real release on three OSes, every commit (ARC-09-S03)', () => {
@@ -546,17 +592,35 @@ test('required-contexts.json is exactly what ci.yml produces on a pull request (
   // A job's CONTEXT is its `name:` when it has one, not its id — `no-build` prints as
   // `no-build handshake (ubuntu-latest)`. Comparing against the id would have passed for twelve
   // jobs and failed for the one that renames itself, which is the one worth catching.
-  const displayOf = (job) => {
+  const blockOf = (job) => {
     // Sliced PAST the job's own header, or the split cuts at index 0 and the block is empty — the
     // same trap the contexts generator hit reading `matrix:`.
     const header = `\n  ${job}:`;
     const after = jobsBlock.slice(jobsBlock.indexOf(header) + header.length);
-    const block = after.split(/\n {2}[a-z][a-z0-9-]*:\n/)[0];
-    const name = /^ {4}name:\s*(.+)$/m.exec(block);
-    return name ? name[1].trim().replace(/^['"]|['"]$/g, '').replace(/\s*\(.*$/, '') : job;
+    return after.split(/\n {2}[a-z][a-z0-9-]*:\n/)[0];
   };
+  const nameOf = (job) => /^ {4}name:\s*(.+)$/m.exec(blockOf(job))?.[1].trim().replace(/^['"]|['"]$/g, '') ?? null;
+  const displayOf = (job) => nameOf(job)?.replace(/\s*\(.*$/, '') ?? job;
+  // ARC-09-C158 — a job may be exempt only through an aggregator that blocks for it: one that
+  // `needs:` it, runs `if: always()` (a skipped check after a failed shard is not a red one), and is
+  // itself a required context. The exempt job's own contexts are then not required.
+  const exempt = fixture._notRequiredJobs ?? {};
   for (const job of jobNames) {
     const display = displayOf(job);
+    if (job in exempt) {
+      const { aggregator, why } = exempt[job];
+      assert.ok(jobNames.includes(aggregator) && !(aggregator in exempt),
+        `${job}'s aggregator ${aggregator} is not a required job in ci.yml`);
+      assert.match(blockOf(aggregator), new RegExp(`^ {4}needs:.*(?<![\\w-])${job}(?![\\w-])`, 'm'),
+        `${aggregator} does not need ${job}`);
+      assert.match(blockOf(aggregator), /^ {4}if: always\(\)$/m, `${aggregator} has no \`if: always()\``);
+      assert.ok(fixture.contexts.includes(nameOf(aggregator)),
+        `${aggregator} (printed as "${nameOf(aggregator)}") is not a required context, so nothing blocks for ${job}`);
+      assert.equal(fixture.contexts.some((c) => c === display || c.startsWith(`${display} (`)), false,
+        `${job} is exempt, yet the fixture requires its contexts`);
+      assert.ok(why.length > 30, `${job}'s exemption carries no reason`);
+      continue;
+    }
     assert.ok(fixture.contexts.some((c) => c === display || c.startsWith(`${display} (`)),
       `${job} (printed as "${display}") produces no context in the fixture`);
   }
