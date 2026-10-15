@@ -208,7 +208,7 @@ Two of the four commercial claims apps' SLA definitions are keyed on the service
 
 ### Verdict C — §1.1 halt protocol (documented extension point)
 
-Whichever approach is chosen, the request implies **new tables**:
+Whichever approach is chosen, the documented extension requires **new tables**:
 
 - Case-type extension path: two new case tables extending `sn_ins_claim_cml_base` (plus task/adjuster-task/incident tables per line, mirroring the shipped auto set).
 - Generic path: possibly one new incident table extending `sn_ins_claim_property` if property or liability loss data does not fit `sn_ins_claim_property` / `sn_ins_claim_injury`.

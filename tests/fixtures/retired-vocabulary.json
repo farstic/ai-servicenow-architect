@@ -4,6 +4,7 @@
     { "pattern": "Tier [0-9]", "sample": "Tier 2", "why": "the Tier 0/1/2 permission vocabulary" },
     { "pattern": "mcp__nowaikit__", "sample": "mcp__nowaikit__snow_x", "why": "the retired tool prefix" },
     { "pattern": "mcp__servicenow-mcp__", "sample": "mcp__servicenow-mcp__snow_x", "why": "a live-instance tool prefix — the engine must not name one" },
-    { "pattern": "nowaikit", "sample": "nowaikit", "why": "the retired product name" }
+    { "pattern": "nowaikit", "sample": "nowaikit", "why": "the retired product name" },
+    { "pattern": "[Ii]mpl(?:y|ies|ied)\\b[^.]{0,40}\\b(?:custom|new)\\b", "sample": "the request implies a custom table", "why": "the §1.1 trigger ARC-09-C150 retired: Verdict C when a custom object is NAMED in the request or is the only viable path after the baseline evaluation; what a request seems to imply is not a trigger" }
   ]
 }

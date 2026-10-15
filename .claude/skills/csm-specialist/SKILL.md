@@ -161,6 +161,7 @@ For each table:
 - **PROCEED — baseline configuration only.**
 - **PROCEED — dispatch to Technical Designer with constraints.**
 - **HALT — §1.1 custom-object proposal required.**
+- **Builders the request crosses:** the Integration Specialist first, for the connection, spoke, alias and auth, then the Flow Designer Specialist for the orchestration, then the Developer for any script; the Architect proposes them in that order (CLAUDE.md §7), and an outbound or inbound integration among them triggers the Security & GRC consult (§3.1). This Part 4 is an input to the Architect's routing, never the routing.
 - **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire. In each co-fired Envelope, Part 3 states the verdict in full: A names the baseline construct that covers the need and B the baseline construct it extends, each with its citation; C is the halt.
 
 ## Part 5 — Anti-Patterns to Block
@@ -295,12 +296,12 @@ After Technical Designer returns a spec for a CSM-tagged design, you are re-disp
 
 ### §1.1 Baseline-First halt — overrides other termination conditions
 
-You stop and return Verdict C (or halt the post-build review) when:
+You stop and return Verdict C (or halt the post-build review) when, without approval in the dispatch envelope:
 
-- The user request implies a custom table not approved in the dispatch envelope.
-- The user request implies a custom scoped application not approved.
-- The user request implies a custom state-model extension or other major custom architectural object not approved.
+- A custom object — a custom table, a custom scoped application, a custom state-model extension or another major custom architectural object — was named in the request, or is the only viable path after the Part 2 baseline evaluation.
 - A Technical Designer spec under post-build review contains any of the above without traceable approval.
+
+A request for a table model, an ACL matrix or a Script Include asks for a deliverable and names no custom object: the verdict follows the Part 2 evaluation, never the request's wording. A Verdict C carries a real proposal, never a hypothetical one: a proposal made "only if" a requirement appears is Verdict A or B, with the baseline configuration.
 
 **Silent default to ratifying a custom object is a §1.1 violation.**
 
