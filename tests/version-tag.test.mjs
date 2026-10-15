@@ -128,6 +128,33 @@ test('AC 2 — two commits past the tag, the distance is named twice over', (t) 
   assert.equal(lineFor(f.root, 'tag:'), 'tag:        v9.1.0+1 (1 commit past v9.1.0)');
 });
 
+test('ARC-09-C154 — two v* tags on HEAD: the version of record\'s own tag is named, not the other', (t) => {
+  // Seen live on 2.1.0: the architect's negative tag, on the release commit and fetched by the owner's upgrade, was
+  // what `git describe` named, while integrity used v2.1.0.
+  const f = checkout(t);
+  tagAt(f.root, 'v9.0.0', buildTagMessage({
+    version: '9.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
+  execFileSync('git', ['tag', '-a', 'v9.9.7-negative.1', '-m', 'a negative test'],
+    { cwd: f.root, stdio: 'pipe', env: { ...process.env, GIT_COMMITTER_DATE: '2030-01-01T00:00:00Z' } });
+  assert.match(git(f.root, ['describe', '--tags', '--match', 'v*']).trim(), /^v9\.9\.7-negative\.1$/,
+    'describe does not name the other tag here, so the case would prove nothing');
+  for (const full of [true, false]) {
+    const info = versionInfo(f.root, { full });
+    assert.equal(info.tag.name, 'v9.0.0', `full: ${full}`);
+    assert.deepEqual([info.tag.exact, info.tag.distance], [true, 0], `full: ${full}`);
+  }
+  assert.equal(lineFor(f.root, 'tag:'), 'tag:        v9.0.0 (exact)');
+});
+
+test('ARC-09-C154 — with no tag for the version of record at HEAD, describe answers as before', (t) => {
+  const f = checkout(t, { version: '9.0.1' });
+  tagAt(f.root, 'v9.0.0', buildTagMessage({
+    version: '9.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
+  const info = versionInfo(f.root);
+  assert.equal(info.tag.name, 'v9.0.0', 'the fallback named no tag');
+  assert.equal(lineFor(f.root, 'tag:'), 'tag:        v9.0.0 (exact)');
+});
+
 test('an import/* tag is not a release — the --match filter is the whole point', (t) => {
   const f = checkout(t);
   // This repository really carries two of these, from the predecessor histories. Without the
