@@ -856,6 +856,7 @@ jobs:
         run: |
           node --test --test-concurrency=2 \
             tests/upgrade/upgrade.e2e.test.mjs \
+            tests/upgrade/upgrade-licence.e2e.test.mjs \
             tests/upgrade/upgrade-unit.test.mjs \
             tests/upgrade/harness-shape.test.mjs \
             tests/upgrade/plan-agrees.test.mjs \
