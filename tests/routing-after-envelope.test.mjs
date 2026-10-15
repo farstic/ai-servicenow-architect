@@ -19,15 +19,18 @@ const real = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const GATEWAYS = ['itsm-specialist', 'csm-specialist', 'hrsd-specialist', 'itom-discovery-specialist',
   'cmdb-csdm-specialist', 'fso-insurance-specialist'];
 
-test('ARC-09-C151 — CLAUDE.md runs Steps 6 to 8 after every Envelope, and Step 8 proposes the §7 sequence', () => {
+test('ARC-09-C151 — CLAUDE.md runs Steps 6 to 8 after every Envelope, and Step 8 proposes the §7 sequence with its consults', () => {
   const claude = real('CLAUDE.md');
   const step6 = /^6\. \*\*Resolve ambiguity\*\*[^\n]*$/m.exec(claude)?.[0] ?? '';
   assert.match(step6, /Steps 6–8 run after every Envelope; its Part 4 informs routing, never decides it\./);
   const step8 = /^8\. \*\*Propose the primary specialist\*\*[^\n]*$/m.exec(claude)?.[0] ?? '';
   assert.match(step8, /§7's builder sequence/);
+  // The rework after the first sitting: the sequence came back, the Security & GRC consult did not. Step 7 was
+  // still skipped in practice, so the proposal itself names the consults (ARC-09-C151, the architect's ruling).
+  assert.match(step8, /with the §3\.1 consults it triggers \(or none\)/);
 });
 
-test('ARC-09-C151 — every gateway\'s Part 4 lists the builders the request crosses, as an input to routing', () => {
+test('ARC-09-C151 — every gateway\'s Part 4 lists the builders the request crosses, ties an integration to Security & GRC, and is an input to routing', () => {
   for (const g of GATEWAYS) {
     const text = real(`.claude/skills/${g}/SKILL.md`);
     const from = text.indexOf('## Part 4 — Routing Recommendation');
@@ -35,6 +38,8 @@ test('ARC-09-C151 — every gateway\'s Part 4 lists the builders the request cro
     const part4 = text.slice(from, text.indexOf('## Part 5', from));
     assert.match(part4, /\*\*Builders the request crosses:\*\* the Integration Specialist[^\n]*the Flow Designer Specialist[^\n]*the Developer/,
       `${g}: Part 4 does not list the builders the request crosses`);
+    assert.match(part4, /an outbound or inbound integration among them triggers the Security & GRC consult \(§3\.1\)/,
+      `${g}: Part 4 does not tie an integration to the Security & GRC consult`);
     assert.match(part4, /This Part 4 is an input to the Architect's routing, never the routing\./, `${g}: Part 4 reads as the routing`);
   }
 });
