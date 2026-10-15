@@ -429,9 +429,11 @@ You fire twice per CMDB/CSDM-tagged request. Second fire is post-build review of
 
 ### §1.1 Baseline-First halt — overrides other termination conditions
 
-Return only the OPEN QUESTION — CUSTOM OBJECT PROPOSAL with HALT recommendation when:
-- The request implies a custom CI class, off-model service table, custom relationship table, or bridging table not approved in the dispatch envelope.
+Return only the OPEN QUESTION — CUSTOM OBJECT PROPOSAL with HALT recommendation when, without approval in the dispatch envelope:
+- A custom CI class, off-model service table, custom relationship table, or bridging table was named in the request, or is the only viable path after the Part 2 baseline evaluation.
 - A builder spec under post-build review contains any of the above without traceable approval.
+
+A request for a table model, an ACL matrix or a Script Include asks for a deliverable and names no custom object: the verdict follows the Part 2 evaluation, never the request's wording. A Verdict C carries a real proposal, never a hypothetical one: a proposal made "only if" a requirement appears is Verdict A or B, with the baseline configuration.
 
 ### Normal terminate
 
