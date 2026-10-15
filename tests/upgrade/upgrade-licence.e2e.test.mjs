@@ -24,6 +24,9 @@ import { bootstrapUser, buildEnforcementWorld, buildManifestWorld, buildWorld, g
 
 const MINUTES = 10 * 60 * 1000;
 
+// ARC-09-C158 CONTROL, never merged: a planted failure in shard 2. The aggregator must read it as red.
+test('ARC-09-C158 control — a planted failure in shard 2', () => { assert.fail('planted: shard 2 must fail, and upgrade-e2e (windows-latest) with it'); });
+
 // ── ARC-11-C6 — a user without a licence ─────────────────────────────────────────────────────────────────
 //
 // The owner's own path: a checkout on the last release that runs without a licence, upgrading to the first that
