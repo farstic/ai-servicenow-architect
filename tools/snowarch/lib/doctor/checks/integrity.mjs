@@ -16,7 +16,7 @@
 // --refresh`, never here. The SessionStart hook leaves it out of its doctor run by name: the hook runs the integrity
 // function itself, on its stat key.
 import { integrityLine, integrityStatus } from '../../licence/manifest.mjs';
-import { refusalOf } from '../../../../../packages/snowarch/dist/licence/integrity.js';
+import { refusalOf, restoreBlocker } from '../../../../../packages/snowarch/dist/licence/integrity.js';
 import { PRODUCT_KEYS } from '../../licence/keys.mjs';
 import { localDir } from '../../local-paths.mjs';
 import { defineCheck } from '../registry.mjs';
@@ -46,6 +46,10 @@ export function integrityChecks() {
         if (s.state === 'verified') return { ...ok(integrityLine(s), data), fixable: false };
         const cli = cliOf(ctx);
         if (s.state === 'modified') {
+          // ARC-09-C149 — the repair offered is the one that runs: the reason the restore would refuse with comes
+          // first (no local release tag, a link that leaves the checkout), in the launcher's words.
+          const blocked = restoreBlocker(ctx.root, s.tag, s.modified, { cli });
+          if (blocked) return fail(`Integrity: cannot restore — ${blocked.reason}`, { data, fixable: false, remedy: blocked.remedy });
           return fail(integrityLine(s), {
             data: { ...data, fix: { kind: 'integrity-restore' } },
             fixable: true,

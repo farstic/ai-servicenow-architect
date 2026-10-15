@@ -551,6 +551,29 @@ export function restoredLine({ restored, moved, tag, folder, staged, first }) {
         + `(${first}). Your own material belongs under clients/<name>/.`;
 }
 /**
+ * ARC-09-C149 — why the signed files of a modified tree cannot be put back, found before anything is tried, or `null`:
+ * git cannot run, this checkout holds no `tag`, the tag names another commit than the manifest (`manifestCommit`, when
+ * the caller has it), or a changed path is reached through a link that leaves the checkout. `restoreTree` asks it
+ * first, and E-32 asks it before it offers `doctor --fix`, so the repair a user is offered is the one that runs.
+ */
+export function restoreBlocker(root, tag, modified, { manifestCommit = null, run = spawnSync, cli = cliSpelling() } = {}) {
+    const head = run('git', ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`], { cwd: root, encoding: 'utf8', timeout: 60_000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    if (head.error)
+        return { reason: `git could not run (${head.error.message})`, remedy: reinstall };
+    const tagged = String(head.stdout ?? '').trim();
+    if (head.status !== 0 || !COMMIT.test(tagged))
+        return { reason: `this checkout holds no ${tag} tag to restore from`, remedy: reinstall };
+    if (manifestCommit !== null && tagged !== manifestCommit) {
+        return { reason: `the signed manifest for ${tag} names commit ${manifestCommit.slice(0, 7)}, and this checkout's ${tag} `
+                + `names ${tagged.slice(0, 7)}`, remedy: reinstall };
+    }
+    const outside = modified.find((d) => leavesRoot(root, d.path));
+    if (outside) {
+        return { reason: `${outside.path} is reached through a link that leaves this checkout, so nothing was restored`, remedy: repair(cli) };
+    }
+    return null;
+}
+/**
  * Put the signed files back, all or nothing (R3): copy each replaced file aside, `git checkout <tag>` the changed and
  * missing ones, re-hash them, and only then move the extras. Any failure is a refusal with its reason, and nothing is
  * moved; the folder made for it is removed again.
@@ -559,21 +582,9 @@ function restoreTree(root, tag, manifest, modified, { local, now, run, cli, proj
     const git = (args, input) => run('git', args, { cwd: root, encoding: 'utf8', input, timeout: 60_000, windowsHide: true,
         stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
     const local0 = localOf(root, local);
-    const head = git(['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`]);
-    if (head.error)
-        return refused(tag, `git could not run (${head.error.message})`, reinstall, hashed, null);
-    const tagged = String(head.stdout ?? '').trim();
-    if (head.status !== 0 || !COMMIT.test(tagged)) {
-        return refused(tag, `this checkout holds no ${tag} tag to restore from`, reinstall, hashed, null);
-    }
-    if (tagged !== manifest.commit) {
-        return refused(tag, `the signed manifest for ${tag} names commit ${manifest.commit.slice(0, 7)}, and this checkout's ${tag} `
-            + `names ${tagged.slice(0, 7)}`, reinstall, hashed, null);
-    }
-    const outside = modified.find((d) => leavesRoot(root, d.path));
-    if (outside) {
-        return refused(tag, `${outside.path} is reached through a link that leaves this checkout, so nothing was restored`, repair(cli), hashed, null);
-    }
+    const blocked = restoreBlocker(root, tag, modified, { manifestCommit: manifest.commit, run, cli });
+    if (blocked)
+        return refused(tag, blocked.reason, blocked.remedy, hashed, null);
     const stamp = stampFolder(now());
     const folder = join(local0, 'integrity-removed', stamp);
     const put = modified.filter((d) => d.why !== 'extra').map((d) => d.path);

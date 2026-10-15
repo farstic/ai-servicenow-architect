@@ -223,6 +223,20 @@ export declare function restoredLine({ restored, moved, tag, folder, staged, fir
     first: string;
 }): string;
 /**
+ * ARC-09-C149 — why the signed files of a modified tree cannot be put back, found before anything is tried, or `null`:
+ * git cannot run, this checkout holds no `tag`, the tag names another commit than the manifest (`manifestCommit`, when
+ * the caller has it), or a changed path is reached through a link that leaves the checkout. `restoreTree` asks it
+ * first, and E-32 asks it before it offers `doctor --fix`, so the repair a user is offered is the one that runs.
+ */
+export declare function restoreBlocker(root: string, tag: string, modified: readonly TreeDifference[], { manifestCommit, run, cli }?: {
+    manifestCommit?: string | null;
+    run?: typeof spawnSync;
+    cli?: string;
+}): {
+    reason: string;
+    remedy: string;
+} | null;
+/**
  * THE ONE FUNCTION (C141): this checkout's integrity, restored when it can be, refused when it cannot.
  *
  *   exempt    a development tree, or no engine checkout here: nothing to check (Q2);
