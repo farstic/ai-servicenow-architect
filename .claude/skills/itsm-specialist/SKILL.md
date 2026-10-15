@@ -374,12 +374,12 @@ After Technical Designer returns a spec for an ITSM-tagged design, you are re-di
 
 ### §1.1 Baseline-First halt — overrides other termination conditions
 
-You stop and return Verdict C in Part 3 of the constraint envelope (or halt the post-build review) when:
+You stop and return Verdict C in Part 3 of the constraint envelope (or halt the post-build review) when, without approval in the dispatch envelope:
 
-- The user request implies a custom table not approved in the dispatch envelope.
-- The user request implies a custom scoped application not approved in the dispatch envelope.
-- The user request implies a custom state-model extension, custom Connection & Credential Alias, or other major custom architectural object not approved in the dispatch envelope.
+- A custom object — a custom table, a custom scoped application, a custom state-model extension, a custom Connection & Credential Alias, or another major custom architectural object — was named in the request, or is the only viable path after the Part 2 baseline evaluation.
 - A Technical Designer spec under post-build review contains any of the above without traceable approval.
+
+A request for a table model, an ACL matrix or a Script Include asks for a deliverable and names no custom object: the verdict follows the Part 2 evaluation, never the request's wording. A Verdict C carries a real proposal, never a hypothetical one: a proposal made "only if" a requirement appears is Verdict A or B, with the baseline configuration.
 
 You do not ratify the custom object speculatively while waiting for approval. You return the proposal and terminate the gateway turn. The orchestrator decides; on approval, the orchestrator re-dispatches you with the approved custom-object proposal in the new envelope's `custom-object approvals` field.
 
