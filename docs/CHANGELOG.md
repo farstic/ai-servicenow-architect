@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.1.2 — 2026-10-16
+
+### Notes
+
 **A maintenance release after 2.1.1, from a colleague's 30-day licence and the owner's rc.3 and rc.4 sittings.** A
 licence reads expiring only near the end of its own term, so a 30-day licence no longer reads expiring on its first
 day, and a licence in force that is expiring tells the user to ask its issuer for a renewal. A gateway in review mode
@@ -39,6 +43,32 @@ server's contract, which has 399 tools and 74 error codes as in 2.1.1. Upgrading
 
 - The session-start banner, measured: the Mode line reached 10 of 10 headless sessions in a design-only install,
   and a control session with the hook off counted 0. The measurement in a live install is pending (ARC-09-C162).
+
+### Fixed
+
+- engine: ARC-09-C161, CSM and ITSM Part 2 always weigh the closest money and audit tables (6cb40b3)
+- engine: ARC-09-C160, a gateway's review mode says cleared or a §1.1 violation, in all six (9e8fe15)
+- engine: ARC-09-C159, expiring scales with the licence's term; an expiring licence is renewed (09f3741)
+
+### Internal
+
+- plan: ARC-09-C164 opens, the S-13 budget with plugins; the engine's share is 12,150 chars (a193e3b)
+- plan: ARC-09-C160 and C161 record the architect's T-01 and T-02 before/after sittings (dc38b46)
+- plan: ARC-09-C159, C160 and C161 merged and shipping in 2.1.2; C162 and C163 stay open (fb25063)
+- changelog: the 2.1.2 Notes and groups, and the server's licence-threshold line (e638785)
+- plan: ARC-09-C163 opens, the licence rule with no session-start banner to read (6eca943)
+- plan: ARC-09-C160 and C161, the owner approved the text as written (e68dd43)
+- plan: ARC-09-C162 opens, measured in design-only first: the banner reached 10 of 10 sessions (5c10c9b)
+- plan: ARC-09-C160 and C161 fixed on their branch, with the rc.3 sitting's observations (ef66eee)
+- tests: ARC-09-C161, red — CSM and ITSM Part 2 always weigh the closest money and audit tables (0b6a84a)
+- tests: ARC-09-C160, red — a gateway's review says cleared or a §1.1 violation, not a verdict (fc00f3a)
+- plan: ARC-09-C159, the owner approved the renewal sentence as written (49a41f4)
+- plan: ARC-09-C159 fixed on its branch, with the colleague's 30-day licence and the rule (e58da88)
+- tests: ARC-09-C159, red — expiring scales with the licence's term; the remedy is the renewal (7ad0545)
+- plan: ARC-09-C149 and C152 to C158 shipped in 2.1.1, tag v2.1.1 at release commit 1ae4a0f (999d366)
+- changelog: the server package's 2.1.1 block is dated, and 2.1.2-dev keeps the open C119 gap (2b4c4cf)
+
+Tag v2.1.2 · contract c6c66a53131b · docs-pin aa447ce
 
 ## 2.1.1 — 2026-10-16
 
