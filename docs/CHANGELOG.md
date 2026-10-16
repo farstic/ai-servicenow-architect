@@ -18,12 +18,12 @@ release breaking for a caller of those two tools. The Now Assist Specialist know
 an AI Agent Studio tool, every agent and workflow design states its access rules, and the design ends with a build
 plan that asks one write question per call, naming every record the call writes, which the write gate states too. A
 new ledger records which of the server's 399 tools have run against a real instance: 26 are named in a validation
-record, none is verified live yet, and the contract gate keeps every tool listed. The rewritten AI agent tools are
-run against an instance in the release candidate's live sitting before this version is tagged. Whether the
-session-start Mode line reaches every session in a live install is still to be measured. The server's contract keeps
-its 399 tools and 74 error codes, and the licence format and the signed manifest are unchanged. Upgrading from 2.1.2
-needs no step beyond `./snowarch upgrade`; a script or prompt that called the two changed tools with their removed
-inputs needs the new ones.
+record or a platform note, none is verified live yet, and the contract gate keeps every tool listed. The rewritten AI
+agent tools are run against an instance in the release candidate's live sitting before this version is tagged.
+Whether the session-start Mode line reaches every session in a live install is still to be measured. The server's
+contract keeps its 399 tools and 74 error codes, and the licence format and the signed manifest are unchanged.
+Upgrading from 2.1.2 needs no step beyond `./snowarch upgrade`; a script or prompt that called the two changed tools
+with their removed inputs needs the new ones.
 
 ### Breaking
 
