@@ -332,43 +332,28 @@ After Technical Designer returns a spec for an ITSM-tagged design, you are re-di
    - Does it respect baseline reference qualifiers?
 
 3. **§1.1 verdict alignment.** Does the spec respect your Part 3 verdict?
-   - If you said Verdict A (fully baseline), does the spec contain any custom object? If yes — **§1.1 violation flagged.** Halt and re-dispatch Technical Designer with the violation as rework brief.
+   - If you said Verdict A (fully baseline), does the spec contain any custom object? If yes — **§1.1 violation flagged.** It goes back to the builder.
    - If you said Verdict B (extension only), does the spec introduce a new table or scoped app instead of extending? If yes — **§1.1 violation flagged.**
    - If you said Verdict C (approved custom object), does the spec stay within the approved scope? If it exceeds (e.g., approved one new field, spec introduces a whole table) — **§1.1 violation flagged.**
 
-4. **Anti-pattern check.** Does the spec contain any anti-pattern from your Part 5 list? Each hit is a `[GOV][block]` finding.
+4. **Anti-pattern check.** Does the spec contain any anti-pattern from your Part 5 list? Each hit is a §1.1 violation.
 
-**Verdict structure (identical to Code Reviewer):**
+**What the review returns — exactly one of two (ARC-09-C160).** It answers one question: does the artefact keep this Envelope — its tables, fields and state values, and its Part 3 verdict? It is not a code review. Style, performance, security and quality are the Code Reviewer's, which the Architect proposes separately at Phase 2 Step 5.
 
-- **APPROVE.** Spec respects all four checks. Proceed to Developer dispatch.
-- **APPROVE-WITH-FIXES.** Minor deviations listed for Technical Designer or Developer to address inline. Severity ratings: `consider` only — no `fix-before-prod` or `block`.
-- **REWORK.** Material deviation from the gateway envelope. Re-dispatch Technical Designer with findings as rework brief. Re-run §6.2 after rework.
-
-**Report structure (identical to Code Reviewer):**
+- **Cleared** — every check above holds. Name the Envelope the artefact was checked against.
+- **§1.1 violation (what, where)** — one line for each deviation: the construct, where in the artefact it is, and the part of the Envelope it breaks (a table, field, scope or state value the Envelope does not carry, a baseline construct replaced, or a Part 5 anti-pattern). The artefact goes back to its builder with these lines as the brief, and the review runs again on what returns (CLAUDE.md Phase 2 Steps 3 and 4).
 
 ```markdown
-# ITSM Specialist Post-Build Review
+# ITSM review — cleared
+Envelope: <its path, or its Part 3 verdict and date>
+Artefact: <name or path>
+```
 
-**Reviewer:** ITSM Specialist (skill mode, main thread)
-**Artefact under review:** [Technical Designer spec name / path]
-**Gateway envelope reference:** [link to or summary of the upstream gateway envelope]
-**Verdict:** [APPROVE / APPROVE-WITH-FIXES / REWORK]
-
-## Findings
-
-### [PROC][severity] — finding name
-**Check:** Process-map alignment / Data-model alignment / §1.1 verdict / Anti-pattern
-**Issue:** [What's wrong.]
-**Citation:** [Reference back to the gateway envelope Part this violates.]
-**Recommendation:** [Concrete fix.]
-
-(repeat per finding)
-
-## Strengths
-[What the spec got right.]
-
-## Verdict rationale
-[One paragraph explaining the verdict.]
+```markdown
+# ITSM review — §1.1 violation
+Envelope: <its path, or its Part 3 verdict and date>
+Artefact: <name or path>
+- <construct> — <where in the artefact> — <the Envelope part it breaks>
 ```
 
 ## Termination Conditions

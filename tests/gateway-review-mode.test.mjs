@@ -18,13 +18,24 @@ import { gatewayDirs } from './lib/gateways.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The `## Post-Build Review Mode` section of a gateway's skill, to the next `## `. */
+/**
+ * The `## Post-Build Review Mode` section of a gateway's skill, to the next `## ` heading OUTSIDE a code fence. A
+ * report template's own `## Findings` heading, inside its fence, is not the section's end: reading it as one is how
+ * the first edit of this row left half a template behind and still passed.
+ */
 function reviewSection(dir) {
-  const text = readFileSync(join(ROOT, '.claude/skills', dir, 'SKILL.md'), 'utf8');
-  const from = text.indexOf('\n## Post-Build Review Mode');
+  const lines = readFileSync(join(ROOT, '.claude/skills', dir, 'SKILL.md'), 'utf8').split('\n');
+  const from = lines.findIndex((l) => l.startsWith('## Post-Build Review Mode'));
   assert.ok(from > 0, `${dir}: no Post-Build Review Mode section`);
-  const to = text.indexOf('\n## ', from + 1);
-  return text.slice(from, to === -1 ? undefined : to);
+  let fenced = false;
+  let to = lines.length;
+  for (let i = from + 1; i < lines.length; i += 1) {
+    if (lines[i].startsWith('```')) fenced = !fenced;
+    else if (!fenced && lines[i].startsWith('## ')) { to = i; break; }
+  }
+  const section = lines.slice(from, to);
+  assert.equal(section.filter((l) => l.startsWith('```')).length % 2, 0, `${dir}: the review section leaves a code fence open`);
+  return section.join('\n');
 }
 
 /** The shared answer, with the gateway's own name taken out, so the six can be compared. */
