@@ -191,6 +191,24 @@ test('ARC-11-C6 — show and check with no licence say missing, what is refused,
   }
 });
 
+test('ARC-09-C159 — check names the renewal for an expiring licence, in E-31\'s words, and a licence that is ok says nothing of it', async (t) => {
+  // Issued months ago (the fixture's 2026-01-15), so the threshold is the full 30 days: `issue` stamps today, and a
+  // licence issued today is never expiring before its last third.
+  const w = world(t);
+  const primary = keyPair();
+  const keys = productKeys(primary, keyPair());
+  writeFileSync(licencePath(w.root), licenceText(licence({ valid_until: '2026-10-20' }), primary));
+  const r = await run(w, ['check'], {}, { keys });
+  assert.equal(r.code, EXIT_OK, r.text);
+  assert.match(r.text, /Licence: expiring · LIC-2026-0002/);
+  assert.ok(r.lines.includes('step:   Licence LIC-2026-0002 expires on 2026-10-20 (10 days left) — ask the issuer for a renewal before then.'), r.text);
+  assert.doesNotMatch(r.text, /install a valid licence/);
+  writeFileSync(licencePath(w.root), licenceText(licence(), primary));
+  const ok = await run(w, ['check'], {}, { keys });
+  assert.equal(ok.code, EXIT_OK, ok.text);
+  assert.doesNotMatch(ok.text, /renewal/);
+});
+
 test('ARC-11-C1 — init-list writes a signed version-1 empty list and the commands for the owner\'s first push', async (t) => {
   const w = world(t);
   const g = await keygen(t, w);

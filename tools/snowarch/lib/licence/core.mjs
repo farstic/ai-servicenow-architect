@@ -15,7 +15,7 @@
  * are product keys, and only they can sign at all — so a perpetual licence (no `valid_until`) from
  * any other key is invalid exactly as every licence from any other key is (ruling R3).
  *
- * THE STATES are `ok`, `expiring` (30 days or fewer left), `expired`, `revoked`, `invalid` and
+ * THE STATES are `ok`, `expiring` (see `expiringThreshold`), `expired`, `revoked`, `invalid` and
  * `missing`. An id is reported only when the signature holds: an id read from a forged file is the
  * forger's word, and the audit trail records it only from an authentic one.
  *
@@ -124,6 +124,15 @@ export const utcDate = (now) => now.toISOString().slice(0, 10);
 /** Whole days from `from` to `to`, both YYYY-MM-DD. */
 export const daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 
+/**
+ * ARC-09-C159 — WHEN A LICENCE IS EXPIRING: when the days left are at most min(EXPIRING_DAYS, floor(term / 3)), the
+ * term being the licence's own length in whole days, valid_until − issued. A year's licence warns from 30 days left, a
+ * 30-day licence from 10, a 3-day one from 1, and a perpetual licence never. Under a flat 30 days the Windows
+ * colleague's 30-day licence read `expiring` on its first day (2026-10-16).
+ */
+export const expiringThreshold = (issued, validUntil) =>
+  Math.min(EXPIRING_DAYS, Math.floor(daysBetween(issued, validUntil) / 3));
+
 const verdict = (state, over = {}) => ({
   state, id: null, licensee: null, org: null, scope: null, issued: null, validUntil: null,
   perpetual: false, daysLeft: null, key: null, signatureValid: false, reason: null, revocation: null, ...over,
@@ -162,7 +171,7 @@ export function checkLicence(text, { keys, list = null, now }) {
       revocation: { revokedAt: entry.revokedAt, reason: entry.reason } });
   }
   if (daysLeft !== null && daysLeft < 0) return verdict('expired', { ...known, reason: `expired on ${l.valid_until}` });
-  if (daysLeft !== null && daysLeft <= EXPIRING_DAYS) return verdict('expiring', known);
+  if (daysLeft !== null && daysLeft <= expiringThreshold(l.issued, l.valid_until)) return verdict('expiring', known);
   return verdict('ok', known);
 }
 
