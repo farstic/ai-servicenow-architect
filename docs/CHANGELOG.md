@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.2.0-rc.1 — 2026-10-16
+
+### Notes
+
 **A minor release: the AI agent tools write to AI Agent Studio's own tables, and the Architect designs an agentic
 solution with its access rules and its build plan.** The four AI agent tools wrote to tables a current instance does
 not have. They now write an agent, its tool links and a workflow's team, use case and members where AI Agent Studio
@@ -61,6 +65,47 @@ with their removed inputs needs the new ones.
 - Two platform notes: PN-17, what an AI Agent Studio insert creates by itself, and PN-18, pointing REST capture at an
   update set moves the user's own session there too (ARC-09-C165).
 - T-36, a two-turn validation test of an agentic design (ARC-09-C166).
+
+### Breaking
+
+- snow_ai_ai_agent_add no longer takes capabilities or auto_generate_acls and (3fb08dc)
+
+### Added
+
+- ci: ARC-09-C167a, the live-coverage ledger, generated and held by gen:check (27c3de2)
+
+### Fixed
+
+- tests: ARC-09-C168, no test spells a version the next release can carry; fixtures move to 9.x (2a82d4e)
+- now-assist-specialist: ARC-09-C166, §2.2 names AI agents; three tool tiers; Example 2's access (3a80629)
+- now-assist-specialist: ARC-09-C166, AI Agent Studio tools, access rules and a build manifest (7a68330)
+- contract: ARC-09-C166, one call that writes several records is one write question naming all (8d22c79)
+- server: ARC-09-C165, the index's record_type is a plain choice value, not a pinned list (6b3cb2b)
+- server: ARC-09-C165, the read says it checks no access rules; record_type is custom or template (27f5d2d)
+- server: ARC-09-C165, the snow_ai_* tools write AI Agent Studio's sn_aia_* tables and no ACL (3fb08dc)
+
+### Internal
+
+- plan: ARC-09-C168 names its draft, #467 (b39e8eb)
+- plan: ARC-09-C168 opens and is fixed on its branch; C167a records the rc.1 finding (bba2081)
+- tests: ARC-09-C168, red — the next-release sweep asks patch, minor and major, final or rc (5dc658e)
+- changelog: the 2.2.0 Notes count the platform notes among the records that name a tool (4ef2ea1)
+- changelog: the 2.2.0 Notes and groups; breaking for the two AI agent build tools (3fba3dd)
+- plan: ARC-09-C167a names its draft, #464 (2ded60b)
+- plan: ARC-09-C167 splits: C167a the ledger, built; C167b the sweep, open (28d42ff)
+- plan: ARC-09-C165 merged with its live re-verification pending; C166's second round (a6e027f)
+- plan: ARC-09-C166 names its draft, #463 (d3c3186)
+- plan: ARC-09-C166 fixed on its branch; the owner approved the five files as written (41441da)
+- tests: ARC-09-C166, T-36 — an agentic design has its instance model, access rules, manifest (7db69d3)
+- server: ARC-09-C165, red — the read checks no access rules; record_type is custom or template (21010cc)
+- plan: ARC-09-C165 names its draft, #462 (f21772d)
+- plan: ARC-09-C165 fixed on its branch; C166 and C167 open (2e073be)
+- PN-17 and PN-18, the AI Agent Studio records and the capture target seen in the owner's trial (9a87d8c)
+- server: ARC-09-C165, red — the snow_ai_* tools write sn_aia_*, never sys_ai_agent or an ACL (c9227b4)
+- plan: ARC-09-C159, C160 and C161 shipped in 2.1.2, tag v2.1.2 at release commit e1aeece (3d5924c)
+- changelog: the server package's 2.1.2 block is dated, and 2.1.3-dev keeps the open C119 gap (7a43c43)
+
+Tag v2.2.0-rc.1 · contract bd79bb3637c0 · docs-pin aa447ce
 
 ## 2.1.2 — 2026-10-16
 

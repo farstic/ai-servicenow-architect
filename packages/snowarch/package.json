@@ -1,6 +1,6 @@
 {
   "name": "@farstic/snowarch",
-  "version": "2.1.3-dev",
+  "version": "2.2.0-rc.1",
   "description": "ServiceNow MCP server and snowarch CLI — the live-instance half of AI ServiceNow Architect",
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
