@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-15
+**Last updated:** 2026-10-16
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 35 tests, T-01 through T-35, no number reserved. The count is asserted by
+> **How many.** 36 tests, T-01 through T-36, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -1962,6 +1962,57 @@ on Windows), design-only.
 
 ---
 
+## T-36 — an agentic solution is designed with its instance model, access rules and build manifest
+
+**Covers:** `.claude/skills/now-assist-specialist/SKILL.md` (Tools, Access rules, Build manifest, and Instance model and build sequence), its `EXAMPLES.md` Example 4, `governance/mcp-protocols.md` (Building an agentic solution in live mode) and the rule file's §2.1 granularity bullet (ARC-09-C166)
+**Modes:** design-only ✅ · live: not run (in live mode the build manifest is executed under the write gate, one approval per call)
+
+### Prompt
+
+Turn 1:
+
+```
+Design an AI agent with one existing read-only tool and an agentic workflow that uses it. Design only; no client.
+```
+
+Turn 2 — same session, after turn 1's answer:
+
+```
+Use the defaults for every open question. Approved — proceed with the Now Assist Specialist and produce the full design now.
+```
+
+### Expected behaviour
+
+Turn 1:
+
+1. The Architect routes to the Now Assist Specialist, lists its open questions each with a default, proposes the handoff and waits — no design yet, which is clarify-first working.
+2. A tool it assumes or asks about is an AI Agent Studio tool (`sn_aia_tool`: a script, flow action, subflow, record operation and the like), never one of this product's `snow_*` server tools.
+
+Turn 2:
+
+1. The Now Assist Specialist is adopted: `Skill(now-assist-specialist)`, a Read of its `SKILL.md`, or its sub-agent dispatched.
+2. The design carries the instance model: the `sn_aia_*` tables, cited `(citation: markdown/intelligent-experiences/na-aia-reference.md)`, and what an insert creates by itself, attributed to PN-17.
+3. Tools: the existing tool reused, as configuration, with its execution mode — Supervised or Autonomous — cited to `markdown/intelligent-experiences/add-tool-aia-new.md`.
+4. Access rules for the agent and for the workflow: user access (the roles of the Allow-If ACL), identity (Dynamic user or AI user, with the reason) and role filtering (the approved roles).
+5. The build manifest: `snow_ai_ai_agent_add`, then `snow_ai_agentic_workflow_add`, each with ONE §2.1 question that names every record the call writes, in order; capture first; the read-backs; the offer to restore the previous capture target; running the solution a separate step.
+6. §1.1 Verdict A: linking an existing tool is configuration.
+
+### Pass criteria
+
+- Turn 1 routes to the Now Assist Specialist with open questions and defaults, and writes no design.
+- Turn 2 has all four: the instance model, Tools with reuse or create and the execution mode, Access rules in three parts for the agent and the workflow, and the build manifest with two calls and one enumerating question each.
+- 0 dead citations and 0 invented names: every table or stage name is in the corpus or attributed to PN-17 or PN-18.
+- §1.1 Verdict A.
+
+### Fail signals
+
+- Access rules absent, or written for the agent only.
+- A build manifest with one question per record.
+- The agent's tool named as an MCP or server tool — `snow_core_records_query` or any other `snow_*` — instead of an AI Agent Studio tool.
+- A table or stage name that is neither in the corpus nor in PN-17, or a version state presented as documented.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -2040,7 +2091,7 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
 | 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` `T-35` | the launchers, without Git Bash — the path that has cost the most cells |
 | 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |
