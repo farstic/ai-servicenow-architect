@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.1.1 — 2026-10-16
+
+### Notes
+
 **A maintenance release after 2.1.0, from the owner's rc.3 sitting and a colleague's Windows install of 2.1.0, both
 on 2026-10-15.** It changes no licence, no manifest and no protocol: licences, the signed manifest of the Architect's
 own files and the server's contract are as in 2.1.0, with 399 tools and 74 error codes. Upgrading from 2.1.0 needs no
@@ -43,6 +47,42 @@ step beyond `./snowarch upgrade`.
 
 - The Windows upgrade e2e runs as two shards, each with its own 45-minute limit, behind the required context
   `upgrade-e2e (windows-latest)`, which needs both; main's required checks are unchanged (ARC-09-C158).
+
+### Fixed
+
+- engine: ARC-09-C157, the Next line names the folder for claude; doctor names the install (d7f7f9c)
+- engine: ARC-09-C156, issue prints the install commands; check names a licence by another name (8dd002f)
+- engine: a document is a builder's, however short — proposed at Step 8, never written in-thread (c58aac0)
+- integration-specialist: the MID Server and alias citations name pages that say what they cite (7e9a394)
+- engine: the engine line names the version of record's own tag when it points at HEAD (caa51e1)
+- doctor: E-32 names why a restore would refuse before it offers doctor --fix (b04d795)
+
+### Internal
+
+- changelog: the 2.1.1 Notes and groups, and the server's no-behaviour-change line (b18e833)
+- plan: ARC-09-C155, C156 and C157, the owner approved the preview as written (5efcd5c)
+- tests: ARC-09-C157, the B09 cases' titles and comments count the six lines they assert (6f17ecf)
+- plan: ARC-09-C155, C156 and C157 fixed on their branch, and the C158 row's watch line (cb58eea)
+- docs: ARC-09-C155, Git for Windows 2.55 prints the same harmless "is not a commit!" as 2.54 (e2b2610)
+- tests: ARC-09-C156 and C157, red — a licence under its own name; the folder claude starts in (84d3211)
+- plan: ARC-09-C155, C156 and C157 open from the Windows colleague's 2.1.0 install (e5daf31)
+- plan: ARC-09-C158 measured on #453 — two shards, the 63 names, and the planted failure (6a4c521)
+- plan: ARC-09-C158 opens fixed on its branch, and C143's watch is superseded by it (231b0fb)
+- ci: Windows upgrade-e2e runs as two shards, and upgrade-e2e (windows-latest) needs both (a70f266)
+- tests: the upgrade's licence and manifest cases move to their own file, by subject (6ad1a99)
+- tests: ARC-09-C158, red — two Windows upgrade shards and one required context that needs both (d07c4ee)
+- plan: ARC-09-C152, the owner approved the preview as written (4b70b97)
+- plan: ARC-09-C152 fixed, and T-33 covers the three surfaces that route a document (c6541b2)
+- tests: ARC-09-C152, red — CLAUDE.md, skill and taxonomy send a document to its builder (fada8a4)
+- plan: ARC-09-C153, the owner approved the preview as written (3012c99)
+- plan: ARC-09-C153 fixed, with the measured counts and a sweep of the skill's citations (26b2a5c)
+- plan: ARC-09-C149 and C154 fixed, red first, with their controls (2e876b1)
+- tests: C149 and C154, red — E-32 names a missing tag; the engine names the version's own tag (8b45cad)
+- plan: ARC-11-C7 and C141 close on the owner's rc.3 sitting; four rows open from it (3a623c6)
+- plan: 2.1.0 released on 2026-10-15, tag v2.1.0 at release commit 1d28d5a (69e28c4)
+- changelog: the server package's 2.1.0 block is dated, and 2.1.1-dev keeps the open C119 gap (23cf12a)
+
+Tag v2.1.1 · contract 6dcfe2a45451 · docs-pin aa447ce
 
 ## 2.1.0 — 2026-10-15
 

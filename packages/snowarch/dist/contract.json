@@ -1,7 +1,7 @@
 {
   "contractVersion": 1,
   "product": "snowarch",
-  "version": "2.1.1-dev",
+  "version": "2.1.1",
   "server": {
     "suggestedName": "servicenow"
   },
