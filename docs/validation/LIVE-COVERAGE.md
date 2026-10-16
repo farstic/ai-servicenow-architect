@@ -578,8 +578,8 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 
 | Tool | Status | Record | Date | Instance family | Note | Named in |
 |---|---|---|---|---|---|---|
-| `snow_ai_agentic_workflow_add` | unverified | — | — | — | rewritten in ARC-09-C165; its live re-verification is pending the v2.2.0-rc.1 sitting | 1 |
-| `snow_ai_ai_agent_add` | unverified | — | — | — | rewritten in ARC-09-C165; its live re-verification is pending the v2.2.0-rc.1 sitting | 1 |
+| `snow_ai_agentic_workflow_add` | unverified | — | — | — | rewritten in ARC-09-C165; its live re-verification is pending the next release candidate's live sitting | 1 |
+| `snow_ai_ai_agent_add` | unverified | — | — | — | rewritten in ARC-09-C165; its live re-verification is pending the next release candidate's live sitting | 1 |
 | `snow_ai_ai_agent_read` | unverified | — | — | — | — | 0 |
 | `snow_ai_ai_agents_index` | unverified | — | — | — | — | 0 |
 

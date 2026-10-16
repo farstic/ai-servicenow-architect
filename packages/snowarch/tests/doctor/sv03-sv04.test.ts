@@ -181,10 +181,10 @@ describe('SV-03 — the flag matrix', () => {
     // the check printed only the location until the acceptance pass. Both now — the version is what
     // a support conversation asks for, the location answers which of two installs is in use.
     const present = await runCheck('SV-03', {
-      fluent: () => ({ installed: true, where: join(home, 'sdk'), version: '3.0.0' }),
+      fluent: () => ({ installed: true, where: join(home, 'sdk'), version: '9.9.9' }),
     });
     expect(present.detail).toContain('SDK present');
-    expect(present.detail).toMatch(/3\.0\.0/);
+    expect(present.detail).toMatch(/9\.9\.9/);
     expect(present.status).toBe('ok');
 
     // A version the probe could not read is not a failure: the SDK is still installed, and a doctor
@@ -194,7 +194,7 @@ describe('SV-03 — the flag matrix', () => {
     });
     expect(noVersion.status).toBe('ok');
     expect(noVersion.detail).toContain('SDK present');
-    expect(noVersion.detail).not.toMatch(/3\.0\.0/);
+    expect(noVersion.detail).not.toMatch(/9\.9\.9/);
     expect(present.detail).not.toContain('FLUENT_NOT_INSTALLED');
   });
 
