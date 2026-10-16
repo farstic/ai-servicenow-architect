@@ -53,8 +53,7 @@ concept and does nothing for the API — setting it looks like success and captu
 established on a live instance and is recorded as PN-01 in `docs/PLATFORM-NOTES.md`, with the
 consequence that capture cannot be verified any other way and cannot be repaired afterwards.
 
-Before any write that produces a configuration object — Script Include, Business Rule, Client
-Script, UI Policy, UI Action, ACL, Flow, table or field — four calls:
+Before any write that produces a configuration object — Script Include, Business Rule, Client Script, UI Policy, UI Action, ACL, Flow, AI agent, agentic workflow, table or field — four calls:
 
 1. `snow_us_active_update_set_ensure` `{ "name": "<engagement>-<topic>" }` — the name is required, and only the caller's own
    in-progress sets are returned. Without both, a shared instance hands back whoever opened one last,
@@ -71,6 +70,40 @@ are registered so the refusal can name the route that works, not because they wo
 
 Capture cannot be applied retroactively over REST. If steps 1–2 were skipped, stop and say so.
 
+## Building an agentic solution in live mode
+
+An AI agent and an agentic workflow are built by two tools, and each writes several records in one call
+(ARC-09-C165). `snow_ai_ai_agent_add` writes the agent (`sn_aia_agent`) and one tool link
+(`sn_aia_agent_tool_m2m`) per tool. `snow_ai_agentic_workflow_add` writes the team (`sn_aia_team`), the
+workflow (`sn_aia_usecase`) with that team, and one member (`sn_aia_team_member`) per agent. Both need
+`NOW_ASSIST_ENABLED` and `WRITE_ENABLED`, so §2.0 stops them under any preset but `full` or a `custom` one
+with both on. The order, and what each step costs in approval:
+
+1. **Capture first.** An agentic solution is configuration, and every record of the build is captured, the
+   ones the instance creates by itself included (PN-17). The §2.2 ensure and capture are named in the first
+   write question — `About to <action> on instance "<label>", after ensuring update set <name> and pointing capture at it — write approved?` — and the capture call returns `previous`, the update set
+   the preference named before the build. Keep it for step 6.
+2. **The agent, one question.** N distinct records is N questions, each asked and answered before its own call — except one call that writes several records: that is one question naming every record the call writes, in order. A request that enumerates them is the request, not the approval — the same sentence as "the original task description is not approval". For the agent:
+   `About to create AI agent "<name>" (sn_aia_agent) and its tool links (sn_aia_agent_tool_m2m: <tool>, …) on instance "<label>", after ensuring update set <name> and pointing capture at it — write approved?`
+3. **The workflow, one question, after its agents exist.**
+   `About to create agentic workflow "<name>": team (sn_aia_team), workflow (sn_aia_usecase), members (sn_aia_team_member: <agent>, …) on instance "<label>" — write approved?`
+4. **Read-backs, after each call.** Each tool checks what it can before its first write, and a refusal says
+   "Nothing was written.". It reads every record back, reports the configuration and the version the
+   instance created by itself, and reports any difference as a warning. A failure after the first record
+   names every record created and deletes nothing. Report each result, warnings first, before the next call.
+5. **Verify.** `snow_us_update_set_preview` on the build's update set, as §2.2 step 4.
+6. **Restore the capture target.** Pointing capture at the build's update set also moved the user's own UI
+   session to it (PN-18). Offer to point it back at `previous` — `snow_us_capture_target_set` again, a write with its own
+   question.
+7. **Running it is a separate step.** A test run in AI Agent Studio, or a trigger, executes the solution.
+   It is never part of the build, and it has its own approval.
+
+**Access is not part of the build.** Neither tool writes an ACL, an identity or role filtering: each result's
+`access_rules` says so, and its `studio_route` names the AI Agent Studio page where they are configured.
+The design's Access rules item is applied there, before the solution is used. An inserted agent is active at
+once (PN-17), so until then build it inactive: `active: false` sets its configuration (`sn_aia_agent_config`)
+inactive after the links, and the agent's question names that record last.
+
 ## Required tools
 
 What the engine depends on, from `packages/contract/required-tools.json`, joined with what the
@@ -78,6 +111,8 @@ server declares. A rename on the server side moves the sha and fails the pin bef
 
 | Tool | Gate | Mutates | Used by |
 |---|---|---|---|
+| `snow_ai_agentic_workflow_add` | now_assist (then write) | yes | §2.1, now-assist-specialist |
+| `snow_ai_ai_agent_add` | now_assist (then write) | yes | §2.1, now-assist-specialist |
 | `snow_atf_atf_suite_exec` | atf | yes | §2.1, atf-author |
 | `snow_atf_atf_test_exec` | atf | yes | §2.1, atf-author |
 | `snow_cmdb_reconcile` | cmdb_write | yes | §2.1, cmdb-csdm-specialist |

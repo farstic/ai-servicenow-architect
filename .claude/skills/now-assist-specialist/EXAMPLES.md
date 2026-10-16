@@ -1,6 +1,6 @@
 # Now Assist Specialist — Examples
 
-Three gold-standard examples of Now Assist Specialist output, demonstrating the skill's disciplines: explicit confidence routing, human-in-the-loop boundaries, AI Control Tower attestations, and the Baseline-first audit pattern with the §1.1 escalation flow.
+Four gold-standard examples of Now Assist Specialist output, demonstrating the skill's disciplines: explicit confidence routing, human-in-the-loop boundaries, AI Control Tower attestations, the Baseline-first audit pattern with the §1.1 escalation flow, and — in Example 4 — an agentic solution's access rules and build manifest.
 
 ---
 
@@ -251,6 +251,8 @@ One-shot per case submission. Invoked by the customer portal submission flow (Fl
 | `semanticSearchCases` | **CUSTOM — §1.1 ESCALATION REQUIRED** | Compare the new case's text against the candidate cases via semantic similarity (AI Search profile). | Read-only. |
 | `proposeDeflection` | **Baseline** (agent output to the calling flow) | Hands the verdict, the existing case reference and the confidence back to the portal flow, which renders the deflection UX. | None — writes no record. |
 
+**Execution mode:** all three are read-only, with no side effect → Autonomous; a tool with a side effect would be Supervised *(citation: `markdown/intelligent-experiences/add-tool-aia-new.md`)*. In AI Agent Studio terms, `getRecentCasesForAccount` is a record operation and `semanticSearchCases` a search retrieval over the AI Search profile — both configured over baseline capabilities; `proposeDeflection` is the agent's output to the calling flow, not a tool record.
+
 **OPEN QUESTION — CUSTOM OBJECT PROPOSAL (§1.1):** see §13 — the `semanticSearchCases` Action requires Chief Architect approval before this design can be implemented.
 
 ## 6. Confidence routing
@@ -347,6 +349,25 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 | Custom LLM provider | 0 | n/a — uses Now LLM Service |
 
 **Compliance status: COMPLIANT.** Design uses configuration within baseline frameworks (AI Agent Studio, AI Search, AICT) and keeps its verdicts in the baseline Generative AI Log. No §1.1 escalation.
+
+## 15. Access rules
+
+- **User access:** users with specified roles — `snc_external`, the role a registered portal contact holds *(citation: `markdown/customer-service-management/manage-cust-registration-requests.md`)*. Saving the access rules in AI Agent Studio generates the Allow-If ACL from it *(citation: `markdown/intelligent-experiences/define-sec-aia-new.md`)*.
+- **Identity:** Dynamic user, the default — the submitting contact. The agent then reads only the cases that contact may already see, which is what keeps a deflection safe: it cannot surface another account's case *(citation: `markdown/intelligent-experiences/aia-security-implementation.md`)*.
+- **Role filtering:** approved roles `snc_external`, so a contact who also holds an internal role runs the agent as a customer *(citation: `markdown/platform-security/identity/role-masking.md`)*.
+
+## 16. Build manifest
+
+Live mode, preset `full`. Before the first call, the two tools are configured in AI Agent Studio (configuration, not built by these calls), and the trigger is the portal flow that Flow Designer Specialist designs.
+
+1. `snow_ai_ai_agent_add` with both tool links and `active: false`:
+   `About to create AI agent "Duplicate Case Detection Agent" (sn_aia_agent), its tool links (sn_aia_agent_tool_m2m: getRecentCasesForAccount, semanticSearchCases) and set its configuration inactive (sn_aia_agent_config) on instance "<label>", after ensuring update set acme-duplicate-case-detection and pointing capture at it — write approved?`
+   Keep the update set the capture call reports as previous.
+2. Read back: the configuration reads inactive, a version exists, two tool links — every warning reported first.
+3. Apply item 15 in AI Agent Studio, on the page the result names, then activate the agent there.
+4. `snow_us_update_set_preview` shows every record in acme-duplicate-case-detection.
+5. Offer to point capture back at the previous update set — its own write question (PN-18).
+6. Invoking it from the portal flow is a separate, approved step.
 
 ---
 
@@ -510,6 +531,203 @@ The discipline shown here is **explicit exclusions** in §3 — listing what the
 §5's "Override conditions: None" is also a deliberate discipline — every section must be populated. "Not applicable" with a rationale is correct; silence is rejected.
 
 §8 (Open decisions) catches a real risk: the attestation references a "Closed — Confidential" state that may not be baseline. Rather than assert it exists, the attestation flags it as OD-AICT-02 and routes back to HRSD Specialist for verification. This is the honest-uncertainty pattern: the Now Assist Specialist designs the AICT attestation but doesn't pretend to know Acme's HR state model.
+
+---
+
+## Example 4 — Minimal agentic solution: one agent, one existing read-only script tool, one workflow
+
+### Input prompt
+
+> Now Assist Specialist task: design an AI agent that tells a service desk analyst which assignment groups a user belongs to, using a read-only script tool that already exists on the instance, and an agentic workflow that uses the agent.
+>
+> Trigger: chat only — the analyst asks in Virtual Agent; no automatic trigger.
+> Existing tool: an AI Agent Studio script tool, **Read user groups**, which reads a user's group memberships and writes nothing.
+> Sensitivity: internal; group names and a user's name, nothing else.
+> Multilanguage: English only.
+> Pre-approved custom objects: none.
+> Mode: live, on the instance labelled `pdi`, engagement `acme`.
+> Release family: Australia.
+
+### Expected output
+
+**File suggestion:** `clients/acme/now-assist/group-membership-agent-design.md`
+
+```markdown
+# Group membership agent and workflow — AI Agent and Agentic Workflow Design
+
+| | |
+|---|---|
+| Capability type | AI Agent (chat, per question) and Agentic workflow (one agent) |
+| Version | 0.1 (draft) |
+| Author | Now Assist Specialist |
+| Date | 2026-10-16 |
+| Release family | Australia |
+
+## AI agent — Group membership agent
+
+### 1. Purpose
+
+Answer a service desk analyst's question about which assignment groups a user belongs to, from the instance's own group membership, without the analyst opening the user record.
+
+### 2. Capability statement
+
+List the assignment groups a named user belongs to.
+
+### 3. Trigger and lifecycle
+
+Chat only: invoked through the agentic workflow below from Virtual Agent; no trigger, which is optional when the solution is used only in chats (citation: `markdown/intelligent-experiences/add-trigger-aia-new.md`). One-shot per question; nothing persists between questions.
+
+### 4. System prompt outline
+
+- **Role:** you answer which assignment groups a user belongs to, for a service desk analyst.
+- **Constraints:** use only the result of the Read user groups tool; never infer a membership the tool did not return; name the user you looked up.
+- **Refusal conditions:** any question that is not about a user's group membership; a request to change a membership.
+- **Tone:** brief, factual, internal.
+
+### 5. Tools
+
+| Tool | Reuse or new | Purpose | Side-effect class | Execution mode |
+|---|---|---|---|---|
+| Read user groups (`sn_aia_tool`, script) | Reuse — configuration, no §1.1 review | Reads the user's group memberships | Read-only | Autonomous — a read operation (citation: `markdown/intelligent-experiences/add-tool-aia-new.md`) |
+
+The value stored behind Autonomous is read from the instance's choice list before the build, never assumed (PN-17).
+
+### 6. Confidence routing
+
+At confidence ≥ 0.85 that the user is identified uniquely, the agent answers. Below 0.85 — two users share the name, or none matches — it asks the analyst which user is meant, and answers nothing until told.
+
+### 7. Human-in-the-loop conditions
+
+None — a read-only lookup with one Autonomous read tool. A write tool added later would be Supervised and would need a new design.
+
+### 8. Memory and context
+
+None retained across questions.
+
+### 9. Multilanguage scope
+
+English only; a question in another language gets an English answer saying so.
+
+### 10. AI Control Tower attestation
+
+Purpose: group membership lookup for service desk analysts. Data classes: user name, group membership, group name. Output: the chat answer. Refusal conditions: as item 4. Audit retention: the engagement's default.
+
+### 11. Performance budget
+
+One tool call per question; a design target of an answer within 10 seconds.
+
+### 12. Test strategy
+
+- Happy path: a user in two groups — both named.
+- Refusal: "add this user to the network group" — refused, nothing written.
+- Ambiguity: two users with the same name — the agent asks which.
+- Access: an analyst without `itil` cannot invoke the agent; an analyst who also holds `admin` gets an answer computed with `itil` only.
+- Governance: the attestation's data classes match the tool's reads.
+
+### 13. Open decisions
+
+- **OD-1:** the approved role for role filtering is `itil` on the assumption that it lets the tool read group membership — confirm on the instance before the build.
+
+### 14. Baseline-first audit
+
+COMPLIANT — §1.1 Verdict A. The tool exists and is reused (configuration). No new table, scope, Connection Alias or custom tool.
+
+### 15. Access rules
+
+- **User access:** users with specified roles — `itil`. Saving the access rules in AI Agent Studio generates the Allow-If ACL from that role (citation: `markdown/intelligent-experiences/define-sec-aia-new.md`).
+- **Identity:** Dynamic user, the default — the analyst's own roles; nothing here needs roles the analysts lack (citation: `markdown/intelligent-experiences/aia-security-implementation.md`).
+- **Role filtering:** approved roles `itil`, so an analyst who also holds `admin` runs it with `itil` only (citation: `markdown/platform-security/identity/role-masking.md`).
+
+### 16. Build manifest
+
+See the workflow's item 14: one manifest builds both.
+
+## Agentic workflow — Group membership lookup
+
+### 1. Purpose
+
+Give Virtual Agent one entry point to the group membership agent.
+
+### 2. Workflow narrative
+
+The analyst asks in Virtual Agent; the workflow hands the question to the group membership agent and returns its answer.
+
+### 3. Agent chain
+
+Group membership agent only. Passed forward: the analyst's question.
+
+### 4. Trigger and termination
+
+Chat only; ends when the agent answers or refuses.
+
+### 5. Per-Agent design references
+
+The AI agent section above.
+
+### 6. End-to-end confidence routing
+
+The agent's (item 6 above); the workflow adds no threshold.
+
+### 7. Human-in-the-loop checkpoints
+
+None — read-only.
+
+### 8. AI Control Tower attestation
+
+Covers the one agent; the same data classes.
+
+### 9. Performance budget
+
+As the agent's.
+
+### 10. Test strategy
+
+The agent's cases, invoked through the workflow; plus an analyst without `itil` on the workflow's own ACL.
+
+### 11. Open decisions
+
+OD-1 above.
+
+### 12. Baseline-first audit
+
+COMPLIANT — as the agent's.
+
+### 13. Access rules
+
+The workflow's own: users with specified roles — `itil`; Dynamic user; approved roles `itil`. The agent admits the same role, so the invoker passes both ACLs (citation: `markdown/intelligent-experiences/aia-security-implementation.md`).
+
+### 14. Build manifest
+
+Live mode, instance `pdi`, preset `full` (both tools need `NOW_ASSIST_ENABLED` and `WRITE_ENABLED`).
+
+1. `snow_ai_ai_agent_add` with the tool link and `active: false` — the agent stays inactive until its access rules are applied:
+   `About to create AI agent "Group membership agent" (sn_aia_agent), its tool link (sn_aia_agent_tool_m2m: Read user groups) and set its configuration inactive (sn_aia_agent_config) on instance "pdi", after ensuring update set acme-group-membership and pointing capture at it — write approved?`
+   Keep the update set the capture call reports as previous.
+2. Read back: the configuration reads inactive, a version exists, one tool link — every warning reported before the next call.
+3. `snow_ai_agentic_workflow_add`:
+   `About to create agentic workflow "Group membership lookup": team (sn_aia_team), workflow (sn_aia_usecase), member (sn_aia_team_member: Group membership agent) on instance "pdi" — write approved?`
+   The workflow is active on insert (PN-17), so step 5 follows at once.
+4. Read back: the version, the one member; `snow_us_update_set_preview` shows every record in acme-group-membership.
+5. Apply items 15 and 13 in AI Agent Studio, on the pages each result names, then activate the agent there.
+6. Offer to point capture back at the previous update set — its own write question (PN-18).
+7. Testing the workflow on a record in AI Agent Studio is a separate, approved step (citation: `markdown/intelligent-experiences/test-ai-asset-new.md`).
+```
+
+### §6.2 post-build manifest
+
+> *Capability design produced. The agent reuses an existing tool and writes nothing, so no builder is needed before the build manifest runs.*
+>
+> **Proposing handoffs:**
+>
+> 1. **Security & GRC Specialist consult** — review of the access rules and the role filtering (OD-1) — proceed?
+>
+> **Baseline-first audit: COMPLIANT** — §1.1 Verdict A.
+>
+> **No Code Reviewer trigger** — no new script.
+
+### Explanation
+
+The example shows the three disciplines this skill adds for agentic solutions. The agent's tool is an AI Agent Studio tool that already exists, so linking it is configuration and the verdict is A; one of this product's server tools is never the agent's tool. The access rules are written for the agent and the workflow separately, because each has its own ACL, identity and role filtering, and the invoker must pass both. The build manifest asks one question per call, naming every record the call writes in order, builds the agent inactive because an inserted agent is active at once (PN-17), and ends by offering to restore the capture target (PN-18) — running the solution stays a separate approval.
 
 ---
 

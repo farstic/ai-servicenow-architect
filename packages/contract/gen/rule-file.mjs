@@ -79,10 +79,17 @@ export const PREFLIGHT_UNKNOWN_GATE = 'unknown gate `<gate>` — contract and ru
  * The sentence is deliberately the SAME shape as the "not approval" list beside it: a request that
  * enumerates its targets is still a request. Naming three records is how a person describes a job,
  * not how they approve three writes.
+ *
+ * ARC-09-C166 (ruling OQ-DS-1) — one call can write several records: `snow_ai_ai_agent_add` writes the
+ * agent and a tool link per tool. A question per record cannot be answered before a call that writes
+ * them together, so that call is one question, and the question names every record, in order — the
+ * construction the §2.2 pair already has. Extended in place: the rule file stands on its 72-line cap.
+ * `governance/mcp-protocols.md` states the same constant in its agentic build section.
  */
 export const APPROVAL_PER_RECORD = 'N distinct records is N questions, each asked and answered '
-  + 'before its own call. A request that enumerates them is the request, not the approval — the '
-  + 'same sentence as "the original task description is not approval".';
+  + 'before its own call — except one call that writes several records: that is one question naming '
+  + 'every record the call writes, in order. A request that enumerates them is the request, not the '
+  + 'approval — the same sentence as "the original task description is not approval".';
 
 /**
  * The §2.2 pair under one approval — but only when the question says so.
@@ -98,6 +105,15 @@ export const APPROVAL_PER_RECORD = 'N distinct records is N questions, each aske
  */
 export const APPROVAL_WITH_CAPTURE = 'About to <action> on instance "<label>", after ensuring '
   + 'update set <name> and pointing capture at it — write approved?';
+
+/**
+ * The configuration objects §2.2 names, in the rule file's heading and in the long form's paragraph. One list,
+ * so the always-loaded line cannot name fewer objects than the protocols do. ARC-09-C166 added the AI agent and
+ * the agentic workflow: their records are captured like any configuration (PN-17), and the agentic build section
+ * of `governance/mcp-protocols.md` captures first.
+ */
+export const CAPTURE_OBJECTS = 'Script Include, Business Rule, Client Script, UI Policy, UI Action, ACL, Flow, '
+  + 'AI agent, agentic workflow, table or field';
 
 /**
  * A session with no engagement named, about to make its first write to an instance (ARC-09-C105).
@@ -238,7 +254,7 @@ On Windows PowerShell, type \`${spellings({ platform: 'win32', env: {} }).cli}\`
 - The §2.2 ensure + capture pair is covered by the configuration write's approval ONLY when the question names them: \`${APPROVAL_WITH_CAPTURE}\` Asked bare, each is its own write and gets its own question.
 - ${NO_ENGAGEMENT_RULE}
 
-## §2.2 — Update-set capture (before every configuration write: Script Include, Business Rule, Client Script, UI Policy, UI Action, ACL, Flow, table or field)
+## §2.2 — Update-set capture (before every configuration write: ${CAPTURE_OBJECTS})
 1. \`${ensure}\` \`{ "name": "<engagement>-<topic>" }\` — returns the in-progress update set created by the authenticated user, creating it if absent.
 2. \`${capture}\` \`{ "update_set_sys_id": "<sys_id from step 1>" }\` — sets \`sys_user_preference\` \`sys_update_set\` for the authenticated user; REST writes are captured from now on.
 3. Perform the write (step 3 needs its own "write approved").

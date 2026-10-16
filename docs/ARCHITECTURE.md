@@ -966,7 +966,7 @@ flowchart LR
     con --> st
   end
   subgraph engine["packages/contract — the engine"]
-    pin["required-tools.json<br/>42 tools · used_by · pinned sha"]
+    pin["required-tools.json<br/>44 tools · used_by · pinned sha"]
     lint["engine-lint.mjs<br/>11 checks"]
     gen["gen-governance.mjs<br/>5 targets"]
     con --> pin

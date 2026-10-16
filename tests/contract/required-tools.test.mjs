@@ -53,11 +53,13 @@ test('serverKey is a legal MCP registration key', () => {
   assert.match(pin.serverKey, /^[A-Za-z0-9_-]+$/);
 });
 
-test('the seed lists exactly 42 tools', () => {
+test('the seed lists exactly 44 tools', () => {
   // 41 at S01, plus `snow_core_instance_switch` at S02. It changes no ServiceNow record, so it
   // is not `mutates` — but `03` S-23 names it among the 14 that must prompt, and it is the only
   // way to change which instance a write lands on. ARC-05-S07's ask list unions the two fields.
-  assert.equal(pin.tools.length, 42);
+  // ARC-09-C166 adds the two AI Agent Studio build tools, which the Now Assist Specialist's build
+  // manifest and the agentic section of `governance/mcp-protocols.md` name (L09).
+  assert.equal(pin.tools.length, 44);
 });
 
 test('every name matches the tool-name convention', () => {
