@@ -49,6 +49,8 @@ let auditFile: string;
 let seen: Array<{ request: string; precheck: boolean }> = [];
 /** What the fixture answers for a POST to a table; a test sets it. */
 let postAnswer: (table: string, body: Record<string, unknown>) => { status: number; body: unknown };
+/** What the fixture answers for a GET of one record, `/table/<table>/<sys_id>`; absent, an empty result. */
+let getAnswer: ((table: string, sysId: string) => Record<string, unknown>) | undefined;
 
 const cutName = (body: Record<string, unknown>): Record<string, unknown> => ({
   sys_id: SYS_ID, ...body, name: String(body.name).slice(0, 40),
@@ -91,6 +93,8 @@ beforeAll(async () => {
         const answer = postAnswer(table, raw ? JSON.parse(raw) : {});
         return send(answer.status, answer.body);
       }
+      const [, , , , recordTable, recordId] = url.pathname.split('/');
+      if (req.method === 'GET' && recordId && getAnswer) return send(200, { result: getAnswer(recordTable, recordId) });
       return send(200, { result: [] });
     });
   });
@@ -153,6 +157,7 @@ const textOf = (r: unknown): string =>
 
 beforeEach(() => {
   seen = [];
+  getAnswer = undefined;
   base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-auditwarn-')));
   home = join(base, 'home');
   checkout = join(base, 'volume', 'repo');
@@ -214,13 +219,18 @@ describe('ARC-09-C101 (b) - the audit line carries the warning, not just `ok`', 
   });
 
   it('a tool that wrote a cut value and then FAILED: the line carries the error code AND the warning', async () => {
-    postAnswer = (table, body) => (table === 'sys_security_acl'
+    // The agent is written with its name cut, then its tool link is refused (ARC-09-C165).
+    const tool = 'b'.repeat(32);
+    postAnswer = (table, body) => (table === 'sn_aia_agent_tool_m2m'
       ? { status: 403, body: { error: { message: 'User Not Authorized' } } }
       : { status: 201, body: { result: cutName(body) } });
+    getAnswer = (table, sysId) => (table === 'sn_aia_tool'
+      ? { sys_id: sysId, name: 'Read groups' }
+      : cutName({ name: LONG, description: 'd', role: 'r', instructions: 'i' }));
     const client = await connect('full');
     const res = await client.callTool({
       name: 'snow_ai_ai_agent_add',
-      arguments: { name: LONG, description: 'd', capabilities: ['a'] },
+      arguments: { name: LONG, description: 'd', role: 'r', instructions: 'i', tools: [{ tool_sys_id: tool }] },
     });
 
     expect((res as { isError?: boolean }).isError).toBe(true);
@@ -228,7 +238,7 @@ describe('ARC-09-C101 (b) - the audit line carries the warning, not just `ok`', 
     expect(line!.tool).toBe('snow_ai_ai_agent_add');
     expect(line!.result).not.toBe('ok');                         // the failure is still the headline
     expect(line!.warnings).toEqual([
-      { code: 'VALUE_TRUNCATED', table: 'sys_ai_agent', fields: ['name'], count: 1 },
+      { code: 'VALUE_TRUNCATED', table: 'sn_aia_agent', fields: ['name'], count: 1 },
     ]);
     expect(readFileSync(auditFile, 'utf8')).not.toContain(MARKER);
   });

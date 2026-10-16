@@ -14,7 +14,7 @@ import { carryWarningsOnError, type CutValueWarning } from '../../src/servicenow
  * contain a marker of its own.
  */
 const cut = {
-  code: 'VALUE_TRUNCATED', operation: 'create', table: 'sys_ai_agent', sys_id: 'a1', field: 'name',
+  code: 'VALUE_TRUNCATED', operation: 'create', table: 'sn_aia_agent', sys_id: 'a1', field: 'name',
   sent_length: 60, stored_length: 40, column_limit: 40, confirmed: true, message: 'm',
 } as CutValueWarning;
 
@@ -34,7 +34,7 @@ describe('toolErrorText', () => {
     carryWarningsOnError(err, [cut]);
     const [first, second, ...rest] = toolErrorText(err).split('\n');
     expect(first).toBe('Error: ACL refused (Code: INSUFFICIENT_PRIVILEGES)');
-    expect(second).toContain('sys_ai_agent.name');
+    expect(second).toContain('sn_aia_agent.name');
     expect(rest).toEqual([]);
     expect(second).not.toMatch(/\(Code:/);
   });
@@ -44,6 +44,6 @@ describe('toolErrorText', () => {
     carryWarningsOnError(err, [cut]);
     const text = toolErrorText(err);
     expect(text.startsWith('Error executing tool: socket hang up\n')).toBe(true);
-    expect(text).toContain('sys_ai_agent.name');
+    expect(text).toContain('sn_aia_agent.name');
   });
 });
