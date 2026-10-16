@@ -9,6 +9,41 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A maintenance release after 2.1.0, from the owner's rc.3 sitting and a colleague's Windows install of 2.1.0, both
+on 2026-10-15.** It changes no licence, no manifest and no protocol: licences, the signed manifest of the Architect's
+own files and the server's contract are as in 2.1.0, with 399 tools and 74 error codes. Upgrading from 2.1.0 needs no
+step beyond `./snowarch upgrade`.
+
+### Fixed
+
+- Doctor check E-32 names why a modified checkout cannot be restored — the checkout holds no release tag, or a changed
+  file is reached through a link that leaves it — before it offers `./snowarch doctor --fix`, where it offered a
+  repair that could not run (ARC-09-C149).
+- `./snowarch version` and the status panel's Engine line name the version of record's own tag when it points at the
+  checkout's commit, where `git describe` could name another tag on the same commit (ARC-09-C154).
+- `./snowarch licence issue` prints the two commands that install the file under the one name the product reads,
+  `.local/licence.json`, with the file's real name. With no licence installed, `./snowarch licence check` names a
+  licence it finds in `.local/` under another name, with the command that renames it, and nothing from inside it
+  (ARC-09-C156).
+- The bootstrap's last block names the folder Claude Code has to start in, ``Next: run `claude` in this folder:``
+  and the checkout's path, from the Node bootstrap and from both Node-free launchers. Run from outside any checkout,
+  `doctor` and `status` name the install to `cd` to, where they said `<the checkout>` (ARC-09-C157).
+
+### Changed
+
+- A document, however short — a design note, an HLD, LLD or PDD — is the HLD/LLD Writer's, and a runbook or KBA is
+  Operational Documentation's: proposed at Step 8, dispatched only after approval, and never written by the
+  Architect itself (ARC-09-C152).
+- The Integration Specialist's MID Server and alias citations name corpus pages that say what they cite
+  (ARC-09-C153).
+- `docs/TROUBLESHOOTING.md` names Git for Windows 2.55, which prints the same harmless "is not a commit!" warning on
+  the documented clone as 2.54, and says how to see that the checkout is at the tag (ARC-09-C155).
+
+### Internal
+
+- The Windows upgrade e2e runs as two shards, each with its own 45-minute limit, behind the required context
+  `upgrade-e2e (windows-latest)`, which needs both; main's required checks are unchanged (ARC-09-C158).
+
 ## 2.1.0 — 2026-10-15
 
 ### Notes
