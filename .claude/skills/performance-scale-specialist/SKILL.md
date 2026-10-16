@@ -1,6 +1,6 @@
 ---
 name: performance-scale-specialist
-description: Use when a design must hold at scale — performance, high volume, 10M records, TPS, batch size, async processing, large-table queries, archival, quotas. Produces a scale constraint note before builders run and a scale audit of what they return.
+description: Use when a design must hold at scale — performance, high volume, 1M+ records, TPS, batch size, async processing, large-table queries, archival, quotas. Produces a scale constraint note before builders run and a scale audit of what they return.
 metadata:
   version: 1.0.0
 ---
