@@ -362,6 +362,62 @@ teardown. `docs/validation/2.0.12-rc.2-live-sitting.md`, § ARC-09-C122: R2, W3 
 (ARC-09-C95). Since ARC-09-C122 its output lists every input row of the step, the rows the instance defaulted
 included; before it, they were invisible to the caller. A teardown removes the step, not its input rows.
 
+## PN-17 — An AI agent's configuration and version are created by its insert; a workflow's team is not
+
+**Applies to:** `sn_aia_agent`, `sn_aia_agent_config`, `sn_aia_version`, `sn_aia_agent_tool_m2m`, `sn_aia_usecase`,
+`sn_aia_team`, `sn_aia_team_member` · Brazil patch 0 · observed in the owner's trial over the REST Table API on
+2.1.1, 2026-10-16 (ARC-09-C165)
+**Behaviour:**
+- **The agent's insert creates two more records.** One insert into `sn_aia_agent` created, in the same second, an
+  `sn_aia_agent_config` (`active=true`, `current_version` empty) and an `sn_aia_version` "Version 1"
+  (`state=committed`, a `snapshot` holding the definition, the tools and the security settings). The agent is
+  active as soon as it is inserted. AI Agent Studio opens it as "Version 1 · Current" although `current_version`
+  is empty.
+- **A tool link rewrites the snapshot.** Inserting an `sn_aia_agent_tool_m2m` added the link to the committed
+  version's `snapshot.overlay.tools`, with `executionMode: "copilot"`, and created no new version. The link's
+  defaults included `display_output=true`.
+- **A workflow's insert creates a version and nothing else.** An insert into `sn_aia_usecase` created an
+  `sn_aia_version` "V1" (`state=published`, empty `snapshot`) and no `sn_aia_team`. The workflow has no agents
+  until a team is created, set on `sn_aia_usecase.team`, and given `sn_aia_team_member` rows.
+- **No access control.** Nothing in this sequence created an ACL or an access role. AI Agent Studio counted the
+  new workflow among those "with no access control list (ACL) configured".
+- **Captured.** Every record above, the automatic ones included, landed in the update set the user preference
+  named (PN-01).
+- **Studio's pages.** An agent opened at `/aiux/aia/agent/<sn_aia_agent sys_id>/visualize` and a workflow at
+  `/aiux/aia/workflow/<sn_aia_usecase sys_id>/visualize`; `/usecase/` in the workflow's place answered "Page not
+  found".
+
+**Grounding:** the tables are documented — `markdown/intelligent-experiences/na-aia-reference.md`, "AI agents
+tables installed" (lines 713–893, with the underscores escaped as `sn\_aia\_`), lists `sn_aia_agent`,
+`sn_aia_agent_config`, `sn_aia_tool`, `sn_aia_agent_tool_m2m`, `sn_aia_usecase`, `sn_aia_team` and
+`sn_aia_team_member`. The access model is in `markdown/intelligent-experiences/define-sec-aia-new.md` and
+`markdown/intelligent-experiences/aia-security-implementation.md`, and a tool's two execution modes, Supervised and
+Autonomous, in `markdown/intelligent-experiences/add-tool-aia-new.md`. Not documented in the bundled corpus (branch
+`australia`): `sn_aia_version` and its states, the automatic records, the snapshot rewrite, the absent team and the
+Studio routes — observed behaviour, on a family one ahead of the corpus; verify on the instance's family.
+**Evidence:** the owner's trial record, which is engagement-local and not committed. The live re-verification with
+the fixed tools gates ARC-09-C165's merge and is recorded under `docs/validation/` without sys_ids or instance URL.
+**Engine consequence:** since ARC-09-C165 `snow_ai_ai_agent_add` reads the configuration and the version back
+rather than creating them, and reports a missing one as a warning; `active: false` modifies the configuration.
+`snow_ai_agentic_workflow_add` creates the team first and sets it on the workflow's insert: 2 + N inserts and no
+modify. Both return `access_rules`, saying that nothing configured access, and `studio_route`, where it is
+configured.
+
+## PN-18 — Pointing REST capture at an update set moves the user's own UI session to it too
+
+**Applies to:** `sys_user_preference` (`name=sys_update_set`) · Brazil patch 0 · observed in the owner's trial on
+2.1.1, 2026-10-16 (ARC-09-C165)
+**Behaviour:** `snow_us_capture_target_set` sets the authenticated user's `sys_update_set` preference, which REST
+capture follows (PN-01). The same user's interactive session followed it too: after the trial, the ServiceNow header
+in the owner's own browser showed the trial's update set. Changes that user then makes by hand land in that update
+set until it is switched back.
+**Grounding:** none in ServiceNowDocs (`markdown/application-development/system-update-sets/` for the baseline
+concept); observed behaviour.
+**Evidence:** the owner's trial record, which is engagement-local and not committed.
+**Engine consequence:** `snow_us_capture_target_set` already returns `previous`, the update set the preference named
+before the call (ARC-09-C127), so a second call can point capture back. Offering that restore at the end of a build
+sequence belongs to the Architect, in `governance/mcp-protocols.md` (ARC-09-C166).
+
 ## Windows notes — this repository, not ServiceNow
 
 The notes above are ServiceNow behaviour. These are about the machine the engine runs on, and they

@@ -536,13 +536,13 @@ describe('warnings survive a tool that throws AFTER it wrote', () => {
 
   it('carries them on the error, and describes them for the person who reads the error', () => {
     const err = new ServiceNowError('second step failed', 'INSUFFICIENT_PRIVILEGES');
-    const w = { code: 'VALUE_TRUNCATED', operation: 'create', table: 'sys_ai_agent', sys_id: 'a1', field: 'name',
+    const w = { code: 'VALUE_TRUNCATED', operation: 'create', table: 'sn_aia_agent', sys_id: 'a1', field: 'name',
       sent_length: 60, stored_length: 40, column_limit: 40, confirmed: true, message: 'm' } as CutValueWarning;
     expect(describeCutsOnError(err)).toBe('');
     carryWarningsOnError(err, [w]);
     expect(err.message).toBe('second step failed');                   // the error itself is not rewritten
     const note = describeCutsOnError(err);
-    expect(note).toContain('sys_ai_agent.name');
+    expect(note).toContain('sn_aia_agent.name');
     expect(note).toContain('a1');
     expect(note).toMatch(/modify/);
     expect(note).not.toMatch(/\(Code:/);                               // never mistaken for the error's own code
@@ -556,24 +556,27 @@ describe('warnings survive a tool that throws AFTER it wrote', () => {
   });
 
   it('the router puts the cut of an earlier write on the error of a later one', async () => {
-    // snow_ai_ai_agent_add writes the agent, then two ACLs. The agent's name comes back cut and the
-    // ACL write is refused: the person is told the second thing, and used to never hear the first.
+    // snow_ai_ai_agent_add writes the agent, then one tool link per tool. The agent's name comes back
+    // cut and the link write is refused: the person is told the second thing, and used to never hear the first.
+    const agent = { sys_id: 'a'.repeat(32), name: 'n'.repeat(40), description: 'd', role: 'r', instructions: 'i' };
+    const tool = 'b'.repeat(32);
     const fake = new FakeRestClient({
-      created: { sys_ai_agent: { sys_id: 'a1', name: 'n'.repeat(40) } },
+      created: { sn_aia_agent: agent },
+      records: { [`sn_aia_agent/${agent.sys_id}`]: agent, [`sn_aia_tool/${tool}`]: { sys_id: tool, name: 'Read groups' } },
     });
     const real = fake.createRecord.bind(fake);
     fake.createRecord = async (table: string, data: Record<string, unknown>) => {
-      if (table === 'sys_security_acl') throw new ServiceNowError('ACL refused', 'INSUFFICIENT_PRIVILEGES');
+      if (table === 'sn_aia_agent_tool_m2m') throw new ServiceNowError('link refused', 'INSUFFICIENT_PRIVILEGES');
       return real(table, data);
     };
     let caught: unknown;
     try {
       await runWithInstance(runtime(), () => routeToolInvocation(fake.asClient(), 'snow_ai_ai_agent_add',
-        { name: 'n'.repeat(60), description: 'd', capabilities: ['a'] }));
+        { name: 'n'.repeat(60), description: 'd', role: 'r', instructions: 'i', tools: [{ tool_sys_id: tool }] }));
     } catch (e) { caught = e; }
     expect(caught).toBeInstanceOf(ServiceNowError);
     expect((caught as ServiceNowError).code).toBe('INSUFFICIENT_PRIVILEGES');
-    expect(describeCutsOnError(caught)).toContain('sys_ai_agent.name');
+    expect(describeCutsOnError(caught)).toContain('sn_aia_agent.name');
   });
 });
 

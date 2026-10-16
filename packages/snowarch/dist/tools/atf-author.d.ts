@@ -30,6 +30,7 @@
  * read-back warning or a refusal, never as a write the tool claims it made.
  */
 import type { ServiceNowClient } from '../servicenow/client.js';
+import type { ServiceNowRecord } from '../servicenow/types.js';
 type Row = Record<string, unknown>;
 export type AuthorWarning = Row & {
     code: string;
@@ -37,6 +38,14 @@ export type AuthorWarning = Row & {
     field: string;
     message: string;
 };
+/** A value with its transport shape taken off: a reference's `value`, every scalar as its string. Also ai-agents.ts's (ARC-09-C165). */
+export declare function plain(v: unknown): string | undefined;
+/** Write one record and read it back. Also ai-agents.ts's, for the sn_aia_* records (ARC-09-C165). */
+export declare function write(client: ServiceNowClient, table: string, sent: Row, live: boolean, sysId?: string): Promise<{
+    sysId: string;
+    stored: ServiceNowRecord;
+    warnings: AuthorWarning[];
+}>;
 export declare function addTest(client: ServiceNowClient, args: Row): Promise<Row>;
 export declare function addStep(client: ServiceNowClient, args: Row): Promise<Row>;
 export {};

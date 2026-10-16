@@ -9994,7 +9994,7 @@
   },
   {
     "name": "snow_ai_ai_agent_add",
-    "description": "Create an AI agent definition with optional auto-generated ACLs (requires NOW_ASSIST_ENABLED + WRITE_ENABLED)",
+    "description": "Create an AI Agent Studio agent: writes sn_aia_agent, then one sn_aia_agent_tool_m2m per tool, and reads back the configuration and version the instance creates. Creates no access control (requires NOW_ASSIST_ENABLED + WRITE_ENABLED)",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -10004,24 +10004,62 @@
         },
         "description": {
           "type": "string",
-          "description": "Agent description"
+          "description": "What the agent does"
         },
-        "capabilities": {
+        "role": {
+          "type": "string",
+          "description": "The agent's role"
+        },
+        "instructions": {
+          "type": "string",
+          "description": "The agent's instructions"
+        },
+        "agent_type": {
+          "type": "string",
+          "description": "Sent only when given; the instance default otherwise"
+        },
+        "channel": {
+          "type": "string",
+          "description": "Sent only when given; the instance default otherwise"
+        },
+        "tools": {
           "type": "array",
+          "description": "Existing sn_aia_tool records to link, one sn_aia_agent_tool_m2m each",
           "items": {
-            "type": "string"
-          },
-          "description": "List of capability identifiers the agent supports"
+            "type": "object",
+            "properties": {
+              "tool_sys_id": {
+                "type": "string",
+                "description": "sys_id of an existing sn_aia_tool"
+              },
+              "execution_mode": {
+                "type": "string",
+                "description": "A value listed in sys_choice on the instance; omitted, the instance default"
+              },
+              "name": {
+                "type": "string",
+                "description": "The link's name"
+              },
+              "display_output": {
+                "type": "boolean",
+                "description": "Show the tool's raw output to the user (instance default true)"
+              }
+            },
+            "required": [
+              "tool_sys_id"
+            ]
+          }
         },
-        "auto_generate_acls": {
+        "active": {
           "type": "boolean",
-          "description": "Automatically create ACL records for the agent (default true)"
+          "description": "false sets the agent's configuration inactive; an inserted agent is active"
         }
       },
       "required": [
         "name",
         "description",
-        "capabilities"
+        "role",
+        "instructions"
       ],
       "additionalProperties": false
     },
@@ -10031,13 +10069,17 @@
   },
   {
     "name": "snow_ai_ai_agents_index",
-    "description": "List AI agent definitions",
+    "description": "List AI Agent Studio agents (sn_aia_agent), each with active from its configuration",
     "inputSchema": {
       "type": "object",
       "properties": {
         "active": {
           "type": "boolean",
-          "description": "Filter by active status"
+          "description": "Filter by the configuration's active flag"
+        },
+        "record_type": {
+          "type": "string",
+          "description": "Filter by record_type (values observed on Brazil patch 0: custom, template — PN-17)"
         },
         "limit": {
           "type": "number",
@@ -10052,13 +10094,13 @@
   },
   {
     "name": "snow_ai_ai_agent_read",
-    "description": "Get an AI agent definition and its related ACLs",
+    "description": "Get an AI Agent Studio agent (sn_aia_agent) with its configuration, versions and tool links",
     "inputSchema": {
       "type": "object",
       "properties": {
         "sys_id": {
           "type": "string",
-          "description": "System ID of the AI agent"
+          "description": "sys_id of the sn_aia_agent"
         }
       },
       "required": [
@@ -10071,7 +10113,7 @@
   },
   {
     "name": "snow_ai_agentic_workflow_add",
-    "description": "Create an agentic workflow linked to an AI agent (requires NOW_ASSIST_ENABLED + WRITE_ENABLED)",
+    "description": "Create an agentic workflow: writes sn_aia_team, sn_aia_usecase, then one sn_aia_team_member per agent, and reads back the version the instance creates. Creates no access control (requires NOW_ASSIST_ENABLED + WRITE_ENABLED)",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -10081,51 +10123,37 @@
         },
         "description": {
           "type": "string",
-          "description": "Workflow description"
+          "description": "What the workflow does"
         },
-        "agent_sys_id": {
+        "base_plan": {
           "type": "string",
-          "description": "System ID of the parent AI agent"
+          "description": "The workflow's base plan"
         },
-        "steps": {
+        "agent_sys_ids": {
           "type": "array",
-          "description": "Ordered list of workflow steps",
           "items": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "Step name"
-              },
-              "action": {
-                "type": "string",
-                "description": "Action identifier"
-              },
-              "inputs": {
-                "type": "object",
-                "description": "Step input parameters"
-              },
-              "condition": {
-                "type": "string",
-                "description": "Optional condition expression"
-              }
-            },
-            "required": [
-              "name",
-              "action"
-            ]
-          }
+            "type": "string"
+          },
+          "description": "sys_ids of existing sn_aia_agent records, one team member each"
         },
-        "trigger_conditions": {
+        "execution_mode": {
           "type": "string",
-          "description": "Optional trigger condition expression"
+          "description": "A value listed in sys_choice on the instance; omitted, the instance default"
+        },
+        "team_name": {
+          "type": "string",
+          "description": "The team's name (default: the workflow's name)"
+        },
+        "memory_scope": {
+          "type": "string",
+          "description": "Written only when the instance's dictionary has the column"
         }
       },
       "required": [
         "name",
         "description",
-        "agent_sys_id",
-        "steps"
+        "base_plan",
+        "agent_sys_ids"
       ],
       "additionalProperties": false
     },
