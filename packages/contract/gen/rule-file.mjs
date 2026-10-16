@@ -107,6 +107,15 @@ export const APPROVAL_WITH_CAPTURE = 'About to <action> on instance "<label>", a
   + 'update set <name> and pointing capture at it — write approved?';
 
 /**
+ * The configuration objects §2.2 names, in the rule file's heading and in the long form's paragraph. One list,
+ * so the always-loaded line cannot name fewer objects than the protocols do. ARC-09-C166 added the AI agent and
+ * the agentic workflow: their records are captured like any configuration (PN-17), and the agentic build section
+ * of `governance/mcp-protocols.md` captures first.
+ */
+export const CAPTURE_OBJECTS = 'Script Include, Business Rule, Client Script, UI Policy, UI Action, ACL, Flow, '
+  + 'AI agent, agentic workflow, table or field';
+
+/**
  * A session with no engagement named, about to make its first write to an instance (ARC-09-C105).
  *
  * `clients/_unfiled/` is where DESIGN artefacts go when no engagement is named (CLAUDE.md Phase 1
@@ -245,7 +254,7 @@ On Windows PowerShell, type \`${spellings({ platform: 'win32', env: {} }).cli}\`
 - The §2.2 ensure + capture pair is covered by the configuration write's approval ONLY when the question names them: \`${APPROVAL_WITH_CAPTURE}\` Asked bare, each is its own write and gets its own question.
 - ${NO_ENGAGEMENT_RULE}
 
-## §2.2 — Update-set capture (before every configuration write: Script Include, Business Rule, Client Script, UI Policy, UI Action, ACL, Flow, table or field)
+## §2.2 — Update-set capture (before every configuration write: ${CAPTURE_OBJECTS})
 1. \`${ensure}\` \`{ "name": "<engagement>-<topic>" }\` — returns the in-progress update set created by the authenticated user, creating it if absent.
 2. \`${capture}\` \`{ "update_set_sys_id": "<sys_id from step 1>" }\` — sets \`sys_user_preference\` \`sys_update_set\` for the authenticated user; REST writes are captured from now on.
 3. Perform the write (step 3 needs its own "write approved").

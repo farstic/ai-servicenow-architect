@@ -51,7 +51,7 @@ The orchestrator passes a dispatch envelope containing:
 3. **Purpose** — one-sentence capability statement (what it does and the business outcome).
 4. **Trigger** — record event / scheduled / programmatic / user-initiated / agentic-workflow step.
 5. **Inputs** — input parameters / record context / user query.
-6. **Tools / actions available** — baseline AI Search? Baseline summarisation? Baseline classification? For an AI agent, the AI Agent Studio tools it may use: existing ones to reuse, or new ones (custom Action tools — require §1.1 approval).
+6. **Tools / actions available** — baseline AI Search? Baseline summarisation? Baseline classification? For an AI agent, the AI Agent Studio tools it may use: existing ones to reuse, or new ones — configured over a baseline capability (configuration), a new script (custom code for Developer), or a new flow action or subflow built for the agent (a custom Action tool — requires §1.1 approval).
 7. **Confidence routing** — high-confidence action vs low-confidence action; human-in-loop threshold.
 8. **Override conditions** — what causes the AI capability to defer to a human regardless of confidence.
 9. **Multilanguage scope** — single language or multiple? Drives prompt construction and AI Search configuration.

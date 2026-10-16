@@ -53,8 +53,7 @@ concept and does nothing for the API — setting it looks like success and captu
 established on a live instance and is recorded as PN-01 in `docs/PLATFORM-NOTES.md`, with the
 consequence that capture cannot be verified any other way and cannot be repaired afterwards.
 
-Before any write that produces a configuration object — Script Include, Business Rule, Client
-Script, UI Policy, UI Action, ACL, Flow, table or field — four calls:
+Before any write that produces a configuration object — Script Include, Business Rule, Client Script, UI Policy, UI Action, ACL, Flow, AI agent, agentic workflow, table or field — four calls:
 
 1. `snow_us_active_update_set_ensure` `{ "name": "<engagement>-<topic>" }` — the name is required, and only the caller's own
    in-progress sets are returned. Without both, a shared instance hands back whoever opened one last,

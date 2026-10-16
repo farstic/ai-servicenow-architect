@@ -251,6 +251,8 @@ One-shot per case submission. Invoked by the customer portal submission flow (Fl
 | `semanticSearchCases` | **CUSTOM — §1.1 ESCALATION REQUIRED** | Compare the new case's text against the candidate cases via semantic similarity (AI Search profile). | Read-only. |
 | `proposeDeflection` | **Baseline** (agent output to the calling flow) | Hands the verdict, the existing case reference and the confidence back to the portal flow, which renders the deflection UX. | None — writes no record. |
 
+**Execution mode:** all three are read-only, with no side effect → Autonomous; a tool with a side effect would be Supervised *(citation: `markdown/intelligent-experiences/add-tool-aia-new.md`)*. In AI Agent Studio terms, `getRecentCasesForAccount` is a record operation and `semanticSearchCases` a search retrieval over the AI Search profile — both configured over baseline capabilities; `proposeDeflection` is the agent's output to the calling flow, not a tool record.
+
 **OPEN QUESTION — CUSTOM OBJECT PROPOSAL (§1.1):** see §13 — the `semanticSearchCases` Action requires Chief Architect approval before this design can be implemented.
 
 ## 6. Confidence routing
@@ -347,6 +349,25 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 | Custom LLM provider | 0 | n/a — uses Now LLM Service |
 
 **Compliance status: COMPLIANT.** Design uses configuration within baseline frameworks (AI Agent Studio, AI Search, AICT) and keeps its verdicts in the baseline Generative AI Log. No §1.1 escalation.
+
+## 15. Access rules
+
+- **User access:** users with specified roles — `snc_external`, the role a registered portal contact holds *(citation: `markdown/customer-service-management/manage-cust-registration-requests.md`)*. Saving the access rules in AI Agent Studio generates the Allow-If ACL from it *(citation: `markdown/intelligent-experiences/define-sec-aia-new.md`)*.
+- **Identity:** Dynamic user, the default — the submitting contact. The agent then reads only the cases that contact may already see, which is what keeps a deflection safe: it cannot surface another account's case *(citation: `markdown/intelligent-experiences/aia-security-implementation.md`)*.
+- **Role filtering:** approved roles `snc_external`, so a contact who also holds an internal role runs the agent as a customer *(citation: `markdown/platform-security/identity/role-masking.md`)*.
+
+## 16. Build manifest
+
+Live mode, preset `full`. Before the first call, the two tools are configured in AI Agent Studio (configuration, not built by these calls), and the trigger is the portal flow that Flow Designer Specialist designs.
+
+1. `snow_ai_ai_agent_add` with both tool links and `active: false`:
+   `About to create AI agent "Duplicate Case Detection Agent" (sn_aia_agent), its tool links (sn_aia_agent_tool_m2m: getRecentCasesForAccount, semanticSearchCases) and set its configuration inactive (sn_aia_agent_config) on instance "<label>", after ensuring update set acme-duplicate-case-detection and pointing capture at it — write approved?`
+   Keep the update set the capture call reports as previous.
+2. Read back: the configuration reads inactive, a version exists, two tool links — every warning reported first.
+3. Apply item 15 in AI Agent Studio, on the page the result names, then activate the agent there.
+4. `snow_us_update_set_preview` shows every record in acme-duplicate-case-detection.
+5. Offer to point capture back at the previous update set — its own write question (PN-18).
+6. Invoking it from the portal flow is a separate, approved step.
 
 ---
 

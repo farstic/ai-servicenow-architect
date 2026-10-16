@@ -10,7 +10,7 @@ import { fillLauncher } from '../../packages/contract/lib/contract.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
-import { APPROVAL_PER_RECORD, APPROVAL_WITH_CAPTURE, PREFLIGHT_STOP, PREFLIGHT_UNKNOWN_GATE }
+import { APPROVAL_PER_RECORD, APPROVAL_WITH_CAPTURE, CAPTURE_OBJECTS, PREFLIGHT_STOP, PREFLIGHT_UNKNOWN_GATE }
   from '../../packages/contract/gen/rule-file.mjs';
 
 /**
@@ -645,6 +645,20 @@ test('ARC-09-C166 — one call that writes several records is one question: the 
     assert.ok(section.includes(APPROVAL_PER_RECORD), 'the agentic build section does not state the constant');
     assert.ok(section.includes('snow_ai_ai_agent_add') && section.includes('snow_ai_agentic_workflow_add'),
       'the agentic build section does not name both build tools');
+  } finally { cleanup(dir); }
+});
+
+test('ARC-09-C166 — §2.2 names the AI agent and the agentic workflow, from one list, in both forms', () => {
+  // The agentic build captures first (mcp-protocols); the always-loaded heading must not name fewer objects.
+  const dir = tree();
+  try {
+    assert.equal(run(dir).code, 0);
+    assert.match(CAPTURE_OBJECTS, /AI agent, agentic workflow/);
+    const heading = ruleOf(dir).split('\n').find((l) => l.startsWith('## §2.2'));
+    assert.ok(heading?.includes(CAPTURE_OBJECTS), 'the rule file\'s §2.2 heading is not the list');
+    const doc = readFileSync(join(dir, 'governance/mcp-protocols.md'), 'utf8');
+    const section = doc.slice(doc.indexOf('## §2.2'), doc.indexOf('\n## ', doc.indexOf('## §2.2') + 1));
+    assert.ok(section.includes(CAPTURE_OBJECTS), 'the long form\'s §2.2 does not state the list');
   } finally { cleanup(dir); }
 });
 

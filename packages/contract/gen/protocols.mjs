@@ -2,7 +2,7 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { spellings } from '../../../tools/snowarch/lib/text.mjs';
 import { fillLauncher } from '../lib/contract.mjs';
-import { APPROVAL_PER_RECORD, APPROVAL_WITH_CAPTURE, NO_ENGAGEMENT_RULE } from './rule-file.mjs';
+import { APPROVAL_PER_RECORD, APPROVAL_WITH_CAPTURE, CAPTURE_OBJECTS, NO_ENGAGEMENT_RULE } from './rule-file.mjs';
 
 /**
  * ARC-07-C32 — this page is COMMITTED, so the launcher placeholders fill in as PINNED POSIX: its
@@ -131,8 +131,7 @@ concept and does nothing for the API — setting it looks like success and captu
 established on a live instance and is recorded as PN-01 in \`docs/PLATFORM-NOTES.md\`, with the
 consequence that capture cannot be verified any other way and cannot be repaired afterwards.
 
-Before any write that produces a configuration object — Script Include, Business Rule, Client
-Script, UI Policy, UI Action, ACL, Flow, table or field — four calls:
+Before any write that produces a configuration object — ${CAPTURE_OBJECTS} — four calls:
 
 1. \`${ensure}\` \`{ "name": "<engagement>-<topic>" }\` — the name is required, and only the caller's own
    in-progress sets are returned. Without both, a shared instance hands back whoever opened one last,
