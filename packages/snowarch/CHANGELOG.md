@@ -3,17 +3,19 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
-## Unreleased (2.1.2-dev)
+## Unreleased (2.1.3-dev)
+
+**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
+then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
+with credentials the instance has just refused.
+
+## 2.1.2 — 2026-10-16
 
 **A licence's expiring state scales with its term (ARC-09-C159).** `src/licence/core.ts` reads a licence as
 expiring when its days left are at most min(30, floor(term / 3)), the term being `valid_until` − `issued` in whole
 days, and a perpetual licence never; `expiringThreshold` is the rule, held equal to the engine's by the parity test.
 The server's first-answer notice for an expiring licence keeps its words. The contract is 2.1.1's: 399 tools and 74
 error codes.
-
-**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
-then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
-with credentials the instance has just refused.
 
 ## 2.1.1 — 2026-10-16
 
