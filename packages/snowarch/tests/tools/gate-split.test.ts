@@ -230,6 +230,26 @@ describe('criterion 3 - ATF is exec-gated only (unchanged, asserted)', () => {
   });
 });
 
+// ARC-09-C165, case 8: the AI agent tools write several sn_aia_* records per call, so each _add needs NOW_ASSIST AND
+// write (`gate: now_assist`, `alsoRequires: write`), refused by the first flag that is off; the two reads are ungated.
+describe('ARC-09-C165 - snow_ai_*_add needs NOW_ASSIST and WRITE; the reads are ungated', () => {
+  const ADD = ['snow_ai_ai_agent_add', 'snow_ai_agentic_workflow_add'];
+  const READ = ['snow_ai_ai_agents_index', 'snow_ai_ai_agent_read'];
+  const noWrite = { ...expandPreset('full'), WRITE_ENABLED: 'false' } as Flags;
+
+  it.each(ADD)('%s is refused without NOW_ASSIST', async (name) => {
+    expect(await codeFor(name, expandPreset('pdi-developer'), 'pdi-developer')).toBe('NOW_ASSIST_NOT_ENABLED');
+  });
+
+  it.each(ADD)('%s is refused without WRITE', async (name) => {
+    expect(await codeFor(name, noWrite, 'custom')).toBe('WRITE_NOT_ENABLED');
+  });
+
+  it.each(READ)('%s is ungated', async (name) => {
+    expect(PASSED_THE_GATE).toContain(await codeFor(name, expandPreset('read-only'), 'read-only'));
+  });
+});
+
 describe('criterion 4 - every snow_na_* tool is licence-gated (unchanged, asserted)', () => {
   const naTools = collectToolCatalog().map((t) => t.name).filter((n) => n.startsWith('snow_na_'));
 
