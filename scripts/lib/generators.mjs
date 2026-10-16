@@ -161,6 +161,14 @@ export const GENERATORS = [
     targets: ['packages/snowarch/README.md'],
   },
   {
+    // ARC-09-C167a: the live-coverage ledger. Its --check also fails when a manifest tool has no entry in
+    // docs/validation/live-coverage.json, so a new tool cannot ship without saying whether it has run live.
+    id: 'gen-live-coverage',
+    script: 'scripts/live-coverage.mjs',
+    supportsRoot: false,
+    targets: ['docs/validation/LIVE-COVERAGE.md'],
+  },
+  {
     // ARC-06-S13, and LAST on purpose: it reads `text.json`, which `gen-text` writes, and composes
     // `README.md` from `docs/INSTALL.md` — so anything that changes either has to have run first.
     id: 'gen-readme',
