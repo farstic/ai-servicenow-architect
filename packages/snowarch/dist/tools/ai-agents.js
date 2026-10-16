@@ -22,8 +22,11 @@ const accessRules = (route) => ({
 const accessNotRead = (route) => ({
     checked: false, note: 'this tool does not read access rules', configure_at: route,
 });
-/** The record_type values the owner's trial saw (PN-17): template for the platform's agents, custom for ours. */
-const RECORD_TYPES = new Set(['custom', 'template']);
+/**
+ * record_type as a plain choice value, so nothing but a value reaches the encoded query. The values are observed, not
+ * documented — template for the platform's agents and custom for ours on Brazil patch 0 (PN-17) — so none is pinned.
+ */
+const CHOICE_VALUE = /^[a-z_]+$/;
 export function aiAgentsToolManifest() {
     return [
         {
@@ -69,7 +72,7 @@ export function aiAgentsToolManifest() {
                 type: 'object',
                 properties: {
                     active: { type: 'boolean', description: 'Filter by the configuration\'s active flag' },
-                    record_type: { type: 'string', description: 'Filter by record_type (custom or template)' },
+                    record_type: { type: 'string', description: 'Filter by record_type (values observed on Brazil patch 0: custom, template — PN-17)' },
                     limit: { type: 'number', description: 'Max records to return (default 25)' },
                 },
                 required: [],
@@ -354,8 +357,8 @@ async function addWorkflow(client, args) {
 async function indexAgents(client, args) {
     const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : 25;
     const recordType = args.record_type;
-    if (recordType !== undefined && recordType !== '' && !RECORD_TYPES.has(recordType)) {
-        throw new ServiceNowError('record_type must be custom or template', 'INVALID_REQUEST');
+    if (recordType !== undefined && recordType !== '' && !(typeof recordType === 'string' && CHOICE_VALUE.test(recordType))) {
+        throw new ServiceNowError('record_type must be a plain choice value (letters and underscores)', 'INVALID_REQUEST');
     }
     const query = recordType ? `record_type=${recordType}` : undefined;
     const resp = await client.queryRecords({ table: AGENT, query, limit,

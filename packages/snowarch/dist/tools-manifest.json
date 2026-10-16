@@ -10079,7 +10079,7 @@
         },
         "record_type": {
           "type": "string",
-          "description": "Filter by record_type (custom or template)"
+          "description": "Filter by record_type (values observed on Brazil patch 0: custom, template — PN-17)"
         },
         "limit": {
           "type": "number",

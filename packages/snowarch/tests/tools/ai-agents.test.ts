@@ -300,10 +300,12 @@ describe('ARC-09-C165 — snow_ai_* writes AI Agent Studio\'s own tables', () =>
       configure_at: `/aiux/aia/agent/${AGENT_A}/visualize` });
   });
 
-  it('11 — the index takes record_type custom or template, and nothing else reaches the query', async () => {
+  it('11 — the index takes record_type as a plain choice value, and nothing else reaches the query', async () => {
     const { client } = fakeInstance(SEED());
-    const refused = dispatchAiAgentsAction(client, 'snow_ai_ai_agents_index', { record_type: 'custom^ORname!=x' });
-    await expect(refused).rejects.toMatchObject({ code: 'INVALID_REQUEST', message: 'record_type must be custom or template' });
+    for (const bad of ['custom^ORname!=x', 'Template']) {
+      await expect(dispatchAiAgentsAction(client, 'snow_ai_ai_agents_index', { record_type: bad })).rejects.toMatchObject(
+        { code: 'INVALID_REQUEST', message: 'record_type must be a plain choice value (letters and underscores)' });
+    }
     expect(client.queryRecords).not.toHaveBeenCalled();
     await dispatchAiAgentsAction(client, 'snow_ai_ai_agents_index', { record_type: 'template' });
     expect(client.queryRecords).toHaveBeenCalledWith(expect.objectContaining({ table: 'sn_aia_agent', query: 'record_type=template' }));
