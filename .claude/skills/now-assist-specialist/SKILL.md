@@ -54,7 +54,7 @@ Before designing, confirm you have:
 2. **One-sentence capability statement** — "Summarise an incident's chronology for the agent on form load." If the user can't state the capability in one sentence, the capability is too broad — break it down before designing.
 3. **Trigger** — Form-load? Record-event? User invocation in Virtual Agent? Scheduled? Chained from another Agent?
 4. **Inputs** — what data the capability reads (table fields, related records, external context).
-5. **Tools / Actions available to the Agent** — for AI Agents only. Baseline Actions (read from a table, update a field) vs. custom Actions (which require Developer + §1.1 review).
+5. **Tools available to the Agent** — for AI Agents only. Per tool: reuse an existing tool (`sn_aia_tool`), which is configuration, or create a new one, which is a custom Action tool under §1.1 — a script tool is built by Developer and reviewed by Code Reviewer, a subflow or flow action tool is designed by Flow Designer Specialist. Per tool, its execution mode: Supervised or Autonomous *(citation: `markdown/intelligent-experiences/add-tool-aia-new.md`)*.
 6. **Confidence routing strategy** — at what confidence threshold does the Agent act autonomously vs. propose to a human?
 7. **Override and human-in-the-loop conditions** — when must a human be in the loop regardless of confidence (e.g., financial actions, irreversible actions, PII handling)?
 8. **Multilanguage scope** — English only, or multilingual? Drives prompt design and AI Control Tower configuration.
@@ -73,7 +73,7 @@ If items 1, 2, 3, 6, or 7 are missing, return a clarification request. Items 6 a
 2. **Capability statement** — one sentence (same as input).
 3. **Trigger and lifecycle** — when the Agent runs, how long it lives (one-shot per record vs. session-scoped vs. long-lived).
 4. **System prompt outline** — the role, tone, constraints, and refusal conditions. Full prompt body is a deliverable but the design captures the structure and key clauses.
-5. **Tools / Actions available** — list of Actions the Agent can invoke. Per Action: name, type (baseline / custom — §1.1 reviewed), purpose, side-effect class (read-only / write / external-call).
+5. **Tools** — an agent's tool is an AI Agent Studio tool (`sn_aia_tool`): a script, flow action, subflow, record operation, catalog item, generative AI skill, search retrieval, conversational topic or MCP server *(citations: `markdown/intelligent-experiences/add-script-ai-agent.md`, `markdown/intelligent-experiences/add-database-op-ai-agent.md`)* — never one of this product's `snow_*` server tools, which act from the designer's machine and are not on the instance. Per tool: name; reuse of an existing `sn_aia_tool` (configuration) or a new tool (a custom Action tool, §1.1 reviewed: a script tool goes to Developer, then Code Reviewer; a subflow or flow action tool to Flow Designer Specialist); purpose; side-effect class (read-only / write / external-call); execution mode. **Autonomous** runs the tool as soon as the agent selects it — for read operations and low-consequence updates; **Supervised** waits for a person to approve, so it stalls in an unattended run — for anything that writes, deletes, contacts a customer or spends budget *(citation: `markdown/intelligent-experiences/add-tool-aia-new.md`)*. The value stored behind each mode is read from the instance's choice list before a build, never assumed (PN-17).
 6. **Confidence routing** — per outcome class: at confidence ≥ X, Agent acts autonomously; at confidence < X, Agent proposes to a human and waits. Explicit, not implicit.
 7. **Human-in-the-loop conditions** — list of conditions that force human review regardless of confidence (PII handling, financial impact, customer-facing comms, irreversible actions).
 8. **Memory and context** — what the Agent retains across turns (if session-scoped); what it does not retain.
@@ -83,6 +83,21 @@ If items 1, 2, 3, 6, or 7 are missing, return a clarification request. Items 6 a
 12. **Test strategy** — happy path, refusal cases, edge cases, multilingual cases, governance attestation validation.
 13. **Open decisions** — anything not yet resolved.
 14. **Baseline-first audit** — custom objects referenced (custom tables for Agent state, new scoped app, custom Action tools, custom Connection Aliases for non-baseline LLM), each with approval status.
+15. **Access rules** — mandatory; each AI agent and each agentic workflow has its own *(citation: `markdown/intelligent-experiences/aia-security-implementation.md`)*:
+    - **User access** — who may invoke it: users with specified roles (the default; name the roles), authenticated users, or public (sparingly, and never for an agent that exposes record data). Saving the access rules in AI Agent Studio generates an Allow-If, role-based ACL from the roles chosen, and any one of them grants access *(citation: `markdown/intelligent-experiences/define-sec-aia-new.md`)*. The invoker must also pass the ACL of every component assigned to it — each agent of a workflow, and tools such as generative AI skills, flows and flow actions — or the run fails.
+    - **Identity** — Dynamic user, the default, runs with the invoker's roles; AI user, a dedicated `sys_user` record, runs with its own roles whoever invokes it. Choose AI user only when the work needs roles the invokers lack, and say why.
+    - **Role filtering** — for a dynamic user, the approved roles: the run gets the intersection of the invoker's roles and these. Role filtering must be applied for all AI agents and agentic workflows to run as dynamic users; with no roles selected, the agent inherits every role the invoker holds *(citations: `markdown/intelligent-experiences/define-sec-aia-new.md`, `markdown/platform-security/identity/role-masking.md`)*. It does not apply to an AI user.
+
+    On a newly activated instance, an agent or workflow without its own ACL is denied by default; an instance upgraded from an earlier release keeps its earlier posture until an admin opts in *(citation: `markdown/intelligent-experiences/aia-security-implementation.md`)*. Nothing this product's server tools write configures any of this (PN-17): it is configured in AI Agent Studio. **A design without Access rules is incomplete, as one without confidence routing is.**
+16. **Build manifest** — the last item, written in every mode and executed only in live mode, under the write gate: the calls that build the design, in order, each with the §2.1 question asked before it. One call that writes several records is one question that names every record it writes, in order.
+    1. Pre-flight (§2.0): both build tools need `NOW_ASSIST_ENABLED` and `WRITE_ENABLED` — the `full` preset.
+    2. Capture first (§2.2): `snow_us_active_update_set_ensure` and `snow_us_capture_target_set`, named in the first question. Keep the update set the capture call reports as previous.
+    3. `snow_ai_ai_agent_add` — `About to create AI agent "<name>" (sn_aia_agent) and its tool links (sn_aia_agent_tool_m2m: <tool>, …) on instance "<label>", after ensuring update set <engagement>-<topic> and pointing capture at it — write approved?` An inserted agent is active at once (PN-17), so until its access rules are applied, build it inactive: `active: false` sets its configuration (`sn_aia_agent_config`) inactive after the links, and the question names that record last.
+    4. `snow_ai_agentic_workflow_add`, once its agents exist — `About to create agentic workflow "<name>": team (sn_aia_team), workflow (sn_aia_usecase), members (sn_aia_team_member: <agent>, …) on instance "<label>" — write approved?`
+    5. Read-backs — report each call's configuration, version, tool links or members, and every warning, before the next call. The result says no access was configured and names the Studio page where item 15 is applied.
+    6. `snow_us_update_set_preview` — the records are in the update set.
+    7. Offer to point capture back at the previous update set, with its own write question (PN-18).
+    8. Running the solution — Studio's manual test on a record *(citation: `markdown/intelligent-experiences/test-ai-asset-new.md`)*, or a trigger — is a separate step with its own approval, never part of the build.
 
 ### Now Assist skill design (for AI Skill Kit skills)
 
@@ -114,6 +129,8 @@ If items 1, 2, 3, 6, or 7 are missing, return a clarification request. Items 6 a
 10. **Test strategy**.
 11. **Open decisions**.
 12. **Baseline-first audit**.
+13. **Access rules** — the workflow's own, as in the AI Agent design's item 15: user access, identity and role filtering. Every agent in it must admit the invoker too. **A design without Access rules is incomplete.**
+14. **Build manifest** — as in the AI Agent design's item 16. The workflow's call comes after its agents' calls.
 
 ### Virtual Agent topic design
 
@@ -153,6 +170,23 @@ If items 1, 2, 3, 6, or 7 are missing, return a clarification request. Items 6 a
 7. **Periodic review cadence** — recommended re-attestation frequency.
 8. **Open decisions**.
 
+## Instance model and build sequence (AI Agent Studio)
+
+AI Agent Studio keeps an agentic solution in its own tables, listed under *AI agents tables installed* (lines 713–893) *(citation: `markdown/intelligent-experiences/na-aia-reference.md`)*:
+
+| Object | Table |
+|---|---|
+| AI agent | `sn_aia_agent`; its configuration is `sn_aia_agent_config` |
+| Tool | `sn_aia_tool`; an agent's tools are `sn_aia_agent_tool_m2m` rows |
+| Agentic workflow | `sn_aia_usecase` |
+| The workflow's agents | `sn_aia_team_member` rows of an `sn_aia_team` |
+| Trigger | `sn_aia_trigger_configuration` |
+| Approved roles for role filtering | `sys_agent_access_role_configuration` |
+
+**What an insert creates by itself** — observed on Brazil patch 0, not in the bundled corpus (PN-17). An `sn_aia_agent` insert creates its configuration, active, and a version record. An `sn_aia_usecase` insert creates a version and no team. The version table is `sn_aia_version` — not documented in the bundled corpus — verify on the instance. A REST-built agent is therefore active at once, while Studio's own path ends with **Activate** *(citation: `markdown/intelligent-experiences/create-aia-new.md`)*; nothing in the sequence creates access control.
+
+**Build order** — agent, then its tool links, then the team, then the workflow with that team, then one member per agent. Studio's guided setup takes an agent through its tools, then its access rules, then its triggers *(citation: `markdown/intelligent-experiences/create-aia-new.md`)*, and a workflow through its agents, then its access rules, then its triggers *(citation: `markdown/intelligent-experiences/create-aw-new.md`)*. Access rules and triggers are configured in AI Agent Studio, not by this product's server tools; a trigger is optional when the solution is used only in chats, and its condition decides how widely it runs *(citation: `markdown/intelligent-experiences/add-trigger-aia-new.md`)*.
+
 ## Now Assist conventions (mandatory)
 
 | Element | Rule |
@@ -164,7 +198,9 @@ If items 1, 2, 3, 6, or 7 are missing, return a clarification request. Items 6 a
 | AI Control Tower attestation | Always included. The governance layer is not optional. |
 | Multilanguage scope | Always stated. "English only" is a valid answer; silence is not. |
 | Audit retention | Always specified per capability. Defaults to engagement-wide policy where one exists. |
-| Tool / Action list | For Agents — every Action listed with type (baseline / custom — §1.1 reviewed), purpose, side-effect class. |
+| Tool / Action list | For Agents — every tool an AI Agent Studio tool, listed as reused or new (§1.1 reviewed), with purpose, side-effect class and execution mode. |
+| Access rules | Always stated for an AI agent and an agentic workflow: user access, identity, role filtering. |
+| Build manifest | Always the last item for an AI agent and an agentic workflow: the calls in order, one §2.1 question per call naming every record it writes. |
 | Refusal conditions | Always explicit. The capability refuses on what conditions, with what user-facing message. |
 | Test cases per capability | Minimum: 1 happy path, 1 refusal, 1 multilingual (if multilingual scoped), 1 governance attestation validation. |
 
@@ -195,6 +231,12 @@ If items 1, 2, 3, 6, or 7 are missing, return a clarification request. Items 6 a
 - **Vague prompts** — system prompts in the design must specify role, tone, constraints, and refusal conditions. "Just be helpful" is rejected.
 
 - **Tool list without side-effect class** — for Agents, every Action must specify read-only vs. write vs. external-call.
+
+- **A server tool as the agent's tool** — an agent's tool is an AI Agent Studio tool on the instance; this product's `snow_*` tools build it, and are never one of its tools.
+
+- **Missing access rules** — an AI agent or agentic workflow design without user access, identity and role filtering is rejected; "configure security later" is not a design.
+
+- **A build manifest that asks once per record** — one call that writes several records is one §2.1 question naming them all, in order; a question per record cannot be answered before a call that has already run.
 
 - **Designing AI Agents that orchestrate flows** — that's Flow Designer Specialist's job. You design the Agent's behaviour; Flow Designer designs the flow that invokes it.
 

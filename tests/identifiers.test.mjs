@@ -25,11 +25,16 @@ const EXPECTED = { 'example-field': 9, 'payload-key': 23, 'example-role': 3, 'sc
 // the marker covers its whole line, and a platform name retyped in capitals is never looked at.
 // ARC-09-C117 moved `tool` from 6 to 18. The live-verification paragraph names `snow_core_records_query` and
 // `snow_disco_table_discover` in each of the six gateways' Part 2, the owner having approved its words.
-const EXCUSES = { tool: 18, marker: 7, proposed: 4, glob: 5, glued: 1, placeholder: 4, 'script-code': 19 };
+// ARC-09-C166 moved `tool` from 18 to 26 and `marker` from 7 to 8: the Now Assist Specialist's build manifest names
+// the two AI Agent Studio build tools and the §2.2 calls (five sites in SKILL.md, three in EXAMPLES.md), and its
+// instance model marks `sn_aia_version`, which the corpus does not print (PN-17).
+const EXCUSES = { tool: 26, marker: 8, proposed: 4, glob: 5, glued: 1, placeholder: 4, 'script-code': 19 };
 const CAPITALS = {
   // ARC-09-C117 added LICENCE_NOT_VALID: the live-verification paragraph says no read runs under it.
+  // ARC-09-C166 added NOW_ASSIST_ENABLED and WRITE_ENABLED: the build manifest names the two preset flags its tools need.
   constant: ['AT_RISK', 'BODY_SHA256', 'CMDB_WRITE', 'FLAG_DEPENDENCY_VIOLATION', 'GET_TICKET', 'LICENCE_NOT_VALID', 'NOW_ASSIST',
-    'POST_CLOSE_TICKET', 'POST_TICKET', 'PRESET_FLAGS_MISMATCH', 'PUT_TICKET', 'REST_OUT', 'WAR_ROOM'],
+    'NOW_ASSIST_ENABLED', 'POST_CLOSE_TICKET', 'POST_TICKET', 'PRESET_FLAGS_MISMATCH', 'PUT_TICKET', 'REST_OUT', 'WAR_ROOM',
+    'WRITE_ENABLED'],
   mixed: ['Discovery_Custom', 'System_Ext'],
 };
 // What the two C104 arms rest on in the real roster. A change is a decision made in review.

@@ -51,7 +51,7 @@ The orchestrator passes a dispatch envelope containing:
 3. **Purpose** — one-sentence capability statement (what it does and the business outcome).
 4. **Trigger** — record event / scheduled / programmatic / user-initiated / agentic-workflow step.
 5. **Inputs** — input parameters / record context / user query.
-6. **Tools / actions available** — baseline AI Search? Baseline summarisation? Baseline classification? Custom Actions (requires §1.1 approval)?
+6. **Tools / actions available** — baseline AI Search? Baseline summarisation? Baseline classification? For an AI agent, the AI Agent Studio tools it may use: existing ones to reuse, or new ones (custom Action tools — require §1.1 approval).
 7. **Confidence routing** — high-confidence action vs low-confidence action; human-in-loop threshold.
 8. **Override conditions** — what causes the AI capability to defer to a human regardless of confidence.
 9. **Multilanguage scope** — single language or multiple? Drives prompt construction and AI Search configuration.
@@ -74,7 +74,7 @@ If items 1, 2, 3, or 4 are missing, **stop and return a clarification request** 
    - Baseline summarisation, classification, and translation Actions.
    If a baseline construct serves the requirement, design with baseline only and proceed. If a custom architectural object is required, halt per §1.1.
 5. **Verify Now Assist platform behaviour** by reading the local corpus — `vendor/ServiceNowDocs/markdown/intelligent-experiences/` (Now Assist, AI Skill Kit, AI Control Tower) and the `now-assist-for-*` folders under `vendor/ServiceNowDocs/markdown/application-development/` — for any non-trivial Now Assist or AI Control Tower behaviour you depend on; if the corpus does not cover a claim, say so instead of recalling it.
-6. **Walk the capability specification structure** per the SKILL: capability statement, trigger, inputs, prompt design, tools list, confidence routing, human-in-loop gates, multilanguage handling, AI Control Tower attestations, evaluation criteria, governance plan.
+6. **Walk the capability specification structure** per the SKILL: capability statement, trigger, inputs, prompt design, tools list, confidence routing, human-in-loop gates, multilanguage handling, AI Control Tower attestations, evaluation criteria, governance plan — and, for an AI agent or agentic workflow, its access rules and, last, its build manifest.
 7. **Identify downstream handoffs**: Developer (custom Action server scripts, only if approved per §1.1), Flow Designer Specialist (orchestration that invokes the AI capability), Integration Specialist (non-baseline LLM provider plumbing, only if approved per §1.1), Security & GRC Specialist (AI Control Tower attestation review).
 8. **Write the specification** following all SKILL output rules.
 
@@ -85,7 +85,7 @@ Return to the orchestrator a structured response containing:
 1. **Specification(s)** — one or more `.md` artefacts, each with:
    - Suggested file path (e.g., `clients/<client>/now-assist/<capability-name>-spec.md`).
    - Header block (capability name, type, version, release family).
-   - All required sections per the SKILL (capability statement, trigger, prompt, tools, confidence, human-in-loop, multilanguage, governance, evaluation).
+   - All required sections per the SKILL (capability statement, trigger, prompt, tools, confidence, human-in-loop, multilanguage, governance, evaluation; for an AI agent or agentic workflow, access rules and the build manifest).
    - Open Questions block.
    - Downstream handoff manifest.
    - Consult flags block.
