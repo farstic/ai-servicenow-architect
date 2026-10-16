@@ -280,4 +280,44 @@ describe('ARC-09-C165 — snow_ai_* writes AI Agent Studio\'s own tables', () =>
     for (const gone of ['agent_sys_id', 'steps', 'trigger_conditions']) expect(props('snow_ai_agentic_workflow_add')).not.toContain(gone);
     expect(JSON.stringify(aiAgentsToolManifest())).not.toMatch(/sys_ai_agent|sys_security_acl|ACL/);
   });
+
+  it('10 — snow_ai_ai_agent_read reads the sn_aia_* tables, and says it did not inspect access rules', async () => {
+    const { client } = fakeInstance({ ...SEED(),
+      sn_aia_agent_config: [{ agent: AGENT_A, active: 'true' }],
+      sn_aia_version: [{ target_table: 'sn_aia_agent', target_id: AGENT_A, state: 'committed' }],
+      sn_aia_agent_tool_m2m: [{ agent: AGENT_A, tool: TOOL, name: 'Read groups' }] });
+    const result = await dispatchAiAgentsAction(client, 'snow_ai_ai_agent_read', { sys_id: AGENT_A });
+    expect(client.getRecord).toHaveBeenCalledWith('sn_aia_agent', AGENT_A);
+    const queried = client.queryRecords.mock.calls.map((x) => x[0].table);
+    expect(queried).toEqual(expect.arrayContaining(['sn_aia_agent_config', 'sn_aia_version', 'sn_aia_agent_tool_m2m', 'sn_aia_tool']));
+    expect(queried).not.toContain('sys_ai_agent');
+    expect(queried).not.toContain('sys_security_acl');
+    expect(result.config).toEqual(expect.objectContaining({ active: 'true' }));
+    expect(result.versions).toHaveLength(1);
+    expect(result.tool_links[0].tool_record).toEqual(expect.objectContaining({ name: 'Read groups' }));
+    // The read never looked at access control, so it says so rather than "none" (an agent made in Studio may have one).
+    expect(result.access_rules).toEqual({ checked: false, note: 'this tool does not read access rules',
+      configure_at: `/aiux/aia/agent/${AGENT_A}/visualize` });
+  });
+
+  it('11 — the index takes record_type custom or template, and nothing else reaches the query', async () => {
+    const { client } = fakeInstance(SEED());
+    const refused = dispatchAiAgentsAction(client, 'snow_ai_ai_agents_index', { record_type: 'custom^ORname!=x' });
+    await expect(refused).rejects.toMatchObject({ code: 'INVALID_REQUEST', message: 'record_type must be custom or template' });
+    expect(client.queryRecords).not.toHaveBeenCalled();
+    await dispatchAiAgentsAction(client, 'snow_ai_ai_agents_index', { record_type: 'template' });
+    expect(client.queryRecords).toHaveBeenCalledWith(expect.objectContaining({ table: 'sn_aia_agent', query: 'record_type=template' }));
+  });
+
+  it('12 — agent_type and channel are sent only when passed', async () => {
+    const bare = fakeInstance(SEED());
+    await dispatchAiAgentsAction(bare.client, 'snow_ai_ai_agent_add', AGENT_ARGS);
+    expect(bare.client.createRecord.mock.calls[0][0]).toBe('sn_aia_agent');
+    expect(bare.client.createRecord.mock.calls[0][1]).not.toHaveProperty('agent_type');
+    expect(bare.client.createRecord.mock.calls[0][1]).not.toHaveProperty('channel');
+    const given = fakeInstance(SEED());
+    await dispatchAiAgentsAction(given.client, 'snow_ai_ai_agent_add', { ...AGENT_ARGS, channel: 'x' });
+    expect(given.client.createRecord).toHaveBeenNthCalledWith(1, 'sn_aia_agent', expect.objectContaining({ channel: 'x' }));
+    expect(given.client.createRecord.mock.calls[0][1]).not.toHaveProperty('agent_type');
+  });
 });
