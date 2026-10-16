@@ -149,6 +149,13 @@ For each table:
 
 **Citation:** `markdown/customer-service-management/csm-data-management.md`
 
+**Always evaluate, for a request about money against an account or an audit trail (ARC-09-C161).** Part 2 names each of these, says what it records, and says whether it serves the need and why, before Part 3 decides:
+- SLA records — Task SLA [`task_sla`] and SLA Definition [`contract_sla`] *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*;
+- invoices — AR invoice [`sn_otc_invoice`] and AR invoice line [`sn_otc_invoice_line`], the invoice data held for an account *(citation: `markdown/customer-service-management/ar-invoice.md`, `markdown/customer-service-management/ar-invoice-line.md`)*;
+- contracts and entitlements — Contract [`ast_contract`] and Entitlement [`service_entitlement`], and the entitlement a case carries *(citation: `markdown/customer-service-management/r_BRIWCustomerService.md`, `markdown/customer-service-management/create-csm-service-contracts.md`)*;
+- journal fields — the work notes and comments a record keeps [`sys_journal_field`] *(citation: `markdown/platform-administration/c_JournalFields.md`)*;
+- audit history — Audit [`sys_audit`] and History Sets [`sys_history_set`] *(citation: `markdown/platform-security/c_DiffBtwnAuditHistSets.md`)*.
+
 ## Part 3 — §1.1 Baseline-First Verdict
 
 ### Verdict A — Fully covered by baseline

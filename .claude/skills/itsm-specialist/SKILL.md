@@ -152,6 +152,12 @@ For each table:
 
 **Citation:** `markdown/it-service-management/<process>-data-model.md` or relevant per-process page.
 
+**Always evaluate, for a request about an audit trail or an escalation record (ARC-09-C161).** Part 2 names each of these, says what it records, and says whether it serves the need and why, before Part 3 decides:
+- journal fields — the work notes and comments a record keeps [`sys_journal_field`] *(citation: `markdown/platform-administration/c_JournalFields.md`)*;
+- audit history — Audit [`sys_audit`], History Sets [`sys_history_set`] and History [`sys_history_line`] *(citation: `markdown/platform-security/c_DiffBtwnAuditHistSets.md`)*;
+- SLA records — Task SLA [`task_sla`] and SLA Definition [`contract_sla`] *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*;
+- on-call escalation — the on-call rota [`cmn_rota`] and its members [`cmn_rota_member`] *(citation: `markdown/it-service-management/on-call-scheduling/c_OnCallSchedulingConcepts.md`)*.
+
 ## Part 3 — §1.1 Baseline-First Verdict
 
 One of three verdicts. Citation discipline per the SKILL governance.
