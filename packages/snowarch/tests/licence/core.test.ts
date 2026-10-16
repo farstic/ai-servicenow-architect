@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import {
-  canonicalJson, checkLicence, EXPIRING_DAYS, fingerprint, LICENCE_FORMAT, LIST_FORMAT, newerList, readList,
+  canonicalJson, checkLicence, EXPIRING_DAYS, expiringThreshold, fingerprint, LICENCE_FORMAT, LIST_FORMAT, newerList, readList,
   type ProductKey,
 } from '../../src/licence/core.js';
 import { PRODUCT_KEYS } from '../../src/licence/keys.js';
@@ -73,6 +73,26 @@ describe('ARC-11-C1 — the server\'s licence core', () => {
     expect([thirty.state, thirty.daysLeft]).toEqual(['expiring', 30]);
     const thirtyOne = check(signed(LICENCE_FORMAT, 'licence', payload({ valid_until: '2026-11-10' })));
     expect([thirtyOne.state, thirtyOne.daysLeft]).toEqual(['ok', 31]);
+  });
+
+  it('ARC-09-C159 — expiring at most min(EXPIRING_DAYS, a third of the term) days left; perpetual never', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+    const state = (term: number, left: number, issued = '2026-10-16'): string => {
+      const until = iso(Date.parse(`${issued}T00:00:00Z`) + term * DAY);
+      const now = new Date(Date.parse(`${until}T12:00:00Z`) - left * DAY);
+      const s = checkLicence(signed(LICENCE_FORMAT, 'licence', payload({ issued, valid_until: until })), { keys: KEYS, now, list: null });
+      expect(s.daysLeft).toBe(left);
+      return s.state;
+    };
+    expect([state(30, 30), state(30, 11), state(30, 10), state(30, 2)]).toEqual(['ok', 'ok', 'expiring', 'expiring']);
+    expect([state(365, 31), state(365, 30)]).toEqual(['ok', 'expiring']);
+    expect([state(3, 2), state(3, 1), state(3, 0)]).toEqual(['ok', 'expiring', 'expiring']);
+    expect([expiringThreshold('2026-10-16', '2026-11-15'), expiringThreshold('2026-01-15', '2027-10-10'),
+      expiringThreshold('2026-10-16', '2026-10-19'), expiringThreshold('2026-10-16', '2026-10-16')]).toEqual([10, 30, 1, 0]);
+    const forever = payload({ issued: '2026-10-16' });
+    delete forever.valid_until;
+    expect(checkLicence(signed(LICENCE_FORMAT, 'licence', forever), { keys: KEYS, now: new Date('2099-01-01T00:00:00Z'), list: null }).state).toBe('ok');
   });
 
   it('applies a list only when a product key signed it, and never one with a lower version', () => {

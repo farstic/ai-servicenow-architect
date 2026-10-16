@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  canonicalJson, checkLicence, EXPIRING_DAYS, fingerprint, LICENCE_FORMAT, LIST_FORMAT, newerList,
+  canonicalJson, checkLicence, EXPIRING_DAYS, expiringThreshold, fingerprint, LICENCE_FORMAT, LIST_FORMAT, newerList,
   readList, signLicence,
 } from '../lib/licence/core.mjs';
 import { keyPair, licence, licenceText, listDoc as signedList, productKeys } from './helpers/licence.mjs';
@@ -103,6 +103,40 @@ test('ARC-11-C1 — expiry: the valid_until day is inclusive, in UTC, and the la
   assert.deepEqual([at('2026-11-09', lastSecond).state, at('2026-11-09', lastSecond).daysLeft], ['expiring', 30]);
   assert.equal(at('2026-11-10', lastSecond).state, 'ok');
   assert.equal(at('2026-10-09', lastSecond).signatureValid, true, 'an expired licence is still authentic');
+});
+
+// ARC-09-C159 — the colleague's 30-day LIC-2026-0010 read `expiring` on its first day (2026-10-16) under the flat 30.
+// The rule, from the architect's ruling: expiring when daysLeft <= min(EXPIRING_DAYS, floor(term / 3)), the term being
+// valid_until − issued in whole days; a perpetual licence never.
+test('ARC-09-C159 — expiring is at most min(EXPIRING_DAYS, a third of the licence\'s own term) days left; perpetual never', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+  // A licence issued on `issued` that runs `term` days, checked at noon UTC with `left` days left.
+  const state = (term, left, issued = '2026-10-16') => {
+    const until = iso(Date.parse(`${issued}T00:00:00Z`) + term * DAY);
+    const now = new Date(Date.parse(`${until}T12:00:00Z`) - left * DAY);
+    const s = check(fileText(licence({ issued, valid_until: until })), { now });
+    assert.equal(s.daysLeft, left, `term ${term}, ${left} left: daysLeft is ${s.daysLeft}`);
+    return s.state;
+  };
+  // A 30-day licence: min(30, 10) = 10.
+  assert.equal(state(30, 30), 'ok', 'a 30-day licence on its first day');
+  assert.equal(state(30, 11), 'ok', 'one day above the threshold');
+  assert.equal(state(30, 10), 'expiring', 'day 20, at the threshold');
+  assert.equal(state(30, 2), 'expiring', 'day 28');
+  // A year's licence keeps a month's notice: min(30, 121) = 30.
+  assert.equal(state(365, 31), 'ok');
+  assert.equal(state(365, 30), 'expiring');
+  // A 3-day licence: min(30, 1) = 1.
+  assert.equal(state(3, 2), 'ok');
+  assert.equal(state(3, 1), 'expiring');
+  assert.equal(state(3, 0), 'expiring', 'the last day');
+  // The one definition the verdict uses.
+  assert.deepEqual([expiringThreshold('2026-10-16', '2026-11-15'), expiringThreshold('2026-01-15', '2027-10-10'),
+    expiringThreshold('2026-10-16', '2026-10-19'), expiringThreshold('2026-10-16', '2026-10-16')], [10, 30, 1, 0]);
+  // A perpetual licence is never expiring, whatever the date.
+  const { valid_until: _, ...forever } = licence({ issued: '2026-10-16' });
+  assert.equal(check(fileText(forever), { now: new Date('2099-01-01T00:00:00Z') }).state, 'ok');
 });
 
 test('ARC-11-C1 — no file is missing; a file that is not a licence is invalid', () => {

@@ -67,6 +67,10 @@ function cases() {
     ['day 30', licenceText(licence({ valid_until: '2026-11-09' }), primary), {}],
     ['day 31', licenceText(licence({ valid_until: '2026-11-10' }), primary), {}],
     ['last day', licenceText(licence({ valid_until: '2026-10-10' }), primary), {}],
+    // ARC-09-C159 — a 30-day term's threshold is 10: 20 left is ok, 10 is expiring, and 11 is ok in a 32-day term.
+    ['30-day term, 20 left', licenceText(licence({ issued: '2026-09-30', valid_until: '2026-10-30' }), primary), {}],
+    ['30-day term, 10 left', licenceText(licence({ issued: '2026-09-20', valid_until: '2026-10-20' }), primary), {}],
+    ['32-day term, 11 left', licenceText(licence({ issued: '2026-09-19', valid_until: '2026-10-21' }), primary), {}],
     ['expired', licenceText(licence({ valid_until: '2026-10-09' }), primary), {}],
     ['design-only', licenceText(licence({ scope: 'design-only' }), primary), {}],
     ['forged', JSON.stringify(doc), {}],
