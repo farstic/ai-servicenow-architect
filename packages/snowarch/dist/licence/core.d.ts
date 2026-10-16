@@ -63,6 +63,13 @@ export declare function licenceProblem(value: unknown): string | null;
 export declare const utcDate: (now: Date) => string;
 /** Whole days from `from` to `to`, both YYYY-MM-DD. */
 export declare const daysBetween: (from: string, to: string) => number;
+/**
+ * ARC-09-C159 — WHEN A LICENCE IS EXPIRING: when the days left are at most min(EXPIRING_DAYS, floor(term / 3)), the
+ * term being the licence's own length in whole days, valid_until − issued. A year's licence warns from 30 days left, a
+ * 30-day licence from 10, a 3-day one from 1, and a perpetual licence never. Under a flat 30 days the Windows
+ * colleague's 30-day licence read `expiring` on its first day (2026-10-16).
+ */
+export declare const expiringThreshold: (issued: string, validUntil: string) => number;
 export interface CheckOptions {
     keys: readonly ProductKey[];
     list?: {

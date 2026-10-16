@@ -12,7 +12,7 @@
  *   over the canonical JSON of `licence` (keys sorted at every depth, no whitespace);
  * - a key the product does not ship signs nothing, whatever fingerprint the file claims, so a
  *   perpetual licence (no `valid_until`) from any other key is invalid like every other;
- * - the states are ok, expiring (30 days or fewer), expired, revoked, invalid and missing, and an
+ * - the states are ok, expiring (see `expiringThreshold`), expired, revoked, invalid and missing, and an
  *   id is reported only when the signature holds;
  * - a revocation list names a licence by id, date and a reason from a short list, and a list no
  *   newer than the one held is ignored.
@@ -142,6 +142,15 @@ export const utcDate = (now: Date): string => now.toISOString().slice(0, 10);
 export const daysBetween = (from: string, to: string): number =>
   Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 
+/**
+ * ARC-09-C159 — WHEN A LICENCE IS EXPIRING: when the days left are at most min(EXPIRING_DAYS, floor(term / 3)), the
+ * term being the licence's own length in whole days, valid_until − issued. A year's licence warns from 30 days left, a
+ * 30-day licence from 10, a 3-day one from 1, and a perpetual licence never. Under a flat 30 days the Windows
+ * colleague's 30-day licence read `expiring` on its first day (2026-10-16).
+ */
+export const expiringThreshold = (issued: string, validUntil: string): number =>
+  Math.min(EXPIRING_DAYS, Math.floor(daysBetween(issued, validUntil) / 3));
+
 const verdict = (state: LicenceState, over: Partial<LicenceStatus> = {}): LicenceStatus => ({
   state, id: null, licensee: null, org: null, scope: null, issued: null, validUntil: null,
   perpetual: false, daysLeft: null, key: null, signatureValid: false, reason: null, revocation: null, ...over,
@@ -180,7 +189,7 @@ export function checkLicence(text: string | null | undefined, { keys, list = nul
       revocation: { revokedAt: entry.revokedAt, reason: entry.reason } });
   }
   if (daysLeft !== null && daysLeft < 0) return verdict('expired', { ...known, reason: `expired on ${l.valid_until}` });
-  if (daysLeft !== null && daysLeft <= EXPIRING_DAYS) return verdict('expiring', known);
+  if (daysLeft !== null && daysLeft <= expiringThreshold(l.issued as string, l.valid_until as string)) return verdict('expiring', known);
   return verdict('ok', known);
 }
 

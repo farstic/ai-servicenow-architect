@@ -59,8 +59,10 @@ test('ARC-11-C6 — E-31\'s remedy is the remedy alone, by the owner\'s ruling f
     assert.equal(r.status, 'fail');
     assert.equal(r.remedy, REMEDY(cli), r.remedy);
   }
+  // ARC-09-C159 — a licence in force that is expiring is not a refusal, so its remedy is the renewal, never the install.
   const soon = await E31.run(ctxFor(t, { file: licenceText(licence({ valid_until: '2026-10-25' }), primary) }));
-  assert.equal(soon.remedy, REMEDY(cli), soon.remedy);
+  assert.equal(soon.remedy, 'Licence LIC-2026-0002 expires on 2026-10-25 (15 days left) — ask the issuer for a renewal before then.');
+  assert.doesNotMatch(soon.remedy, /install a valid licence/);
 });
 
 test('ARC-11-C1 — a licence in force is ok; one in its last month is a warning; a forged one is a FAIL that says why', async (t) => {
