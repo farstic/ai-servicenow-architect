@@ -627,6 +627,27 @@ test('ARC-05-S13 — the approval-granularity sentences are the generator\'s con
   } finally { cleanup(dir); }
 });
 
+test('ARC-09-C166 — one call that writes several records is one question: the same constant in §2.1 and in the agentic build', () => {
+  // OQ-DS-1: the composite call (`snow_ai_ai_agent_add` writes the agent and a link per tool) is one
+  // question naming every record. The short form and the long form state it from one constant, so a
+  // session reading the rule file and a reader of the protocols cannot be told two different counts.
+  const dir = tree();
+  try {
+    assert.equal(run(dir).code, 0);
+    assert.match(APPROVAL_PER_RECORD, /one call that writes several records: that is one question naming every record the call writes, in order/);
+    const text = ruleOf(dir);
+    const gate = text.slice(text.indexOf('## §2.1'), text.indexOf('## §2.2'));
+    assert.ok(gate.includes(APPROVAL_PER_RECORD), 'the composite sentence is not in the rule file\'s §2.1');
+    const doc = readFileSync(join(dir, 'governance/mcp-protocols.md'), 'utf8');
+    const start = doc.indexOf('## Building an agentic solution in live mode');
+    assert.ok(start > 0, 'mcp-protocols.md has no agentic build section');
+    const section = doc.slice(start, doc.indexOf('\n## ', start + 1));
+    assert.ok(section.includes(APPROVAL_PER_RECORD), 'the agentic build section does not state the constant');
+    assert.ok(section.includes('snow_ai_ai_agent_add') && section.includes('snow_ai_agentic_workflow_add'),
+      'the agentic build section does not name both build tools');
+  } finally { cleanup(dir); }
+});
+
 test('ARC-05-S13 — T-23 states the same capture question, from the same constant', () => {
   const doc = readFileSync(join(root, 'tests/VALIDATION-TESTS.md'), 'utf8');
   const t23 = doc.slice(doc.indexOf('## T-23'), doc.indexOf('## Regression Workflow'));

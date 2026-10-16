@@ -79,10 +79,17 @@ export const PREFLIGHT_UNKNOWN_GATE = 'unknown gate `<gate>` — contract and ru
  * The sentence is deliberately the SAME shape as the "not approval" list beside it: a request that
  * enumerates its targets is still a request. Naming three records is how a person describes a job,
  * not how they approve three writes.
+ *
+ * ARC-09-C166 (ruling OQ-DS-1) — one call can write several records: `snow_ai_ai_agent_add` writes the
+ * agent and a tool link per tool. A question per record cannot be answered before a call that writes
+ * them together, so that call is one question, and the question names every record, in order — the
+ * construction the §2.2 pair already has. Extended in place: the rule file stands on its 72-line cap.
+ * `governance/mcp-protocols.md` states the same constant in its agentic build section.
  */
 export const APPROVAL_PER_RECORD = 'N distinct records is N questions, each asked and answered '
-  + 'before its own call. A request that enumerates them is the request, not the approval — the '
-  + 'same sentence as "the original task description is not approval".';
+  + 'before its own call — except one call that writes several records: that is one question naming '
+  + 'every record the call writes, in order. A request that enumerates them is the request, not the '
+  + 'approval — the same sentence as "the original task description is not approval".';
 
 /**
  * The §2.2 pair under one approval — but only when the question says so.

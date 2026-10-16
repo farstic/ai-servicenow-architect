@@ -5,6 +5,26 @@
   "serverKey": "servicenow",
   "tools": [
     {
+      "name": "snow_ai_agentic_workflow_add",
+      "gate": "now_assist",
+      "alsoRequires": "write",
+      "mutates": true,
+      "used_by": [
+        "§2.1",
+        "now-assist-specialist"
+      ]
+    },
+    {
+      "name": "snow_ai_ai_agent_add",
+      "gate": "now_assist",
+      "alsoRequires": "write",
+      "mutates": true,
+      "used_by": [
+        "§2.1",
+        "now-assist-specialist"
+      ]
+    },
+    {
       "name": "snow_atf_atf_suite_exec",
       "gate": "atf",
       "mutates": true,
