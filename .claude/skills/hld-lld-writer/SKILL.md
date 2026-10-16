@@ -1,6 +1,6 @@
 ---
 name: hld-lld-writer
-description: Use when authoring a High-Level Design, Low-Level Design or Process Design Document for a ServiceNow programme. Produces enterprise-grade Word-ready markdown structured for architectural review boards and sign-off panels, consuming Technical Designer component specs and synthesising them into programme-level documents.
+description: Use when authoring a high- or low-level design (HLD, LLD), a PDD (process design document) or a design note — any design or architecture document. Produces Word-ready markdown for review boards, built from Technical Designer specs.
 metadata:
   version: 1.0.0
 ---

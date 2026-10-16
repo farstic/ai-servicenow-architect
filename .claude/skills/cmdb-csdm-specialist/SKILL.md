@@ -1,6 +1,6 @@
 ---
 name: cmdb-csdm-specialist
-description: Mandatory gateway for ServiceNow CMDB and Common Service Data Model work — CI class modelling, CSDM domains and service types, CSDM-to-CMDB table mapping, implementation-stage alignment, Identification and Reconciliation Engine rules, CMDB Health, install base, and the service and CI layer shared by ITSM and CSM. Produces the 5-Part Constraint Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4. Owns the model; ITOM/Discovery owns CI population.
+description: Mandatory gateway for CMDB and CSDM — configuration item class modelling, CI relationship, CSDM domains, phase and stage, service types, IRE rules, CMDB Health, install base. Produces the 5-Part Constraint Envelope. Owns the model, not CI population.
 metadata:
   version: 2.0.0
 ---

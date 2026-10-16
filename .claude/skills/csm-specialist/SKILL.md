@@ -1,6 +1,6 @@
 ---
 name: csm-specialist
-description: Mandatory gateway for ServiceNow Customer Service Management work — case lifecycle, the account, contact and consumer model, contract and entitlement evaluation, CRM Workspace (formerly CSM Configurable Workspace), Customer Service Portal, special handling notes and customer projects. Produces the 5-Part Constraint Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4.
+description: Mandatory gateway for Customer Service Management — case lifecycle, account, contact, consumer, contract and entitlement, CSM Workspace (CRM Workspace), Customer Service Portal, special handling notes. Produces the 5-Part Constraint Envelope.
 metadata:
   version: 2.0.0
 ---

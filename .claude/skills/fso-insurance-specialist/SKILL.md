@@ -1,6 +1,6 @@
 ---
 name: fso-insurance-specialist
-description: Mandatory gateway for ServiceNow Financial Services Operations (FSO) insurance work — case, task and policy data model, Personal and Commercial Lines Servicing and change coverage, claims (FNOL, adjusters, reserves, payments, SIU), underwriting tasks, life servicing, Document Processor, Complaint Management, Customer Lifecycle and KYC, Guidewire, FRISS and Socure, and Now Assist for FSO. Co-fires with CSM. Produces the 5-Part Constraint Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4.
+description: Mandatory gateway for FSO (Financial Services Operations) insurance — insurance policy, change coverage, claims, FNOL, adjuster, reserve, SIU, underwriting task, life servicing, Document Processor, Complaint Management, Customer Lifecycle, KYC.
 metadata:
   version: 1.0.1
 ---

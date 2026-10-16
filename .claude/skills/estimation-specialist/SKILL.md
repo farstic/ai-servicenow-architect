@@ -1,6 +1,6 @@
 ---
 name: estimation-specialist
-description: Use when a ServiceNow scope, story set or design needs a defensible effort estimate — method selection, the platform complexity rubric, confidence ranges, contingency, and grounding against team velocity and capacity. Produces a range with method, assumptions, complexity breakdown and the baseline-versus-custom effort delta, never a single number, and records into baseline SPM demand, story-point and cost/effort plans.
+description: Use when work needs an estimate — estimation, sizing, LOE or level of effort, story points, T-shirt size, how long, how big, ballpark, ROM. Produces a range with method, assumptions, confidence and the custom-work delta, never a single number.
 metadata:
   version: 1.0.0
 ---

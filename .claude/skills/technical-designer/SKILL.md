@@ -1,6 +1,6 @@
 ---
 name: technical-designer
-description: Use when designing the technical implementation of a ServiceNow capability — table models, field types, ACL matrices, business rule lists, client-side logic, UI policies, flow outlines, scoped-app structure and persona or role models. Produces design specifications — the what and the why — not implementation code, and hands off to Developer, Flow Designer Specialist and Integration Specialist for the how.
+description: Use when designing how a capability is built — design the code, table model, ACL matrix, business rule list, client logic, UI policies, flow outline, function and method signatures. Produces design specs, the what and why; Developer does the how.
 metadata:
   version: 1.0.0
 ---

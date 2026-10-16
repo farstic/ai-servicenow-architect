@@ -1,6 +1,6 @@
 ---
 name: now-assist-specialist
-description: Use when designing or troubleshooting a ServiceNow Now Assist capability — AI Agents, Now Assist skills, agentic workflows, Virtual Agent topics, Now LLM Service consumption, AI Search and AI Control Tower governance. Produces capability designs at the right level with explicit confidence routing, human-in-the-loop boundaries and governance attestations, handing off to Flow Designer Specialist for invocation orchestration and Developer for backing logic.
+description: Use when designing Now Assist — AI Agent and agentic workflow in AI Agent Studio, Now Assist skill, Virtual Agent, AiRR, AI Search, AI Control Tower. Produces designs with confidence routing, human in the loop, access rules and a build manifest.
 metadata:
   version: 1.0.0
 ---
