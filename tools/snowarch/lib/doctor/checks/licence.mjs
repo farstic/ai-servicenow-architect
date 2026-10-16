@@ -12,7 +12,7 @@
 //
 // THE DATA NAMES THE STATE AND THE ID, never the licensee or the org: a report's `--json` and the
 // banner's cache travel further than the licence file does.
-import { REFUSED, REMEDY, bannerLine, daysLeftPhrase, licenceStatus } from '../../licence/state.mjs';
+import { REFUSED, REMEDY, bannerLine, daysLeftPhrase, licenceStatus, renewalSentence } from '../../licence/state.mjs';
 import { PRODUCT_KEYS } from '../../licence/keys.mjs';
 import { defineCheck } from '../registry.mjs';
 import { cliOf } from '../spell.mjs';
@@ -57,11 +57,12 @@ export function licenceChecks() {
         const why = s.state === 'expiring' ? daysLeftPhrase(s.daysLeft) : (s.state === 'missing' ? null : s.reason);
         const cli = cliOf(ctx);
         // `expiring` is in force, so it is a warning; the refused states are what enforcement refuses (gate.ts).
-        // Either way the remedy is the refusal's, and nothing after it (the owner's ruling, 2026-10-13).
+        // A refused state's remedy is the refusal's, and nothing after it (the owner's ruling, 2026-10-13). A licence in
+        // force that is expiring is renewed, not reinstalled (ARC-09-C159).
         const refused = REFUSED.includes(s.state);
         return (refused ? fail : warn)(why ? `${line} — ${why}` : line, {
           data,
-          remedy: REMEDY(cli),
+          remedy: s.state === 'expiring' ? renewalSentence(s) : REMEDY(cli),
           command: `${cli} licence check`,
         });
       },

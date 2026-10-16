@@ -39,3 +39,10 @@ export function daysLeftPhrase(days) {
   if (days === 0) return 'last day';
   return days === 1 ? '1 day left' : `${days} days left`;
 }
+
+/**
+ * ARC-09-C159 — what to do about a licence in force that is expiring: renew it. Never the refusal's remedy, which tells a
+ * reader to install a valid licence when the one installed is valid. E-31's remedy and `licence check` print it.
+ */
+export const renewalSentence = (s) =>
+  `Licence ${s.id} expires on ${s.validUntil} (${daysLeftPhrase(s.daysLeft)}) — ask the issuer for a renewal before then.`;

@@ -43,7 +43,7 @@ import {
   MANIFESTS_FROM, manifestFromArchive, readManifest, releaseTagOf, signManifest, signedRelease,
 } from '../licence/manifest.mjs';
 import {
-  allowedPhrase, bannerLine, heldList, licenceStatus, listStale, readListCache, REFUSED,
+  allowedPhrase, bannerLine, heldList, licenceStatus, listStale, readListCache, REFUSED, renewalSentence,
 } from '../licence/state.mjs';
 
 export const USAGE = (where) => {
@@ -277,6 +277,8 @@ function check({ flags, log, root, keys, now, env, config, where }) {
   log.step(bannerLine(s));
   // The command every remedy names says what the day means too (ruling B): a term, from a signature that holds.
   if (s.signatureValid && !s.perpetual) log.step(validUntilLine(s));
+  // ARC-09-C159 — E-31's remedy for a licence in force that is expiring, in the same words.
+  if (s.state === 'expiring') log.step(`  ${renewalSentence(s)}`);
   if (s.reason && s.state !== 'ok' && s.state !== 'expiring') log.step(`  why: ${s.reason}`);
   if (s.state === 'missing') {
     const dir = localDir(root);
