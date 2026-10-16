@@ -9,6 +9,59 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A minor release: the AI agent tools write to AI Agent Studio's own tables, and the Architect designs an agentic
+solution with its access rules and its build plan.** The four AI agent tools wrote to tables a current instance does
+not have. They now write an agent, its tool links and a workflow's team, use case and members where AI Agent Studio
+keeps them, read every record back, refuse before writing what they cannot check, and create no access control: their
+result says so and names the Studio page where it is configured. Two of them take different inputs, which makes this
+release breaking for a caller of those two tools. The Now Assist Specialist knows that model now: an agent's tool is
+an AI Agent Studio tool, every agent and workflow design states its access rules, and the design ends with a build
+plan that asks one write question per call, naming every record the call writes, which the write gate states too. A
+new ledger records which of the server's 399 tools have run against a real instance: 26 are named in a validation
+record or a platform note, none is verified live yet, and the contract gate keeps every tool listed. The rewritten AI
+agent tools are run against an instance in the release candidate's live sitting before this version is tagged.
+Whether the session-start Mode line reaches every session in a live install is still to be measured. The server's
+contract keeps its 399 tools and 74 error codes, and the licence format and the signed manifest are unchanged.
+Upgrading from 2.1.2 needs no step beyond `./snowarch upgrade`; a script or prompt that called the two changed tools
+with their removed inputs needs the new ones.
+
+### Breaking
+
+- `snow_ai_ai_agent_add` no longer takes `capabilities` or `auto_generate_acls`, and requires `role` and
+  `instructions`. `snow_ai_agentic_workflow_add` no longer takes `agent_sys_id`, `steps` or `trigger_conditions`, and
+  requires `base_plan` and `agent_sys_ids`. Neither creates an ACL: access is configured in AI Agent Studio
+  (ARC-09-C165).
+
+### Fixed
+
+- The AI agent tools write AI Agent Studio's tables: an agent as `sn_aia_agent` with one `sn_aia_agent_tool_m2m` per
+  tool, and a workflow as `sn_aia_team`, `sn_aia_usecase` and one `sn_aia_team_member` per agent. They read back the
+  configuration and version the instance creates by itself and report them; an execution mode is accepted only when
+  the instance lists it; a refusal says "Nothing was written."; a failure after the first record names every record
+  created and deletes nothing. Until now they wrote tables a current instance does not have (ARC-09-C165).
+- The Now Assist Specialist designs an agentic solution from AI Agent Studio's model. An agent's tool is an AI Agent
+  Studio tool, never one of this product's server tools, and a new one is configuration, custom code for the
+  Developer, or — a new flow action or subflow built for the agent — a custom object that needs approval. Every agent
+  and workflow design has its access rules (who may invoke it, the identity it runs as, its approved roles) and ends
+  with a build manifest (ARC-09-C166).
+
+### Changed
+
+- The write gate: one call that writes several records is one write question that names every record the call
+  writes, in order, and the update-set capture list names AI agents and agentic workflows (ARC-09-C166).
+
+### Added
+
+- `docs/validation/LIVE-COVERAGE.md`, generated from `docs/validation/live-coverage.json`: the status of each of the
+  server's 399 tools against a real instance — verified live, refused, named in a record only, or unverified. The
+  contract gate fails when a tool has no entry (ARC-09-C167a).
+
+### Internal
+
+- Two platform notes: PN-17, what an AI Agent Studio insert creates by itself, and PN-18, pointing REST capture at an
+  update set moves the user's own session there too (ARC-09-C165).
+- T-36, a two-turn validation test of an agentic design (ARC-09-C166).
+
 ## 2.1.2 — 2026-10-16
 
 ### Notes
