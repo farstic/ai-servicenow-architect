@@ -9,6 +9,37 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A maintenance release after 2.1.1, from a colleague's 30-day licence and the owner's rc.3 and rc.4 sittings.** A
+licence reads expiring only near the end of its own term, so a 30-day licence no longer reads expiring on its first
+day, and a licence in force that is expiring tells the user to ask its issuer for a renewal. A gateway in review mode
+says whether the artefact keeps its Envelope, and leaves the code to the Code Reviewer. The CSM and ITSM gateways
+always weigh the closest baseline tables for a request about money, an audit trail or an escalation. Whether the
+session-start Mode line reaches every session was measured in a design-only install, 10 sessions of 10; the
+measurement in a live install is still to come. Nothing changes in the licence format, the signed manifest or the
+server's contract, which has 399 tools and 74 error codes as in 2.1.1. Upgrading from 2.1.1 needs no step beyond
+`./snowarch upgrade`.
+
+### Fixed
+
+- A licence reads expiring when its days left are at most a third of its own term, and never more than 30 days, the
+  term running from its issue to its last day; a perpetual licence never does. For a licence in force that is
+  expiring, doctor check E-31 and `./snowarch licence check` say "Licence <id> expires on <date> (<n> days left) —
+  ask the issuer for a renewal before then", where they said to install a valid licence (ARC-09-C159).
+
+### Changed
+
+- A gateway in review mode checks the artefact against its own Envelope — its tables, fields and state values, and
+  its Part 3 verdict — and returns exactly one of two answers: cleared, or a §1.1 violation, naming what and where.
+  It is not a code review: the Code Reviewer is proposed separately (ARC-09-C160).
+- The CSM and ITSM gateways' Part 2 always weighs the closest baseline tables for a request about money against an
+  account, an audit trail or an escalation record — SLA records, invoices, contracts and entitlements, journal
+  fields, audit history and the on-call rota — each with a citation to the bundled corpus (ARC-09-C161).
+
+### Internal
+
+- The session-start banner, measured: the Mode line reached 10 of 10 headless sessions in a design-only install,
+  and a control session with the hook off counted 0. The measurement in a live install is pending (ARC-09-C162).
+
 ## 2.1.1 — 2026-10-16
 
 ### Notes
