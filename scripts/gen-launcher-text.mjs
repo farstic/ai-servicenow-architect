@@ -102,6 +102,8 @@ export function region({ shell = 'bash', remedies: r = remedies, text: t = text,
     set('MSG_DOCTOR', t.doctorUnavailable),
     set('MSG_MODE', t.modeDesign),
     set('MSG_NEXT', next),
+    // ARC-09-C157 — the folder slot in MSG_NEXT, filled by each launcher with its own root at the moment it prints.
+    set('MSG_ROOT_SLOT', t.rootSlot),
     set('MSG_CITATIONS', 'citations: not verified until Node 20+ is installed'),
     END,
   ];

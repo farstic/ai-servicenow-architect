@@ -322,6 +322,9 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ['tools/snowarch/tests/instance-root-entry.test.mjs', [
     { at: 'usage: ~ instance <command>', kind: 'PINNED', n: 1, why: 'the assertion claims this sentence is absent' },
   ]],
+  ['tools/snowarch/tests/licence-command.test.mjs', [
+    { at: 'step: found: LIC-2026-0002.json in .local/ is a licence ', kind: 'EXPECTED_RENDERING', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/commands/licence.mjs)' },
+  ]],
   ['tools/snowarch/tests/store-forwarder.test.mjs', [
     { at: 'usage: ~ store', kind: 'PINNED', n: 1, why: 'a pinned and a deriving line both carry it' },
   ]],

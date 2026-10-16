@@ -25,14 +25,14 @@
  * Exit codes: the three read commands exit 0 when the licence is in force (`ok` or `expiring`) and 1
  * otherwise, so a script can ask; the owner's five exit 0 when they wrote what they said; 2 is usage.
  */
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { generateKeyPairSync } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { loadConfig } from '../config.mjs';
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../exit.mjs';
 import { localDir, licencePath } from '../local-paths.mjs';
-import { spellings } from '../text.mjs';
+import { isWindowsShell, spellings } from '../text.mjs';
 import {
   checkLicence, fingerprint, ID_PATTERN, licenceProblem, publicKeyOf, readList, REASONS, SCOPES, signLicence,
   signList, utcDate,
@@ -237,7 +237,31 @@ function verifyFile({ positional, log, root, keys, now }) {
   return inForce(s);
 }
 
-function check({ flags, log, root, keys, now, env, config }) {
+/**
+ * ARC-09-C156 — the licences in `.local/` under any name but the one the product reads.
+ *
+ * The Windows colleague's 2.1.0 install (2026-10-15) copied the file into `.local/` under the name it was sent with,
+ * and every surface said `Licence: missing`. A JSON there counts only when it verifies as a licence under a key this
+ * product ships, so the product's own files (the store, the caches) are never named. Read, never printed: the caller
+ * names the file and nothing in it.
+ */
+function strayLicences(root, { keys, now }) {
+  const dir = localDir(root);
+  const own = basename(licencePath(root));
+  let names;
+  try { names = readdirSync(dir); } catch { return []; }
+  return names.filter((name) => name.endsWith('.json') && name !== own).sort().filter((name) => {
+    try {
+      const path = join(dir, name);
+      if (statSync(path).size > 64 * 1024) return false;
+      return checkLicence(readFileSync(path, 'utf8'), { keys, now }).signatureValid === true;
+    } catch {
+      return false;
+    }
+  });
+}
+
+function check({ flags, log, root, keys, now, env, config, where }) {
   if (flags.refresh) {
     const r = refreshList(root, { config: config(), keys, now: now(), env });
     log.step(refreshSays(r));
@@ -254,6 +278,17 @@ function check({ flags, log, root, keys, now, env, config }) {
   // The command every remedy names says what the day means too (ruling B): a term, from a signature that holds.
   if (s.signatureValid && !s.perpetual) log.step(validUntilLine(s));
   if (s.reason && s.state !== 'ok' && s.state !== 'expiring') log.step(`  why: ${s.reason}`);
+  if (s.state === 'missing') {
+    const dir = localDir(root);
+    const cli = spellings(where).cli;
+    for (const name of strayLicences(root, { keys, now: now() })) {
+      log.step(`  found: ${name} in .local/ is a licence under another name, and only licence.json is read. `
+        + `Rename it, then run ${cli} licence check again:`);
+      log.step(isWindowsShell(where)
+        ? `    Move-Item "${dir}\\${name}" "${dir}\\licence.json"`
+        : `    mv "${dir}/${name}" "${dir}/licence.json"`);
+    }
+  }
   log.step(listLine(s, now()));
   enforcementLines(log, s);
   return inForce(s);
@@ -366,6 +401,16 @@ function issue({ flags, log, root, keys, now }) {
   log.step(`licence issue: ${id} for ${to} (${org}), ${scope}, ${perpetual ? 'perpetual' : `until ${validUntil}`}`);
   log.step(`  written to ${outPath}`);
   log.step('Send this file to the licensee, who installs it by copying it to .local/licence.json in their checkout.');
+  // ARC-09-C156 — the two commands, with the file's real name, because "copying it to .local/licence.json" was read
+  // as "into .local/" on the Windows colleague's install (2026-10-15). From the checkout folder, as every other
+  // command there runs; Downloads is where a sent file lands, and the line after says what to change if not.
+  const name = basename(outPath);
+  const posixName = /^[\w.@%+=:,-]+$/.test(name) ? name : `'${name.replace(/'/g, "'\\''")}'`;
+  log.step('  It must be named licence.json there: a copy under its own name is not read. From their checkout folder, '
+    + 'with the file in Downloads:');
+  log.step(`    macOS or Linux:      cp ~/Downloads/${posixName} .local/licence.json`);
+  log.step(`    Windows PowerShell:  Copy-Item "$HOME\\Downloads\\${name}" .local\\licence.json`);
+  log.step('  Saved somewhere else, that folder replaces Downloads. Then they restart Claude Code, whose banner names the licence.');
   return EXIT_OK;
 }
 

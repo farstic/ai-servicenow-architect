@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-15
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 34 tests, T-01 through T-34, no number reserved. The count is asserted by
+> **How many.** 35 tests, T-01 through T-35, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -1607,7 +1607,7 @@ returns.
 | # | On | Do | Expect |
 |---|---|---|---|
 | 1 | B | Before any licence: `./snowarch doctor`, `./snowarch status`, then start Claude Code and read the capabilities. | E-31 FAILs: `Licence: missing`, with the remedy `Run ./snowarch licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards`, and nothing after it. The status panel's second line and the banner's second line are both `Licence: missing`. The tool count is the release's, and the tool is refused: `Error: licence missing — no tool runs without a valid licence. …`, ending `(Code: LICENCE_NOT_VALID)`. The Architect says that no deliverable is produced, and does not retry. |
-| 2 | A | `./snowarch licence issue --to "Sam Example" --org "Example Consulting Ltd" --scope live --key ~/snowarch-keys/primary.pem`, with `--valid-until` set to a date about six months out. Send the file to B outside any repository. | `licence issue: LIC-2026-0002 for Sam Example (Example Consulting Ltd), live, until` that date, and the file beside the key. |
+| 2 | A | `./snowarch licence issue --to "Sam Example" --org "Example Consulting Ltd" --scope live --key ~/snowarch-keys/primary.pem`, with `--valid-until` set to a date about six months out. Send the file to B outside any repository. | `licence issue: LIC-2026-0002 for Sam Example (Example Consulting Ltd), live, until` that date, and the file beside the key. Then the two commands that install it under its one name, with the file's name in them: `cp ~/Downloads/LIC-2026-0002.json .local/licence.json` and `Copy-Item "$HOME\Downloads\LIC-2026-0002.json" .local\licence.json` (ARC-09-C156). |
 | 3 | B | Copy the file to `.local/licence.json`. Run `./snowarch licence check --refresh`, `./snowarch doctor` and `./snowarch status`. | `revocation list: version <n> fetched`, then `Licence: ok · LIC-2026-0002 · until` the date and `valid until:  <date> (UTC, N days)`. E-31 is ok. The panel's second line is the same `Licence:` line, and its `Doctor:` line no longer names E-31. |
 | 4 | B | Restart Claude Code and read the capabilities. Run `./snowarch licence check`. | The banner's second line is `Licence: ok · LIC-2026-0002 · until` the date. The tool answers, with no licence block. `check` says `nothing is refused while the licence is in force`, with `valid until:  <date> (UTC, N days)`. |
 | 5 | A | `./snowarch licence revoke LIC-2026-0002 --reason ended --key ~/snowarch-keys/primary.pem --list ~/snowarch-licences`, then the git commands it prints. | The list's version goes up by one, and the owner's push puts it on `main`. |
@@ -1620,6 +1620,7 @@ returns.
 | 12 | A, B | `issue --scope design-only`, with an end date, and install it on B, whose checkout is live. Run `./snowarch licence check`, then read the capabilities in a new session. | `Licence: ok · LIC-… · design-only · until` the date, and `scope: licence LIC-… covers design-only; live needs a live-scope licence, so a live server refuses every tool`. The tool answers `licence LIC-… covers design-only; live needs a live-scope licence. …`, ending `(Code: LICENCE_NOT_VALID)`, with the notice block. The Architect does not retry. |
 | 13 | A | `./snowarch licence keygen --out /tmp/x.pem --recovery-out /tmp/y.pem --to "<name>" --org "Example Consulting Ltd"`. The placeholder is deliberate. | `error: --to "<name>" is a placeholder, not a value — type the real name, without angle brackets`, and neither key file exists. |
 | 14 | A | `issue` with `--key` the recovery key, then `./snowarch licence verify` on the file. | `signature: valid — recovery key`. |
+| 15 | B | With no `.local/licence.json`, put the file from row 2 in `.local/` under its own name, `LIC-2026-0002.json`, as the Windows colleague did (ARC-09-C156). Run `./snowarch licence check`, then the command it prints, then `check` again. | The first `check`: `Licence: missing`, then `found: LIC-2026-0002.json in .local/ is a licence under another name, and only licence.json is read. Rename it, then run ./snowarch licence check again:`, and a `mv` line with this checkout's `.local/` path (`Move-Item` in Windows PowerShell). Nothing from inside the file is printed. After the rename: `Licence: ok · LIC-2026-0002 · until` the date. |
 
 ### Pass criteria
 
@@ -1927,6 +1928,40 @@ An incident is reopened by its caller after it was resolved. What does the basel
 - A file deleted, not moved.
 ---
 
+## T-35 — Claude Code starts in the folder the install names, and a launcher run from outside names it too
+
+**Covers:** ARC-09-C157 — the bootstrap's Next line (`tools/snowarch/lib/text.mjs`, filled in `bootstrap.sh` and `bootstrap.ps1`), `docs/INSTALL.md`'s line after the Windows commands, and the doctor's and status's "not at the repository root" line from outside any checkout
+**Modes:** design-only ✅ · live ✅ (the same lines)
+
+**Run by hand**, on Windows in PowerShell and on macOS or Ubuntu, on a fresh install of the release under test —
+the path a Windows colleague's install took on 2.1.0, starting `claude` one folder above the checkout.
+
+### Setup
+
+A machine with no checkout of this product. Install with the commands on `docs/INSTALL.md` (`.\bootstrap.cmd`
+on Windows), design-only.
+
+### Expected behaviour
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | Read the end of the install. | The block's Next line is ``Next: run `claude` in this folder:`` followed by the checkout's absolute path (`C:\Users\…\ai-servicenow-architect` on Windows), and the line under it is `You will see one workspace-trust dialog — answer Yes.` Nothing says `here`, and no `{root}` is printed. A machine without Node, through the Node-free launcher, prints the same two lines. |
+| 2 | Go to the folder above the checkout, start `claude`, run `/mcp`, then exit. | No `Mode:` banner, and `/mcp` lists no `servicenow` server: started outside the checkout, Claude Code loads none of this product. |
+| 3 | From that folder, run the launcher by its path: `.\ai-servicenow-architect\snowarch.cmd doctor`, then `status` (`./ai-servicenow-architect/snowarch` elsewhere). | Each exits 3 with one line, `DOCTOR: not at the repository root — run: cd ` (`STATUS:` for status) and the checkout's absolute path. |
+| 4 | Run that `cd`, start `claude`, and run `/mcp`. | The banner's `Mode: design-only` line prints, and `/mcp` shows the `servicenow` server as the install left it. |
+
+### Pass criteria
+
+- Every row as written. The path in rows 1 and 3 is the same folder, and the `cd` in row 3 works pasted as printed.
+- Row 1 holds on both launchers: the Node path and the Node-free one.
+
+### Fail signals
+
+- `claude` here, `{root}` or `<the checkout>` anywhere in rows 1 and 3.
+- A path with the other platform's separator, or a `cd` that does not reach the checkout.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -2005,9 +2040,9 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
-| 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the launchers, without Git Bash — the path that has cost the most cells |
+| 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` `T-35` | the launchers, without Git Bash — the path that has cost the most cells |
 | 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |
 
 Rows 1–3 need no instance and no credential. Row 4 needs a PDI and is the only row where a write

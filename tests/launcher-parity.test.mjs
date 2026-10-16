@@ -157,7 +157,10 @@ test('the launcher is short — it is a launcher, not a second implementation', 
   // part a reader needs: `rm -rf` in a launcher must say who is allowed to run it.
   assert.ok(lines - generated <= 209,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
-  assert.ok(lines <= 231, `${lines} total lines`);
+  // Raised 231 → 233 (total only; the hand-written count is unchanged) by ARC-09-C157: two GENERATED lines, the
+  // folder slot MSG_ROOT_SLOT and the Next block's second line, because the line now names the folder `claude`
+  // has to start in. The one hand-written line that prints it changed in place.
+  assert.ok(lines <= 233, `${lines} total lines`);
 });
 
 test('the state and the cache bash writes are the ones Node reads', async () => {

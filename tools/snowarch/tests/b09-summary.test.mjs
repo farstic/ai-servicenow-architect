@@ -22,13 +22,14 @@ const ctxFor = (root, over = {}) => ({
 
 test('B09 returns the block rather than printing it — the step line comes first', async () => {
   // The runner prints a step's line AFTER `run()` returns, so a block written from inside would be
-  // followed by `[B09/09] summary … ok` and the closing five lines would not be the last five.
+  // followed by `[B09/09] summary … ok` and the closing six lines would not be the last six.
   const root = makeCheckout();
   const lines = [];
   const r = await runB09(ctxFor(root, { line: (l) => lines.push(l) }));
   assert.deepEqual(lines, [], 'B09 printed the block itself');
   assert.equal(typeof r.next, 'string');
-  assert.equal(r.next.split('\n').length, 5);
+  // ARC-09-C157 — six: the Next line names the folder, and the dialog sentence has its own line.
+  assert.equal(r.next.split('\n').length, 6);
 });
 
 test('the counts come from this run when no doctor exists, and from the doctor when one does', () => {
@@ -149,8 +150,9 @@ test('AC 1 — the design-only block, and the Node-absent first line', async () 
   const r = await runB09(ctxFor(root));
   // Built from `text.mjs`, never spelled twice: a snapshot typed out here would be a second
   // definition of the thing this story exists to have one of.
+  // ARC-09-C157 — with the root the run was in, which the Next line now names.
   assert.equal(r.next, summaryBlock({ mode: 'design-only', counts: { ok: 3, warn: 0, fail: 0 },
-    serverKey: config(root).mcp.serverKey, platform: 'linux', env: {} }));
+    serverKey: config(root).mcp.serverKey, root, platform: 'linux', env: {} }));
 
   const noNode = await runB09(ctxFor(root, { node: { present: false } }));
   assert.equal(noNode.next.split('\n')[0],
@@ -219,7 +221,7 @@ test('AC 3 — --json.next is the same string the human run printed', async () =
   const human = recorder();
   await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }), log: human,
     out: sink(), err: sink() });
-  const printed = human.lines.slice(-5).join('\n');
+  const printed = human.lines.slice(-6).join('\n');
 
   const jsonLog = recorder();
   await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true, json: true }),
@@ -227,29 +229,31 @@ test('AC 3 — --json.next is the same string the human run printed', async () =
   const payload = JSON.parse(jsonLog.lines.at(-1));
 
   assert.equal(payload.next, printed, '--json.next and the printed block have drifted');
-  assert.equal(printed.split('\n').length, 5);
+  assert.equal(printed.split('\n').length, 6);
   assert.match(printed, /^DOCTOR: /);
 });
 
-test('AC 1 — the last five lines of a real run are the block', async () => {
+test('AC 1 — the last six lines of a real run are the block', async () => {
   const root = makeCheckout();
   const log = recorder();
   const code = await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }),
     log, out: sink(), err: sink() });
   assert.equal(code, 0);
-  const last = log.lines.slice(-5);
+  const last = log.lines.slice(-6);
   assert.match(last[0], /^DOCTOR: \d+ ok, \d+ warn, \d+ fail$/);
   assert.equal(last[1], 'Mode: design-only');
-  assert.match(last[2], /^Next: run `claude` here\./);
+  // ARC-09-C157 — the folder, by name: "here" sent a colleague's `claude` one folder up, where it loads nothing.
+  assert.equal(last[2], `Next: run \`claude\` in this folder: ${root}`);
+  assert.equal(last[3], '      You will see one workspace-trust dialog — answer Yes.');
   // The spelling comes from `spellings()` for THIS shell, not from a POSIX literal: on the Windows
   // runner the block correctly says `snowarch.cmd`, and asserting `./snowarch` there was the test
   // choosing a platform and then checking a different one.
   // Built from ADD_INSTANCE rather than retyped: ARC-05-S06 criterion 3 is that this remedy has ONE
   // definition, and a test that spells its own copy is a second one that drifts the same way the
   // doctor's Mode line did.
-  assert.equal(last[4], `      Add a live instance later: run ${ADD_INSTANCE(spellings().cli)}.`);
+  assert.equal(last[5], `      Add a live instance later: run ${ADD_INSTANCE(spellings().cli)}.`);
   // ...and the step line is above them, not below.
-  assert.match(log.lines.at(-6), /^\[B09\/09\] summary … ok/);
+  assert.match(log.lines.at(-7), /^\[B09\/09\] summary … ok/);
 });
 
 

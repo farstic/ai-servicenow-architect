@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compose, dialogsParagraph } from '../scripts/gen-readme.mjs';
+import { ROOT_SLOT, SAMPLE_ROOT } from '../tools/snowarch/lib/text.mjs';
 import { allowedCloneTags } from './lib/install-tag.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
@@ -110,7 +111,8 @@ test('criterion 5 — "what you will see" is the tool\'s own text, not a copy of
   const region = /<!-- generated:closing-block -->\n([\s\S]*?)<!-- \/generated:closing-block -->/
     .exec(read(INSTALL));
   assert.ok(region, 'no closing-block region');
-  for (const line of [text.doctorUnavailable, text.modeDesign, text.posix.nextDesign]) {
+  // ARC-09-C157 — the Next line carries the folder as a slot the launchers fill; the page shows a sample folder.
+  for (const line of [text.doctorUnavailable, text.modeDesign, text.posix.nextDesign.replace(ROOT_SLOT, SAMPLE_ROOT)]) {
     assert.ok(region[1].includes(line), `the page's block is missing: ${line.split('\n')[0]}`);
   }
 });
@@ -296,7 +298,11 @@ test('the page stays a page, and the tail stays a tail', () => {
   // 308 since ARC-09-C140: from 2.1, B01 prints the signed manifest it fetched, on its own line before B01's, and
   // the transcript shows the tool's lines (criterion 5). Its explanation was folded into the sentence above the
   // transcript, so the fact costs that one line and no prose.
-  assert.ok(install <= 308, `${install} lines of install page (criterion: 308)`);
+  // 313 since ARC-09-C156 and C157, from the Windows colleague's 2.1.0 install (2026-10-15). Four lines are the two
+  // commands that install a licence under its one name, in a fence so they paste — the file had gone into .local/
+  // under its own name and read as missing. One is the Next block's folder: the line names it now, and the dialog
+  // sentence moved to a line of its own. The prose around both was rewrapped rather than grown.
+  assert.ok(install <= 313, `${install} lines of install page (criterion: 313)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.

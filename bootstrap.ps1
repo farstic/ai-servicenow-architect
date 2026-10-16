@@ -23,9 +23,11 @@ $MSG_UPSTREAM_SCHEME_FMT = 'corpus upstream is {0} — not probed (this check sp
 $MSG_TLS = 'TLS interception detected — set GIT_SSL_CAINFO (or git config http.sslCAInfo) to your corporate CA bundle and re-run; the MCP server needs the same bundle via NODE_EXTRA_CA_CERTS (docs/TROUBLESHOOTING.md)'
 $MSG_DOCTOR = 'DOCTOR: unavailable until Node 20+ is installed (design-only is complete)'
 $MSG_MODE = 'Mode: design-only'
-$MSG_NEXT = 'Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.
+$MSG_NEXT = 'Next: run `claude` in this folder: {root}
+      You will see one workspace-trust dialog — answer Yes.
       (If you are already inside Claude Code in this folder: exit it and start `claude` again.)
       Add a live instance later: run .\snowarch.cmd mode live, or /snowarch setup-instance inside Claude.'
+$MSG_ROOT_SLOT = '{root}'
 $MSG_CITATIONS = 'citations: not verified until Node 20+ is installed'
 # text-end
 
@@ -314,5 +316,5 @@ Write-Json "$Root\.local\doctor-last.json" $cache 5
 Step 'B09' 'summary' 'ok'; Record 'B09' 'ok'
 Say $MSG_DOCTOR
 Say $MSG_MODE
-Say $MSG_NEXT
+Say $MSG_NEXT.Replace($MSG_ROOT_SLOT, $Root)
 exit 0

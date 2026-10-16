@@ -43,10 +43,13 @@ the launching shell has no such variable, so the server deletes empty proxy and 
 start-up, before the HTTP agent is built.
 
 **Two messages the clone prints on Windows that are not errors.** A release tag is *annotated* — a tag
-object that points at the commit rather than being one — and git 2.54 says so out loud while checking it
-out anyway: `warning: refs/tags/v2.0.7 <sha> is not a commit!`. Confirmed twice on
-git 2.54.0.windows.1 during the 2026-09-28 Windows sitting, and absent on git 2.39, so a reader who does
-not see it has nothing missing. The other is the fourteen lines about "detached HEAD", which the clone
+object that points at the commit rather than being one — and git 2.54 and 2.55 say so out loud while
+checking it out anyway: `warning: refs/tags/v2.0.7 <sha> is not a commit!`. Confirmed twice on
+git 2.54.0.windows.1 during the 2026-09-28 Windows sitting, and on git 2.55.0.windows.5 cloning v2.1.0 in
+a colleague's install on 2026-10-15; absent on git 2.39, so a reader who does not see it has nothing
+missing. The checkout is at the tag all the same: `git describe --tags` prints it, and
+`.\snowarch.cmd status` (`./snowarch status` elsewhere) names it on its Engine line. The other is
+the fourteen lines about "detached HEAD", which the clone
 command on the install page already quiets with `-c advice.detachedHead=false`. Neither needs anything
 done about it; `./snowarch doctor` is what tells you whether the install is actually wrong.
 

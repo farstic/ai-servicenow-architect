@@ -56,7 +56,7 @@ cd ai-servicenow-architect
 .\bootstrap.cmd
 ```
 
-Then `claude` in the same folder.
+Then run `claude` in that same folder, `ai-servicenow-architect` — the bootstrap's Next line prints its full path, such as `C:\Users\you\ai-servicenow-architect`. Started from any other folder, the one above it included, Claude Code loads none of this product, and `/mcp` shows nothing.
 
 ### What you will see
 
@@ -92,7 +92,8 @@ It ends with the block below — the tool's own text, inserted here from its sou
 ```
 DOCTOR: unavailable until Node 20+ is installed (design-only is complete)
 Mode: design-only
-Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.
+Next: run `claude` in this folder: /Users/you/ai-servicenow-architect
+      You will see one workspace-trust dialog — answer Yes.
       (If you are already inside Claude Code in this folder: exit it and start `claude` again.)
       Add a live instance later: run ./snowarch mode live, or /snowarch setup-instance inside Claude.
 ```
@@ -103,10 +104,14 @@ and re-running resumes from that step rather than starting again.
 
 ### The licence
 
-From 2.0.13 the product checks for a licence from the author. Copy the file you were given to `.local/licence.json`
-in the checkout, before or after the install, which runs without one, and restart Claude Code.
-`./snowarch licence check` shows its state. Without a licence in force no tool runs, and no command but `licence`,
-`doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`.
+From 2.0.13 the product checks for a licence from the author. Copy the file you were given to `.local/licence.json` in the checkout, under that name — a copy under its own name is not read — before or after the install, which runs without one, and restart Claude Code. From the checkout folder, with the file in Downloads (`LIC-2026-0002.json` stands for your file's name):
+
+```
+cp ~/Downloads/LIC-2026-0002.json .local/licence.json                  # macOS or Linux
+Copy-Item "$HOME\Downloads\LIC-2026-0002.json" .local\licence.json     # Windows PowerShell
+```
+
+`./snowarch licence check` shows its state, and names a licence it finds in `.local/` under another name with the command that renames it. Without a licence in force no tool runs, and no command but `licence`, `doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`.
 
 ### The dialogs
 

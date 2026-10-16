@@ -110,6 +110,7 @@ export const run = async (ctx) => {
     nodeUsable: ctx.node?.present !== false,
     dialogs: EXPECTED_DIALOGS,
     serverKey: ctx.config.mcp.serverKey,
+    root: ctx.root,
     platform: ctx.plat,
     env: ctx.env,
     warnings: warningsFrom(state),

@@ -31,6 +31,8 @@ import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { SAMPLE_ROOT } from '../tools/snowarch/lib/text.mjs';
+
 // `fileURLToPath`, never `new URL(...).pathname` — `/C:/…` on Windows is not a path.
 const selfRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -58,7 +60,9 @@ export function replaceRegion(doc, name, body) {
 
 /** The closing block, as the tool prints it — fenced, so the indentation survives. */
 export function closingBlock(text) {
-  return ['```', text.doctorUnavailable, text.modeDesign, text.posix.nextDesign, '```'].join('\n');
+  // ARC-09-C157 — the Next line's folder slot shows a sample folder here, the way a reader's terminal shows theirs.
+  return ['```', text.doctorUnavailable, text.modeDesign, text.posix.nextDesign.replace(text.rootSlot, SAMPLE_ROOT), '```']
+    .join('\n');
 }
 
 /**

@@ -33,7 +33,7 @@ import { engineBlock, engineRegistry, serverBlock, staleBlock,
 import { deriveMode, modeLine, modeLineDetailed } from './mode.mjs';
 import { applyPlan, buildPlan, fixesBlock, logFix, renderPlan } from './fix.mjs';
 import { cacheStale, writeReportCache } from '../doctor-cache.mjs';
-import { contractSha, version as engineVersion } from '../config.mjs';
+import { contractSha, root as configRoot, version as engineVersion } from '../config.mjs';
 import { collectPrereqs } from './prereqs.mjs';
 import { buildReport } from './report-json.mjs';
 import { configuredDocs } from '../docs/status.mjs';
@@ -461,13 +461,18 @@ const defaultAsk = (input) => askOnce(input);
  * The order is the dependency order, not a preference: there is no config to read until the root is
  * known, and no floor to compare until the config is read.
  */
-export function resolveCheckout({ cwd = process.cwd(), who = 'DOCTOR', node = process.versions.node } = {}) {
+export function resolveCheckout({ cwd = process.cwd(), who = 'DOCTOR', node = process.versions.node,
+  install = configRoot } = {}) {
   const fail = (message, exit = EXIT_PREREQ) => ({ problem: { message, exit } });
 
   const root = findRoot(cwd);
-  // Nothing above this directory is a checkout. The sentence still names what to do, and says
-  // what it does not know rather than inventing a path.
-  if (!root) return fail(notAtRoot('<the checkout>', who));
+  // Nothing above this directory is a checkout. ARC-09-C157 — the launcher that ran this is in one, though: it is the
+  // install the reader meant, so the sentence names it (the Windows colleague, 2026-10-15, one folder above it). Only a
+  // launcher outside any checkout leaves nothing to name, and then the sentence says what it does not know.
+  if (!root) {
+    const known = install && existsSync(join(install, 'engine.config.json'));
+    return fail(notAtRoot(known ? install : '<the checkout>', who));
+  }
 
   // INSIDE the checkout is not AT it. Every path in a report — the store, the corpus, the
   // settings — is resolved relative to the root, and a run from `clients/acme/` that quietly used
