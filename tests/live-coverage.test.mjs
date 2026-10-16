@@ -45,7 +45,8 @@ test('C167a — the seeds: C165\'s two build tools wait for rc.1, and every name
   const ledger = JSON.parse(read(LEDGER));
   for (const t of ['snow_ai_ai_agent_add', 'snow_ai_agentic_workflow_add']) {
     assert.equal(ledger.tools[t].status, 'unverified');
-    assert.match(ledger.tools[t].note, /pending the v2\.2\.0-rc\.1 sitting/);
+    // No version in the note or here (ARC-09-C168): the release writes its version before the post-write suite.
+    assert.match(ledger.tools[t].note, /pending the next release candidate's live sitting$/);
   }
   const named = namedBy(manifestTools(), realRecords());
   for (const [t, e] of Object.entries(ledger.tools)) {
