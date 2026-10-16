@@ -48,6 +48,13 @@ const ROUTE_NOTE = "observed on Brazil patch 0; not in the australia corpus — 
 const accessRules = (route: string) => ({
   acl: 'none', identity: 'instance default (dynamic user)', role_filtering: 'none', configure_at: route,
 });
+/** The read inspects no access control, so it says that, not "none": an agent made in Studio may have an ACL. */
+const accessNotRead = (route: string) => ({
+  checked: false, note: 'this tool does not read access rules', configure_at: route,
+});
+
+/** The record_type values the owner's trial saw (PN-17): template for the platform's agents, custom for ours. */
+const RECORD_TYPES = new Set(['custom', 'template']);
 
 type Row = Record<string, unknown>;
 /** A warning with no registered code: a record the platform was expected to create was not found. The audit skips it. */
@@ -373,7 +380,11 @@ async function addWorkflow(client: ServiceNowClient, args: Row): Promise<Row> {
 
 async function indexAgents(client: ServiceNowClient, args: Row): Promise<Row> {
   const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : 25;
-  const query = typeof args.record_type === 'string' && args.record_type !== '' ? `record_type=${args.record_type}` : undefined;
+  const recordType = args.record_type;
+  if (recordType !== undefined && recordType !== '' && !RECORD_TYPES.has(recordType as string)) {
+    throw new ServiceNowError('record_type must be custom or template', 'INVALID_REQUEST');
+  }
+  const query = recordType ? `record_type=${recordType}` : undefined;
   const resp = await client.queryRecords({ table: AGENT, query, limit,
     fields: 'sys_id,name,description,agent_type,record_type,sys_scope,sys_updated_on' });
   const ids = resp.records.map((r) => plain(r.sys_id)).filter((v): v is string => Boolean(v));
@@ -406,7 +417,7 @@ async function readAgent(client: ServiceNowClient, args: Row): Promise<Row> {
   return {
     agent, config, active: config ? (plain(config.active) ?? 'unknown') : 'unknown', versions,
     tool_links: links.map((l) => ({ ...l, tool_record: toolOf.get(plain(l.tool)) ?? null })),
-    access_rules: accessRules(route), studio_route: route, studio_route_note: ROUTE_NOTE,
+    access_rules: accessNotRead(route), studio_route: route, studio_route_note: ROUTE_NOTE,
   };
 }
 

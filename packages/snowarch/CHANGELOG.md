@@ -16,9 +16,10 @@ the configuration and version records the instance creates by itself and reports
 state (PN-17); `active: false` sets the configuration inactive and reads it back. An `execution_mode` is accepted
 only when the instance's `sys_choice` lists it, and `memory_scope` only when the dictionary has the column, both
 read before the first write. A refusal says "Nothing was written."; a failure after the first record names every
-record created and deletes nothing. The result carries `access_rules` (no ACL, the instance's default identity, no
-role filtering) and the Studio page to configure them, `studio_route`, which is observed on Brazil and not in the
-corpus. Removed inputs, none of which had a column behind it: `capabilities` and `auto_generate_acls` on the agent,
+record created and deletes nothing. Each `_add` result carries `access_rules` (no ACL, the instance's default
+identity, no role filtering) and the Studio page to configure them, `studio_route`, which is observed on Brazil and
+not in the corpus; `snow_ai_ai_agent_read` says it does not read access rules, and the index takes a `record_type`
+of `custom` or `template` only. Removed inputs, none of which had a column behind it: `capabilities` and `auto_generate_acls` on the agent,
 `agent_sys_id`, `steps` and `trigger_conditions` on the workflow. The agent now requires `role` and `instructions`,
 and the workflow `base_plan` and `agent_sys_ids`. Still 399 tools, 163 of them mutating, and 74 error codes.
 
