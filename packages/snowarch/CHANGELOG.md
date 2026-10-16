@@ -5,6 +5,23 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased (2.1.2-dev)
 
+**Breaking — the AI agent tools write AI Agent Studio's tables, and no ACL (ARC-09-C165).** `snow_ai_ai_agent_add`,
+`snow_ai_ai_agents_index`, `snow_ai_ai_agent_read` and `snow_ai_agentic_workflow_add` used `sys_ai_agent`,
+`sys_ai_agentic_workflow` and two `sys_security_acl` rows conditioned on `sys_ai_agent`, tables a current instance
+does not have: in the owner's trial on a Brazil instance the index failed with `INVALID_REQUEST`. AI Agent Studio
+keeps its objects in `sn_aia_*` (the corpus lists them: `intelligent-experiences/na-aia-reference.md:713-893`). An
+agent is now written as `sn_aia_agent` and one `sn_aia_agent_tool_m2m` per tool, and an agentic workflow as
+`sn_aia_team`, then `sn_aia_usecase` with that team, then one `sn_aia_team_member` per agent. Each tool reads back
+the configuration and version records the instance creates by itself and reports them, never asserting their
+state (PN-17); `active: false` sets the configuration inactive and reads it back. An `execution_mode` is accepted
+only when the instance's `sys_choice` lists it, and `memory_scope` only when the dictionary has the column, both
+read before the first write. A refusal says "Nothing was written."; a failure after the first record names every
+record created and deletes nothing. The result carries `access_rules` (no ACL, the instance's default identity, no
+role filtering) and the Studio page to configure them, `studio_route`, which is observed on Brazil and not in the
+corpus. Removed inputs, none of which had a column behind it: `capabilities` and `auto_generate_acls` on the agent,
+`agent_sys_id`, `steps` and `trigger_conditions` on the workflow. The agent now requires `role` and `instructions`,
+and the workflow `base_plan` and `agent_sys_ids`. Still 399 tools, 163 of them mutating, and 74 error codes.
+
 **A licence's expiring state scales with its term (ARC-09-C159).** `src/licence/core.ts` reads a licence as
 expiring when its days left are at most min(30, floor(term / 3)), the term being `valid_until` − `issued` in whole
 days, and a perpetual licence never; `expiringThreshold` is the rule, held equal to the engine's by the parity test.

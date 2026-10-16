@@ -56,8 +56,8 @@ const SYS_ID = /^[0-9a-f]{32}$/i;
 type Row = Record<string, unknown>;
 export type AuthorWarning = Row & { code: string; table: string; field: string; message: string };
 
-/** A value with its transport shape taken off: a reference's `value`, every scalar as its string. */
-function plain(v: unknown): string | undefined {
+/** A value with its transport shape taken off: a reference's `value`, every scalar as its string. Also ai-agents.ts's (ARC-09-C165). */
+export function plain(v: unknown): string | undefined {
   if (v === null || v === undefined) return undefined;
   if (typeof v === 'object') return plain((v as { value?: unknown }).value);
   return String(v);
@@ -144,7 +144,8 @@ async function readBack(client: ServiceNowClient, w: Written): Promise<{ stored:
   return { stored, warnings };
 }
 
-async function write(client: ServiceNowClient, table: string, sent: Row, live: boolean, sysId?: string):
+/** Write one record and read it back. Also ai-agents.ts's, for the sn_aia_* records (ARC-09-C165). */
+export async function write(client: ServiceNowClient, table: string, sent: Row, live: boolean, sysId?: string):
 Promise<{ sysId: string; stored: ServiceNowRecord; warnings: AuthorWarning[] }> {
   const answer = (sysId === undefined
     ? await client.createRecord(table, sent)

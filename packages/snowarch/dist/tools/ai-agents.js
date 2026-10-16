@@ -1,19 +1,56 @@
 import { ServiceNowError } from '../utils/errors.js';
 import { requireNowAssist, requireWrite } from '../utils/permissions.js';
+import { plain, write } from './atf-author.js';
+const AGENT = 'sn_aia_agent';
+const CONFIG = 'sn_aia_agent_config';
+const VERSION = 'sn_aia_version';
+const TOOL = 'sn_aia_tool';
+const LINK = 'sn_aia_agent_tool_m2m';
+const USECASE = 'sn_aia_usecase';
+const TEAM = 'sn_aia_team';
+const MEMBER = 'sn_aia_team_member';
+const SYS_ID = /^[0-9a-f]{32}$/i;
+/** The Studio pages, observed on Brazil patch 0 only (PN-17): one note says so, never prose in every field. */
+const agentRoute = (sysId) => `/aiux/aia/agent/${sysId}/visualize`;
+const workflowRoute = (sysId) => `/aiux/aia/workflow/${sysId}/visualize`;
+const ROUTE_NOTE = "observed on Brazil patch 0; not in the australia corpus — verify on the instance's family";
+/** What a record written here carries for access: nothing, and where that is configured (ruling OQ-DS-2). */
+const accessRules = (route) => ({
+    acl: 'none', identity: 'instance default (dynamic user)', role_filtering: 'none', configure_at: route,
+});
 export function aiAgentsToolManifest() {
     return [
         {
             name: 'snow_ai_ai_agent_add',
-            description: 'Create an AI agent definition with optional auto-generated ACLs (requires NOW_ASSIST_ENABLED + WRITE_ENABLED)',
+            description: 'Create an AI Agent Studio agent: writes sn_aia_agent, then one sn_aia_agent_tool_m2m per tool, and '
+                + 'reads back the configuration and version the instance creates. Creates no access control '
+                + '(requires NOW_ASSIST_ENABLED + WRITE_ENABLED)',
             inputSchema: {
                 type: 'object',
                 properties: {
                     name: { type: 'string', description: 'Agent name' },
-                    description: { type: 'string', description: 'Agent description' },
-                    capabilities: { type: 'array', items: { type: 'string' }, description: 'List of capability identifiers the agent supports' },
-                    auto_generate_acls: { type: 'boolean', description: 'Automatically create ACL records for the agent (default true)' },
+                    description: { type: 'string', description: 'What the agent does' },
+                    role: { type: 'string', description: 'The agent\'s role' },
+                    instructions: { type: 'string', description: 'The agent\'s instructions' },
+                    agent_type: { type: 'string', description: 'Sent only when given; the instance default otherwise' },
+                    channel: { type: 'string', description: 'Sent only when given; the instance default otherwise' },
+                    tools: {
+                        type: 'array',
+                        description: 'Existing sn_aia_tool records to link, one sn_aia_agent_tool_m2m each',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                tool_sys_id: { type: 'string', description: 'sys_id of an existing sn_aia_tool' },
+                                execution_mode: { type: 'string', description: 'A value listed in sys_choice on the instance; omitted, the instance default' },
+                                name: { type: 'string', description: 'The link\'s name' },
+                                display_output: { type: 'boolean', description: 'Show the tool\'s raw output to the user (instance default true)' },
+                            },
+                            required: ['tool_sys_id'],
+                        },
+                    },
+                    active: { type: 'boolean', description: 'false sets the agent\'s configuration inactive; an inserted agent is active' },
                 },
-                required: ['name', 'description', 'capabilities'],
+                required: ['name', 'description', 'role', 'instructions'],
             },
             gate: 'now_assist',
             mutates: true,
@@ -21,11 +58,12 @@ export function aiAgentsToolManifest() {
         },
         {
             name: 'snow_ai_ai_agents_index',
-            description: 'List AI agent definitions',
+            description: 'List AI Agent Studio agents (sn_aia_agent), each with active from its configuration',
             inputSchema: {
                 type: 'object',
                 properties: {
-                    active: { type: 'boolean', description: 'Filter by active status' },
+                    active: { type: 'boolean', description: 'Filter by the configuration\'s active flag' },
+                    record_type: { type: 'string', description: 'Filter by record_type (custom or template)' },
                     limit: { type: 'number', description: 'Max records to return (default 25)' },
                 },
                 required: [],
@@ -35,11 +73,11 @@ export function aiAgentsToolManifest() {
         },
         {
             name: 'snow_ai_ai_agent_read',
-            description: 'Get an AI agent definition and its related ACLs',
+            description: 'Get an AI Agent Studio agent (sn_aia_agent) with its configuration, versions and tool links',
             inputSchema: {
                 type: 'object',
                 properties: {
-                    sys_id: { type: 'string', description: 'System ID of the AI agent' },
+                    sys_id: { type: 'string', description: 'sys_id of the sn_aia_agent' },
                 },
                 required: ['sys_id'],
             },
@@ -48,30 +86,21 @@ export function aiAgentsToolManifest() {
         },
         {
             name: 'snow_ai_agentic_workflow_add',
-            description: 'Create an agentic workflow linked to an AI agent (requires NOW_ASSIST_ENABLED + WRITE_ENABLED)',
+            description: 'Create an agentic workflow: writes sn_aia_team, sn_aia_usecase, then one sn_aia_team_member per '
+                + 'agent, and reads back the version the instance creates. Creates no access control '
+                + '(requires NOW_ASSIST_ENABLED + WRITE_ENABLED)',
             inputSchema: {
                 type: 'object',
                 properties: {
                     name: { type: 'string', description: 'Workflow name' },
-                    description: { type: 'string', description: 'Workflow description' },
-                    agent_sys_id: { type: 'string', description: 'System ID of the parent AI agent' },
-                    steps: {
-                        type: 'array',
-                        description: 'Ordered list of workflow steps',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                name: { type: 'string', description: 'Step name' },
-                                action: { type: 'string', description: 'Action identifier' },
-                                inputs: { type: 'object', description: 'Step input parameters' },
-                                condition: { type: 'string', description: 'Optional condition expression' },
-                            },
-                            required: ['name', 'action'],
-                        },
-                    },
-                    trigger_conditions: { type: 'string', description: 'Optional trigger condition expression' },
+                    description: { type: 'string', description: 'What the workflow does' },
+                    base_plan: { type: 'string', description: 'The workflow\'s base plan' },
+                    agent_sys_ids: { type: 'array', items: { type: 'string' }, description: 'sys_ids of existing sn_aia_agent records, one team member each' },
+                    execution_mode: { type: 'string', description: 'A value listed in sys_choice on the instance; omitted, the instance default' },
+                    team_name: { type: 'string', description: 'The team\'s name (default: the workflow\'s name)' },
+                    memory_scope: { type: 'string', description: 'Written only when the instance\'s dictionary has the column' },
                 },
-                required: ['name', 'description', 'agent_sys_id', 'steps'],
+                required: ['name', 'description', 'base_plan', 'agent_sys_ids'],
             },
             gate: 'now_assist',
             mutates: true,
@@ -82,112 +111,296 @@ export function aiAgentsToolManifest() {
 const AI_AGENT_TOOL_NAMES = new Set([
     'snow_ai_ai_agent_add', 'snow_ai_ai_agents_index', 'snow_ai_ai_agent_read', 'snow_ai_agentic_workflow_add',
 ]);
+// ─── Checks: every one a read, every one before the first write ────────────────────────────────────────────────
+const refuse = (why) => { throw new ServiceNowError(`${why} Nothing was written.`, 'INVALID_REQUEST'); };
+const codeOf = (e) => (e instanceof ServiceNowError ? e.code : 'UNKNOWN');
+function text(args, key, required) {
+    const v = args[key];
+    if (v === undefined && !required)
+        return undefined;
+    if (typeof v !== 'string' || v.trim() === '')
+        return refuse(`${key} must be a non-empty string.`);
+    return v;
+}
+/** The record by sys_id, or a refusal that says whether it is absent or could not be read. */
+async function mustExist(client, table, sysId, what) {
+    if (!SYS_ID.test(sysId))
+        refuse(`${what} ${JSON.stringify(sysId)} is not a sys_id.`);
+    let record;
+    try {
+        record = await client.getRecord(table, sysId);
+    }
+    catch (e) {
+        if (codeOf(e) !== 'NOT_FOUND')
+            refuse(`${what} ${sysId} could not be read from ${table} (${codeOf(e)}).`);
+    }
+    // An empty answer is how the REST layer reports "no such record", as a 404 is.
+    if (!record || !plain(record.sys_id))
+        refuse(`${what} ${sysId} is not a ${table} record on this instance.`);
+    return record;
+}
+/**
+ * The execution modes the instance lists for `table`, read from `sys_choice` (the brief: never hard-coded). Read only
+ * when the caller passed one; one query per table per call; the values across every language.
+ */
+async function listedModes(client, table) {
+    let rows;
+    try {
+        rows = (await client.queryRecords({ table: 'sys_choice', query: `name=${table}^element=execution_mode^inactive=false`,
+            fields: 'value', limit: 100 })).records;
+    }
+    catch (e) {
+        return refuse(`execution_mode cannot be checked: the choice list could not be read (${codeOf(e)}).`);
+    }
+    const values = new Set(rows.map((r) => plain(r.value)).filter((v) => Boolean(v)));
+    if (values.size === 0)
+        refuse(`execution_mode cannot be checked: no execution_mode choices are listed on this instance for ${table}.`);
+    return values;
+}
+function checkMode(mode, listed, table) {
+    if (!listed.has(mode)) {
+        refuse(`execution_mode ${JSON.stringify(mode)} is not listed on this instance for ${table} (listed: ${[...listed].join(', ')}).`);
+    }
+}
+/** Whether the instance's dictionary has `table.column` — read before a column the corpus does not document is sent. */
+async function hasColumn(client, table, column) {
+    let rows;
+    try {
+        rows = (await client.queryRecords({ table: 'sys_dictionary', query: `name=${table}^element=${column}`,
+            fields: 'element', limit: 1 })).records;
+    }
+    catch (e) {
+        return refuse(`${column} cannot be checked: the dictionary could not be read (${codeOf(e)}).`);
+    }
+    if (rows.length === 0)
+        refuse(`${column} is not a column of ${table} on this instance.`);
+}
+/** The first record matching `query`, or null. A read after a write: a refusal here is not a write failure. */
+async function first(client, table, query) {
+    const resp = await client.queryRecords({ table, query, limit: 1, orderBy: '-sys_created_on' });
+    return resp.records[0] ?? null;
+}
+/** A failure after the first record: rethrown, naming every record already created. Nothing is deleted. */
+function leftBehind(error, created, warnings, retry) {
+    const [head, ...rest] = created;
+    const also = rest.length === 0 ? '' : `, as were ${rest.map((c) => `${c.table} ${c.sysId}`).join(', ')}`;
+    const readBackNote = warnings.length === 0 ? ''
+        : ` The read-back reported ${warnings.map((w) => `${w.code} on ${w.table}.${w.field}`).join(', ')}.`;
+    const message = error instanceof Error ? error.message : String(error);
+    return new ServiceNowError(`${message} — ${head.table} ${head.sysId} was created, but the call did not finish${also}. `
+        + `Read them before trying again, and ${retry}. Nothing was deleted.${readBackNote}`, error instanceof ServiceNowError ? error.code : 'CREATE_FAILED', error instanceof ServiceNowError ? error.details : undefined);
+}
+function toolsArg(v) {
+    if (v === undefined)
+        return [];
+    if (!Array.isArray(v))
+        return refuse('tools must be an array.');
+    return v.map((t, i) => {
+        if (typeof t !== 'object' || t === null)
+            return refuse(`tools[${i}] must be an object.`);
+        const o = t;
+        if (typeof o.tool_sys_id !== 'string')
+            return refuse(`tools[${i}].tool_sys_id is required.`);
+        if (o.execution_mode !== undefined && typeof o.execution_mode !== 'string')
+            refuse(`tools[${i}].execution_mode must be a string.`);
+        if (o.name !== undefined && typeof o.name !== 'string')
+            refuse(`tools[${i}].name must be a string.`);
+        if (o.display_output !== undefined && typeof o.display_output !== 'boolean')
+            refuse(`tools[${i}].display_output must be true or false.`);
+        return o;
+    });
+}
+async function addAgent(client, args) {
+    const name = text(args, 'name', true);
+    const sent = {
+        name, description: text(args, 'description', true), role: text(args, 'role', true),
+        instructions: text(args, 'instructions', true),
+    };
+    for (const key of ['agent_type', 'channel']) {
+        const v = text(args, key, false);
+        if (v !== undefined)
+            sent[key] = v;
+    }
+    if (args.active !== undefined && typeof args.active !== 'boolean')
+        refuse('active must be true or false.');
+    const tools = toolsArg(args.tools);
+    for (const [i, t] of tools.entries())
+        await mustExist(client, TOOL, t.tool_sys_id, `tools[${i}].tool_sys_id`);
+    if (tools.some((t) => t.execution_mode !== undefined)) {
+        const listed = await listedModes(client, LINK);
+        for (const t of tools)
+            if (t.execution_mode !== undefined)
+                checkMode(t.execution_mode, listed, LINK);
+    }
+    const agent = await write(client, AGENT, sent, args.active !== false);
+    const created = [{ table: AGENT, sysId: agent.sysId }];
+    const warnings = [...agent.warnings];
+    const links = [];
+    let config;
+    let version;
+    try {
+        config = await first(client, CONFIG, `agent=${agent.sysId}`);
+        version = await first(client, VERSION, `target_id=${agent.sysId}`);
+        for (const t of tools) {
+            const link = { agent: agent.sysId, tool: t.tool_sys_id };
+            if (t.name !== undefined)
+                link.name = t.name;
+            if (t.execution_mode !== undefined)
+                link.execution_mode = t.execution_mode;
+            if (t.display_output !== undefined)
+                link.display_output = t.display_output;
+            const done = await write(client, LINK, link, true);
+            created.push({ table: LINK, sysId: done.sysId });
+            warnings.push(...done.warnings);
+            links.push(done.stored);
+        }
+        if (args.active === false && config) {
+            const done = await write(client, CONFIG, { active: false }, false, String(plain(config.sys_id)));
+            warnings.push(...done.warnings);
+            config = done.stored;
+        }
+    }
+    catch (error) {
+        throw leftBehind(error, created, warnings, 'do not add the agent a second time');
+    }
+    if (!config) {
+        warnings.push({ table: CONFIG, message: `configuration record not found; the agent may be active. No ${CONFIG} row has `
+                + `agent=${agent.sysId}, and none was created: read it on the instance${args.active === false ? ', then set active to false' : ''}.` });
+    }
+    if (!version) {
+        warnings.push({ table: VERSION, message: `version record not found: no ${VERSION} row has target_id=${agent.sysId}, `
+                + 'and none was created. Open the agent in AI Agent Studio to see its version.' });
+    }
+    const route = agentRoute(agent.sysId);
+    return {
+        ...(warnings.length > 0 ? { warnings } : {}),
+        agent: agent.stored, config, version,
+        active: config ? (plain(config.active) ?? 'unknown') : 'unknown',
+        tool_links: links,
+        access_rules: accessRules(route), studio_route: route, studio_route_note: ROUTE_NOTE,
+        summary: `Created AI agent "${name}" (${agent.sysId}) with ${links.length} tool link(s); `
+            + (warnings.length === 0 ? 'every record reads back as sent.' : `${warnings.length} warning(s) — see warnings.`)
+            + ' It has no access control: configure it in AI Agent Studio before use.',
+    };
+}
+// ─── snow_ai_agentic_workflow_add ───────────────────────────────────────────────────────────────────────────────
+async function addWorkflow(client, args) {
+    const name = text(args, 'name', true);
+    const description = text(args, 'description', true);
+    const basePlan = text(args, 'base_plan', true);
+    const mode = text(args, 'execution_mode', false);
+    const teamName = text(args, 'team_name', false) ?? name;
+    const memoryScope = text(args, 'memory_scope', false);
+    const agents = args.agent_sys_ids;
+    if (!Array.isArray(agents) || agents.length === 0 || agents.some((a) => typeof a !== 'string')) {
+        refuse('agent_sys_ids must be a non-empty array of sys_ids.');
+    }
+    const agentIds = agents;
+    for (const [i, id] of agentIds.entries())
+        await mustExist(client, AGENT, id, `agent_sys_ids[${i}]`);
+    if (mode !== undefined)
+        checkMode(mode, await listedModes(client, USECASE), USECASE);
+    if (memoryScope !== undefined)
+        await hasColumn(client, MEMBER, 'memory_scope');
+    // The team first, so the workflow's insert carries it and nothing is modified afterwards (PN-17).
+    const team = await write(client, TEAM, { name: teamName }, true);
+    const created = [{ table: TEAM, sysId: team.sysId }];
+    const warnings = [...team.warnings];
+    const members = [];
+    let workflow;
+    let version;
+    try {
+        const sent = { name, description, base_plan: basePlan, team: team.sysId };
+        if (mode !== undefined)
+            sent.execution_mode = mode;
+        workflow = await write(client, USECASE, sent, true);
+        created.push({ table: USECASE, sysId: workflow.sysId });
+        warnings.push(...workflow.warnings);
+        for (const agent of agentIds) {
+            const member = { team: team.sysId, agent };
+            if (memoryScope !== undefined)
+                member.memory_scope = memoryScope;
+            const done = await write(client, MEMBER, member, true);
+            created.push({ table: MEMBER, sysId: done.sysId });
+            warnings.push(...done.warnings);
+            members.push(done.stored);
+        }
+        version = await first(client, VERSION, `target_id=${workflow.sysId}`);
+    }
+    catch (error) {
+        throw leftBehind(error, created, warnings, 'do not add the workflow a second time');
+    }
+    if (!version) {
+        warnings.push({ table: VERSION, message: `version record not found: no ${VERSION} row has target_id=${workflow.sysId}, `
+                + 'and none was created. Open the workflow in AI Agent Studio to see its version.' });
+    }
+    const route = workflowRoute(workflow.sysId);
+    return {
+        ...(warnings.length > 0 ? { warnings } : {}),
+        workflow: workflow.stored, team: team.stored, members, version,
+        access_rules: accessRules(route), studio_route: route, studio_route_note: ROUTE_NOTE,
+        summary: `Created agentic workflow "${name}" (${workflow.sysId}) with team ${team.sysId} and ${members.length} member(s); `
+            + (warnings.length === 0 ? 'every record reads back as sent.' : `${warnings.length} warning(s) — see warnings.`)
+            + ' It has no access control: configure it in AI Agent Studio before use.',
+    };
+}
+// ─── The reads ──────────────────────────────────────────────────────────────────────────────────────────────────
+async function indexAgents(client, args) {
+    const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : 25;
+    const query = typeof args.record_type === 'string' && args.record_type !== '' ? `record_type=${args.record_type}` : undefined;
+    const resp = await client.queryRecords({ table: AGENT, query, limit,
+        fields: 'sys_id,name,description,agent_type,record_type,sys_scope,sys_updated_on' });
+    const ids = resp.records.map((r) => plain(r.sys_id)).filter((v) => Boolean(v));
+    // `active` is the configuration's (PN-17), joined here rather than dot-walked.
+    const configs = ids.length === 0 ? [] : (await client.queryRecords({ table: CONFIG, query: `agentIN${ids.join(',')}`,
+        fields: 'agent,active', limit: ids.length })).records;
+    const activeOf = new Map(configs.map((c) => [plain(c.agent), plain(c.active)]));
+    let agents = resp.records.map((r) => ({ ...r, active: activeOf.get(plain(r.sys_id)) ?? 'unknown' }));
+    if (args.active !== undefined)
+        agents = agents.filter((a) => a.active === String(args.active));
+    return {
+        count: agents.length, total: resp.total ?? null, truncated: resp.count >= limit, agents,
+    };
+}
+async function readAgent(client, args) {
+    const sysId = args.sys_id;
+    if (typeof sysId !== 'string' || !SYS_ID.test(sysId))
+        throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
+    const agent = await client.getRecord(AGENT, sysId);
+    if (!plain(agent?.sys_id))
+        throw new ServiceNowError(`${sysId} is not a ${AGENT} record on this instance`, 'NOT_FOUND');
+    const config = await first(client, CONFIG, `agent=${sysId}`);
+    const versions = (await client.queryRecords({ table: VERSION, query: `target_id=${sysId}`, limit: 20,
+        fields: 'sys_id,version_name,version_number,state,active,sys_created_on' })).records;
+    const links = (await client.queryRecords({ table: LINK, query: `agent=${sysId}`, limit: 50,
+        fields: 'sys_id,name,tool,execution_mode,active,display_output' })).records;
+    const toolIds = [...new Set(links.map((l) => plain(l.tool)).filter((v) => Boolean(v)))];
+    const tools = toolIds.length === 0 ? [] : (await client.queryRecords({ table: TOOL, query: `sys_idIN${toolIds.join(',')}`,
+        fields: 'sys_id,name,type,target_document_table', limit: toolIds.length })).records;
+    const toolOf = new Map(tools.map((t) => [plain(t.sys_id), t]));
+    const route = agentRoute(sysId);
+    return {
+        agent, config, active: config ? (plain(config.active) ?? 'unknown') : 'unknown', versions,
+        tool_links: links.map((l) => ({ ...l, tool_record: toolOf.get(plain(l.tool)) ?? null })),
+        access_rules: accessRules(route), studio_route: route, studio_route_note: ROUTE_NOTE,
+    };
+}
 export async function dispatchAiAgentsAction(client, name, args) {
     if (!AI_AGENT_TOOL_NAMES.has(name))
         return null;
     switch (name) {
-        case 'snow_ai_ai_agent_add': {
+        case 'snow_ai_ai_agent_add':
             requireNowAssist();
             requireWrite();
-            if (!args.name)
-                throw new ServiceNowError('name is required', 'INVALID_REQUEST');
-            if (!args.description)
-                throw new ServiceNowError('description is required', 'INVALID_REQUEST');
-            if (!args.capabilities || !Array.isArray(args.capabilities)) {
-                throw new ServiceNowError('capabilities must be an array of strings', 'INVALID_REQUEST');
-            }
-            const agentData = {
-                name: args.name,
-                description: args.description,
-                capabilities: args.capabilities.join(','),
-                active: true,
-            };
-            const agentRecord = await client.createRecord('sys_ai_agent', agentData);
-            const agentSysId = String(agentRecord.sys_id);
-            const autoAcls = args.auto_generate_acls !== false;
-            const createdAcls = [];
-            if (autoAcls) {
-                // Create read ACL for the agent
-                const readAcl = await client.createRecord('sys_security_acl', {
-                    name: `${args.name} - Read`,
-                    type: 'record',
-                    operation: 'read',
-                    admin_overrides: true,
-                    active: true,
-                    description: `Auto-generated read ACL for AI agent: ${args.name}`,
-                    condition: `sys_ai_agent=${agentSysId}`,
-                });
-                createdAcls.push(readAcl);
-                // Create write ACL for the agent
-                const writeAcl = await client.createRecord('sys_security_acl', {
-                    name: `${args.name} - Write`,
-                    type: 'record',
-                    operation: 'write',
-                    admin_overrides: true,
-                    active: true,
-                    description: `Auto-generated write ACL for AI agent: ${args.name}`,
-                    condition: `sys_ai_agent=${agentSysId}`,
-                });
-                createdAcls.push(writeAcl);
-            }
-            return {
-                message: 'AI agent created',
-                agent: agentRecord,
-                acls_created: createdAcls.length,
-                acls: createdAcls,
-            };
-        }
-        case 'snow_ai_ai_agents_index': {
-            const parts = [];
-            if (args.active !== undefined)
-                parts.push(`active=${args.active}`);
-            const query = parts.length > 0 ? parts.join('^') : undefined;
-            const resp = await client.queryRecords({
-                table: 'sys_ai_agent',
-                query,
-                limit: args.limit || 25,
-                fields: 'sys_id,name,description,capabilities,active,sys_updated_on',
-            });
-            return { count: resp.count, agents: resp.records };
-        }
-        case 'snow_ai_ai_agent_read': {
-            if (!args.sys_id)
-                throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
-            const agent = await client.getRecord('sys_ai_agent', args.sys_id);
-            const agentSysId = String(agent.sys_id);
-            // Fetch related ACLs
-            const aclResp = await client.queryRecords({
-                table: 'sys_security_acl',
-                query: `conditionLIKEsys_ai_agent=${agentSysId}`,
-                limit: 20,
-                fields: 'sys_id,name,type,operation,active,description',
-            });
-            return { agent, acls: aclResp.records, acl_count: aclResp.count };
-        }
-        case 'snow_ai_agentic_workflow_add': {
+            return addAgent(client, args);
+        case 'snow_ai_ai_agents_index':
+            return indexAgents(client, args);
+        case 'snow_ai_ai_agent_read':
+            return readAgent(client, args);
+        case 'snow_ai_agentic_workflow_add':
             requireNowAssist();
             requireWrite();
-            if (!args.name)
-                throw new ServiceNowError('name is required', 'INVALID_REQUEST');
-            if (!args.description)
-                throw new ServiceNowError('description is required', 'INVALID_REQUEST');
-            if (!args.agent_sys_id)
-                throw new ServiceNowError('agent_sys_id is required', 'INVALID_REQUEST');
-            if (!args.steps || !Array.isArray(args.steps)) {
-                throw new ServiceNowError('steps must be an array', 'INVALID_REQUEST');
-            }
-            const workflowData = {
-                name: args.name,
-                description: args.description,
-                agent: args.agent_sys_id,
-                steps: JSON.stringify(args.steps),
-                active: true,
-            };
-            if (args.trigger_conditions)
-                workflowData.trigger_conditions = args.trigger_conditions;
-            const record = await client.createRecord('sys_ai_agentic_workflow', workflowData);
-            return { message: 'Agentic workflow created', workflow: record };
-        }
+            return addWorkflow(client, args);
         default:
             return null;
     }

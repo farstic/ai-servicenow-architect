@@ -14,8 +14,8 @@ const VALUE = 'sys_variable_value';
  */
 const SERVER_SCRIPT_CONFIG = 'Run Server Side Script';
 const SYS_ID = /^[0-9a-f]{32}$/i;
-/** A value with its transport shape taken off: a reference's `value`, every scalar as its string. */
-function plain(v) {
+/** A value with its transport shape taken off: a reference's `value`, every scalar as its string. Also ai-agents.ts's (ARC-09-C165). */
+export function plain(v) {
     if (v === null || v === undefined)
         return undefined;
     if (typeof v === 'object')
@@ -94,7 +94,8 @@ async function readBack(client, w) {
     }
     return { stored, warnings };
 }
-async function write(client, table, sent, live, sysId) {
+/** Write one record and read it back. Also ai-agents.ts's, for the sn_aia_* records (ARC-09-C165). */
+export async function write(client, table, sent, live, sysId) {
     const answer = (sysId === undefined
         ? await client.createRecord(table, sent)
         : await client.updateRecord(table, sysId, sent)) ?? {};

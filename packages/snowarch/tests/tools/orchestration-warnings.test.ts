@@ -110,19 +110,26 @@ describe('ARC-09-C100 - a cut write in a playbook step', () => {
   });
 
   it('a step that wrote a cut value and then FAILED is an error step that still carries the warning', async () => {
-    class AclRefuses extends FakeRestClient {
+    // The agent is written with its name cut, then its tool link is refused (ARC-09-C165).
+    class LinkRefused extends FakeRestClient {
       override async createRecord(table: string, data: Record<string, unknown>) {
-        if (table === 'sys_security_acl') throw new ServiceNowError('User Not Authorized', 'INSUFFICIENT_PRIVILEGES');
+        if (table === 'sn_aia_agent_tool_m2m') throw new ServiceNowError('User Not Authorized', 'INSUFFICIENT_PRIVILEGES');
         return super.createRecord(table, data);
       }
     }
-    const fake = new AclRefuses({ created: { sys_ai_agent: { sys_id: 'ag1', name: 'x'.repeat(40) } } });
+    const agent = { sys_id: 'a'.repeat(32), name: 'x'.repeat(40), description: 'd', role: 'r', instructions: 'i' };
+    const tool = 'b'.repeat(32);
+    const fake = new LinkRefused({
+      created: { sn_aia_agent: agent },
+      records: { [`sn_aia_agent/${agent.sys_id}`]: agent, [`sn_aia_tool/${tool}`]: { sys_id: tool, name: 'Read groups' } },
+    });
     const { result } = await run([
-      { tool_name: 'snow_ai_ai_agent_add', args_template: { name: 'x'.repeat(44), description: 'd', capabilities: ['a'] }, on_error: 'continue' },
+      { tool_name: 'snow_ai_ai_agent_add', on_error: 'continue',
+        args_template: { name: 'x'.repeat(44), description: 'd', role: 'r', instructions: 'i', tools: [{ tool_sys_id: tool }] } },
     ], fake);
     expect(result.steps[0].status).toBe('error');
     expect(result.steps[0].warnings).toHaveLength(1);
-    expect(result.steps[0].warnings[0]).toMatchObject({ table: 'sys_ai_agent', field: 'name', step: 0 });
+    expect(result.steps[0].warnings[0]).toMatchObject({ table: 'sn_aia_agent', field: 'name', step: 0 });
   });
 
   it('a warning the TOOL put on its own result halts a stop playbook too, and goes on under continue', async () => {
