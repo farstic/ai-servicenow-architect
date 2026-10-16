@@ -3,16 +3,18 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
-## Unreleased (2.1.1-dev)
+## Unreleased (2.1.2-dev)
+
+**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
+then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
+with credentials the instance has just refused.
+
+## 2.1.1 — 2026-10-16
 
 **No server behaviour changes.** `src/licence/integrity.ts` exports the restore's own checks as `restoreBlocker`,
 which the engine's doctor check E-32 asks before it offers `doctor --fix` (ARC-09-C149). The server's restore asks
 the same function, and refuses for the same reasons in the same words. The contract is 2.1.0's: 399 tools and 74
 error codes.
-
-**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
-then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
-with credentials the instance has just refused.
 
 ## 2.1.0 — 2026-10-15
 
