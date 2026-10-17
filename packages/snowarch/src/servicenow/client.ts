@@ -26,6 +26,9 @@ import { currentInstanceOrNull } from './context.js';
  */
 const NOT_RETRIED: readonly string[] = ['AUTHENTICATION_FAILED', 'INVALID_REQUEST', 'NOT_FOUND', 'INSUFFICIENT_PRIVILEGES'];
 
+/** How much of a refusal's non-JSON body the message shows (ARC-09-C176): enough to name a gateway, not a page. */
+const NON_JSON_BODY_SHOWN = 200;
+
 // ─── The Batch API's bodies (ARC-09-C108) ────────────────────────────────────────────────────
 //
 // vendor/ServiceNowDocs/markdown/api-reference/rest-apis/batch-api.md: `rest_requests.body` is the
@@ -339,8 +342,13 @@ export class ServiceNowClient {
               errorDetail = String(errorJson.error.detail);
             }
           } catch {
-            // Error response wasn't JSON, use status text
+            // Not JSON (a gateway's page, say): its own text, shortened, after the status line.
+            const body = errorText.replace(/\s+/g, ' ').trim();
+            if (body) errorMessage = `${errorMessage}: ${body.slice(0, NON_JSON_BODY_SHOWN)}`;
           }
+          // ARC-09-C176 — the detail is where a refusal says what refused it (an ACL, a Business Rule, a
+          // scope), so it is part of the message the caller reads, not only of `details`.
+          if (errorDetail && !errorMessage.includes(errorDetail)) errorMessage = `${errorMessage}: ${errorDetail}`;
 
           // Map HTTP status to error codes. The default was `API_ERROR`, which is in no
           // registry and so reached a caller with no meaning and no remedy attached —
@@ -1103,11 +1111,11 @@ export class ServiceNowClient {
           `Your account lacks delete rights on this table/record, or a Business Rule blocked the operation.${suffix}`,
       };
     }
+    // The message already carries the detail since ARC-09-C176; it is added here only when it does not.
+    const said = sn?.message ?? (error instanceof Error ? error.message : 'Unknown error');
     return {
       code: 'DELETE_FAILED',
-      message:
-        `Failed to delete ${table}/${sysId}: ${sn?.message ?? (error instanceof Error ? error.message : 'Unknown error')}` +
-        (detail ? ` (detail: ${detail})` : ''),
+      message: `Failed to delete ${table}/${sysId}: ${said}` + (detail && !said.includes(detail) ? ` (detail: ${detail})` : ''),
     };
   }
 

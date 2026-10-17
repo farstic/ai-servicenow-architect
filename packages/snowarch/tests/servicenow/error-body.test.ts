@@ -86,6 +86,19 @@ describe('ARC-09-C176 — a refusal carries the instance\'s own error text', () 
     expect(bare).toBe('Error: Operation Failed (Code: INSUFFICIENT_PRIVILEGES)');
   });
 
+  it('deleteRecord still reads the detail itself: a 403 is DELETE_ACL_DENIED, and a fallback names the detail once', async () => {
+    const aborted = "Operation against file 'incident' was aborted by Business Rule 'Example'";
+    respond(http, refusal(403, 'Operation Failed', aborted));
+    const denied = await client().deleteRecord('incident', 'a'.repeat(32)).then(() => undefined, (e: unknown) => e);
+    expect(denied).toMatchObject({ code: 'DELETE_ACL_DENIED' });
+    expect(toolErrorText(denied)).toContain(`ServiceNow detail: ${aborted}`);
+    resetFetchMock(http);
+    respond(http, refusal(400, 'Invalid request', 'Something odd'));
+    const other = toolErrorText(await client().deleteRecord('incident', 'a'.repeat(32)).then(() => undefined, (e: unknown) => e));
+    expect(other).toContain('Failed to delete incident/');
+    expect(other.split('Something odd')).toHaveLength(2);
+  });
+
   it('the ARC-09-C174 rethrow carries it: the detail, then the step, then what was created', async () => {
     const TOOL = 'a'.repeat(32);
     const AGENT = 'b'.repeat(32);
