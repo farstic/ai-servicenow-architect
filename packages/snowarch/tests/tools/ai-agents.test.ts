@@ -377,7 +377,7 @@ describe('ARC-09-C174 — a partial build names the step that failed', () => {
   function refusing(method: Method, table: string) {
     const fake = fakeInstance(SEED());
     const mock = fake.client[method] as ReturnType<typeof vi.fn>;
-    const real = mock.getMockImplementation()!;
+    const real = mock.getMockImplementation() as (...args: unknown[]) => Promise<unknown>;
     mock.mockImplementation(async (...args: unknown[]) => {
       const name = method === 'queryRecords' ? (args[0] as { table: string }).table : args[0];
       if (name === table) throw new ServiceNowError('Operation failed', 'INSUFFICIENT_PRIVILEGES');
