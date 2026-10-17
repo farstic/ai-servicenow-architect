@@ -442,3 +442,42 @@ describe('ARC-09-C174 — a partial build names the step that failed', () => {
     expect(error.message).toMatch(new RegExp(`while reading sn_aia_version; sn_aia_team ${ID} was created, but the call did not finish, as were sn_aia_usecase ${ID}, sn_aia_team_member ${ID}, sn_aia_team_member ${ID}\\.`));
   });
 });
+
+/**
+ * ARC-09-C180 — a tool link the caller does not name is named after its tool. The owner's v2.2.0-rc.2 check on
+ * `tgdev` (2026-10-17): an `sn_aia_agent_tool_m2m` insert without `name` was refused, 403 "Operation Failed", by
+ * the before-insert rule "Check duplicate name"; the same insert with the tool's name was created, and AI Agent
+ * Studio names a link after its tool (PN-17). The tool record is already read before the first write.
+ */
+describe('ARC-09-C180 — an unnamed tool link takes its tool\'s name', () => {
+  const linkCalls = (c: { createRecord: ReturnType<typeof vi.fn> }): Row[] =>
+    c.createRecord.mock.calls.filter((x) => x[0] === 'sn_aia_agent_tool_m2m').map((x) => x[1] as Row);
+
+  it('a link without a name is sent with the tool\'s name', async () => {
+    const { client } = fakeInstance(SEED());
+    await dispatchAiAgentsAction(client, 'snow_ai_ai_agent_add', { ...AGENT_ARGS, tools: [{ tool_sys_id: TOOL }] });
+    expect(linkCalls(client)).toEqual([expect.objectContaining({ tool: TOOL, name: 'Read groups' })]);
+  });
+
+  it('a name the caller passes is kept', async () => {
+    const { client } = fakeInstance(SEED());
+    await dispatchAiAgentsAction(client, 'snow_ai_ai_agent_add',
+      { ...AGENT_ARGS, tools: [{ tool_sys_id: TOOL, name: 'Directory lookup' }] });
+    expect(linkCalls(client)).toEqual([expect.objectContaining({ name: 'Directory lookup' })]);
+  });
+
+  it('control: a tool with no name on the instance gives the link none — nothing is invented', async () => {
+    const unnamed = 'd'.repeat(32);
+    const seed = SEED();
+    seed.sn_aia_tool.push({ sys_id: unnamed, type: 'script' });
+    const { client } = fakeInstance(seed);
+    await dispatchAiAgentsAction(client, 'snow_ai_ai_agent_add', { ...AGENT_ARGS, tools: [{ tool_sys_id: unnamed }] });
+    expect(linkCalls(client)[0]).not.toHaveProperty('name');
+  });
+
+  it('the manifest says the default', () => {
+    const add = aiAgentsToolManifest().find((t) => t.name === 'snow_ai_ai_agent_add')!;
+    const items = (add.inputSchema.properties as Row).tools as { items: { properties: { name: { description: string } } } };
+    expect(items.items.properties.name.description).toMatch(/default: the tool's name/);
+  });
+});

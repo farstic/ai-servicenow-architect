@@ -29,6 +29,13 @@ const NOT_RETRIED: readonly string[] = ['AUTHENTICATION_FAILED', 'INVALID_REQUES
 /** How much of a refusal's non-JSON body the message shows (ARC-09-C176): enough to name a gateway, not a page. */
 const NON_JSON_BODY_SHOWN = 200;
 
+/** A response body as a message shows it (ARC-09-C179): the parsed JSON re-serialised, or the raw text, collapsed and cut. */
+function shownBody(body: unknown): string {
+  if (body === undefined) return '(empty)';
+  const text = (typeof body === 'string' ? body : JSON.stringify(body)).replace(/\s+/g, ' ').trim();
+  return text === '' ? '(empty)' : text.slice(0, NON_JSON_BODY_SHOWN);
+}
+
 // ─── The Batch API's bodies (ARC-09-C108) ────────────────────────────────────────────────────
 //
 // vendor/ServiceNowDocs/markdown/api-reference/rest-apis/batch-api.md: `rest_requests.body` is the
@@ -293,7 +300,7 @@ export class ServiceNowClient {
     url: string,
     options: RequestInit = {},
     requestedRetries: number = this.maxRetries,
-    onResponse?: (response: { headers?: { get?: (name: string) => string | null } }) => void
+    onResponse?: (response: { status?: number; headers?: { get?: (name: string) => string | null } }) => void
   ): Promise<T> {
     let lastError: Error | undefined;
     const maxRetries = Number.isInteger(requestedRetries) && requestedRetries >= 0
@@ -997,11 +1004,20 @@ export class ServiceNowClient {
     logger.info(`Creating record in ${table}`);
     const url = `${this.baseUrl}/api/now/table/${table}`;
     try {
-      const response = await this.request<ServiceNowApiResponse<ServiceNowRecord>>(url, {
+      let status: number | undefined;
+      const response = await this.request<ServiceNowApiResponse<ServiceNowRecord> | string | null | undefined>(url, {
         method: 'POST',
         body: JSON.stringify(data),
-      });
-      return response.result;
+      }, this.maxRetries, (r) => { status = r.status; });
+      // ARC-09-C179 — an answer with no record in it is not a created record, whatever its status: the instance may
+      // have discarded the insert. Refused here, with the status and the body, so no caller reports it as created.
+      const record = typeof response === 'object' && response !== null ? response.result : undefined;
+      if (!record || typeof record !== 'object' || !record.sys_id) {
+        throw new ServiceNowError(`No record returned for the create on ${table} (HTTP ${status ?? 'unknown'}); body: `
+          + `${shownBody(response)}. The instance may have discarded the insert: read ${table} before adding it again.`,
+        'CREATE_FAILED', { status, table });
+      }
+      return record;
     } catch (error) {
       if (error instanceof ServiceNowError) throw error;
       throw new ServiceNowError(
@@ -1085,7 +1101,10 @@ export class ServiceNowClient {
     const haystack = `${sn?.message ?? (error instanceof Error ? error.message : '')} ${detail ?? ''}`.toLowerCase();
 
     const ACL = /acl|aborted|insufficient (rights|privilege)|not authorized|security|write operation .* not permitted|no permission|operation against file/;
-    const CONSTRAINT = /referenced by|cannot be deleted because|cascade|referential integrity|foreign|child record|in use by|dependent|constraint/;
+    // ARC-09-C177: the instance words an ACL refusal "ACL Exception Delete Failed due to security constraints"
+    // (PN-16). That wording decides before the constraint pattern, which no longer matches the bare word.
+    const ACL_WORDING = /acl exception|security constraints/;
+    const CONSTRAINT = /referenced by|cannot be deleted because|cascade|referential integrity|foreign|child record|in use by|dependent/;
     const NOT_FOUND = /no record|record not found|does not exist|not found/;
     const suffix = detail ? ` ServiceNow detail: ${detail}` : '';
 
@@ -1095,7 +1114,7 @@ export class ServiceNowClient {
         message: `Cannot delete ${table}/${sysId}: the record does not exist (it may have already been deleted).`,
       };
     }
-    if (CONSTRAINT.test(haystack)) {
+    if (!ACL_WORDING.test(haystack) && CONSTRAINT.test(haystack)) {
       return {
         code: 'DELETE_CONSTRAINT',
         message:

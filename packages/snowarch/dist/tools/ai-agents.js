@@ -51,7 +51,7 @@ export function aiAgentsToolManifest() {
                             properties: {
                                 tool_sys_id: { type: 'string', description: 'sys_id of an existing sn_aia_tool' },
                                 execution_mode: { type: 'string', description: 'A value listed in sys_choice on the instance; omitted, the instance default' },
-                                name: { type: 'string', description: 'The link\'s name' },
+                                name: { type: 'string', description: 'The link\'s name; default: the tool\'s name' },
                                 display_output: { type: 'boolean', description: 'Show the tool\'s raw output to the user (instance default true)' },
                             },
                             required: ['tool_sys_id'],
@@ -242,8 +242,12 @@ async function addAgent(client, args) {
     if (args.active !== undefined && typeof args.active !== 'boolean')
         refuse('active must be true or false.');
     const tools = toolsArg(args.tools);
-    for (const [i, t] of tools.entries())
-        await mustExist(client, TOOL, t.tool_sys_id, `tools[${i}].tool_sys_id`);
+    // ARC-09-C180: each tool's name, from the read that proves it exists. An unnamed link is refused by the before-insert
+    // rule "Check duplicate name" (PN-17), and AI Agent Studio names a link after its tool.
+    const toolNames = [];
+    for (const [i, t] of tools.entries()) {
+        toolNames.push(plain((await mustExist(client, TOOL, t.tool_sys_id, `tools[${i}].tool_sys_id`)).name));
+    }
     if (tools.some((t) => t.execution_mode !== undefined)) {
         const listed = await listedModes(client, LINK);
         for (const t of tools)
@@ -259,10 +263,11 @@ async function addAgent(client, args) {
     try {
         agent = await write(client, AGENT, sent, args.active !== false, undefined, progress);
         warnings.push(...agent.warnings);
-        for (const t of tools) {
+        for (const [i, t] of tools.entries()) {
             const link = { agent: agent.sysId, tool: t.tool_sys_id };
-            if (t.name !== undefined)
-                link.name = t.name;
+            const linkName = t.name ?? toolNames[i];
+            if (linkName !== undefined && linkName !== '')
+                link.name = linkName;
             if (t.execution_mode !== undefined)
                 link.execution_mode = t.execution_mode;
             if (t.display_output !== undefined)
