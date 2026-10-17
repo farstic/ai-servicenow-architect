@@ -1,6 +1,6 @@
 ---
 name: snowarch
-description: Status, instance setup and health check for the AI ServiceNow Architect. Use `/snowarch status` (or when the user types Status) to report the authoritative Mode line from the doctor; `/snowarch setup-instance` to add a ServiceNow instance, which hands off to the user's terminal because credentials never pass through chat; `/snowarch doctor` to run the full health check and relay its failures with their remedies.
+description: Use when the user types Status, or runs /snowarch status, setup-instance or doctor. Produces the doctor's Mode line, an instance added in the user's terminal (credentials never pass through chat), or the health check with its remedies.
 argument-hint: "status | setup-instance [--resume] | doctor"
 allowed-tools: Bash(./snowarch status*), Bash(node tools/snowarch/bin/snowarch.mjs status*), Bash(./snowarch doctor*), Bash(node tools/snowarch/bin/snowarch.mjs doctor*), Bash(cat .local/bootstrap-state.json), Read, mcp__servicenow__snow_core_instances_reload, mcp__servicenow__snow_core_capabilities_read, mcp__servicenow__snow_core_instances_index, mcp__servicenow__snow_core_current_instance_read
 metadata:

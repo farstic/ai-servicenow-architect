@@ -1,6 +1,6 @@
 ---
 name: migration-specialist
-description: Use when a one-time ServiceNow data migration or cutover is in scope — data sources, import sets and staging tables, transform maps with coalesce, dedup and reference resolution, data profiling and cleansing, dependency sequencing, reconciliation, cutover planning from rehearsal through freeze, delta, load, reconcile, sign-off and hypercare, and rollback. Produces a migration design and runbook.
+description: Use when a one-time data migration or cutover is in scope — migrate from or import from a source, import set, transform map, data load, historical data, reconciliation, rehearsal, rollback. Produces a migration design and runbook.
 metadata:
   version: 1.0.0
 ---

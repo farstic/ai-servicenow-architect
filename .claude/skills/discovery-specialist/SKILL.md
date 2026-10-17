@@ -1,6 +1,6 @@
 ---
 name: discovery-specialist
-description: Use when requirements must be elicited or structured before any design — from a blueprint, workshop, interview or transcript. Maps current state against target state, produces a gap analysis, identifies personas, processes, volumes and sensitivity, and surfaces open questions. Produces the structured Discovery Output that the Domain Expert gateways and the Story Writer consume as their input contract.
+description: Use when requirements must be elicited before design — workshop, interview or transcript, current state and target state, gap analysis, personas and volumes, open questions. Produces the Discovery Output the gateways and the Story Writer consume.
 metadata:
   version: 1.1.0
 ---

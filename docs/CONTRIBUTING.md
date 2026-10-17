@@ -481,6 +481,7 @@ re-implements its rule proves only that the re-implementation works.
 | SK-08 | no skill name collides with a Claude Code built-in command | the built-in wins and the skill is unreachable |
 | SK-09 | no retired vocabulary under `.claude/` — the token list is `RETIRED` in `tests/lib/lint-rules.mjs`, not repeated here | the v3 rebuild dropped the old permission-tier and product names; the rule stops them coming back while ARC-02-S06 sweeps the governing documents. Spelling the tokens in prose would trip the separate legacy-name ratchet, which is the point of keeping one source of truth |
 | SK-10 | every `.claude/…`, `governance/…`, `templates/…`, `docs/…` path quoted in a skill body, agent body or governing document resolves | a dead path routes the reader — or the model — to nothing |
+| SK-13 | each project skill's `description` ≤ 250 chars, and the roster's together ≤ 7,500 — `lintDescriptionBudget`, `tests/skill-description-budget.test.mjs` | Claude Code's 30,000-character listing budget counts the user's own skills too (S-13 measures the whole session); the engine bounds its share |
 | AG-01 | `name` equals the agent's file stem | as SK-01 |
 | AG-02 | `description` present, no unquoted `": "` | as SK-03; the orchestrator dispatches on this text |
 | AG-03 | explicit `tools:` list, no `mcp__*`, no `Agent`/`Task` | **an agent with no `tools:` key inherits everything, MCP tools included** — a sub-agent must not hold instance access, and must not dispatch sub-agents |
@@ -1003,12 +1004,15 @@ the one-time migration scripts and went with them at ARC-02's acceptance.)
 1. **Sentence 1 — the trigger sentence.** `Use when …` for builders, reviewers and consults;
    `Mandatory gateway for …` for the five Domain Experts. Name the domain nouns a user would actually
    type — tables, products, artefact names.
-2. **Sentence 2 — what it produces.** The artefact name. Gateways add: *Produces the 5-Part Constraint
-   Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4.*
+2. **Sentence 2 — what it produces.** The artefact name. Gateways: *Produces the 5-Part Constraint
+   Envelope.* Where it fires is in `## Triggers`, under **Fires:**.
 3. **Sentence 3, optional — the one boundary** that prevents mis-routing.
 
-Hard limits, enforced by SK-02 and SK-11: **≤ 500 characters**, no ServiceNowDocs paths, no §1.1
-mechanics, and no keyword lists. Quote the scalar whenever it contains `: ` (SK-03).
+Hard limits, enforced by SK-02, SK-11 and SK-13: **≤ 250 characters** per description and **≤ 7,500** for the
+roster's descriptions together (SK-13, ARC-09-C164; SK-02's 500 stays the outer bound), no ServiceNowDocs paths, no
+§1.1 mechanics, and no keyword lists. Keep every trigger noun that `governance/taxonomy.md` §4 lists for the skill:
+shortening a description must not drop one, because a dropped noun is a routing defect. Quote the scalar whenever it
+contains `: ` (SK-03).
 
 Nothing is deleted to hit the limit. The keyword list, the firing statement and the "not this skill"
 boundaries move into a `## Triggers` section, which is every SKILL.md's first H2:

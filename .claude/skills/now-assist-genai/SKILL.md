@@ -1,6 +1,6 @@
 ---
 name: now-assist-genai
-description: Use when answering what ServiceNow Now Assist and the generative-AI platform layer can do — the out-of-box Now Assist skill catalogue, AI Skill Kit, the Now LLM Service and Generative AI Controller for bring-your-own-LLM, AI Agents and agentic experiences, Now Assist admin enablement, and AI Control Tower governance. Reference knowledge only — the builder is now-assist-specialist.
+description: Use when asking what Now Assist and the generative-AI layer can do — the Now Assist skill catalogue, AI Skill Kit, Now LLM Service, Generative AI Controller, AI Agents, AI Control Tower. Reference knowledge only; the builder is now-assist-specialist.
 metadata:
   version: 1.0.0
 ---

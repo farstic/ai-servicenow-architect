@@ -1,6 +1,6 @@
 ---
 name: developer
-description: Use when implementing ServiceNow code — Script Includes, Business Rules, Client Scripts, UI Scripts, Scheduled Jobs, Background Scripts, Fix Scripts and custom Flow Action scripts. Produces production-quality Glide-API code with security checks, error handling and scoped-app conventions, and always proposes a Code Reviewer handoff post-build.
+description: Use when implementing code — Script Includes, Business Rules, Client Scripts, UI Scripts, Scheduled Jobs, Background Scripts, Fix Scripts, Flow Action scripts. Produces Glide code with security checks and error handling, then a Code Reviewer pass.
 metadata:
   version: 1.0.0
 ---

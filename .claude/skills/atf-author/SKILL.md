@@ -1,6 +1,6 @@
 ---
 name: atf-author
-description: "Use when writing ServiceNow Automated Test Framework coverage — tests, test suites and steps across the baseline step categories, reusable tests and templates, assertions, test-data setup and rollback, and runner placement. Produces ATF test and suite designs with mandatory deployment notes. Two modes: inline single-component coverage in the main thread, and full-app batch suite generation as a sub-agent."
+description: Use when writing ATF (Automated Test Framework) coverage — test case, test suite, steps, reusable tests, assertions, test data and rollback. Produces ATF test and suite designs with deployment notes, inline or as a sub-agent for a whole app.
 metadata:
   version: 1.1.0
 ---

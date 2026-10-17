@@ -1,6 +1,6 @@
 ---
 name: diagramming-specialist
-description: Use when a ServiceNow design needs a figure — solution and context (C4), data-model and ERD, sequence, process and swimlane, state and lifecycle, deployment and MID topology, CSDM and CMDB relationship maps, and project visuals such as roadmap, Gantt and RACI. Delivers every figure as editable draw.io with an SVG or PNG export; Mermaid only as a draft, PlantUML on request. Depicts architecture faithfully and flags inconsistencies to the source author; it never invents or decides architecture.
+description: Use when a design needs a diagram — C4 or architecture diagram, ERD, sequence diagram, swimlane, state diagram, deployment, CSDM map, roadmap, Gantt, RACI. Produces editable draw.io with SVG or PNG; Mermaid only as a draft. Depicts, never decides.
 metadata:
   version: 1.0.0
 ---

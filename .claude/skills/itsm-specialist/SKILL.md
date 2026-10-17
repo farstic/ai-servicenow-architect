@@ -1,6 +1,6 @@
 ---
 name: itsm-specialist
-description: Mandatory gateway for ServiceNow IT Service Management work — incident, problem, change, request and RITM, major incident management, on-call scheduling, SLAs, assignment group rules and Service Operations Workspace. Produces the 5-Part Constraint Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4.
+description: Mandatory gateway for IT Service Management — incident, problem, change, request and RITM, escalation, major incident (MIM), on-call, SLA, assignment rules, Service Operations Workspace. Produces the 5-Part Constraint Envelope.
 metadata:
   version: 2.0.0
 ---

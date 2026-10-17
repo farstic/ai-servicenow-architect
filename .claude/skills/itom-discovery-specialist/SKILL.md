@@ -1,6 +1,6 @@
 ---
 name: itom-discovery-specialist
-description: Mandatory gateway for ServiceNow IT Operations Management work — MID Server, Discovery, CMDB Discovery, Service Mapping, Event Management, Identification and Reconciliation Engine rules, CSDM phase alignment, Service Graph Connectors and Cloud Discovery. Produces the 5-Part Constraint Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4. Owns CI population; CMDB & CSDM owns the model.
+description: Mandatory gateway for IT Operations Management — Discovery, CMDB Discovery, MID Server, Service Mapping, Event Management, alert correlation, Service Graph Connectors, Cloud Discovery. Produces the 5-Part Constraint Envelope. Owns CI population.
 metadata:
   version: 2.0.0
 ---

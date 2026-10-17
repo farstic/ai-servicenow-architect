@@ -187,7 +187,7 @@ When the user's task contains certain keywords or phrases, the router has a stro
 | "implement", "write the code", "code the", "build the script" | Developer | — |
 | "design the code", "function signature", "method signature" | Technical Designer | Developer (for the actual code) |
 | "review this code", "code review", "lint", "anti-pattern" | Code Reviewer | — |
-| "scale", "performance", "10M records", "high volume", "TPS", "batch size", "async" | Performance & Scale | Technical Designer |
+| "scale", "performance", "1M+ records", "high volume", "TPS", "batch size", "async" | Performance & Scale | Technical Designer |
 
 ### 4.2 Flow and automation triggers
 
