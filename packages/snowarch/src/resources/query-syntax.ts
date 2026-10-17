@@ -61,8 +61,13 @@ Use these in query values for dynamic date ranges:
 | \`javascript:gs.endOfLastMonth()\` | End of last month | date range queries |
 | \`javascript:gs.hoursAgo(N)\` | N hours ago | \`sys_updated_on>=javascript:gs.hoursAgo(4)\` |
 | \`javascript:gs.minutesAgo(N)\` | N minutes ago | real-time monitoring |
+| \`javascript:gs.minutesAgoStart(N)\`, \`minutesAgoEnd(N)\` | Start, end of the minute N minutes ago | \`sys_created_onONLast 15 minutes@javascript:gs.minutesAgoStart(15)@javascript:gs.minutesAgoEnd(0)\` |
+| \`javascript:gs.daysAgoStart(N)\`, \`daysAgoEnd(N)\` | Start, end of the day N days ago | \`sla_dueONToday@javascript:gs.daysAgoStart(0)@javascript:gs.daysAgoEnd(0)\` |
 | \`javascript:gs.now()\` | Current timestamp | \`sys_created_on<=javascript:gs.now()\` |
 | \`javascript:gs.getUserID()\` | Current user sys_id | \`assigned_to=javascript:gs.getUserID()\` |
+
+The \`hoursAgo\`, \`monthsAgo\` and \`quartersAgo\` functions have the same \`Start\` and \`End\` forms, and \`daysAgoLocal(N)\` exists too.
+Any other \`javascript:\` expression is refused: compute the value and send it literally, as \`sys_created_on>2026-10-17 06:00:00\`.
 
 ## Reference Fields (Dot-Walking)
 Access fields on referenced records using dot notation:

@@ -368,7 +368,8 @@ ARC-09-C177 the server reports the refused delete's wording, "ACL Exception … 
 
 **Applies to:** `sn_aia_agent`, `sn_aia_agent_config`, `sn_aia_version`, `sn_aia_agent_tool_m2m`, `sn_aia_usecase`,
 `sn_aia_team`, `sn_aia_team_member` · Brazil patch 0 · observed in the owner's trial over the REST Table API on
-2.1.1, 2026-10-16 (ARC-09-C165), and again with the fixed tools on v2.2.0-rc.1, 2026-10-17
+2.1.1, 2026-10-16 (ARC-09-C165), again with the fixed tools on v2.2.0-rc.1, 2026-10-17, and in the owner's continued
+run that day (ARC-09-C172)
 **Behaviour:**
 - **The agent's insert creates two more records.** One insert into `sn_aia_agent` created, in the same second, an
   `sn_aia_agent_config` (`active=true`, `current_version` empty) and an `sn_aia_version` "Version 1"
@@ -378,9 +379,10 @@ ARC-09-C177 the server reports the refused delete's wording, "ACL Exception … 
 - **A tool link rewrites the snapshot.** Inserting an `sn_aia_agent_tool_m2m` added the link to the committed
   version's `snapshot.overlay.tools`, with `executionMode: "copilot"`, and created no new version. The link's
   defaults included `display_output=true`.
-- **An unnamed link is refused.** An `sn_aia_agent_tool_m2m` insert without `name` was refused by the before-insert
-  rule "Check duplicate name": 403, "Operation Failed". The same insert with the tool's name was created. AI Agent
-  Studio names a link after its tool. Observed on `tgdev`, Brazil patch 0, 2026-10-17 (ARC-09-C180).
+- **An unnamed link is refused.** An `sn_aia_agent_tool_m2m` insert without `name` is refused by a data policy,
+  "Data Policy Exception: The following fields are mandatory: Name", with HTTP 403. The same insert with the tool's
+  name was created. AI Agent Studio names a link after its tool. Observed on `tgdev`, Brazil patch 0, 2026-10-17, on
+  v2.2.0-rc.3, where the instance's own text first reached the caller (ARC-09-C176, ARC-09-C180).
 - **A workflow's insert creates a version and nothing else.** An insert into `sn_aia_usecase` created an
   `sn_aia_version` "V1" (`state=published`, empty `snapshot`) and no `sn_aia_team`. The workflow has no agents
   until a team is created, set on `sn_aia_usecase.team`, and given `sn_aia_team_member` rows.
@@ -391,12 +393,18 @@ ARC-09-C177 the server reports the refused delete's wording, "ACL Exception … 
 - **`current_version` varies.** On the same instance the agent's configuration had `current_version` empty in the
   first trial and populated in the v2.2.0-rc.1 run. Both were observed, so the tool reports the value it reads and
   asserts neither.
-- **The stored execution modes.** The values seen are `autopilot` for Autonomous and `copilot` for Supervised. A
-  workflow's insert without one stored `copilot`. They are observed values, read from the instance's `sys_choice`,
-  never defaults to send.
-- **Studio's pages.** An agent opened at `/aiux/aia/agent/<sn_aia_agent sys_id>/visualize` and a workflow at
-  `/aiux/aia/workflow/<sn_aia_usecase sys_id>/visualize`; `/usecase/` in the workflow's place answered "Page not
-  found".
+- **The stored execution modes.** The values seen are `autopilot` for Autonomous and `copilot` for Supervised. They
+  are observed values, read from the instance's `sys_choice`, never defaults to send.
+- **The defaults the instance filled in.** Observed on Brazil patch 0, 2026-10-17, on records written without the
+  field:
+  - a workflow's `execution_mode`: `copilot`;
+  - a team member's `memory_scope`: `global`;
+  - an agent's `channel`: `nap_and_va`, and its `agent_type`: `internal`.
+- **Studio's pages.** Two route families open the same objects:
+  - `/aiux/aia/agent/<sn_aia_agent sys_id>/visualize` for an agent and `/aiux/aia/workflow/<sn_aia_usecase
+    sys_id>/visualize` for a workflow; `/usecase/` in the workflow's place answered "Page not found";
+  - `/now/agent-studio/agent-setup/<sys_id of the sn_aia_agent>` for an agent's setup, and a
+    `/usecase-guided-setup/<id>/…` path for a workflow's (prefix not recorded), observed on Brazil patch 0, 2026-10-17.
 
 **Grounding:** the tables are documented — `markdown/intelligent-experiences/na-aia-reference.md`, "AI agents
 tables installed" (lines 713–893, with the underscores escaped as `sn\_aia\_`), lists `sn_aia_agent`,
@@ -405,9 +413,11 @@ tables installed" (lines 713–893, with the underscores escaped as `sn\_aia\_`)
 `markdown/intelligent-experiences/aia-security-implementation.md`, and a tool's two execution modes, Supervised and
 Autonomous, in `markdown/intelligent-experiences/add-tool-aia-new.md`. Not documented in the bundled corpus (branch
 `australia`): `sn_aia_version` and its states, the automatic records, the snapshot rewrite, the absent team, the
-refused unnamed link and the Studio routes — observed behaviour, on a family one ahead of the corpus; verify on the
-instance's family.
-**Evidence:** the owner's trial record, which is engagement-local and not committed, and
+refused unnamed link, the Studio routes and the defaults — observed behaviour, on a family one ahead of the corpus;
+verify on the instance's family.
+**Evidence:** the owner's trial record, which is engagement-local and not committed; the owner's continued run on
+`tgdev`, 2026-10-17, engagement-local, summarised by the Architect in the engagement folder and not committed; the
+owner's v2.2.0-rc.2 and rc.3 checks on `tgdev`, 2026-10-17, whose session transcript is engagement-local; and
 `docs/validation/2.2.0-rc.1-live-sitting.md`, the run with the fixed tools.
 **Engine consequence:** since ARC-09-C165 `snow_ai_ai_agent_add` reads the configuration and the version back
 rather than creating them, and reports a missing one as a warning; `active: false` modifies the configuration.
@@ -419,17 +429,61 @@ link rewrites the version's snapshot. Since ARC-09-C180 a link the caller does n
 ## PN-18 — Pointing REST capture at an update set moves the user's own UI session to it too
 
 **Applies to:** `sys_user_preference` (`name=sys_update_set`) · Brazil patch 0 · observed in the owner's trial on
-2.1.1, 2026-10-16 (ARC-09-C165)
+2.1.1, 2026-10-16 (ARC-09-C165), and in the owner's continued run, 2026-10-17 (ARC-09-C172)
 **Behaviour:** `snow_us_capture_target_set` sets the authenticated user's `sys_update_set` preference, which REST
 capture follows (PN-01). The same user's interactive session followed it too: after the trial, the ServiceNow header
 in the owner's own browser showed the trial's update set. Changes that user then makes by hand land in that update
-set until it is switched back.
+set until it is switched back. A browser session already open when the preference changed did not pick up the new
+update set until the user logged in again (observed on Brazil patch 0, 2026-10-17).
 **Grounding:** none in ServiceNowDocs (`markdown/application-development/system-update-sets/` for the baseline
 concept); observed behaviour.
-**Evidence:** the owner's trial record, which is engagement-local and not committed.
+**Evidence:** the owner's trial record, which is engagement-local and not committed, and the owner's continued run on
+`tgdev`, 2026-10-17, engagement-local, summarised by the Architect in the engagement folder and not committed.
 **Engine consequence:** `snow_us_capture_target_set` already returns `previous`, the update set the preference named
 before the call (ARC-09-C127), so a second call can point capture back. Offering that restore at the end of a build
-sequence belongs to the Architect, in `governance/mcp-protocols.md` (ARC-09-C166).
+sequence belongs to the Architect, in `governance/mcp-protocols.md` (ARC-09-C166), which also says that a browser
+already open needs a new login before a hand-made change is captured (ARC-09-C172).
+
+## PN-19 — What AI Agent Studio's access-rules step does by itself
+
+**Applies to:** an AI agent's and an agentic workflow's security controls in AI Agent Studio, and
+`sn_aia_usecase_config_override` · Brazil patch 0 · observed in the owner's continued run, 2026-10-17 (ARC-09-C172)
+**Behaviour:**
+- **Approved roles are pre-filled.** The data-access step's **Approved roles** came pre-filled from the roles chosen
+  for user access: both user-access roles (`itil`, `admin`) were copied, and `admin` was removed by hand.
+- **Cancel does not stop the save.** In the "Save updates?" dialog, Cancel did not stop the save: the changes were
+  saved.
+- **The save creates records and switches the workflow on.** Saving created an `sn_aia_usecase_config_override`
+  (`active=true`) and an ECC Queue policy record, and set the workflow active. Both records appeared in the update
+  set after the Studio step.
+- **Search lags.** Studio's keyword search did not find a newly created agent at once.
+
+**Grounding:** the step itself is documented — `markdown/intelligent-experiences/define-sec-aia-new.md` (user access,
+then data access with **Approved roles** for a dynamic user), and
+`markdown/intelligent-experiences/aia-studio-domain-separation.md` lists `sn_aia_usecase_config_override` among the
+configuration tables. Not documented in the bundled corpus (branch `australia`): the pre-fill, the dialog, the records
+the save creates, the workflow's activation and the search lag — observed behaviour, on a family one ahead of the
+corpus; verify on the instance's family.
+**Evidence:** the owner's continued run on `tgdev`, 2026-10-17, engagement-local, summarised by the Architect in the
+engagement folder and not committed.
+**Engine consequence:** none in the tools — no tool sets access rules. `governance/mcp-protocols.md` says the Studio
+step is a write with its own question, and the Now Assist Specialist says to remove `admin` from the approved roles and
+to expect the two records in the update set (ARC-09-C172).
+
+## PN-20 — A Protected Script Include's script does not come back over the Table API
+
+**Applies to:** `sys_script_include` with `sys_policy` = `protected` · Brazil patch 0 · measured on `tgdev`, 2026-10-17
+**Behaviour:** The `sn_aia` Script Includes AgentToolM2MDao and AgentVersionDao, read with `snow_core_record_read`
+and `snow_core_records_query`, came back without a `script` field: not empty, absent. AgentToolM2MDao's `sys_policy`
+reads `protected`. The tools pass on what the instance answers (measured in the server: a 5 KB `script` comes back
+whole, and nothing removes a field), so the platform withholds it.
+**Grounding:** `markdown/api-reference/scripts/c_ScriptIncludes.md`, Protection policy (lines 158–174): "Protected —
+… Customers who download the script include cannot see the contents of the script field." That page does not name
+the `sys_policy` column; verify it on the instance. The record's `access` value, `package_private` ("Accessible
+from: This application scope only", lines 93–103), governs calling it from another scope, not reading it.
+**Evidence:** the owner's read on `tgdev`, 2026-10-17, which is engagement-local and not committed.
+**Engine consequence:** none in the tools. A design cannot read a Protected script and must not depend on its
+contents. ARC-09-C178 (OPEN) would name a requested field the instance did not return.
 
 ## Windows notes — this repository, not ServiceNow
 

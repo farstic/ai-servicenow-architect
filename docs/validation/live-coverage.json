@@ -82,7 +82,7 @@
     "snow_core_natural_language_query": { "status": "unverified", "record": null, "date": null, "family": null },
     "snow_core_record_add": { "status": "named-only", "record": "docs/validation/2.0.11-rc.3-live-sitting.md", "date": null, "family": null },
     "snow_core_record_modify": { "status": "unverified", "record": null, "date": null, "family": null },
-    "snow_core_record_read": { "status": "unverified", "record": null, "date": null, "family": null },
+    "snow_core_record_read": { "status": "named-only", "record": "docs/PLATFORM-NOTES.md", "date": "2026-10-17", "family": "Brazil patch 0" },
     "snow_core_record_remove": { "status": "named-only", "record": "docs/validation/2.0.11-rc.1-live-sitting.md", "date": null, "family": null },
     "snow_core_records_query": { "status": "named-only", "record": "docs/validation/2.0.11-rc.1-live-sitting.md", "date": null, "family": null },
     "snow_core_relationships_index": { "status": "unverified", "record": null, "date": null, "family": null },
