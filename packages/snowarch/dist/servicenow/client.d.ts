@@ -1,4 +1,6 @@
 import type { CicdResult, ServiceNowConfig, QueryRecordsParams, QueryRecordsResponse, ServiceNowRecord } from './types.js';
+/** Validate and sanitize ServiceNow encoded query strings */
+export declare function validateQuery(query: string): string;
 /**
  * ARC-09-C125 — a query's page size: the instance's `maxRecords`, this when the store sets none, and never more
  * than `MAX_PAGE`. Exported because `snow_core_records_query`'s description states both, from here, so the
