@@ -186,6 +186,12 @@ export declare const ERROR_CODES: readonly [{
     readonly showInRule: true;
     readonly httpStatus: 403;
 }, {
+    readonly code: "INSTANCE_REFUSED";
+    readonly meaning: "The instance's own rule — a data policy or a business rule — refused the record. This is not a role.";
+    readonly remedy: "the instance's own rule refused the record — read the message, correct the fields it names and send the write again, as a new write with its own approval; do not change roles";
+    readonly showInRule: true;
+    readonly httpStatus: 403;
+}, {
     readonly code: "NOT_FOUND";
     readonly meaning: "The record or table does not exist on this instance.";
     readonly remedy: "check the sys_id and the table name";

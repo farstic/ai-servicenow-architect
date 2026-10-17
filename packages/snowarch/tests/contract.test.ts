@@ -518,10 +518,13 @@ describe('11 — every code the server can throw has a meaning and a remedy', ()
     //                           the rule file, not in the runtime-errors list (`warning: true`).
     //                           ARC-09-C95 adds VALUE_NOT_AS_SENT (a value stored, but not as sent),
     //                           on the VALUE_TRUNCATED line rather than a line of its own.
+    //   the instance's own rule ARC-09-C182: INSTANCE_REFUSED, a 403 that a data policy or a business rule gave.
+    //                           Its remedy is the record, not the roles, and the session must read it before it
+    //                           reaches for INSUFFICIENT_PRIVILEGES' "lacks a role" (the owner's rc.3 check).
     const expected = [
       'ATF_NOT_ENABLED', 'AUTHENTICATION_FAILED', 'CMDB_WRITE_NOT_ENABLED', 'CONNECTION_REFUSED',
       'CONNECTION_TIMEOUT', 'DNS_FAILURE', 'FIELD_NOT_STORED', 'FLUENT_NOT_ENABLED', 'FLUENT_NOT_INSTALLED',
-      'INSTANCE_NOT_LOADED',
+      'INSTANCE_NOT_LOADED', 'INSTANCE_REFUSED',
       'INSUFFICIENT_PRIVILEGES', 'NOW_ASSIST_NOT_ENABLED', 'NO_INSTANCE_CONFIGURED',
       'PROD_WRITE_NOT_ACKNOWLEDGED', 'PROXY_AUTH_REQUIRED', 'PROXY_UNREACHABLE',
       'SCRIPTING_NOT_ENABLED', 'STORE_SCHEMA_NEWER', 'STORE_SCHEMA_OUTDATED',
