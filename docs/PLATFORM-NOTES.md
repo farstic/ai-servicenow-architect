@@ -443,7 +443,7 @@ already open needs a new login before a hand-made change is captured (ARC-09-C17
 `sn_aia_usecase_config_override` · Brazil patch 0 · observed in the owner's continued run, 2026-10-17 (ARC-09-C172)
 **Behaviour:**
 - **Approved roles are pre-filled.** The data-access step's **Approved roles** came pre-filled from the roles chosen
-  for user access, and `admin` had to be removed from them by hand.
+  for user access: both user-access roles (`itil`, `admin`) were copied, and `admin` was removed by hand.
 - **Cancel does not stop the save.** In the "Save updates?" dialog, Cancel did not stop the save: the changes were
   saved.
 - **The save creates records and switches the workflow on.** Saving created an `sn_aia_usecase_config_override`
