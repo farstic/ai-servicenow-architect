@@ -40,8 +40,20 @@ export type AuthorWarning = Row & {
 };
 /** A value with its transport shape taken off: a reference's `value`, every scalar as its string. Also ai-agents.ts's (ARC-09-C165). */
 export declare function plain(v: unknown): string | undefined;
+/**
+ * ARC-09-C174 — where a call that writes several records is: the step it is at, and every record it has created. A
+ * failure is rethrown naming both, so a refusal can be placed. `write` keeps it current, and a record whose read-back
+ * fails is already among `created`.
+ */
+export interface Progress {
+    step: string;
+    created: Array<{
+        table: string;
+        sysId: string;
+    }>;
+}
 /** Write one record and read it back. Also ai-agents.ts's, for the sn_aia_* records (ARC-09-C165). */
-export declare function write(client: ServiceNowClient, table: string, sent: Row, live: boolean, sysId?: string): Promise<{
+export declare function write(client: ServiceNowClient, table: string, sent: Row, live: boolean, sysId?: string, progress?: Progress): Promise<{
     sysId: string;
     stored: ServiceNowRecord;
     warnings: AuthorWarning[];

@@ -16,8 +16,8 @@
  *
  * The composite-write conventions of the ATF authoring tools (ARC-09-C95): every check is a read made before the first
  * write, and a refusal says "Nothing was written."; every record is read back after its write, and a difference is a
- * warning; a failure after the first record rethrows naming every record created, and nothing is deleted — a delete
- * is a write that needs its own approval.
+ * warning; a failure after the first record rethrows naming the step it stopped at and every record created
+ * (ARC-09-C174), and nothing is deleted — a delete is a write that needs its own approval.
  */
 import type { ServiceNowClient } from '../servicenow/client.js';
 import type { ToolDefinition } from './types.js';
