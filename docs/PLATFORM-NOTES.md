@@ -360,7 +360,9 @@ delete, the cascade and the variables' limits: observed behaviour.
 teardown. `docs/validation/2.0.12-rc.2-live-sitting.md`, § ARC-09-C122: R2, W3 and the teardown.
 **Engine consequence:** `snow_atf_atf_step_add` updates a row the insert created rather than adding a second
 (ARC-09-C95). Since ARC-09-C122 its output lists every input row of the step, the rows the instance defaulted
-included; before it, they were invisible to the caller. A teardown removes the step, not its input rows.
+included; before it, they were invisible to the caller. A teardown removes the step, not its input rows. Since
+ARC-09-C177 the server reports the refused delete's wording, "ACL Exception … due to security constraints", as
+`DELETE_ACL_DENIED`; it was `DELETE_CONSTRAINT` on 2.0.11-rc.3.
 
 ## PN-17 — An AI agent's configuration and version are created by its insert; a workflow's team is not
 
