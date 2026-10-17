@@ -366,7 +366,7 @@ included; before it, they were invisible to the caller. A teardown removes the s
 
 **Applies to:** `sn_aia_agent`, `sn_aia_agent_config`, `sn_aia_version`, `sn_aia_agent_tool_m2m`, `sn_aia_usecase`,
 `sn_aia_team`, `sn_aia_team_member` · Brazil patch 0 · observed in the owner's trial over the REST Table API on
-2.1.1, 2026-10-16 (ARC-09-C165)
+2.1.1, 2026-10-16 (ARC-09-C165), and again with the fixed tools on v2.2.0-rc.1, 2026-10-17
 **Behaviour:**
 - **The agent's insert creates two more records.** One insert into `sn_aia_agent` created, in the same second, an
   `sn_aia_agent_config` (`active=true`, `current_version` empty) and an `sn_aia_version` "Version 1"
@@ -383,6 +383,12 @@ included; before it, they were invisible to the caller. A teardown removes the s
   new workflow among those "with no access control list (ACL) configured".
 - **Captured.** Every record above, the automatic ones included, landed in the update set the user preference
   named (PN-01).
+- **`current_version` varies.** On the same instance the agent's configuration had `current_version` empty in the
+  first trial and populated in the v2.2.0-rc.1 run. Both were observed, so the tool reports the value it reads and
+  asserts neither.
+- **The stored execution modes.** The values seen are `autopilot` for Autonomous and `copilot` for Supervised. A
+  workflow's insert without one stored `copilot`. They are observed values, read from the instance's `sys_choice`,
+  never defaults to send.
 - **Studio's pages.** An agent opened at `/aiux/aia/agent/<sn_aia_agent sys_id>/visualize` and a workflow at
   `/aiux/aia/workflow/<sn_aia_usecase sys_id>/visualize`; `/usecase/` in the workflow's place answered "Page not
   found".
@@ -395,13 +401,14 @@ tables installed" (lines 713–893, with the underscores escaped as `sn\_aia\_`)
 Autonomous, in `markdown/intelligent-experiences/add-tool-aia-new.md`. Not documented in the bundled corpus (branch
 `australia`): `sn_aia_version` and its states, the automatic records, the snapshot rewrite, the absent team and the
 Studio routes — observed behaviour, on a family one ahead of the corpus; verify on the instance's family.
-**Evidence:** the owner's trial record, which is engagement-local and not committed. The live re-verification with
-the fixed tools gates ARC-09-C165's merge and is recorded under `docs/validation/` without sys_ids or instance URL.
+**Evidence:** the owner's trial record, which is engagement-local and not committed, and
+`docs/validation/2.2.0-rc.1-live-sitting.md`, the run with the fixed tools.
 **Engine consequence:** since ARC-09-C165 `snow_ai_ai_agent_add` reads the configuration and the version back
 rather than creating them, and reports a missing one as a warning; `active: false` modifies the configuration.
 `snow_ai_agentic_workflow_add` creates the team first and sets it on the workflow's insert: 2 + N inserts and no
 modify. Both return `access_rules`, saying that nothing configured access, and `studio_route`, where it is
-configured.
+configured. Since ARC-09-C169 the agent's configuration and version are read back after its tool links, because a
+link rewrites the version's snapshot.
 
 ## PN-18 — Pointing REST capture at an update set moves the user's own UI session to it too
 
