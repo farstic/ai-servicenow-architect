@@ -1,6 +1,6 @@
 {
   "name": "ai-servicenow-architect",
-  "version": "2.1.3-dev",
+  "version": "2.2.1-dev",
   "private": true,
   "description": "AI ServiceNow Architect — Claude Code engine + bundled ServiceNow MCP server (snowarch)",
   "license": "BUSL-1.1",
