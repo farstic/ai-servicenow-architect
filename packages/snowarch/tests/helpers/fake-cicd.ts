@@ -132,6 +132,8 @@ export function matching(rows: Array<Record<string, unknown>>, query: Record<str
     return v !== null && typeof v === 'object' ? (v as { value?: unknown }).value : v;
   };
   const conditions = (query.sysparm_query ?? '').split('^').filter(Boolean).flatMap((term) => {
+    // A sort term orders the rows and filters none (`ORDERBY<field>`, `ORDERBYDESC<field>`), so it is not a condition.
+    if (/^ORDERBY(DESC)?[a-z_]+$/.test(term)) return [];
     const m = /^([a-z_]+)(=|IN)(.*)$/.exec(term);
     if (!m) throw new Error(`tableOf: the fake does not evaluate "${term}"`);
     const [, field, op, raw] = m;
