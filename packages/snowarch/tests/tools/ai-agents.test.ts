@@ -445,9 +445,10 @@ describe('ARC-09-C174 — a partial build names the step that failed', () => {
 
 /**
  * ARC-09-C180 — a tool link the caller does not name is named after its tool. The owner's v2.2.0-rc.2 check on
- * `tgdev` (2026-10-17): an `sn_aia_agent_tool_m2m` insert without `name` was refused, 403 "Operation Failed", by
- * the before-insert rule "Check duplicate name"; the same insert with the tool's name was created, and AI Agent
- * Studio names a link after its tool (PN-17). The tool record is already read before the first write.
+ * `tgdev` (2026-10-17): an `sn_aia_agent_tool_m2m` insert without `name` was refused, 403 "Operation Failed", by a
+ * data policy ("Data Policy Exception: The following fields are mandatory: Name", read on v2.2.0-rc.3); the same
+ * insert with the tool's name was created, and AI Agent Studio names a link after its tool (PN-17). The tool record
+ * is already read before the first write.
  */
 describe('ARC-09-C180 — an unnamed tool link takes its tool\'s name', () => {
   const linkCalls = (c: { createRecord: ReturnType<typeof vi.fn> }): Row[] =>

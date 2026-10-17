@@ -90,10 +90,14 @@ function validateSysId(sysId) {
     }
     return sysId;
 }
-/** Allowlist of safe GlideSystem functions permitted in javascript: query expressions */
-const SAFE_GS_PATTERN = /^javascript:gs\.(getUserID|beginningOfToday|endOfToday|beginningOfYesterday|endOfYesterday|beginningOfLastMonth|endOfLastMonth|beginningOfThisMonth|endOfThisMonth|beginningOfThisQuarter|endOfThisQuarter|beginningOfThisYear|endOfThisYear|beginningOfNextMonth|endOfNextMonth|beginningOfLast7Days|endOfLast7Days|beginningOfLastYear|endOfLastYear|daysAgo|hoursAgo|minutesAgo|monthsAgo|quartersAgo|yearsAgo|now|dateGenerate)\([\d,\s'":-]*\)$/i;
+/**
+ * Allowlist of safe GlideSystem functions permitted in javascript: query expressions. ARC-09-C172 added the Start, End
+ * and Local forms of the …Ago functions: the GlideSystem API documents them, and the platform's own filter operators
+ * write them into encoded queries (`markdown/platform-user-interface/r_OpAvailableFiltersQueries.md`).
+ */
+const SAFE_GS_PATTERN = /^javascript:gs\.(getUserID|beginningOfToday|endOfToday|beginningOfYesterday|endOfYesterday|beginningOfLastMonth|endOfLastMonth|beginningOfThisMonth|endOfThisMonth|beginningOfThisQuarter|endOfThisQuarter|beginningOfThisYear|endOfThisYear|beginningOfNextMonth|endOfNextMonth|beginningOfLast7Days|endOfLast7Days|beginningOfLastYear|endOfLastYear|daysAgo|daysAgoStart|daysAgoEnd|daysAgoLocal|hoursAgo|hoursAgoStart|hoursAgoEnd|minutesAgo|minutesAgoStart|minutesAgoEnd|monthsAgo|monthsAgoStart|monthsAgoEnd|quartersAgo|quartersAgoStart|quartersAgoEnd|yearsAgo|now|dateGenerate)\([\d,\s'":-]*\)$/i;
 /** Validate and sanitize ServiceNow encoded query strings */
-function validateQuery(query) {
+export function validateQuery(query) {
     if (!query)
         return query;
     // Validate javascript: expressions against safe GlideSystem function allowlist
@@ -101,7 +105,9 @@ function validateQuery(query) {
     if (jsMatches) {
         for (const match of jsMatches) {
             if (!SAFE_GS_PATTERN.test(match.trim())) {
-                throw new ServiceNowError(`Query contains unsafe JavaScript expression: "${match.substring(0, 60)}…". Only standard GlideSystem date/user functions are allowed.`, 'VALIDATION_ERROR');
+                throw new ServiceNowError(`Query contains unsafe JavaScript expression: "${match.substring(0, 60)}…". Only standard GlideSystem date/user `
+                    + 'functions are allowed; for anything else, compute the value and send it literally, '
+                    + 'e.g. sys_created_on>2026-10-17 06:00:00.', 'VALIDATION_ERROR');
             }
         }
     }
