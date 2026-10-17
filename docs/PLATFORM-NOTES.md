@@ -486,6 +486,31 @@ from: This application scope only", lines 93–103), governs calling it from ano
 ARC-09-C178 a read that passes `fields` names the requested fields the instance did not return, as
 `fields_not_returned`.
 
+## PN-21 — A mandatory field over the REST Table API is a data policy's, not the dictionary's
+
+**Applies to:** every table a create writes · every family · the documented rule, and observed on `tgdev`, Brazil patch
+0, 2026-10-17 (ARC-09-C183)
+**Behaviour:**
+- **The dictionary's Mandatory is a form rule.** "Using a dictionary entry to make a field mandatory does not work
+  when using web services or background scripts. You can use a data policy instead." A create over the Table API is
+  not refused for a dictionary-mandatory field it leaves out.
+- **A data policy is enforced on the REST Table API by default.** Its mandatory rules apply to a create that lacks the
+  field. A parent table's policy applies to an extending table only when its Inherit is set.
+- **Observed:** an `sn_aia_agent_tool_m2m` insert without `name` was refused, 403 "Operation Failed: Data Policy
+  Exception: The following fields are mandatory: Name" (PN-17).
+
+**Grounding:** `markdown/platform-administration/t_MakingAFieldMandatory.md` (About this task);
+`markdown/platform-administration/c_DataPolicy.md` (applied to the REST Table API by default);
+`markdown/platform-administration/r_DataPolicyFields.md` (Inherit); `markdown/platform-administration/c_InstalledWithDataPolicy.md`
+(the tables `sys_data_policy2` and `sys_data_policy_rule`). The column names the server reads are not documented in the
+bundled corpus — verify on the instance.
+**Evidence:** the owner's v2.2.0-rc.3 check on `tgdev`, 2026-10-17, which is engagement-local and not committed.
+**Engine consequence:** since ARC-09-C183 every create reads the active data policies of its table and the tables it
+extends, once per table per session, and refuses a field an unconditional rule requires and the create would not send,
+before anything is written. A conditional policy, a field the dictionary defaults and a check it could not make are
+noted on the result as `mandatory_fields`. A conditional policy or a business rule can still refuse, which is why the
+instance's own text is shown (ARC-09-C176, ARC-09-C182).
+
 ## Windows notes — this repository, not ServiceNow
 
 The notes above are ServiceNow behaviour. These are about the machine the engine runs on, and they
