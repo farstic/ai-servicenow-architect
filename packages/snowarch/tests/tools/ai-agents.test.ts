@@ -64,11 +64,20 @@ function fakeInstance(seed: Record<string, Row[]> = {}) {
       if (name === 'sn_aia_agent') {
         put('sn_aia_agent_config', { agent: stored.sys_id, active: 'true', public: 'false', current_version: '' });
         put('sn_aia_version', { target_table: 'sn_aia_agent', target_id: stored.sys_id, version_name: 'Version 1',
-          version_number: '1', state: 'committed', active: 'true' });
+          version_number: '1', state: 'committed', active: 'true', snapshot: JSON.stringify({ overlay: { tools: [] } }) });
       }
       if (name === 'sn_aia_usecase') {
         put('sn_aia_version', { target_table: 'sn_aia_usecase', target_id: stored.sys_id, version_name: 'V1',
           version_number: '1', state: 'published', active: 'true' });
+      }
+      // ...and a tool link rewrites the agent's version snapshot, without a new version (PN-17).
+      if (name === 'sn_aia_agent_tool_m2m') {
+        for (const v of table('sn_aia_version').values()) {
+          if (v.target_id !== data.agent) continue;
+          const snap = JSON.parse(String(v.snapshot ?? '{"overlay":{"tools":[]}}'));
+          snap.overlay.tools.push({ m2mId: stored.sys_id, toolId: data.tool });
+          v.snapshot = JSON.stringify(snap);
+        }
       }
       return { ...stored };
     }),
@@ -269,6 +278,37 @@ describe('ARC-09-C165 — snow_ai_* writes AI Agent Studio\'s own tables', () =>
     const withColumn = fakeInstance({ ...SEED(), sys_dictionary: [{ name: 'sn_aia_team_member', element: 'memory_scope' }] });
     await dispatchAiAgentsAction(withColumn.client, 'snow_ai_agentic_workflow_add', { ...WORKFLOW_ARGS, memory_scope: 'global' });
     expect(withColumn.client.createRecord).toHaveBeenCalledWith('sn_aia_team_member', expect.objectContaining({ memory_scope: 'global' }));
+  });
+
+  it('C169 — the version is read back after the last tool link and the configuration, so it carries the links', async () => {
+    const { client } = fakeInstance(SEED());
+    const result = await dispatchAiAgentsAction(client, 'snow_ai_ai_agent_add', { ...AGENT_ARGS, active: false,
+      tools: [{ tool_sys_id: TOOL }, { tool_sys_id: TOOL, name: 'again' }] });
+    // The rc.1 sitting: the version came back with `tools: []` and a re-read seconds later had the link.
+    const tools = JSON.parse(String(result.version.snapshot)).overlay.tools;
+    expect(tools).toHaveLength(2);
+    expect(tools.every((x: Row) => x.toolId === TOOL)).toBe(true);
+    const order = (fn: ReturnType<typeof vi.fn>, pick: (c: unknown[]) => boolean) =>
+      fn.mock.calls.map((c, i) => [c, fn.mock.invocationCallOrder[i]] as const).filter(([c]) => pick(c)).map(([, o]) => o);
+    const lastLink = Math.max(...order(client.createRecord, (c) => c[0] === 'sn_aia_agent_tool_m2m'));
+    const configRead = Math.min(...order(client.queryRecords, (c) => (c[0] as Row).table === 'sn_aia_agent_config'));
+    const configModify = Math.max(...order(client.updateRecord, (c) => c[0] === 'sn_aia_agent_config'));
+    const versionRead = Math.min(...order(client.queryRecords, (c) => (c[0] as Row).table === 'sn_aia_version'));
+    expect(configRead).toBeGreaterThan(lastLink);
+    expect(versionRead).toBeGreaterThan(configModify);
+    expect(result.config).toEqual(expect.objectContaining({ active: 'false' }));
+  });
+
+  it('C169 — the workflow\'s version is read back after its last member', async () => {
+    const { client } = fakeInstance(SEED());
+    await dispatchAiAgentsAction(client, 'snow_ai_agentic_workflow_add', WORKFLOW_ARGS);
+    const lastMember = Math.max(...client.createRecord.mock.calls
+      .map((c, i) => [c[0], client.createRecord.mock.invocationCallOrder[i]] as const)
+      .filter(([t]) => t === 'sn_aia_team_member').map(([, o]) => o));
+    const versionRead = Math.min(...client.queryRecords.mock.calls
+      .map((c, i) => [(c[0] as Row).table, client.queryRecords.mock.invocationCallOrder[i]] as const)
+      .filter(([t]) => t === 'sn_aia_version').map(([, o]) => o));
+    expect(versionRead).toBeGreaterThan(lastMember);
   });
 
   it('each _add description names every table it writes, in order, and the removed inputs are gone', () => {
