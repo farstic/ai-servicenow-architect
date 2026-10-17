@@ -11,7 +11,7 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 - **named-only** — a record names it, and no sitting has yet confirmed a call.
 - **unverified** — nothing shows it has run against an instance.
 
-**live coverage: 399 tools in 37 families — verified-live 0, refused 0, named-only 24, unverified 375; 26 tools named in a record, 29 families with none; 37 families with no tool verified live.**
+**live coverage: 399 tools in 37 families — verified-live 2, refused 0, named-only 24, unverified 373; 26 tools named in a record, 29 families with none; 36 families with no tool verified live.**
 
 ## By family
 
@@ -46,7 +46,7 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | `inc` | 7 | 0 | 0 | 0 | 7 | 0 |
 | `kb` | 7 | 0 | 0 | 0 | 7 | 0 |
 | `va` | 7 | 0 | 0 | 0 | 7 | 0 |
-| `ai` | 4 | 0 | 0 | 0 | 4 | 2 |
+| `ai` | 4 | 2 | 0 | 0 | 2 | 2 |
 | `cmdb` | 4 | 0 | 0 | 0 | 4 | 0 |
 | `nas` | 4 | 0 | 0 | 0 | 4 | 0 |
 | `prb` | 4 | 0 | 0 | 0 | 4 | 0 |
@@ -54,7 +54,7 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | `tsk` | 4 | 0 | 0 | 0 | 4 | 0 |
 | `orch` | 3 | 0 | 0 | 1 | 2 | 1 |
 | `disco` | 1 | 0 | 0 | 1 | 0 | 1 |
-| **all** | **399** | **0** | **0** | **24** | **375** | **26** |
+| **all** | **399** | **2** | **0** | **24** | **373** | **26** |
 
 ## By tool
 
@@ -479,8 +479,8 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 
 | Tool | Status | Record | Date | Instance family | Note | Named in |
 |---|---|---|---|---|---|---|
-| `snow_us_active_update_set_ensure` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 2 |
-| `snow_us_capture_target_set` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 5 |
+| `snow_us_active_update_set_ensure` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 3 |
+| `snow_us_capture_target_set` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 6 |
 | `snow_us_current_update_set_read` | unverified | — | — | — | — | 0 |
 | `snow_us_update_set_add` | unverified | — | — | — | — | 0 |
 | `snow_us_update_set_complete` | unverified | — | — | — | — | 0 |
@@ -578,8 +578,8 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 
 | Tool | Status | Record | Date | Instance family | Note | Named in |
 |---|---|---|---|---|---|---|
-| `snow_ai_agentic_workflow_add` | unverified | — | — | — | rewritten in ARC-09-C165; its live re-verification is pending the next release candidate's live sitting | 1 |
-| `snow_ai_ai_agent_add` | unverified | — | — | — | rewritten in ARC-09-C165; its live re-verification is pending the next release candidate's live sitting | 1 |
+| `snow_ai_agentic_workflow_add` | verified-live | `docs/validation/2.2.0-rc.1-live-sitting.md` | 2026-10-17 | Brazil patch 0 | — | 2 |
+| `snow_ai_ai_agent_add` | verified-live | `docs/validation/2.2.0-rc.1-live-sitting.md` | 2026-10-17 | Brazil patch 0 | — | 2 |
 | `snow_ai_ai_agent_read` | unverified | — | — | — | — | 0 |
 | `snow_ai_ai_agents_index` | unverified | — | — | — | — | 0 |
 
