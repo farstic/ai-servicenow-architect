@@ -29,6 +29,13 @@ const NOT_RETRIED: readonly string[] = ['AUTHENTICATION_FAILED', 'INVALID_REQUES
 /** How much of a refusal's non-JSON body the message shows (ARC-09-C176): enough to name a gateway, not a page. */
 const NON_JSON_BODY_SHOWN = 200;
 
+/** A response body as a message shows it (ARC-09-C179): the parsed JSON re-serialised, or the raw text, collapsed and cut. */
+function shownBody(body: unknown): string {
+  if (body === undefined) return '(empty)';
+  const text = (typeof body === 'string' ? body : JSON.stringify(body)).replace(/\s+/g, ' ').trim();
+  return text === '' ? '(empty)' : text.slice(0, NON_JSON_BODY_SHOWN);
+}
+
 // ─── The Batch API's bodies (ARC-09-C108) ────────────────────────────────────────────────────
 //
 // vendor/ServiceNowDocs/markdown/api-reference/rest-apis/batch-api.md: `rest_requests.body` is the
@@ -293,7 +300,7 @@ export class ServiceNowClient {
     url: string,
     options: RequestInit = {},
     requestedRetries: number = this.maxRetries,
-    onResponse?: (response: { headers?: { get?: (name: string) => string | null } }) => void
+    onResponse?: (response: { status?: number; headers?: { get?: (name: string) => string | null } }) => void
   ): Promise<T> {
     let lastError: Error | undefined;
     const maxRetries = Number.isInteger(requestedRetries) && requestedRetries >= 0
@@ -997,11 +1004,20 @@ export class ServiceNowClient {
     logger.info(`Creating record in ${table}`);
     const url = `${this.baseUrl}/api/now/table/${table}`;
     try {
-      const response = await this.request<ServiceNowApiResponse<ServiceNowRecord>>(url, {
+      let status: number | undefined;
+      const response = await this.request<ServiceNowApiResponse<ServiceNowRecord> | string | null | undefined>(url, {
         method: 'POST',
         body: JSON.stringify(data),
-      });
-      return response.result;
+      }, this.maxRetries, (r) => { status = r.status; });
+      // ARC-09-C179 — an answer with no record in it is not a created record, whatever its status: the instance may
+      // have discarded the insert. Refused here, with the status and the body, so no caller reports it as created.
+      const record = typeof response === 'object' && response !== null ? response.result : undefined;
+      if (!record || typeof record !== 'object' || !record.sys_id) {
+        throw new ServiceNowError(`No record returned for the create on ${table} (HTTP ${status ?? 'unknown'}); body: `
+          + `${shownBody(response)}. The instance may have discarded the insert: read ${table} before adding it again.`,
+        'CREATE_FAILED', { status, table });
+      }
+      return record;
     } catch (error) {
       if (error instanceof ServiceNowError) throw error;
       throw new ServiceNowError(
