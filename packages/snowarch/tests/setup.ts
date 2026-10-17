@@ -2,7 +2,7 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { afterAll, beforeAll, beforeEach } from 'vitest';
 import { enterInstance } from '../src/servicenow/context.js';
-import { resetColumnLimits } from '../src/servicenow/stored-values.js';
+import { resetColumnLimits, setDataPolicyCheckForTests } from '../src/servicenow/stored-values.js';
 import { expandPreset } from '../src/utils/permissions.js';
 import { currentSuitePreset } from './helpers/preset.js';
 import { releaseLicenceFixture } from '../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
@@ -50,4 +50,6 @@ beforeEach(() => {
   // ARC-09-C97 remembers each instance's column limits, and every test runs on this one runtime: forget
   // them, so no test reads a limit that another test's fake answered.
   resetColumnLimits();
+  // ARC-09-C183's data-policy reads are off for suites that count a write's requests; its own suite turns them on.
+  setDataPolicyCheckForTests(false);
 });

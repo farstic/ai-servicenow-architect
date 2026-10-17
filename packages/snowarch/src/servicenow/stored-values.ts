@@ -314,13 +314,25 @@ interface Column { limit: number | null; type: string | null; definedOn: string 
  * read it at all. A 403 (reading `sys_dictionary` needs `personalize_dictionary`, PN-10) is remembered, so
  * later writes ask nothing; a 5xx or a timeout is not, so the next write asks again.
  */
-interface InstanceColumns { unreadable: boolean; columns: Map<string, Column>; parents: Map<string, string | null> }
+interface InstanceColumns {
+  unreadable: boolean; columns: Map<string, Column>; parents: Map<string, string | null>;
+  /** ARC-09-C183: what the data policies require of each table, read once; and whether this account can read them. */
+  required: Map<string, Requirements>; policiesUnreadable: boolean;
+}
 
 /** Keyed by instance — its label and URL — and never shared between instances. */
 const instanceColumns = new Map<string, InstanceColumns>();
 
 /** Forget every instance's columns. For tests; the server never needs it. */
 export function resetColumnLimits(): void { instanceColumns.clear(); }
+
+/**
+ * ARC-09-C183 — whether a create reads the data policies first. Always on in the server. The test setup turns it off,
+ * because suites written before it count every request a write makes, and feed queued answers in order. The C183 suite
+ * turns it back on and exercises it beside ARC-09-C97's check on the same write path. For tests; the server never calls it.
+ */
+let dataPolicyCheck = true;
+export function setDataPolicyCheckForTests(on: boolean): void { dataPolicyCheck = on; }
 
 interface Budget { closed: boolean }
 
@@ -436,15 +448,12 @@ async function decide(client: ServiceNowClient, dict: InstanceColumns, table: st
  * read got within the budget; otherwise returns, having spent at most PRECHECK_BUDGET_MS. Outside an instance
  * context there is no instance to key a cache by: it returns.
  */
-async function precheck(client: ServiceNowClient, table: string, data: unknown, written: Written[]): Promise<void> {
+async function precheck(client: ServiceNowClient, table: string, data: unknown, written: Written[],
+  operation: 'create' | 'update' = 'update', notes: MandatoryNote[] = []): Promise<void> {
   const rt = currentInstanceOrNull();
   if (!rt || !isObject(data) || !IDENT.test(table)) return;
-  const instance = `${rt.label}\u0000${rt.url}`;
-  let dict = instanceColumns.get(instance);
-  if (!dict) {
-    dict = { unreadable: false, columns: new Map(), parents: new Map() };
-    instanceColumns.set(instance, dict);
-  }
+  const dict = instanceDict(rt);
+  if (operation === 'create') await mandatoryPrecheck(client, dict, table, data, written, notes);
   if (dict.unreadable) return;
   const strings = Object.entries(data)
     .filter((e): e is [string, string] => typeof e[1] === 'string' && e[1] !== '' && IDENT.test(e[0]));
@@ -476,6 +485,234 @@ async function precheck(client: ServiceNowClient, table: string, data: unknown, 
     });
 }
 
+// ─── ARC-09-C183: the instance's mandatory fields, before a create ──────────────────────────────
+//
+// A dictionary entry's Mandatory does not apply to web services (`t_MakingAFieldMandatory.md`: "does not work when
+// using web services or background scripts. You can use a data policy instead"), and a data policy applies to the REST
+// Table API by default (`c_DataPolicy.md`). So the data policies decide: the active ones for the table and the tables it
+// extends, a parent's only when its Inherit is set (`r_DataPolicyFields.md`). The tables are `sys_data_policy2` and
+// `sys_data_policy_rule` (`c_InstalledWithDataPolicy.md`); the corpus documents their fields by label only, so the column
+// names read here — model_table, conditions, inherit, active, short_description; field, mandatory, sys_data_policy —
+// are not documented in the bundled corpus: verify on the instance. A read that is refused, or that comes back without
+// those columns, leaves the table "not checked": a note on the result, never a block (the ARC-09-C97 rule).
+
+/** One data-policy rule that makes a field mandatory: the policy's name, the table it is defined on, its condition. */
+interface MandatoryRule { field: string; policy: string; on: string; condition: string | null }
+
+/** What the data policies require of a table and the tables it extends, or why that is not known. */
+type Requirements = { checked: true; chain: string[]; rules: MandatoryRule[] } | { checked: false; why: string };
+
+/** What a create's result says about mandatory fields it did not block on. One per table. */
+export interface MandatoryNote {
+  table: string;
+  may_be_required?: Array<{ field: string; policy: string; condition: string }>;
+  defaulted?: string[];
+  not_checked?: string;
+}
+
+/** The cache for the instance a call runs on, created on first use. */
+function instanceDict(rt: { label: string; url: string }): InstanceColumns {
+  const instance = `${rt.label}\u0000${rt.url}`;
+  let dict = instanceColumns.get(instance);
+  if (!dict) {
+    dict = { unreadable: false, columns: new Map(), parents: new Map(), required: new Map(), policiesUnreadable: false };
+    instanceColumns.set(instance, dict);
+  }
+  return dict;
+}
+
+/** No condition, or the condition builder's empty one: the rule always applies. */
+const unconditional = (conditions: string | undefined): boolean => !conditions || /^\^?EQ$/.test(conditions.trim());
+
+/** Why a policy read failed, remembered when it was a refusal (the account will not be allowed on the next write either). */
+function policyReadFailed(dict: InstanceColumns, table: string, what: string, e: unknown): Requirements {
+  if (e instanceof ServiceNowError && e.code === 'AUTHENTICATION_FAILED') throw e;
+  const code = e instanceof ServiceNowError ? e.code : 'UNKNOWN';
+  const why = `the data policies could not be read (${what}, ${code})`;
+  if (code === 'INSUFFICIENT_PRIVILEGES') dict.policiesUnreadable = true;
+  logger.warn(`mandatory-field check skipped for ${table}: ${why}`);
+  return { checked: false, why };
+}
+
+/** The table and the tables it extends, nearest first, from the cache ARC-09-C97 keeps. */
+async function chainOf(client: ServiceNowClient, dict: InstanceColumns, table: string, budget: Budget): Promise<string[]> {
+  const chain = [table];
+  for (let at = table; chain.length < 12;) {
+    const up = await parentOf(client, dict, at, budget);
+    if (!up || chain.includes(up)) break;
+    chain.push(up);
+    at = up;
+  }
+  return chain;
+}
+
+/** What the active data policies require of `table`: two reads at most, once per table per instance. */
+async function requirementsOf(client: ServiceNowClient, dict: InstanceColumns, table: string, budget: Budget):
+Promise<Requirements> {
+  const cached = dict.required.get(table);
+  if (cached) return cached;
+  if (dict.policiesUnreadable) return { checked: false, why: 'the data policies could not be read (refused earlier in this session)' };
+  let chain: string[];
+  try {
+    chain = await chainOf(client, dict, table, budget);
+  } catch (e) {
+    return policyReadFailed(dict, table, 'sys_db_object', e);
+  }
+  let policies: Array<Record<string, unknown>>;
+  try {
+    policies = (await client.queryRecords({ table: 'sys_data_policy2', query: `active=true^model_tableIN${chain.join(',')}`,
+      fields: 'sys_id,short_description,model_table,conditions,inherit,active', limit: 200, retries: 0 })).records;
+  } catch (e) {
+    return policyReadFailed(dict, table, 'sys_data_policy2', e);
+  }
+  if (policies.some((p) => plainValue(p.model_table) === undefined)) {
+    const shape: Requirements = { checked: false, why: 'sys_data_policy2 came back without model_table: its columns are not the ones this check reads' };
+    dict.required.set(table, shape);
+    return shape;
+  }
+  // Client-side as well as in the query: a condition on a column the instance does not have is ignored (c_TableAPI.md).
+  const applying = policies.filter((p) => {
+    const on = plainValue(p.model_table) as string;
+    return plainValue(p.active) !== 'false' && (on === table || (chain.includes(on) && isTrue(plainValue(p.inherit))));
+  });
+  let rules: MandatoryRule[] = [];
+  if (applying.length > 0) {
+    const byId = new Map(applying.map((p) => [plainValue(p.sys_id) as string, p]));
+    let rows: Array<Record<string, unknown>>;
+    try {
+      rows = (await client.queryRecords({ table: 'sys_data_policy_rule', query: `mandatory=true^sys_data_policyIN${[...byId.keys()].join(',')}`,
+        fields: 'field,mandatory,sys_data_policy', limit: 500, retries: 0 })).records;
+    } catch (e) {
+      return policyReadFailed(dict, table, 'sys_data_policy_rule', e);
+    }
+    if (rows.some((r) => plainValue(r.field) === undefined)) {
+      const shape: Requirements = { checked: false, why: 'sys_data_policy_rule came back without field: its columns are not the ones this check reads' };
+      dict.required.set(table, shape);
+      return shape;
+    }
+    rules = rows.flatMap((r) => {
+      const p = byId.get(plainValue(r.sys_data_policy) ?? '');
+      if (!p || plainValue(r.mandatory) !== 'true') return [];
+      const conditions = plainValue(p.conditions);
+      return [{ field: plainValue(r.field) as string, policy: plainValue(p.short_description) || (plainValue(p.sys_id) as string),
+        on: plainValue(p.model_table) as string, condition: unconditional(conditions) ? null : (conditions as string).trim() }];
+    });
+  }
+  const done: Requirements = { checked: true, chain, rules };
+  dict.required.set(table, done);
+  return done;
+}
+
+const absent = (data: Record<string, unknown>, field: string): boolean =>
+  !(field in data) || data[field] === undefined || data[field] === null || data[field] === '';
+
+/**
+ * The unconditional rules `data` does not satisfy, and the note for the rest. A missing field the dictionary gives a
+ * `default_value` is reported, not blocked: that a default satisfies a data policy is not documented in the bundled
+ * corpus — verify on the instance. One dictionary read, only when something is missing.
+ */
+async function mandatoryCheck(client: ServiceNowClient, dict: InstanceColumns, table: string, data: Record<string, unknown>,
+  budget: Budget): Promise<{ missing: MandatoryRule[]; note: MandatoryNote | null }> {
+  if (!dataPolicyCheck) return { missing: [], note: null };
+  const req = await requirementsOf(client, dict, table, budget);
+  if (!req.checked) return { missing: [], note: { table, not_checked: req.why } };
+  let missing = req.rules.filter((r) => r.condition === null && absent(data, r.field));
+  const conditional = req.rules.filter((r) => r.condition !== null && absent(data, r.field));
+  const defaulted: string[] = [];
+  if (missing.length > 0) {
+    const fields = [...new Set(missing.map((r) => r.field))];
+    try {
+      const rows = (await client.queryRecords({ table: 'sys_dictionary', query: `nameIN${req.chain.join(',')}^elementIN${fields.join(',')}`,
+        fields: 'name,element,default_value', limit: 100, retries: 0 })).records;
+      for (const f of fields) {
+        if (rows.some((r) => plainValue(r.element) === f && (plainValue(r.default_value) ?? '') !== '')) defaulted.push(f);
+      }
+    } catch (e) {
+      if (e instanceof ServiceNowError && e.code === 'AUTHENTICATION_FAILED') throw e;
+      // An unreadable dictionary leaves the defaults unknown; the data policy still names the field, so it blocks.
+    }
+    missing = missing.filter((r) => !defaulted.includes(r.field));
+  }
+  const note: MandatoryNote = { table };
+  if (conditional.length > 0) {
+    note.may_be_required = conditional.map((r) => ({ field: r.field, policy: r.policy, condition: r.condition as string }));
+  }
+  if (defaulted.length > 0) note.defaulted = defaulted;
+  return { missing, note: note.may_be_required || note.defaulted ? note : null };
+}
+
+/** One sentence per table: the fields, and the policy that names each. */
+function requiresSentence(table: string, missing: MandatoryRule[]): string {
+  const fields = [...new Set(missing.map((r) => r.field))];
+  const byPolicy = new Map<string, { on: string; fields: string[] }>();
+  for (const r of missing) {
+    const entry = byPolicy.get(r.policy) ?? { on: r.on, fields: [] };
+    if (!entry.fields.includes(r.field)) entry.fields.push(r.field);
+    byPolicy.set(r.policy, entry);
+  }
+  const why = [...byPolicy].map(([policy, e]) => `data policy '${policy}'${e.on === table ? '' : ` (on ${e.on})`}: ${e.fields.join(', ')}`);
+  return `The instance requires ${fields.join(', ')} for ${table} — ${why.join('; ')}.`;
+}
+
+/** The refusal: INVALID_REQUEST, since the instance has refused nothing yet, and what the Architect does next. */
+function mandatoryRefusal(perTable: Array<{ table: string; missing: MandatoryRule[] }>, written: Written[]): ServiceNowError {
+  const count = new Set(perTable.flatMap((t) => t.missing.map((r) => `${t.table}.${r.field}`))).size;
+  const sentences = perTable.map((t) => requiresSentence(t.table, t.missing)).join(' ');
+  const nothing = written.length === 0 ? 'Nothing was written.'
+    : `Nothing was sent for this write. This call already wrote ${written.map((w) => `${w.table} ${w.sys_id ?? '(no sys_id)'}`).join(', ')}: `
+      + 'those records exist, so do not add them again.';
+  return new ServiceNowError(`${sentences} ${nothing} Ask the user for ${count === 1 ? 'the value' : 'the values'}, `
+    + `then send ${count === 1 ? 'it' : 'them'} with the write.`, 'INVALID_REQUEST', {
+    required: perTable.map((t) => ({ table: t.table, fields: [...new Set(t.missing.map((r) => r.field))] })),
+    written: written.map((w) => ({ ...w })),
+  });
+}
+
+/** Run `work` under the pre-check budget; `null` when the budget ran out first. */
+async function withinBudget<T>(work: (budget: Budget) => Promise<T>): Promise<T | null> {
+  const budget: Budget = { closed: false };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), PRECHECK_BUDGET_MS); });
+  try {
+    return await Promise.race([work(budget), deadline]);
+  } finally {
+    budget.closed = true;
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/** Before a create on the write path: refuse what a data policy would refuse, and note the rest once per table. */
+async function mandatoryPrecheck(client: ServiceNowClient, dict: InstanceColumns, table: string, data: Record<string, unknown>,
+  written: Written[], notes: MandatoryNote[]): Promise<void> {
+  const result = await withinBudget((budget) => mandatoryCheck(client, dict, table, data, budget));
+  const note = result === null
+    ? { table, not_checked: `the data-policy read did not finish within ${PRECHECK_BUDGET_MS} ms` }
+    : result.note;
+  if (note && !notes.some((n) => n.table === table)) notes.push(note);
+  if (result && result.missing.length > 0) throw mandatoryRefusal([{ table, missing: result.missing }], written);
+}
+
+/**
+ * ARC-09-C183 — for a tool that writes several records: every table it will create on, with the payload it will send,
+ * checked before its FIRST write, so a refusal leaves nothing behind. Outside an instance context there is nothing to
+ * key the cache by, and it returns. The notes are left to the write path, which adds them as each record is created.
+ */
+export async function assertMandatory(client: ServiceNowClient, plans: Array<{ table: string; payload: Record<string, unknown> }>):
+Promise<void> {
+  const rt = currentInstanceOrNull();
+  if (!rt) return;
+  const dict = instanceDict(rt);
+  const perTable: Array<{ table: string; missing: MandatoryRule[] }> = [];
+  for (const plan of plans) {
+    const result = await withinBudget((budget) => mandatoryCheck(client, dict, plan.table, plan.payload, budget));
+    if (!result || result.missing.length === 0) continue;
+    const at = perTable.find((t) => t.table === plan.table);
+    if (at) at.missing.push(...result.missing.filter((r) => !at.missing.some((m) => m.field === r.field)));
+    else perTable.push({ table: plan.table, missing: result.missing });
+  }
+  if (perTable.length > 0) throw mandatoryRefusal(perTable, []);
+}
+
 // ─── The per-invocation wrapper ──────────────────────────────────────────────────────────────
 
 /** How long `settle` may spend on dictionary lookups in total, before the warnings go out unconfirmed. */
@@ -484,7 +721,7 @@ export const SETTLE_BUDGET_MS = 3000;
 /** A write this call made: its table, the record's sys_id and whether it created or updated it. */
 interface Written { table: string; sys_id?: string; operation: 'create' | 'update' }
 
-interface State { pending: Pending[]; warnings: CutValueWarning[]; written: Written[] }
+interface State { pending: Pending[]; warnings: CutValueWarning[]; written: Written[]; notes: MandatoryNote[] }
 
 /** Every client this module has wrapped, mapped to the state its invocation shares. */
 const wrapped = new WeakMap<object, State>();
@@ -500,6 +737,8 @@ export interface Verified {
    * the outer invocation.
    */
   settle(budgetMs?: number): Promise<CutValueWarning[]>;
+  /** ARC-09-C183: what the creates of this invocation were told about mandatory fields, one note per table. */
+  notes(): MandatoryNote[];
 }
 
 const key = (table: string, field: string): string => `${table}\u0000${field}`;
@@ -572,9 +811,9 @@ const isTrue = (v: unknown): boolean => v === true || v === 'true';
  */
 export function withWriteVerification(client: ServiceNowClient): Verified {
   const existing = wrapped.get(client as unknown as object);
-  if (existing) return { client, owner: false, settle: async () => [] };
+  if (existing) return { client, owner: false, settle: async () => [], notes: () => [] };
 
-  const state: State = { pending: [], warnings: [], written: [] };
+  const state: State = { pending: [], warnings: [], written: [], notes: [] };
   const proxy = wrapClient(client, state);
 
   const settle = async (budgetMs: number = SETTLE_BUDGET_MS): Promise<CutValueWarning[]> => {
@@ -592,7 +831,7 @@ export function withWriteVerification(client: ServiceNowClient): Verified {
     return state.warnings;
   };
 
-  return { client: proxy, owner: true, settle };
+  return { client: proxy, owner: true, settle, notes: () => state.notes };
 }
 
 /** Compare what a write sent with what the platform answered, and queue a cut for `settle`. Never throws. */
@@ -686,7 +925,7 @@ function wrapClient(client: ServiceNowClient, state: State): ServiceNowClient {
       const real = target as ServiceNowClient;
       if (prop === 'createRecord') {
         return async (table: string, data: Record<string, unknown>) => {
-          await precheck(real, table, data, state.written);
+          await precheck(real, table, data, state.written, 'create', state.notes);
           const stored = await real.createRecord(table, data);
           record(state, 'create', table, undefined, data, stored);
           remember(state, 'create', table, undefined, stored);
@@ -695,7 +934,7 @@ function wrapClient(client: ServiceNowClient, state: State): ServiceNowClient {
       }
       if (prop === 'updateRecord') {
         return async (table: string, sysId: string, data: Record<string, unknown>) => {
-          await precheck(real, table, data, state.written);
+          await precheck(real, table, data, state.written, 'update');
           const stored = await real.updateRecord(table, sysId, data);
           record(state, 'update', table, sysId, data, stored);
           remember(state, 'update', table, sysId, stored);
@@ -721,6 +960,7 @@ function wrapClient(client: ServiceNowClient, state: State): ServiceNowClient {
       }
       if (prop === 'createChangeRequest') {
         return async (params: unknown) => {
+          await precheck(real, 'change_request', params, state.written, 'create', state.notes);
           const stored = await (value as (p: unknown) => Promise<unknown>).call(target, params);
           record(state, 'create', 'change_request', undefined, params, stored);
           remember(state, 'create', 'change_request', undefined, stored);
@@ -873,6 +1113,17 @@ export function attachWarnings(result: unknown, all: CutValueWarning[]): unknown
     if (isWarningList(prior)) return { warnings: [...prior, ...warnings], ...rest };
   }
   return { warnings, result };
+}
+
+/**
+ * ARC-09-C183 — the mandatory-field notes on the result: a conditional policy, a defaulted field, or a check that could
+ * not be made. Only a plain-object result takes them; any other shape is left as it is and the server log has the note.
+ */
+export function attachMandatoryNotes(result: unknown, notes: MandatoryNote[]): unknown {
+  if (notes.length === 0) return result;
+  if (isPlain(result)) return { ...result, mandatory_fields: notes };
+  logger.info(`mandatory-field notes not attached to a ${Array.isArray(result) ? 'list' : typeof result} result: ${JSON.stringify(notes)}`);
+  return result;
 }
 
 const ON_ERROR = Symbol.for('snowarch.storedValueWarnings');

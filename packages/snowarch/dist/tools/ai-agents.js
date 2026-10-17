@@ -1,4 +1,5 @@
 import { ServiceNowError } from '../utils/errors.js';
+import { assertMandatory } from '../servicenow/stored-values.js';
 import { requireNowAssist, requireWrite } from '../utils/permissions.js';
 import { plain, write } from './atf-author.js';
 const AGENT = 'sn_aia_agent';
@@ -254,6 +255,21 @@ async function addAgent(client, args) {
             if (t.execution_mode !== undefined)
                 checkMode(t.execution_mode, listed, LINK);
     }
+    const linkOf = (i, agentId) => {
+        const t = tools[i];
+        const link = { agent: agentId, tool: t.tool_sys_id };
+        const linkName = t.name ?? toolNames[i];
+        if (linkName !== undefined && linkName !== '')
+            link.name = linkName;
+        if (t.execution_mode !== undefined)
+            link.execution_mode = t.execution_mode;
+        if (t.display_output !== undefined)
+            link.display_output = t.display_output;
+        return link;
+    };
+    // ARC-09-C183: every table this build creates on, with what it will send, before the first write.
+    await assertMandatory(client, [{ table: AGENT, payload: sent },
+        ...tools.map((_, i) => ({ table: LINK, payload: linkOf(i, '(the agent)') }))]);
     const progress = { step: '', created: [] };
     const warnings = [];
     const links = [];
@@ -263,16 +279,8 @@ async function addAgent(client, args) {
     try {
         agent = await write(client, AGENT, sent, args.active !== false, undefined, progress);
         warnings.push(...agent.warnings);
-        for (const [i, t] of tools.entries()) {
-            const link = { agent: agent.sysId, tool: t.tool_sys_id };
-            const linkName = t.name ?? toolNames[i];
-            if (linkName !== undefined && linkName !== '')
-                link.name = linkName;
-            if (t.execution_mode !== undefined)
-                link.execution_mode = t.execution_mode;
-            if (t.display_output !== undefined)
-                link.display_output = t.display_output;
-            const done = await write(client, LINK, link, true, undefined, progress);
+        for (const i of tools.keys()) {
+            const done = await write(client, LINK, linkOf(i, agent.sysId), true, undefined, progress);
             warnings.push(...done.warnings);
             links.push(done.stored);
         }
@@ -328,6 +336,13 @@ async function addWorkflow(client, args) {
         checkMode(mode, await listedModes(client, USECASE), USECASE);
     if (memoryScope !== undefined)
         await hasColumn(client, MEMBER, 'memory_scope');
+    // ARC-09-C183: every table this build creates on, with what it will send, before the first write.
+    const planned = { name, description, base_plan: basePlan, team: '(the team)' };
+    if (mode !== undefined)
+        planned.execution_mode = mode;
+    await assertMandatory(client, [{ table: TEAM, payload: { name: teamName } }, { table: USECASE, payload: planned },
+        ...agentIds.map((agent) => ({ table: MEMBER,
+            payload: { team: '(the team)', agent, ...(memoryScope !== undefined ? { memory_scope: memoryScope } : {}) } }))]);
     const progress = { step: '', created: [] };
     const warnings = [];
     const members = [];

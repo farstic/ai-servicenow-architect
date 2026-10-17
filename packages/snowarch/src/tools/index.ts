@@ -85,7 +85,7 @@ import { cmdbReconciliationToolManifest, dispatchCmdbReconciliationAction } from
 import { orchestrationToolManifest, dispatchOrchestrationAction } from './orchestration.js';
 // Dynamic Schema Discovery
 import { discoveryToolManifest, dispatchDiscoveryAction } from './discovery.js';
-import { attachWarnings, carryWarningsOnError, withWriteVerification } from '../servicenow/stored-values.js';
+import { attachMandatoryNotes, attachWarnings, carryWarningsOnError, withWriteVerification } from '../servicenow/stored-values.js';
 import { logger } from '../utils/logging.js';
 
 // ─── Package Definitions ──────────────────────────────────────────────────────
@@ -414,5 +414,5 @@ export async function routeToolInvocation(
     if (verified.owner) carryWarningsOnError(error, await settled());
     throw error;
   }
-  return verified.owner ? attachWarnings(result, await settled()) : result;
+  return verified.owner ? attachMandatoryNotes(attachWarnings(result, await settled()), verified.notes()) : result;
 }

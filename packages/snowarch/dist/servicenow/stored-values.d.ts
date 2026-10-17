@@ -174,6 +174,27 @@ export declare function reconcile(p: Pending, cut: CutField, limit: number | nul
 export declare const PRECHECK_BUDGET_MS = 3000;
 /** Forget every instance's columns. For tests; the server never needs it. */
 export declare function resetColumnLimits(): void;
+export declare function setDataPolicyCheckForTests(on: boolean): void;
+/** What a create's result says about mandatory fields it did not block on. One per table. */
+export interface MandatoryNote {
+    table: string;
+    may_be_required?: Array<{
+        field: string;
+        policy: string;
+        condition: string;
+    }>;
+    defaulted?: string[];
+    not_checked?: string;
+}
+/**
+ * ARC-09-C183 — for a tool that writes several records: every table it will create on, with the payload it will send,
+ * checked before its FIRST write, so a refusal leaves nothing behind. Outside an instance context there is nothing to
+ * key the cache by, and it returns. The notes are left to the write path, which adds them as each record is created.
+ */
+export declare function assertMandatory(client: ServiceNowClient, plans: Array<{
+    table: string;
+    payload: Record<string, unknown>;
+}>): Promise<void>;
 /** How long `settle` may spend on dictionary lookups in total, before the warnings go out unconfirmed. */
 export declare const SETTLE_BUDGET_MS = 3000;
 export interface Verified {
@@ -187,6 +208,8 @@ export interface Verified {
      * the outer invocation.
      */
     settle(budgetMs?: number): Promise<CutValueWarning[]>;
+    /** ARC-09-C183: what the creates of this invocation were told about mandatory fields, one note per table. */
+    notes(): MandatoryNote[];
 }
 /**
  * Wrap `client` for ONE tool invocation so `createRecord` and `updateRecord` are checked.
@@ -245,6 +268,11 @@ export declare function capWarnings<T extends {
  * a large result loses — and a large result is the script body whose cut matters most.
  */
 export declare function attachWarnings(result: unknown, all: CutValueWarning[]): unknown;
+/**
+ * ARC-09-C183 — the mandatory-field notes on the result: a conditional policy, a defaulted field, or a check that could
+ * not be made. Only a plain-object result takes them; any other shape is left as it is and the server log has the note.
+ */
+export declare function attachMandatoryNotes(result: unknown, notes: MandatoryNote[]): unknown;
 /**
  * Hang the warnings off an error that is about to be thrown, so the layer that renders it can say
  * that an earlier write in the same call stored a cut value. A non-enumerable symbol key: it is not
