@@ -41,14 +41,19 @@ test('C167a — the committed page is what the generator writes, and every manif
   console.log(`    ${totalsLine(tally({ tools, ledger, records }))}`);
 });
 
-test('C167a — the seeds: C165\'s two build tools wait for rc.1, and every named-only tool names its record', () => {
+test('C167a — C165\'s two build tools are verified live by a sitting record, and every named-only tool names its record', () => {
   const ledger = JSON.parse(read(LEDGER));
-  for (const t of ['snow_ai_ai_agent_add', 'snow_ai_agentic_workflow_add']) {
-    assert.equal(ledger.tools[t].status, 'unverified');
-    // No version in the note or here (ARC-09-C168): the release writes its version before the post-write suite.
-    assert.match(ledger.tools[t].note, /pending the next release candidate's live sitting$/);
-  }
   const named = namedBy(manifestTools(), realRecords());
+  // ARC-09-C169: the v2.2.0 release candidate's live sitting ran both. The record is named by pattern, not spelled:
+  // its file name carries a version, and no test may (ARC-09-C168).
+  for (const t of ['snow_ai_ai_agent_add', 'snow_ai_agentic_workflow_add']) {
+    const e = ledger.tools[t];
+    assert.equal(e.status, 'verified-live');
+    assert.match(e.record, /^docs\/validation\/[^/]+-live-sitting\.md$/);
+    assert.ok(named[t].includes(e.record), `${t} does not appear in ${e.record}`);
+    assert.match(e.date, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(e.family, `${t} has no instance family`);
+  }
   for (const [t, e] of Object.entries(ledger.tools)) {
     if (e.status === 'named-only') assert.ok(named[t].includes(e.record), `${t} does not appear in ${e.record}`);
   }

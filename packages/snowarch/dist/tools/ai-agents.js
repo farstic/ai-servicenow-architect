@@ -248,8 +248,6 @@ async function addAgent(client, args) {
     let config;
     let version;
     try {
-        config = await first(client, CONFIG, `agent=${agent.sysId}`);
-        version = await first(client, VERSION, `target_id=${agent.sysId}`);
         for (const t of tools) {
             const link = { agent: agent.sysId, tool: t.tool_sys_id };
             if (t.name !== undefined)
@@ -263,11 +261,15 @@ async function addAgent(client, args) {
             warnings.push(...done.warnings);
             links.push(done.stored);
         }
+        // ARC-09-C169: read back AFTER the links, configuration then version. A tool link rewrites the version's
+        // snapshot (PN-17); read before the links, the version the result reports listed no tools.
+        config = await first(client, CONFIG, `agent=${agent.sysId}`);
         if (args.active === false && config) {
             const done = await write(client, CONFIG, { active: false }, false, String(plain(config.sys_id)));
             warnings.push(...done.warnings);
             config = done.stored;
         }
+        version = await first(client, VERSION, `target_id=${agent.sysId}`);
     }
     catch (error) {
         throw leftBehind(error, created, warnings, 'do not add the agent a second time');
