@@ -397,8 +397,8 @@ run that day (ARC-09-C172)
 - **Studio's pages.** Two route families open the same objects:
   - `/aiux/aia/agent/<sn_aia_agent sys_id>/visualize` for an agent and `/aiux/aia/workflow/<sn_aia_usecase
     sys_id>/visualize` for a workflow; `/usecase/` in the workflow's place answered "Page not found";
-  - `/now/agent-studio/agent-setup/<id>` for an agent's setup, and a `/usecase-guided-setup/<id>/…` path for a
-    workflow's, observed on Brazil patch 0, 2026-10-17.
+  - `/now/agent-studio/agent-setup/<sys_id of the sn_aia_agent>` for an agent's setup, and a
+    `/usecase-guided-setup/<id>/…` path for a workflow's (prefix not recorded), observed on Brazil patch 0, 2026-10-17.
 
 **Grounding:** the tables are documented — `markdown/intelligent-experiences/na-aia-reference.md`, "AI agents
 tables installed" (lines 713–893, with the underscores escaped as `sn\_aia\_`), lists `sn_aia_agent`,
