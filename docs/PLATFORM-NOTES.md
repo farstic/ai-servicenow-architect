@@ -376,6 +376,9 @@ included; before it, they were invisible to the caller. A teardown removes the s
 - **A tool link rewrites the snapshot.** Inserting an `sn_aia_agent_tool_m2m` added the link to the committed
   version's `snapshot.overlay.tools`, with `executionMode: "copilot"`, and created no new version. The link's
   defaults included `display_output=true`.
+- **An unnamed link is refused.** An `sn_aia_agent_tool_m2m` insert without `name` was refused by the before-insert
+  rule "Check duplicate name": 403, "Operation Failed". The same insert with the tool's name was created. AI Agent
+  Studio names a link after its tool. Observed on `tgdev`, Brazil patch 0, 2026-10-17 (ARC-09-C180).
 - **A workflow's insert creates a version and nothing else.** An insert into `sn_aia_usecase` created an
   `sn_aia_version` "V1" (`state=published`, empty `snapshot`) and no `sn_aia_team`. The workflow has no agents
   until a team is created, set on `sn_aia_usecase.team`, and given `sn_aia_team_member` rows.
@@ -399,8 +402,9 @@ tables installed" (lines 713–893, with the underscores escaped as `sn\_aia\_`)
 `sn_aia_team_member`. The access model is in `markdown/intelligent-experiences/define-sec-aia-new.md` and
 `markdown/intelligent-experiences/aia-security-implementation.md`, and a tool's two execution modes, Supervised and
 Autonomous, in `markdown/intelligent-experiences/add-tool-aia-new.md`. Not documented in the bundled corpus (branch
-`australia`): `sn_aia_version` and its states, the automatic records, the snapshot rewrite, the absent team and the
-Studio routes — observed behaviour, on a family one ahead of the corpus; verify on the instance's family.
+`australia`): `sn_aia_version` and its states, the automatic records, the snapshot rewrite, the absent team, the
+refused unnamed link and the Studio routes — observed behaviour, on a family one ahead of the corpus; verify on the
+instance's family.
 **Evidence:** the owner's trial record, which is engagement-local and not committed, and
 `docs/validation/2.2.0-rc.1-live-sitting.md`, the run with the fixed tools.
 **Engine consequence:** since ARC-09-C165 `snow_ai_ai_agent_add` reads the configuration and the version back
@@ -408,7 +412,7 @@ rather than creating them, and reports a missing one as a warning; `active: fals
 `snow_ai_agentic_workflow_add` creates the team first and sets it on the workflow's insert: 2 + N inserts and no
 modify. Both return `access_rules`, saying that nothing configured access, and `studio_route`, where it is
 configured. Since ARC-09-C169 the agent's configuration and version are read back after its tool links, because a
-link rewrites the version's snapshot.
+link rewrites the version's snapshot. Since ARC-09-C180 a link the caller does not name is named after its tool.
 
 ## PN-18 — Pointing REST capture at an update set moves the user's own UI session to it too
 
