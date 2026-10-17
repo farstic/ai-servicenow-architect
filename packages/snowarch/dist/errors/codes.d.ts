@@ -15,11 +15,12 @@
  *   remedy       what to do; prose, because most remedies are a judgement rather than a command
  *   command      set ONLY when there is something runnable; renderers set it as code, and they
  *                never parse `remedy` looking for one
- *   showInRule   the code appears in the always-loaded rule file. Nineteen do: the six flag gates
- *                as one wildcard line, plus the thirteen a session can act on mid-task — seven of
- *                them the network family (ARC-08-S10), because a session that meets DNS, TLS or a
- *                refused connection mid-task must stop and hand over exactly as it does for a
- *                wrong password
+ *   showInRule   the code appears in the always-loaded rule file. The rule-visible subset is every
+ *                entry with showInRule; the generator derives the list, so no count is kept here.
+ *                The flag gates share one wildcard line; the rest are codes a session can act on
+ *                mid-task, the network family among them (ARC-08-S10), because a session that meets
+ *                DNS, TLS or a refused connection must stop and hand over as it does for a wrong
+ *                password
  *   httpStatus   the status the instance returned, where the code maps to one
  *   warning      a warning on a write that succeeded, not an error; with `showInRule` it gets its own
  *                section in the rule file, apart from the runtime errors (ARC-09-C101)
