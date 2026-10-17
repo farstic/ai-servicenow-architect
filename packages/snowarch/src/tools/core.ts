@@ -384,6 +384,17 @@ export function coreToolManifest(): ToolDefinition[] {
   ];
 }
 
+/**
+ * ARC-09-C178 — the fields a read asked for (`fields`, comma-separated) that no returned record carries. The instance
+ * leaves out a field the account may not read, or a Protected script (PN-20); a missing field is not an empty one, so
+ * the read names it. The records are passed on as returned.
+ */
+function notReturned(fields: unknown, records: Array<Record<string, unknown>>): string[] {
+  if (typeof fields !== 'string') return [];
+  const asked = [...new Set(fields.split(',').map((f) => f.trim()).filter((f) => f !== ''))];
+  return asked.filter((f) => !records.some((r) => Object.prototype.hasOwnProperty.call(r, f)));
+}
+
 export async function dispatchCoreAction(
   client: ServiceNowClient,
   name: string,
@@ -404,7 +415,10 @@ export async function dispatchCoreAction(
       const more = !truncated ? ''
         : total !== null ? `; ${total - next} more match: read on with offset ${next}`
           : `; the page reached its limit of ${limit}: read on with offset ${next}`;
+      // ARC-09-C178: a field no returned record carries is named; an empty page says nothing about the fields.
+      const absent = response.records.length === 0 ? [] : notReturned(params.fields, response.records);
       return { count: response.count, records: response.records, limit, offset, total, truncated,
+        ...(absent.length > 0 ? { fields_not_returned: absent } : {}),
         summary: `Found ${response.count} record(s) in "${params.table}"${more}` };
     }
     case 'snow_core_table_schema_read':
@@ -414,7 +428,9 @@ export async function dispatchCoreAction(
     case 'snow_core_record_read': {
       const p = args as GetRecordParams;
       if (!p.table || !p.sys_id) throw new ServiceNowError('table and sys_id are required', 'INVALID_REQUEST');
-      return await client.getRecord(p.table, p.sys_id, p.fields);
+      const record = await client.getRecord(p.table, p.sys_id, p.fields);
+      const absent = record && typeof record === 'object' ? notReturned(p.fields, [record]) : [];
+      return absent.length > 0 ? { ...record, fields_not_returned: absent } : record;
     }
     case 'snow_core_record_add': {
       requireWrite();
