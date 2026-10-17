@@ -10038,7 +10038,7 @@
               },
               "name": {
                 "type": "string",
-                "description": "The link's name"
+                "description": "The link's name; default: the tool's name"
               },
               "display_output": {
                 "type": "boolean",
