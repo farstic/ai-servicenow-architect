@@ -3,7 +3,13 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
-## Unreleased (2.1.3-dev)
+## Unreleased (2.2.1-dev)
+
+**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
+then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
+with credentials the instance has just refused.
+
+## 2.2.0 — 2026-10-17
 
 **Breaking — the AI agent tools write AI Agent Studio's tables, and no ACL (ARC-09-C165).** `snow_ai_ai_agent_add`,
 `snow_ai_ai_agents_index`, `snow_ai_ai_agent_read` and `snow_ai_agentic_workflow_add` used `sys_ai_agent`,
@@ -23,10 +29,6 @@ only as a plain choice value (letters and underscores). Removed inputs, none of 
 `capabilities` and `auto_generate_acls` on the agent, `agent_sys_id`, `steps` and `trigger_conditions` on the
 workflow. The agent now requires `role` and `instructions`, and the workflow `base_plan` and `agent_sys_ids`. Still
 399 tools, 163 of them mutating, and 74 error codes.
-
-**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
-then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
-with credentials the instance has just refused.
 
 ## 2.1.2 — 2026-10-16
 
