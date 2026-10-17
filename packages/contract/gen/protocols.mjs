@@ -166,7 +166,9 @@ with both on. The order, and what each step costs in approval:
 3. **The workflow, one question, after its agents exist.**
    \`About to create agentic workflow "<name>": team (sn_aia_team), workflow (sn_aia_usecase), members (sn_aia_team_member: <agent>, …) on instance "<label>" — write approved?\`
 4. **Read-backs, after each call.** Each tool checks what it can before its first write, and a refusal says
-   "Nothing was written.". It reads every record back, reports the configuration and the version the
+   "Nothing was written.". That includes the data policies of every table it will create on (PN-21): a field one
+   requires and the call would not send is refused there, naming the policy, so ask the user for the value and call
+   again. It reads every record back, reports the configuration and the version the
    instance created by itself, and reports any difference as a warning. A failure after the first record
    names the step it stopped at and every record created, and deletes nothing. Report each result, warnings
    first, before the next call.
