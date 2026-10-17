@@ -447,6 +447,25 @@ describe('ARC-09-C95 — snow_atf_atf_step_add writes the step and its inputs, a
     expect(error?.message).toContain(cicd.db!.rows.sys_atf_step[0].sys_id as string);
     expect(error?.message).toMatch(/was created/);
   });
+
+  // ARC-09-C174 — the refusal names the step it stopped at, before the step it left behind.
+  it('a refused input write names the step: creating sys_variable_value', async () => {
+    cicd.db!.refuse = (method, table) => (method === 'POST' && table === 'sys_variable_value' ? refused(403, 'ACL') : undefined);
+
+    const { error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(error?.code).toBe('INSUFFICIENT_PRIVILEGES');
+    expect(error?.message).toMatch(/ — while creating sys_variable_value; step [0-9a-f]{32} was created/);
+  });
+
+  it('a refused read of the step\'s input rows names the step: reading sys_variable_value', async () => {
+    cicd.db!.refuse = (method, table) => (method === 'GET' && table === 'sys_variable_value' ? refused(403, 'ACL') : undefined);
+
+    const { error } = await call('snow_atf_atf_step_add', { test: TEST, step_config: RSSS, inputs: { script: SCRIPT } });
+
+    expect(error?.code).toBe('INSUFFICIENT_PRIVILEGES');
+    expect(error?.message).toMatch(/ — while reading sys_variable_value; step [0-9a-f]{32} was created/);
+  });
 });
 
 describe('ARC-09-C122 — snow_atf_atf_step_add reads each input variable\'s max_length and mandatory, and lists every input row', () => {

@@ -363,3 +363,82 @@ describe('ARC-09-C165 — snow_ai_* writes AI Agent Studio\'s own tables', () =>
     expect(given.client.createRecord.mock.calls[0][1]).not.toHaveProperty('agent_type');
   });
 });
+
+/**
+ * ARC-09-C174 — a composite write that fails names the step it failed at. The owner's rc.2 check: the agent was
+ * written, a later step was refused with INSUFFICIENT_PRIVILEGES, and the rethrow named the agent but not the step, so
+ * the refusal could not be placed. Each case refuses one step and reads the step back from the message; the code is
+ * the refusal's own.
+ */
+describe('ARC-09-C174 — a partial build names the step that failed', () => {
+  const ID = '[0-9a-f]{32}';
+  type Method = 'createRecord' | 'updateRecord' | 'getRecord' | 'queryRecords';
+  /** The instance refuses `method` on `table`, and serves everything else. */
+  function refusing(method: Method, table: string) {
+    const fake = fakeInstance(SEED());
+    const mock = fake.client[method] as ReturnType<typeof vi.fn>;
+    const real = mock.getMockImplementation()!;
+    mock.mockImplementation(async (...args: unknown[]) => {
+      const name = method === 'queryRecords' ? (args[0] as { table: string }).table : args[0];
+      if (name === table) throw new ServiceNowError('Operation failed', 'INSUFFICIENT_PRIVILEGES');
+      return real(...args);
+    });
+    return fake.client;
+  }
+  async function failure(client: ServiceNowClient, tool: string, args: Row): Promise<ServiceNowError> {
+    const error = await dispatchAiAgentsAction(client, tool, args).then(() => undefined, (e: unknown) => e);
+    expect(error).toBeInstanceOf(ServiceNowError);
+    expect((error as ServiceNowError).code).toBe('INSUFFICIENT_PRIVILEGES');
+    return error as ServiceNowError;
+  }
+  const agentWith = (extra: Row = {}): Row => ({ ...AGENT_ARGS, tools: [{ tool_sys_id: TOOL }], ...extra });
+
+  it('a refused tool link: the step is creating sn_aia_agent_tool_m2m, named before what was created', async () => {
+    const error = await failure(refusing('createRecord', 'sn_aia_agent_tool_m2m'), 'snow_ai_ai_agent_add', agentWith());
+    expect(error.message).toMatch(new RegExp(`^Operation failed — while creating sn_aia_agent_tool_m2m; sn_aia_agent ${ID} was created, but the call did not finish\\.`));
+  });
+
+  it('a refused configuration read: the step is reading sn_aia_agent_config, and the link is named as created', async () => {
+    const error = await failure(refusing('queryRecords', 'sn_aia_agent_config'), 'snow_ai_ai_agent_add', agentWith());
+    expect(error.message).toMatch(new RegExp(`while reading sn_aia_agent_config; sn_aia_agent ${ID} was created, but the call did not finish, as were sn_aia_agent_tool_m2m ${ID}\\.`));
+  });
+
+  it('a refused configuration update (active: false): the step is updating sn_aia_agent_config and its sys_id', async () => {
+    const error = await failure(refusing('updateRecord', 'sn_aia_agent_config'), 'snow_ai_ai_agent_add', agentWith({ active: false }));
+    expect(error.message).toMatch(new RegExp(`while updating sn_aia_agent_config ${ID}; sn_aia_agent ${ID} was created`));
+  });
+
+  it('a refused version read: the step is reading sn_aia_version', async () => {
+    const error = await failure(refusing('queryRecords', 'sn_aia_version'), 'snow_ai_ai_agent_add', agentWith());
+    expect(error.message).toMatch(new RegExp(`while reading sn_aia_version; sn_aia_agent ${ID} was created`));
+  });
+
+  it('a refused read-back of a link it created: the step says so, and the link is named among what was created', async () => {
+    const error = await failure(refusing('getRecord', 'sn_aia_agent_tool_m2m'), 'snow_ai_ai_agent_add', agentWith());
+    const m = error.message.match(new RegExp(`while reading back sn_aia_agent_tool_m2m (${ID}) after creating it; sn_aia_agent ${ID} was created, but the call did not finish, as were sn_aia_agent_tool_m2m (${ID})\\.`));
+    expect(m).not.toBeNull();
+    expect(m![2]).toBe(m![1]);
+  });
+
+  it('a refused read-back of the agent itself: the agent was created, and the message says so', async () => {
+    const error = await failure(refusing('getRecord', 'sn_aia_agent'), 'snow_ai_ai_agent_add', agentWith());
+    const m = error.message.match(new RegExp(`while reading back sn_aia_agent (${ID}) after creating it; sn_aia_agent (${ID}) was created`));
+    expect(m).not.toBeNull();
+    expect(m![2]).toBe(m![1]);
+  });
+
+  it('control: a refused first insert wrote nothing, and its error passes through unchanged', async () => {
+    const error = await failure(refusing('createRecord', 'sn_aia_agent'), 'snow_ai_ai_agent_add', agentWith());
+    expect(error.message).toBe('Operation failed');
+  });
+
+  it('a refused workflow member: the step is creating sn_aia_team_member, after the team and the workflow', async () => {
+    const error = await failure(refusing('createRecord', 'sn_aia_team_member'), 'snow_ai_agentic_workflow_add', WORKFLOW_ARGS);
+    expect(error.message).toMatch(new RegExp(`^Operation failed — while creating sn_aia_team_member; sn_aia_team ${ID} was created, but the call did not finish, as were sn_aia_usecase ${ID}\\.`));
+  });
+
+  it('a refused workflow version read: the step is reading sn_aia_version, and every member is named', async () => {
+    const error = await failure(refusing('queryRecords', 'sn_aia_version'), 'snow_ai_agentic_workflow_add', WORKFLOW_ARGS);
+    expect(error.message).toMatch(new RegExp(`while reading sn_aia_version; sn_aia_team ${ID} was created, but the call did not finish, as were sn_aia_usecase ${ID}, sn_aia_team_member ${ID}, sn_aia_team_member ${ID}\\.`));
+  });
+});
