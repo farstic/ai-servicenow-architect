@@ -274,8 +274,8 @@ async function addAgent(client: ServiceNowClient, args: Row): Promise<Row> {
   }
   if (args.active !== undefined && typeof args.active !== 'boolean') refuse('active must be true or false.');
   const tools = toolsArg(args.tools);
-  // ARC-09-C180: each tool's name, from the read that proves it exists. An unnamed link is refused by the before-insert
-  // rule "Check duplicate name" (PN-17), and AI Agent Studio names a link after its tool.
+  // ARC-09-C180: each tool's name, from the read that proves it exists. An unnamed link is refused by a data policy,
+  // "The following fields are mandatory: Name" (PN-17), and AI Agent Studio names a link after its tool.
   const toolNames: Array<string | undefined> = [];
   for (const [i, t] of tools.entries()) {
     toolNames.push(plain((await mustExist(client, TOOL, t.tool_sys_id, `tools[${i}].tool_sys_id`)).name));

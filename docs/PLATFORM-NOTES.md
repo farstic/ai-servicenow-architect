@@ -379,9 +379,10 @@ run that day (ARC-09-C172)
 - **A tool link rewrites the snapshot.** Inserting an `sn_aia_agent_tool_m2m` added the link to the committed
   version's `snapshot.overlay.tools`, with `executionMode: "copilot"`, and created no new version. The link's
   defaults included `display_output=true`.
-- **An unnamed link is refused.** An `sn_aia_agent_tool_m2m` insert without `name` was refused by the before-insert
-  rule "Check duplicate name": 403, "Operation Failed". The same insert with the tool's name was created. AI Agent
-  Studio names a link after its tool. Observed on `tgdev`, Brazil patch 0, 2026-10-17 (ARC-09-C180).
+- **An unnamed link is refused.** An `sn_aia_agent_tool_m2m` insert without `name` is refused by a data policy,
+  "Data Policy Exception: The following fields are mandatory: Name", with HTTP 403. The same insert with the tool's
+  name was created. AI Agent Studio names a link after its tool. Observed on `tgdev`, Brazil patch 0, 2026-10-17, on
+  v2.2.0-rc.3, where the instance's own text first reached the caller (ARC-09-C176, ARC-09-C180).
 - **A workflow's insert creates a version and nothing else.** An insert into `sn_aia_usecase` created an
   `sn_aia_version` "V1" (`state=published`, empty `snapshot`) and no `sn_aia_team`. The workflow has no agents
   until a team is created, set on `sn_aia_usecase.team`, and given `sn_aia_team_member` rows.
