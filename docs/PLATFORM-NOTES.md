@@ -470,6 +470,21 @@ engagement folder and not committed.
 step is a write with its own question, and the Now Assist Specialist says to remove `admin` from the approved roles and
 to expect the two records in the update set (ARC-09-C172).
 
+## PN-20 — A Protected Script Include's script does not come back over the Table API
+
+**Applies to:** `sys_script_include` with `sys_policy` = `protected` · Brazil patch 0 · measured on `tgdev`, 2026-10-17
+**Behaviour:** The `sn_aia` Script Includes AgentToolM2MDao and AgentVersionDao, read with `snow_core_record_read`
+and `snow_core_records_query`, came back without a `script` field: not empty, absent. AgentToolM2MDao's `sys_policy`
+reads `protected`. The tools pass on what the instance answers (measured in the server: a 5 KB `script` comes back
+whole, and nothing removes a field), so the platform withholds it.
+**Grounding:** `markdown/api-reference/scripts/c_ScriptIncludes.md`, Protection policy (lines 158–174): "Protected —
+… Customers who download the script include cannot see the contents of the script field." That page does not name
+the `sys_policy` column; verify it on the instance. The record's `access` value, `package_private` ("Accessible
+from: This application scope only", lines 93–103), governs calling it from another scope, not reading it.
+**Evidence:** the owner's read on `tgdev`, 2026-10-17, which is engagement-local and not committed.
+**Engine consequence:** none in the tools. A design cannot read a Protected script and must not depend on its
+contents. ARC-09-C178 (OPEN) would name a requested field the instance did not return.
+
 ## Windows notes — this repository, not ServiceNow
 
 The notes above are ServiceNow behaviour. These are about the machine the engine runs on, and they
