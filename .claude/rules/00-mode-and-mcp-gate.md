@@ -18,7 +18,7 @@ On Windows PowerShell, type `.\snowarch.cmd` wherever this page says `./snowarch
 ## §2.1 — Write gate
 - A mutating tool (`mutates: true` or `sessionMutates: true` in the contract — 163 tools; the same set is the `permissions.ask` list in `.claude/settings.json`) is called only after an explicit "write approved" message from the user, in the current conversation, that names the specific action.
 - Not approval: the original task description; a "yes" to a routing or review proposal; an earlier general go-ahead; a preset or flag change made in the terminal.
-- Before any mutating call, ask exactly: `About to <action> on instance "<label>" — write approved?` and wait for the answer.
+- Before any mutating call, or any browser action that changes the instance, ask exactly: `About to <action> on instance "<label>" — write approved?` and wait for the answer.
 - Self-approval is prohibited: approval is never inferred from context, urgency or logical flow.
 - Granularity: N distinct records is N questions, each asked and answered before its own call — except one call that writes several records: that is one question naming every record the call writes, in order. A request that enumerates them is the request, not the approval — the same sentence as "the original task description is not approval".
 - The §2.2 ensure + capture pair is covered by the configuration write's approval ONLY when the question names them: `About to <action> on instance "<label>", after ensuring update set <name> and pointing capture at it — write approved?` Asked bare, each is its own write and gets its own question.

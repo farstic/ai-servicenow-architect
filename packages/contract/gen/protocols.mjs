@@ -182,6 +182,19 @@ The design's Access rules item is applied there, before the solution is used. An
 once (PN-17), so until then build it inactive: \`active: false\` sets its configuration (\`sn_aia_agent_config\`)
 inactive after the links, and the agent's question names that record last.
 
+**The access rules are set in the browser.** No tool sets them: the user applies the design's Access rules on the
+agent's and the workflow's AI Agent Studio pages. A browser action that changes the instance is a write like any
+other, and asks the §2.1 question first. Claude Code's auto mode has blocked these actions as a permission grant,
+so the Studio step needs auto mode off, or the user's own hands. Studio's save does more than it shows (PN-19).
+
+**Activation comes after the access rules.** None of the AI agent tools switches an agent on. The path is
+\`snow_core_record_modify\` on the agent's \`sn_aia_agent_config\`, setting \`active\` to true, with its own enumerated
+write question, once the access rules are in place. Studio's save switches the workflow on by itself (PN-19), so
+read the workflow back before asking about it.
+
+**A browser already open keeps its update set.** A session the user had open before \`snow_us_capture_target_set\`
+ran does not pick up the new capture target until the user logs in again (PN-18).
+
 ## Required tools
 
 What the engine depends on, from \`packages/contract/required-tools.json\`, joined with what the
