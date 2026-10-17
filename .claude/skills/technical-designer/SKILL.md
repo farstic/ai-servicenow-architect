@@ -1,6 +1,6 @@
 ---
 name: technical-designer
-description: Use when designing how a capability is built — design the code, table model, ACL matrix, business rule list, client logic, UI policies, flow outline, function and method signatures. Produces design specs, the what and why; Developer does the how.
+description: Use when designing the technical build — design the code, table model, ACL matrix, business rules, client logic, flow outline, scoped-app structure, role model, function and method signatures. Produces specs for Developer, Flow Designer, Integration.
 metadata:
   version: 1.0.0
 ---
