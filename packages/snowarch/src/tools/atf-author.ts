@@ -144,17 +144,31 @@ async function readBack(client: ServiceNowClient, w: Written): Promise<{ stored:
   return { stored, warnings };
 }
 
+/**
+ * ARC-09-C174 — where a call that writes several records is: the step it is at, and every record it has created. A
+ * failure is rethrown naming both, so a refusal can be placed. `write` keeps it current, and a record whose read-back
+ * fails is already among `created`.
+ */
+export interface Progress {
+  step: string;
+  created: Array<{ table: string; sysId: string }>;
+}
+
 /** Write one record and read it back. Also ai-agents.ts's, for the sn_aia_* records (ARC-09-C165). */
-export async function write(client: ServiceNowClient, table: string, sent: Row, live: boolean, sysId?: string):
-Promise<{ sysId: string; stored: ServiceNowRecord; warnings: AuthorWarning[] }> {
+export async function write(client: ServiceNowClient, table: string, sent: Row, live: boolean, sysId?: string,
+  progress?: Progress): Promise<{ sysId: string; stored: ServiceNowRecord; warnings: AuthorWarning[] }> {
+  const operation = sysId === undefined ? 'create' : 'update';
+  if (progress) progress.step = sysId === undefined ? `creating ${table}` : `updating ${table} ${sysId}`;
   const answer = (sysId === undefined
     ? await client.createRecord(table, sent)
     : await client.updateRecord(table, sysId, sent)) ?? {};
   const id = sysId ?? plain(answer.sys_id);
   if (!id) throw new ServiceNowError(`The instance answered the create on ${table} with no sys_id, so it cannot be read back.`, 'CREATE_FAILED');
-  const { stored, warnings } = await readBack(client, {
-    table, sysId: id, sent, answer, operation: sysId === undefined ? 'create' : 'update', live,
-  });
+  if (progress) {
+    if (sysId === undefined) progress.created.push({ table, sysId: id });
+    progress.step = `reading back ${table} ${id} after ${operation === 'create' ? 'creating' : 'updating'} it`;
+  }
+  const { stored, warnings } = await readBack(client, { table, sysId: id, sent, answer, operation, live });
   return { sysId: id, stored, warnings };
 }
 
@@ -284,11 +298,11 @@ async function attached(client: ServiceNowClient, step: string, name: string, va
   }];
 }
 
-function leftBehind(error: unknown, step: string, warnings: AuthorWarning[]): unknown {
+function leftBehind(error: unknown, at: string, step: string, warnings: AuthorWarning[]): unknown {
   if (!(error instanceof ServiceNowError)) return error;
   const readBackNote = warnings.length === 0 ? ''
     : ` The step's read-back reported ${warnings.map((w) => `${w.code} on ${w.field}`).join(', ')}.`;
-  return new ServiceNowError(`${error.message} — step ${step} was created, but its inputs were not all written: read `
+  return new ServiceNowError(`${error.message} — while ${at}; step ${step} was created, but its inputs were not all written: read `
     + `${VALUE} with document_key=${step} before trying again, and do not add the step a second time.${readBackNote}`,
   error.code, error.details);
 }
@@ -347,7 +361,11 @@ export async function addStep(client: ServiceNowClient, args: Row): Promise<Row>
   // ARC-09-C122 — the rows this call wrote, by sys_id, for the listing after the write.
   const wrote = new Map<string, 'created' | 'updated'>();
   let listed: Row[] = [];
+  // ARC-09-C174 — the step this call is at, for a refusal to name. The input rows it creates are not listed: the
+  // rethrow says to read them all by the step.
+  const progress: Progress = { step: '', created: [] };
   try {
+    progress.step = `reading ${VALUE}`;
     const existing = await client.queryRecords({
       table: VALUE, query: `document_key=${step.sysId}`, fields: 'sys_id,document_key,variable,value', limit: 100,
     });
@@ -364,20 +382,23 @@ export async function addStep(client: ServiceNowClient, args: Row): Promise<Row>
         // Neither row is overwritten: `attached` below names them both in its warning.
       } else if (rows.length === 1) {
         const row = plain(rows[0].sys_id) as string;
-        const done = await write(client, VALUE, { value }, false, row);
+        const done = await write(client, VALUE, { value }, false, row, progress);
         warnings.push(...done.warnings);
         wrote.set(row, 'updated');
       } else {
-        const done = await write(client, VALUE, { document: STEP, document_key: step.sysId, variable, value }, false);
+        const done = await write(client, VALUE, { document: STEP, document_key: step.sysId, variable, value }, false, undefined,
+          progress);
         warnings.push(...done.warnings);
         wrote.set(done.sysId, 'created');
       }
+      progress.step = `reading ${VALUE}`;
       warnings.push(...await attached(client, step.sysId, name, variable));
     }
 
     // ARC-09-C122 — every input row of the step, after the write: the caller sees the rows the insert created from the
     // config's defaults too (PN-16), not only the ones it sent. One read, by the step.
     const nameOf = new Map([...variables].map(([name, v]) => [v.sysId, name]));
+    progress.step = `reading ${VALUE}`;
     const after = await client.queryRecords({
       table: VALUE, query: `document_key=${step.sysId}`, fields: 'sys_id,document_key,variable,value', limit: 100,
     });
@@ -397,7 +418,7 @@ export async function addStep(client: ServiceNowClient, args: Row): Promise<Row>
       }
     }
   } catch (error) {
-    throw leftBehind(error, step.sysId, warnings);
+    throw leftBehind(error, progress.step, step.sysId, warnings);
   }
 
   return {

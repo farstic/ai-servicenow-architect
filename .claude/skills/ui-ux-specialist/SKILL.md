@@ -1,6 +1,6 @@
 ---
 name: ui-ux-specialist
-description: Use when a ServiceNow user-experience surface needs designing — configurable Workspaces on the Next Experience and UI Builder framework, Service Portal pages, widgets, themes and branding, or classic UI form layout, related lists, list views, UI policies and UI actions. Produces UI/UX design specifications — the what and why of the experience — not implementation code and not the table or ACL model.
+description: Use when a user-experience surface needs design — Workspace, UI Builder, Now Experience, Service Portal, widget, theme, form layout, list view, UI policies and actions. Produces UI/UX design specs, not code and not the table or ACL model.
 metadata:
   version: 1.1.0
 ---

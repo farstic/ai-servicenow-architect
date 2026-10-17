@@ -1,6 +1,6 @@
 ---
 name: hrsd-specialist
-description: Mandatory gateway for ServiceNow HR Service Delivery work — HR case lifecycle, Lifecycle Events, HR Profile, Employee Center and Employee Center Pro, scoped HR data policies, HR document templates and HR Knowledge. Produces the 5-Part Constraint Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4.
+description: Mandatory gateway for HR Service Delivery — HR case lifecycle, Lifecycle Events (LE), HR Profile, Employee Center and Employee Center Pro, HR document templates, HR data policies, HR Knowledge. Produces the 5-Part Constraint Envelope.
 metadata:
   version: 2.0.0
 ---

@@ -1,6 +1,6 @@
 ---
 name: integration-specialist
-description: Use when designing or troubleshooting integration architecture between ServiceNow and an external system — outbound REST and SOAP, inbound Scripted REST APIs, IntegrationHub spokes, MID Server placement, authentication including OAuth2, JWT, mutual TLS and Connection & Credential Aliases, retry and dead-letter patterns, and payload security. Produces integration architecture specifications with explicit auth, topology, error handling and observability.
+description: Use when integrating with an external system — REST, SOAP, API, webhook, IntegrationHub spoke, MID Server, ECC queue, Azure DevOps or Service Bus, OAuth2, mutual TLS, credential aliases, retry and dead-letter. Produces integration architecture specs.
 metadata:
   version: 1.0.0
 ---

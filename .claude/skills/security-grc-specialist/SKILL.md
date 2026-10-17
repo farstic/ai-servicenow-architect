@@ -1,6 +1,6 @@
 ---
 name: security-grc-specialist
-description: Use when a ServiceNow design raises an architectural security or compliance question — ACL strategy and evaluation order, the role model and separation of duties, field-level security, data classification and PII handling, encryption and masking, audit and logging design, secure integration, and GRC control and regulatory mapping. Produces a security constraint note before builders run and an architectural-security review of the returned artefact.
+description: Use when a design raises a security or compliance question — ACL, role, RBAC, separation of duties, PII, encryption, audit, GRC, policy, compliance, SecOps, vulnerability. Produces a security constraint note before builders run and a review after.
 metadata:
   version: 1.1.0
 ---

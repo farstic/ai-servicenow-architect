@@ -1,6 +1,6 @@
 ---
 name: app-engine-specialist
-description: Use when a custom scoped ServiceNow application is in scope — scope strategy and application structure, App Engine Studio, App Engine Management Center, decision tables, document templates, and delegated development or maker governance. Produces scoped-app design specifications and structure, not implementation code and not the UI surface design.
+description: Use when a custom scoped app is in scope — scoped app strategy, App Engine Studio, App Engine Management Center, decision table, document template, maker governance. Produces scoped-app design and structure, not code and not the UI.
 metadata:
   version: 1.1.0
 ---

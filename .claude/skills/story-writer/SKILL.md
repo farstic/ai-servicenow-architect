@@ -1,6 +1,6 @@
 ---
 name: story-writer
-description: Use when authoring ServiceNow user stories, acceptance criteria or Gherkin Feature files — including extracting requirements from a workshop transcript, converting Discovery Output into sprint-ready stories, or breaking a feature into a story map. Produces ServiceNow-aware Gherkin with explicit OPEN QUESTIONS blocks, real role and table names, observable acceptance criteria and proposed supporting stories.
+description: Use when writing user stories, acceptance criteria or Gherkin — sprint-ready stories from a transcript or Discovery Output, or a story map. Produces Gherkin Feature files with OPEN QUESTIONS, real role and table names and supporting stories.
 metadata:
   version: 1.0.0
 ---

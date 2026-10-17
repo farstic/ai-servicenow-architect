@@ -129,6 +129,29 @@ export function lintRootless({ root, files, areas, allow = [] }) {
   return fail;
 }
 
+// SK-13 (ARC-09-C164) — the engine's share of Claude Code's skill-listing budget. The listing's 30,000 characters count
+// every skill in the session, the user's and their plugins' included (S-13 measures the whole), so the engine bounds
+// what it owns: each project skill's description at most 250 characters, the roster's at most 7,500 together.
+export const MAX_SHARE_DESCRIPTION = 250;
+export const MAX_ROSTER_DESCRIPTIONS = 7500;
+
+/** `{ skill → description length in characters }` for every `.claude/skills/<name>/SKILL.md`. */
+export function descriptionLengths({ root, skillsRoot = join(root, '.claude/skills') } = {}) {
+  return Object.fromEntries(skillDirs(skillsRoot).map((d) => {
+    const rel = `.claude/skills/${d}/SKILL.md`;
+    const { data } = parseFrontmatter(readFileSync(join(skillsRoot, d, 'SKILL.md'), 'utf8'), rel);
+    return [d, [...String(data.description ?? '')].length];
+  }));
+}
+
+export function lintDescriptionBudget(byName) {
+  const fail = Object.entries(byName).filter(([, n]) => n > MAX_SHARE_DESCRIPTION)
+    .map(([d, n]) => `SK-13 .claude/skills/${d}/SKILL.md: description ${n} chars > ${MAX_SHARE_DESCRIPTION}`);
+  const total = Object.values(byName).reduce((a, b) => a + b, 0);
+  if (total > MAX_ROSTER_DESCRIPTIONS) fail.push(`SK-13 roster: descriptions total ${total} chars > ${MAX_ROSTER_DESCRIPTIONS}`);
+  return fail;
+}
+
 export function lintAgents({ root, agentsRoot = join(root, '.claude/agents'),
                              skillsRoot = join(root, '.claude/skills'), enforceS04 = false } = {}) {
   const fail = [];

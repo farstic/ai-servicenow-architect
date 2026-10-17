@@ -1,6 +1,6 @@
 ---
 name: spm-specialist
-description: Use when Strategic Portfolio Management work is in scope — demand and idea management, project and program management, portfolio planning and investment funding, resource management, the goal and OKR framework, and agile or Enterprise Agile Planning including stories, epics, sprints and program increments. Produces baseline-process guidance, data-model alignment, a §1.1 verdict, anti-patterns and routing recommendations for downstream builders.
+description: Use when Strategic Portfolio Management (SPM) is in scope — demand, ideas, project and program, portfolio and investment funding, resource, OKRs, agile development and Enterprise Agile Planning. Produces baseline guidance and a §1.1 verdict.
 metadata:
   version: 1.1.0
 ---

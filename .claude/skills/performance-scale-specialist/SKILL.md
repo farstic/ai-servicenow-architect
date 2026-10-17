@@ -1,6 +1,6 @@
 ---
 name: performance-scale-specialist
-description: Use when a ServiceNow design has to hold at volume — query design, large-table patterns, asynchronous and batch processing, data growth and archival, transaction quotas and semaphores, ACL and list-rendering cost at scale, and Performance Analytics at volume. Produces a scale constraint note before builders run and a scale audit of the returned artefact.
+description: Use when a design must hold at scale — performance, high volume, 1M+ records, TPS, batch size, async processing, large-table queries, archival, quotas. Produces a scale constraint note before builders run and a scale audit of what they return.
 metadata:
   version: 1.0.0
 ---

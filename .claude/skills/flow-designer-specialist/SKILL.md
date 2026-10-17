@@ -1,6 +1,6 @@
 ---
 name: flow-designer-specialist
-description: Use when designing or troubleshooting Flow Designer flows, subflows, custom Actions in Action Designer, decision tables and IntegrationHub spoke consumption patterns. Produces production-quality flow design specifications with explicit triggers, error handling and transaction strategy, and clear handoffs to Developer for Action server scripts and to Integration Specialist for the plumbing the flow orchestrates.
+description: Use when designing or troubleshooting Flow Designer flows, subflows, custom actions in Action Designer and decision tables — what fires when. Produces flow specs with triggers and error handling; scripts go to Developer, plumbing to Integration.
 metadata:
   version: 1.0.0
 ---

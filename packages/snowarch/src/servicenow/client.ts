@@ -26,6 +26,16 @@ import { currentInstanceOrNull } from './context.js';
  */
 const NOT_RETRIED: readonly string[] = ['AUTHENTICATION_FAILED', 'INVALID_REQUEST', 'NOT_FOUND', 'INSUFFICIENT_PRIVILEGES'];
 
+/** How much of a refusal's non-JSON body the message shows (ARC-09-C176): enough to name a gateway, not a page. */
+const NON_JSON_BODY_SHOWN = 200;
+
+/** A response body as a message shows it (ARC-09-C179): the parsed JSON re-serialised, or the raw text, collapsed and cut. */
+function shownBody(body: unknown): string {
+  if (body === undefined) return '(empty)';
+  const text = (typeof body === 'string' ? body : JSON.stringify(body)).replace(/\s+/g, ' ').trim();
+  return text === '' ? '(empty)' : text.slice(0, NON_JSON_BODY_SHOWN);
+}
+
 // ─── The Batch API's bodies (ARC-09-C108) ────────────────────────────────────────────────────
 //
 // vendor/ServiceNowDocs/markdown/api-reference/rest-apis/batch-api.md: `rest_requests.body` is the
@@ -296,7 +306,7 @@ export class ServiceNowClient {
     url: string,
     options: RequestInit = {},
     requestedRetries: number = this.maxRetries,
-    onResponse?: (response: { headers?: { get?: (name: string) => string | null } }) => void
+    onResponse?: (response: { status?: number; headers?: { get?: (name: string) => string | null } }) => void
   ): Promise<T> {
     let lastError: Error | undefined;
     const maxRetries = Number.isInteger(requestedRetries) && requestedRetries >= 0
@@ -345,8 +355,13 @@ export class ServiceNowClient {
               errorDetail = String(errorJson.error.detail);
             }
           } catch {
-            // Error response wasn't JSON, use status text
+            // Not JSON (a gateway's page, say): its own text, shortened, after the status line.
+            const body = errorText.replace(/\s+/g, ' ').trim();
+            if (body) errorMessage = `${errorMessage}: ${body.slice(0, NON_JSON_BODY_SHOWN)}`;
           }
+          // ARC-09-C176 — the detail is where a refusal says what refused it (an ACL, a Business Rule, a
+          // scope), so it is part of the message the caller reads, not only of `details`.
+          if (errorDetail && !errorMessage.includes(errorDetail)) errorMessage = `${errorMessage}: ${errorDetail}`;
 
           // Map HTTP status to error codes. The default was `API_ERROR`, which is in no
           // registry and so reached a caller with no meaning and no remedy attached —
@@ -995,11 +1010,20 @@ export class ServiceNowClient {
     logger.info(`Creating record in ${table}`);
     const url = `${this.baseUrl}/api/now/table/${table}`;
     try {
-      const response = await this.request<ServiceNowApiResponse<ServiceNowRecord>>(url, {
+      let status: number | undefined;
+      const response = await this.request<ServiceNowApiResponse<ServiceNowRecord> | string | null | undefined>(url, {
         method: 'POST',
         body: JSON.stringify(data),
-      });
-      return response.result;
+      }, this.maxRetries, (r) => { status = r.status; });
+      // ARC-09-C179 — an answer with no record in it is not a created record, whatever its status: the instance may
+      // have discarded the insert. Refused here, with the status and the body, so no caller reports it as created.
+      const record = typeof response === 'object' && response !== null ? response.result : undefined;
+      if (!record || typeof record !== 'object' || !record.sys_id) {
+        throw new ServiceNowError(`No record returned for the create on ${table} (HTTP ${status ?? 'unknown'}); body: `
+          + `${shownBody(response)}. The instance may have discarded the insert: read ${table} before adding it again.`,
+        'CREATE_FAILED', { status, table });
+      }
+      return record;
     } catch (error) {
       if (error instanceof ServiceNowError) throw error;
       throw new ServiceNowError(
@@ -1083,7 +1107,10 @@ export class ServiceNowClient {
     const haystack = `${sn?.message ?? (error instanceof Error ? error.message : '')} ${detail ?? ''}`.toLowerCase();
 
     const ACL = /acl|aborted|insufficient (rights|privilege)|not authorized|security|write operation .* not permitted|no permission|operation against file/;
-    const CONSTRAINT = /referenced by|cannot be deleted because|cascade|referential integrity|foreign|child record|in use by|dependent|constraint/;
+    // ARC-09-C177: the instance words an ACL refusal "ACL Exception Delete Failed due to security constraints"
+    // (PN-16). That wording decides before the constraint pattern, which no longer matches the bare word.
+    const ACL_WORDING = /acl exception|security constraints/;
+    const CONSTRAINT = /referenced by|cannot be deleted because|cascade|referential integrity|foreign|child record|in use by|dependent/;
     const NOT_FOUND = /no record|record not found|does not exist|not found/;
     const suffix = detail ? ` ServiceNow detail: ${detail}` : '';
 
@@ -1093,7 +1120,7 @@ export class ServiceNowClient {
         message: `Cannot delete ${table}/${sysId}: the record does not exist (it may have already been deleted).`,
       };
     }
-    if (CONSTRAINT.test(haystack)) {
+    if (!ACL_WORDING.test(haystack) && CONSTRAINT.test(haystack)) {
       return {
         code: 'DELETE_CONSTRAINT',
         message:
@@ -1109,11 +1136,11 @@ export class ServiceNowClient {
           `Your account lacks delete rights on this table/record, or a Business Rule blocked the operation.${suffix}`,
       };
     }
+    // The message already carries the detail since ARC-09-C176; it is added here only when it does not.
+    const said = sn?.message ?? (error instanceof Error ? error.message : 'Unknown error');
     return {
       code: 'DELETE_FAILED',
-      message:
-        `Failed to delete ${table}/${sysId}: ${sn?.message ?? (error instanceof Error ? error.message : 'Unknown error')}` +
-        (detail ? ` (detail: ${detail})` : ''),
+      message: `Failed to delete ${table}/${sysId}: ${said}` + (detail && !said.includes(detail) ? ` (detail: ${detail})` : ''),
     };
   }
 

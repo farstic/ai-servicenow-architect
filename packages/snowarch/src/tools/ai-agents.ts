@@ -18,14 +18,14 @@
  *
  * The composite-write conventions of the ATF authoring tools (ARC-09-C95): every check is a read made before the first
  * write, and a refusal says "Nothing was written."; every record is read back after its write, and a difference is a
- * warning; a failure after the first record rethrows naming every record created, and nothing is deleted — a delete
- * is a write that needs its own approval.
+ * warning; a failure after the first record rethrows naming the step it stopped at and every record created
+ * (ARC-09-C174), and nothing is deleted — a delete is a write that needs its own approval.
  */
 import type { ServiceNowClient } from '../servicenow/client.js';
 import type { ServiceNowRecord } from '../servicenow/types.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireNowAssist, requireWrite } from '../utils/permissions.js';
-import { plain, write } from './atf-author.js';
+import { plain, write, type Progress } from './atf-author.js';
 import type { ToolDefinition } from './types.js';
 
 const AGENT = 'sn_aia_agent';
@@ -87,7 +87,7 @@ export function aiAgentsToolManifest(): ToolDefinition[] {
               properties: {
                 tool_sys_id: { type: 'string', description: 'sys_id of an existing sn_aia_tool' },
                 execution_mode: { type: 'string', description: 'A value listed in sys_choice on the instance; omitted, the instance default' },
-                name: { type: 'string', description: 'The link\'s name' },
+                name: { type: 'string', description: 'The link\'s name; default: the tool\'s name' },
                 display_output: { type: 'boolean', description: 'Show the tool\'s raw output to the user (instance default true)' },
               },
               required: ['tool_sys_id'],
@@ -220,19 +220,26 @@ async function hasColumn(client: ServiceNowClient, table: string, column: string
 }
 
 /** The first record matching `query`, or null. A read after a write: a refusal here is not a write failure. */
-async function first(client: ServiceNowClient, table: string, query: string): Promise<ServiceNowRecord | null> {
+async function first(client: ServiceNowClient, table: string, query: string, progress?: Progress): Promise<ServiceNowRecord | null> {
+  if (progress) progress.step = `reading ${table}`;
   const resp = await client.queryRecords({ table, query, limit: 1, orderBy: '-sys_created_on' });
   return resp.records[0] ?? null;
 }
 
-/** A failure after the first record: rethrown, naming every record already created. Nothing is deleted. */
-function leftBehind(error: unknown, created: Array<{ table: string; sysId: string }>, warnings: Row[], retry: string): ServiceNowError {
-  const [head, ...rest] = created;
+/**
+ * A failure after the first record: rethrown, naming the step it stopped at (ARC-09-C174) and every record already
+ * created, with the error's own code. Nothing is deleted. A failure of the first insert wrote nothing, and passes
+ * through unchanged.
+ */
+function leftBehind(error: unknown, progress: Progress, warnings: Row[], retry: string): unknown {
+  const [head, ...rest] = progress.created;
+  if (!head) return error;
   const also = rest.length === 0 ? '' : `, as were ${rest.map((c) => `${c.table} ${c.sysId}`).join(', ')}`;
   const readBackNote = warnings.length === 0 ? ''
     : ` The read-back reported ${warnings.map((w) => `${w.code} on ${w.table}.${w.field}`).join(', ')}.`;
   const message = error instanceof Error ? error.message : String(error);
-  return new ServiceNowError(`${message} — ${head.table} ${head.sysId} was created, but the call did not finish${also}. `
+  return new ServiceNowError(`${message} — while ${progress.step}; ${head.table} ${head.sysId} was created, but the call `
+    + `did not finish${also}. `
     + `Read them before trying again, and ${retry}. Nothing was deleted.${readBackNote}`,
   error instanceof ServiceNowError ? error.code : 'CREATE_FAILED', error instanceof ServiceNowError ? error.details : undefined);
 }
@@ -267,40 +274,47 @@ async function addAgent(client: ServiceNowClient, args: Row): Promise<Row> {
   }
   if (args.active !== undefined && typeof args.active !== 'boolean') refuse('active must be true or false.');
   const tools = toolsArg(args.tools);
-  for (const [i, t] of tools.entries()) await mustExist(client, TOOL, t.tool_sys_id, `tools[${i}].tool_sys_id`);
+  // ARC-09-C180: each tool's name, from the read that proves it exists. An unnamed link is refused by the before-insert
+  // rule "Check duplicate name" (PN-17), and AI Agent Studio names a link after its tool.
+  const toolNames: Array<string | undefined> = [];
+  for (const [i, t] of tools.entries()) {
+    toolNames.push(plain((await mustExist(client, TOOL, t.tool_sys_id, `tools[${i}].tool_sys_id`)).name));
+  }
   if (tools.some((t) => t.execution_mode !== undefined)) {
     const listed = await listedModes(client, LINK);
     for (const t of tools) if (t.execution_mode !== undefined) checkMode(t.execution_mode, listed, LINK);
   }
 
-  const agent = await write(client, AGENT, sent, args.active !== false);
-  const created = [{ table: AGENT, sysId: agent.sysId }];
-  const warnings: Row[] = [...agent.warnings];
+  const progress: Progress = { step: '', created: [] };
+  const warnings: Row[] = [];
   const links: Row[] = [];
+  let agent: Awaited<ReturnType<typeof write>>;
   let config: ServiceNowRecord | null;
   let version: ServiceNowRecord | null;
   try {
-    for (const t of tools) {
+    agent = await write(client, AGENT, sent, args.active !== false, undefined, progress);
+    warnings.push(...agent.warnings);
+    for (const [i, t] of tools.entries()) {
       const link: Row = { agent: agent.sysId, tool: t.tool_sys_id };
-      if (t.name !== undefined) link.name = t.name;
+      const linkName = t.name ?? toolNames[i];
+      if (linkName !== undefined && linkName !== '') link.name = linkName;
       if (t.execution_mode !== undefined) link.execution_mode = t.execution_mode;
       if (t.display_output !== undefined) link.display_output = t.display_output;
-      const done = await write(client, LINK, link, true);
-      created.push({ table: LINK, sysId: done.sysId });
+      const done = await write(client, LINK, link, true, undefined, progress);
       warnings.push(...done.warnings);
       links.push(done.stored);
     }
     // ARC-09-C169: read back AFTER the links, configuration then version. A tool link rewrites the version's
     // snapshot (PN-17); read before the links, the version the result reports listed no tools.
-    config = await first(client, CONFIG, `agent=${agent.sysId}`);
+    config = await first(client, CONFIG, `agent=${agent.sysId}`, progress);
     if (args.active === false && config) {
-      const done = await write(client, CONFIG, { active: false }, false, String(plain(config.sys_id)));
+      const done = await write(client, CONFIG, { active: false }, false, String(plain(config.sys_id)), progress);
       warnings.push(...done.warnings);
       config = done.stored;
     }
-    version = await first(client, VERSION, `target_id=${agent.sysId}`);
+    version = await first(client, VERSION, `target_id=${agent.sysId}`, progress);
   } catch (error) {
-    throw leftBehind(error, created, warnings, 'do not add the agent a second time');
+    throw leftBehind(error, progress, warnings, 'do not add the agent a second time');
   }
   if (!config) {
     warnings.push({ table: CONFIG, message: `configuration record not found; the agent may be active. No ${CONFIG} row has `
@@ -341,30 +355,30 @@ async function addWorkflow(client: ServiceNowClient, args: Row): Promise<Row> {
   if (mode !== undefined) checkMode(mode, await listedModes(client, USECASE), USECASE);
   if (memoryScope !== undefined) await hasColumn(client, MEMBER, 'memory_scope');
 
-  // The team first, so the workflow's insert carries it and nothing is modified afterwards (PN-17).
-  const team = await write(client, TEAM, { name: teamName }, true);
-  const created = [{ table: TEAM, sysId: team.sysId }];
-  const warnings: Row[] = [...team.warnings];
+  const progress: Progress = { step: '', created: [] };
+  const warnings: Row[] = [];
   const members: Row[] = [];
+  let team: Awaited<ReturnType<typeof write>>;
   let workflow: Awaited<ReturnType<typeof write>>;
   let version: ServiceNowRecord | null;
   try {
+    // The team first, so the workflow's insert carries it and nothing is modified afterwards (PN-17).
+    team = await write(client, TEAM, { name: teamName }, true, undefined, progress);
+    warnings.push(...team.warnings);
     const sent: Row = { name, description, base_plan: basePlan, team: team.sysId };
     if (mode !== undefined) sent.execution_mode = mode;
-    workflow = await write(client, USECASE, sent, true);
-    created.push({ table: USECASE, sysId: workflow.sysId });
+    workflow = await write(client, USECASE, sent, true, undefined, progress);
     warnings.push(...workflow.warnings);
     for (const agent of agentIds) {
       const member: Row = { team: team.sysId, agent };
       if (memoryScope !== undefined) member.memory_scope = memoryScope;
-      const done = await write(client, MEMBER, member, true);
-      created.push({ table: MEMBER, sysId: done.sysId });
+      const done = await write(client, MEMBER, member, true, undefined, progress);
       warnings.push(...done.warnings);
       members.push(done.stored);
     }
-    version = await first(client, VERSION, `target_id=${workflow.sysId}`);
+    version = await first(client, VERSION, `target_id=${workflow.sysId}`, progress);
   } catch (error) {
-    throw leftBehind(error, created, warnings, 'do not add the workflow a second time');
+    throw leftBehind(error, progress, warnings, 'do not add the workflow a second time');
   }
   if (!version) {
     warnings.push({ table: VERSION, message: `version record not found: no ${VERSION} row has target_id=${workflow.sysId}, `

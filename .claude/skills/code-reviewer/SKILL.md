@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: "Use when reviewing existing ServiceNow code — Script Includes, Business Rules, Client Scripts, UI Scripts, Scheduled Jobs, custom Flow Action scripts and ATF step scripts — against the four checklists: style, performance, security and best practice. Produces a structured review report with severity ratings (block / fix-before-prod / consider) and explicit recommendations."
+description: Use when reviewing ServiceNow code — a code review of Script Includes, Business Rules, Client Scripts, UI Scripts, Scheduled Jobs, Flow Action or ATF step scripts for lint, anti-patterns, performance and security. Produces a severity-rated review.
 metadata:
   version: 1.0.0
 ---

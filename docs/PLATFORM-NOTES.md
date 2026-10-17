@@ -360,7 +360,9 @@ delete, the cascade and the variables' limits: observed behaviour.
 teardown. `docs/validation/2.0.12-rc.2-live-sitting.md`, § ARC-09-C122: R2, W3 and the teardown.
 **Engine consequence:** `snow_atf_atf_step_add` updates a row the insert created rather than adding a second
 (ARC-09-C95). Since ARC-09-C122 its output lists every input row of the step, the rows the instance defaulted
-included; before it, they were invisible to the caller. A teardown removes the step, not its input rows.
+included; before it, they were invisible to the caller. A teardown removes the step, not its input rows. Since
+ARC-09-C177 the server reports the refused delete's wording, "ACL Exception … due to security constraints", as
+`DELETE_ACL_DENIED`; it was `DELETE_CONSTRAINT` on 2.0.11-rc.3.
 
 ## PN-17 — An AI agent's configuration and version are created by its insert; a workflow's team is not
 
@@ -377,6 +379,9 @@ run that day (ARC-09-C172)
 - **A tool link rewrites the snapshot.** Inserting an `sn_aia_agent_tool_m2m` added the link to the committed
   version's `snapshot.overlay.tools`, with `executionMode: "copilot"`, and created no new version. The link's
   defaults included `display_output=true`.
+- **An unnamed link is refused.** An `sn_aia_agent_tool_m2m` insert without `name` was refused by the before-insert
+  rule "Check duplicate name": 403, "Operation Failed". The same insert with the tool's name was created. AI Agent
+  Studio names a link after its tool. Observed on `tgdev`, Brazil patch 0, 2026-10-17 (ARC-09-C180).
 - **A workflow's insert creates a version and nothing else.** An insert into `sn_aia_usecase` created an
   `sn_aia_version` "V1" (`state=published`, empty `snapshot`) and no `sn_aia_team`. The workflow has no agents
   until a team is created, set on `sn_aia_usecase.team`, and given `sn_aia_team_member` rows.
@@ -406,18 +411,19 @@ tables installed" (lines 713–893, with the underscores escaped as `sn\_aia\_`)
 `sn_aia_team_member`. The access model is in `markdown/intelligent-experiences/define-sec-aia-new.md` and
 `markdown/intelligent-experiences/aia-security-implementation.md`, and a tool's two execution modes, Supervised and
 Autonomous, in `markdown/intelligent-experiences/add-tool-aia-new.md`. Not documented in the bundled corpus (branch
-`australia`): `sn_aia_version` and its states, the automatic records, the snapshot rewrite, the absent team and the
-Studio routes and the defaults — observed behaviour, on a family one ahead of the corpus; verify on the instance's
-family.
+`australia`): `sn_aia_version` and its states, the automatic records, the snapshot rewrite, the absent team, the
+refused unnamed link, the Studio routes and the defaults — observed behaviour, on a family one ahead of the corpus;
+verify on the instance's family.
 **Evidence:** the owner's trial record, which is engagement-local and not committed; the owner's continued run on
-`tgdev`, 2026-10-17, engagement-local, summarised by the Architect in the engagement folder and not committed; and
+`tgdev`, 2026-10-17, engagement-local, summarised by the Architect in the engagement folder and not committed; the
+owner's v2.2.0-rc.2 and rc.3 checks on `tgdev`, 2026-10-17, whose session transcript is engagement-local; and
 `docs/validation/2.2.0-rc.1-live-sitting.md`, the run with the fixed tools.
 **Engine consequence:** since ARC-09-C165 `snow_ai_ai_agent_add` reads the configuration and the version back
 rather than creating them, and reports a missing one as a warning; `active: false` modifies the configuration.
 `snow_ai_agentic_workflow_add` creates the team first and sets it on the workflow's insert: 2 + N inserts and no
 modify. Both return `access_rules`, saying that nothing configured access, and `studio_route`, where it is
 configured. Since ARC-09-C169 the agent's configuration and version are read back after its tool links, because a
-link rewrites the version's snapshot.
+link rewrites the version's snapshot. Since ARC-09-C180 a link the caller does not name is named after its tool.
 
 ## PN-18 — Pointing REST capture at an update set moves the user's own UI session to it too
 

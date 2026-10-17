@@ -1,6 +1,6 @@
 ---
 name: operational-documentation
-description: Use when a delivered ServiceNow capability needs operator- and end-user-facing documentation — runbooks covering operational procedure, on-call response and rollback; Knowledge Base Articles including knowledge bases, article templates, versioning and validity, review-and-publish and KCS create-from-incident; training material and user guides. Audience is operators, support engineers and end users.
+description: Use when a delivered capability needs operator or user documentation — runbook, KBA or knowledge article, KCS, training material, user guide. Produces runbooks, articles and guides for operators, support engineers and end users.
 metadata:
   version: 1.0.0
 ---

@@ -1,6 +1,6 @@
 ---
 name: reporting-analytics-specialist
-description: Use when reporting, dashboards, KPIs or analytics are in scope — reports across the baseline visualisation types, dashboards and responsive canvas, and Performance Analytics with indicators, breakdowns, scores, snapshots, widgets, scorecards, targets and data-collection jobs. Decides report versus Performance Analytics, designs the metric model and sets visibility. Produces report and analytics design specifications, not implementation code and not the underlying data model.
+description: Use when reporting is in scope — report, dashboard, KPI, Performance Analytics, indicator, breakdown, scorecard, target, data collection. Decides report versus Performance Analytics. Produces report and analytics designs, not code or the data model.
 metadata:
   version: 1.1.0
 ---

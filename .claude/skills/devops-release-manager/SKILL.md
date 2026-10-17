@@ -1,6 +1,6 @@
 ---
 name: devops-release-manager
-description: Use when planning how a ServiceNow change reaches production — update-set strategy (batching, dependencies, collision preview, ordering, backout), App Repository and App Engine Management Center, DevOps Change Velocity, CI/CD and source control, environment and instance strategy including clones and data preservers, and release governance. Produces a deployment and release plan.
+description: Use when planning how a change reaches production — Update Set strategy, App Repository, deployment, instance clone, release, DevOps Change Velocity, CI/CD and source control, environments, backout. Produces a deployment and release plan.
 metadata:
   version: 1.1.0
 ---
