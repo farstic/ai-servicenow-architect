@@ -637,6 +637,7 @@ COMPLIANT — §1.1 Verdict A. The tool exists and is reused (configuration). No
 - **User access:** users with specified roles — `itil`. Saving the access rules in AI Agent Studio generates the Allow-If ACL from that role (citation: `markdown/intelligent-experiences/define-sec-aia-new.md`).
 - **Identity:** Dynamic user, the default — the analyst's own roles; nothing here needs roles the analysts lack (citation: `markdown/intelligent-experiences/aia-security-implementation.md`).
 - **Role filtering:** approved roles `itil`, so an analyst who also holds `admin` runs it with `itil` only (citation: `markdown/platform-security/identity/role-masking.md`).
+- **In AI Agent Studio:** Studio pre-fills the approved roles from the user-access roles, so remove `admin` by hand; after the save, expect a use-case override and an ECC Queue policy record in the update set (PN-19).
 
 ### 16. Build manifest
 
