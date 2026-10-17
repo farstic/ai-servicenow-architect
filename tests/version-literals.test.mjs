@@ -25,11 +25,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compareSemver } from '../tools/snowarch/lib/semver.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const rootVersion = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
@@ -88,12 +89,12 @@ const HARNESS = 'tests/upgrade/';
 
 // NOT this file: it reads the version and interpolates it, so it never spells one — and its own
 // stale-entry check caught the exemption I wrote for it out of habit.
-function testFiles(dir, out = []) {
+function testFiles(dir, out = [], base = root) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === 'node_modules' || entry.name === 'fixtures' || entry.name === 'dist') continue;
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) { testFiles(full, out); continue; }
-    if (/\.test\.(mjs|ts)$/.test(entry.name)) out.push(relative(root, full).split('\\').join('/'));
+    if (entry.isDirectory()) { testFiles(full, out, base); continue; }
+    if (/\.test\.(mjs|ts)$/.test(entry.name)) out.push(relative(base, full).split('\\').join('/'));
   }
   return out;
 }
@@ -185,16 +186,57 @@ test('no assertion spells the current version of record (ARC-09-C12a)', () => {
  */
 export const releaseTarget = (version) => String(version).replace(/-.*$/, '');
 
-test('no test file spells the version the NEXT release will carry (ARC-09-C12a)', () => {
-  const target = releaseTarget(rootVersion);
+/**
+ * EVERY VERSION THE NEXT RELEASE CAN CARRY — a patch, a minor or a major after the base (ARC-09-C168).
+ *
+ * The sweep used to ask about one: `2.1.3-dev` → `2.1.3`, the patch. The v2.2.0-rc.1 rehearsal of
+ * 2026-10-17 was a MINOR cut from that tree, and `tests/live-coverage.test.mjs` asserted a note naming
+ * `v2.2.0-rc.1`: invisible to this sweep (it asked about 2.1.3) and to the release probe (it derived
+ * `2.1.3-rc.99`), and fatal the moment release.mjs wrote `2.2.0-rc.1` and ran the post-write suite.
+ * Which of the three a cut is cannot be known from the tree, so all three are asked, each as a final
+ * and as any release candidate — the form that bit.
+ */
+export function nextReleaseTargets(version) {
+  const [major, minor, patch] = releaseTarget(version).split('.').map(Number);
+  return [`${major}.${minor}.${patch}`, `${major}.${minor + 1}.0`, `${major + 1}.0.0`];
+}
+
+/**
+ * The lines spelling any of `targets`, as a final or as `-rc.N`, plainly or as a regex literal. The same
+ * boundaries as `literalLines`, so `2.2.0-dev` and `12.2.0` are not findings, and a comment is the lesson.
+ */
+export function nextReleaseLines(text, targets) {
+  const forms = targets.flatMap((t) => [
+    `${asPattern(t)}(?:-rc\\.\\d+)?`,
+    `${asPattern(escapedSpelling(t))}(?:-rc\\\\\\.\\d+)?`,
+  ]).map((f) => new RegExp(`(?<![\\d.])${f}(?![-\\d])`));
+  const hits = [];
+  text.split('\n').forEach((line, i) => {
+    if (/^\s*(\/\/|\*|\/\*|#)/.test(line)) return;
+    if (forms.some((re) => re.test(line))) hits.push(i + 1);
+  });
+  return hits;
+}
+
+/** `file:lines` for every governed test file under `dir` that spells a next target. */
+export function nextReleaseOffenders(dir, targets) {
   const offenders = [];
-  for (const rel of [...testFiles(join(root, 'tests')), ...testFiles(join(root, 'packages'))]) {
-    if (rel in FIXTURE_FILES || rel === SELF || rel.startsWith(HARNESS)) continue;
-    const lines = literalLines(readFileSync(join(root, rel), 'utf8'), target);
-    if (lines.length > 0) offenders.push(`${rel}:${lines.join(',')}`);
+  for (const sub of ['tests', 'packages']) {
+    if (!existsSync(join(dir, sub))) continue;
+    for (const rel of testFiles(join(dir, sub), [], dir)) {
+      if (rel in FIXTURE_FILES || rel === SELF || rel.startsWith(HARNESS)) continue;
+      const lines = nextReleaseLines(readFileSync(join(dir, rel), 'utf8'), targets);
+      if (lines.length > 0) offenders.push(`${rel}:${lines.join(',')}`);
+    }
   }
-  assert.deepEqual(offenders, [], `these spell "${target}", the version the next release writes — `
-    + 'move fixture versions to the 9.x series, or read the version from package.json. A literal '
+  return offenders;
+}
+
+test('no test file spells a version the NEXT release can carry — patch, minor or major, final or rc (ARC-09-C12a, C168)', () => {
+  const targets = nextReleaseTargets(rootVersion);
+  const offenders = nextReleaseOffenders(root, targets);
+  assert.deepEqual(offenders, [], `these spell one of ${targets.join(', ')} (or an rc of one), a version the next `
+    + 'release can write — move fixture versions to the 9.x series, or read the version from package.json. A literal '
     + 'here passes today and fails the release commit, which is the one run that cannot be retried');
 
   // THE EXEMPTION LIST IS THE EXISTING ONE AND NOTHING MORE. A sweep that grew its own list would
@@ -234,6 +276,31 @@ test('C12a — the next-release sweep is not vacuous, and the target is derived'
   assert.deepEqual(literalLines(`  const block = engineBlock(r, { version: '${target}' });`, target), [1],
     'a fixture spelling the next release is no longer caught');
   assert.deepEqual(literalLines("  const block = engineBlock(r, { version: '9.9.9' });", target), []);
+});
+
+test('C168 — the next targets are the patch, the minor and the major, and a planted minor is caught in a scratch test', (t) => {
+  // The derivation, on the 9.x series no release will carry (C17b).
+  assert.deepEqual(nextReleaseTargets('9.1.3-dev'), ['9.1.3', '9.2.0', '10.0.0']);
+  assert.deepEqual(nextReleaseTargets('9.2.0-rc.1'), ['9.2.0', '9.3.0', '10.0.0']);
+  assert.deepEqual(nextReleaseTargets('9.2.0'), ['9.2.0', '9.3.0', '10.0.0']);
+  const nine = nextReleaseTargets('9.1.3-dev');
+  // Each target as a final and as an rc, plainly and as a regex literal; not a dev, a longer number or a comment.
+  assert.deepEqual(nextReleaseLines("x('9.2.0')", nine), [1]);
+  assert.deepEqual(nextReleaseLines("note: 'pending the v9.2.0-rc.1 sitting'", nine), [1]);
+  assert.deepEqual(nextReleaseLines('assert.match(n, /v9\\.2\\.0-rc\\.1/)', nine), [1]);
+  assert.deepEqual(nextReleaseLines("x('10.0.0')", nine), [1]);
+  assert.deepEqual(nextReleaseLines("x('9.2.0-dev'); x('19.2.0'); x('9.9.9')", nine), []);
+  assert.deepEqual(nextReleaseLines('// it was 9.2.0 when this was written', nine), []);
+
+  // THE CONTROL the row asks for: this tree's own minor target, planted in a scratch test file, is caught —
+  // derived from package.json, so no version is spelled here. Before C168 the sweep asked about the patch alone.
+  const targets = nextReleaseTargets(rootVersion);
+  const dir = tempDir('c168-sweep-', t);
+  mkdirSync(join(dir, 'tests'), { recursive: true });
+  writeFileSync(join(dir, 'tests', 'scratch.test.mjs'), `assert.equal(v, '${targets[1]}');\nassert.match(n, /v${targets[1]}-rc.1/);\n`);
+  assert.deepEqual(nextReleaseOffenders(dir, targets), ['tests/scratch.test.mjs:1,2']);
+  writeFileSync(join(dir, 'tests', 'scratch.test.mjs'), "assert.equal(v, '9.9.9');\n");
+  assert.deepEqual(nextReleaseOffenders(dir, targets), []);
 });
 
 test('the sweep would catch a planted literal, and ignores one in a comment (ARC-09-C12a)', () => {
