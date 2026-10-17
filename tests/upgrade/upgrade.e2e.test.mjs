@@ -253,6 +253,45 @@ test('AC 6 — n at the prompt changes nothing', async (t) => {
   assert.match(r.text, /Upgrade plan: v9\.0\.0 → v9\.1\.0/);
 }, MINUTES);
 
+// ARC-09-C170 — the version the plan says you are upgrading FROM. The owner's v2.2.0-rc.1 upgrade, from a detached
+// development commit, printed `import/engine-v2.8.0-worktree → v2.2.0-rc.1`: the from-label came from a `describe`
+// with no `--match`, and this repository carries `import/*` tags from its predecessors. The doctor's describe matches
+// `v*` only; the plan and `--check` now use it, and name the commit when no release tag describes it.
+test('ARC-09-C170 — the from-label is a release tag or the commit, never an import/* tag', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const IMPORT = 'import/engine-v9.0.0-worktree';
+
+  // Two v* tags on HEAD: the version of record's, and a newer one, as a release's negative-test tag is. The version of
+  // record's wins, as it does in the doctor's Engine line (ARC-09-C154).
+  git(w.user, ['tag', '-a', 'v9.0.0-neg.1', '-m', 'a negative-test tag on the release commit']);
+  const check0 = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.match(check0.text, /v9\.2\.0 available \(you are on v9\.0\.0\)/, check0.text);
+  const plan0 = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin });
+  assert.match(plan0.text, /Upgrade plan: v9\.0\.0 → v9\.1\.0/, plan0.text);
+  git(w.user, ['tag', '-d', 'v9.0.0-neg.1']);
+
+  // A development commit past v9.0.0, with an import/* tag on it.
+  git(w.user, ['commit', '--allow-empty', '-m', 'a development commit']);
+  git(w.user, ['tag', IMPORT]);
+  const past = git(w.user, ['rev-parse', '--short=7', 'HEAD']);
+  const check = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.match(check.text, new RegExp(`v9\\.2\\.0 available \\(you are on v9\\.0\\.0\\+1 \\(${past}\\)\\)`), check.text);
+  const plan = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin });
+  assert.match(plan.text, new RegExp(`Upgrade plan: v9\\.0\\.0\\+1 \\(${past}\\) → v9\\.1\\.0`), plan.text);
+  assert.doesNotMatch(`${check.text}\n${plan.text}`, /import\//);
+
+  // A commit no release tag describes at all, with the import/* tag moved onto it.
+  git(w.user, ['checkout', '--orphan', 'c170-orphan']);
+  assert.equal(git(w.user, ['symbolic-ref', '--short', 'HEAD']), 'c170-orphan', 'the orphan checkout did not take');
+  git(w.user, ['commit', '-m', 'an orphan development commit']);
+  git(w.user, ['tag', '-f', IMPORT]);
+  const orphan = git(w.user, ['rev-parse', '--short=7', 'HEAD']);
+  const plan2 = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin });
+  assert.match(plan2.text, new RegExp(`Upgrade plan: a development tree at ${orphan} → v9\\.1\\.0`), plan2.text);
+  assert.doesNotMatch(plan2.text, /import\//);
+}, MINUTES);
+
 // ARC-09-C109 — what counts as an acceptance at `Proceed? [Y/n]`.
 //
 // `promptLine` in upgrade.mjs read a line and returned '' when stdin ended, and '' does not match
