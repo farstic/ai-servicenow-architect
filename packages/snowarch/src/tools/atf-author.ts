@@ -32,7 +32,7 @@
  * read-back warning or a refusal, never as a write the tool claims it made.
  */
 import type { ServiceNowClient } from '../servicenow/client.js';
-import { dictionaryLimits, lengthOf, looksCut, reconcile } from '../servicenow/stored-values.js';
+import { assertMandatory, dictionaryLimits, lengthOf, looksCut, reconcile } from '../servicenow/stored-values.js';
 import type { ServiceNowRecord } from '../servicenow/types.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireScripting } from '../utils/permissions.js';
@@ -354,6 +354,10 @@ export async function addStep(client: ServiceNowClient, args: Row): Promise<Row>
 
   // The step.
   const sent: Row = { test, step_config: config.sysId, active, ...(order !== undefined ? { order } : {}) };
+  // ARC-09-C183: the step and the input rows it may create, with what will be sent, before the first write.
+  await assertMandatory(client, [{ table: STEP, payload: sent },
+    ...[...inputs].map(([name, value]) => ({ table: VALUE,
+      payload: { document: STEP, document_key: '(the step)', variable: (variables.get(name) as InputVariable).sysId, value } }))]);
   const step = await write(client, STEP, sent, active);
   const warnings: AuthorWarning[] = [...step.warnings];
 

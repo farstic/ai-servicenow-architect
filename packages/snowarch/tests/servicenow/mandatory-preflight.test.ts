@@ -15,7 +15,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { newDb, refused, resetCicd, type CicdState, type FakeDb } from '../helpers/fake-cicd.js';
 import { ServiceNowClient } from '../../src/servicenow/client.js';
 import { runWithInstance, type InstanceRuntime } from '../../src/servicenow/context.js';
-import { resetColumnLimits } from '../../src/servicenow/stored-values.js';
+import { resetColumnLimits, setDataPolicyCheckForTests } from '../../src/servicenow/stored-values.js';
 import { routeToolInvocation } from '../../src/tools/index.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import type { ServiceNowError } from '../../src/utils/errors.js';
@@ -91,7 +91,7 @@ afterAll(() => {
   if (logLevel === undefined) delete process.env.LOG_LEVEL;
   else process.env.LOG_LEVEL = logLevel;
 });
-beforeEach(() => { resetCicd(cicd); resetColumnLimits(); });
+beforeEach(() => { resetCicd(cicd); resetColumnLimits(); setDataPolicyCheckForTests(true); });
 
 describe('ARC-09-C183 — a data policy\'s mandatory field is checked before the first write', () => {
   it('an inherited, unconditional policy on task refuses an incident without the field, before any write', async () => {

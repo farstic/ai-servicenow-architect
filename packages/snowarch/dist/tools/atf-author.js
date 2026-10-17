@@ -1,4 +1,4 @@
-import { dictionaryLimits, lengthOf, looksCut, reconcile } from '../servicenow/stored-values.js';
+import { assertMandatory, dictionaryLimits, lengthOf, looksCut, reconcile } from '../servicenow/stored-values.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireScripting } from '../utils/permissions.js';
 import { sysIdArg } from './atf-cicd.js';
@@ -288,6 +288,10 @@ export async function addStep(client, args) {
     }
     // The step.
     const sent = { test, step_config: config.sysId, active, ...(order !== undefined ? { order } : {}) };
+    // ARC-09-C183: the step and the input rows it may create, with what will be sent, before the first write.
+    await assertMandatory(client, [{ table: STEP, payload: sent },
+        ...[...inputs].map(([name, value]) => ({ table: VALUE,
+            payload: { document: STEP, document_key: '(the step)', variable: variables.get(name).sysId, value } }))]);
     const step = await write(client, STEP, sent, active);
     const warnings = [...step.warnings];
     // Its inputs: look before writing, so a row the insert created is updated and not added a second time.

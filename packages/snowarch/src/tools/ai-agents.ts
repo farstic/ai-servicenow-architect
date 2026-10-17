@@ -24,6 +24,7 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import type { ServiceNowRecord } from '../servicenow/types.js';
 import { ServiceNowError } from '../utils/errors.js';
+import { assertMandatory } from '../servicenow/stored-values.js';
 import { requireNowAssist, requireWrite } from '../utils/permissions.js';
 import { plain, write, type Progress } from './atf-author.js';
 import type { ToolDefinition } from './types.js';
@@ -284,6 +285,18 @@ async function addAgent(client: ServiceNowClient, args: Row): Promise<Row> {
     const listed = await listedModes(client, LINK);
     for (const t of tools) if (t.execution_mode !== undefined) checkMode(t.execution_mode, listed, LINK);
   }
+  const linkOf = (i: number, agentId: string): Row => {
+    const t = tools[i];
+    const link: Row = { agent: agentId, tool: t.tool_sys_id };
+    const linkName = t.name ?? toolNames[i];
+    if (linkName !== undefined && linkName !== '') link.name = linkName;
+    if (t.execution_mode !== undefined) link.execution_mode = t.execution_mode;
+    if (t.display_output !== undefined) link.display_output = t.display_output;
+    return link;
+  };
+  // ARC-09-C183: every table this build creates on, with what it will send, before the first write.
+  await assertMandatory(client, [{ table: AGENT, payload: sent },
+    ...tools.map((_, i) => ({ table: LINK, payload: linkOf(i, '(the agent)') }))]);
 
   const progress: Progress = { step: '', created: [] };
   const warnings: Row[] = [];
@@ -294,13 +307,8 @@ async function addAgent(client: ServiceNowClient, args: Row): Promise<Row> {
   try {
     agent = await write(client, AGENT, sent, args.active !== false, undefined, progress);
     warnings.push(...agent.warnings);
-    for (const [i, t] of tools.entries()) {
-      const link: Row = { agent: agent.sysId, tool: t.tool_sys_id };
-      const linkName = t.name ?? toolNames[i];
-      if (linkName !== undefined && linkName !== '') link.name = linkName;
-      if (t.execution_mode !== undefined) link.execution_mode = t.execution_mode;
-      if (t.display_output !== undefined) link.display_output = t.display_output;
-      const done = await write(client, LINK, link, true, undefined, progress);
+    for (const i of tools.keys()) {
+      const done = await write(client, LINK, linkOf(i, agent.sysId), true, undefined, progress);
       warnings.push(...done.warnings);
       links.push(done.stored);
     }
@@ -354,6 +362,12 @@ async function addWorkflow(client: ServiceNowClient, args: Row): Promise<Row> {
   for (const [i, id] of agentIds.entries()) await mustExist(client, AGENT, id, `agent_sys_ids[${i}]`);
   if (mode !== undefined) checkMode(mode, await listedModes(client, USECASE), USECASE);
   if (memoryScope !== undefined) await hasColumn(client, MEMBER, 'memory_scope');
+  // ARC-09-C183: every table this build creates on, with what it will send, before the first write.
+  const planned: Row = { name, description, base_plan: basePlan, team: '(the team)' };
+  if (mode !== undefined) planned.execution_mode = mode;
+  await assertMandatory(client, [{ table: TEAM, payload: { name: teamName } }, { table: USECASE, payload: planned },
+    ...agentIds.map((agent) => ({ table: MEMBER,
+      payload: { team: '(the team)', agent, ...(memoryScope !== undefined ? { memory_scope: memoryScope } : {}) } }))]);
 
   const progress: Progress = { step: '', created: [] };
   const warnings: Row[] = [];
