@@ -409,7 +409,8 @@ Autonomous, in `markdown/intelligent-experiences/add-tool-aia-new.md`. Not docum
 `australia`): `sn_aia_version` and its states, the automatic records, the snapshot rewrite, the absent team and the
 Studio routes and the defaults — observed behaviour, on a family one ahead of the corpus; verify on the instance's
 family.
-**Evidence:** the owner's trial record and the owner's continued run, both engagement-local and not committed, and
+**Evidence:** the owner's trial record, which is engagement-local and not committed; the owner's continued run on
+`tgdev`, 2026-10-17, engagement-local, summarised by the Architect in the engagement folder and not committed; and
 `docs/validation/2.2.0-rc.1-live-sitting.md`, the run with the fixed tools.
 **Engine consequence:** since ARC-09-C165 `snow_ai_ai_agent_add` reads the configuration and the version back
 rather than creating them, and reports a missing one as a warning; `active: false` modifies the configuration.
@@ -429,7 +430,8 @@ set until it is switched back. A browser session already open when the preferenc
 update set until the user logged in again (observed on Brazil patch 0, 2026-10-17).
 **Grounding:** none in ServiceNowDocs (`markdown/application-development/system-update-sets/` for the baseline
 concept); observed behaviour.
-**Evidence:** the owner's trial record and the owner's continued run, both engagement-local and not committed.
+**Evidence:** the owner's trial record, which is engagement-local and not committed, and the owner's continued run on
+`tgdev`, 2026-10-17, engagement-local, summarised by the Architect in the engagement folder and not committed.
 **Engine consequence:** `snow_us_capture_target_set` already returns `previous`, the update set the preference named
 before the call (ARC-09-C127), so a second call can point capture back. Offering that restore at the end of a build
 sequence belongs to the Architect, in `governance/mcp-protocols.md` (ARC-09-C166), which also says that a browser
@@ -455,7 +457,8 @@ then data access with **Approved roles** for a dynamic user), and
 configuration tables. Not documented in the bundled corpus (branch `australia`): the pre-fill, the dialog, the records
 the save creates, the workflow's activation and the search lag — observed behaviour, on a family one ahead of the
 corpus; verify on the instance's family.
-**Evidence:** the owner's continued run, which is engagement-local and not committed.
+**Evidence:** the owner's continued run on `tgdev`, 2026-10-17, engagement-local, summarised by the Architect in the
+engagement folder and not committed.
 **Engine consequence:** none in the tools — no tool sets access rules. `governance/mcp-protocols.md` says the Studio
 step is a write with its own question, and the Now Assist Specialist says to remove `admin` from the approved roles and
 to expect the two records in the update set (ARC-09-C172).
