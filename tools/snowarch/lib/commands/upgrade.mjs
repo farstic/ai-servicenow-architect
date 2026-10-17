@@ -31,10 +31,10 @@ import { join } from 'node:path';
 import { localDir, storePath } from '../local-paths.mjs';
 
 import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from '../exit.mjs';
-import { branchState, describe, git, isShallow } from '../git.mjs';
+import { branchState, describe, git, isShallow, versionTag } from '../git.mjs';
 import { askOnce, isYes } from '../ask.mjs';
 import { childEnv } from '../spawn-env.mjs';
-import { loadConfig, root as defaultRoot } from '../config.mjs';
+import { loadConfig, root as defaultRoot, version as readVersion } from '../config.mjs';
 import { loadState } from '../state.mjs';
 // ARC-08-C29 — the runner's own step list, so the plan and the run are one computation.
 import { STEPS, outputMissingOf } from '../steps/index.mjs';
@@ -682,8 +682,15 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   const tags = releaseTags(root, { pre: Boolean(flags.pre), opts });
   const latest = tags[0]?.tag ?? null;
   const target = flags.to ?? latest;
-  const here = git(root, ['describe', '--tags', '--exact-match'], { ...opts, allowFail: true })?.trim() ?? null;
-  const localTag = here ?? (git(root, ['describe', '--tags', '--abbrev=0'], { ...opts, allowFail: true })?.trim() ?? null);
+  // ARC-09-C170 — which release this checkout is on, by the doctor's own rule (version-info.mjs): the version of record's
+  // `v<version>` tag at HEAD first (ARC-09-C154), then `describe` over `v*` tags only. An `import/*` tag is never named,
+  // and the plan and the doctor's Engine line cannot disagree about the same checkout.
+  const found = versionTag(root, readVersion(root), opts) ?? describe(root, opts);
+  const here = found?.exact ? found.name : null;
+  const localTag = found?.name ?? null;
+  const fromLabel = !found
+    ? `a development tree at ${git(root, ['rev-parse', '--short=7', 'HEAD'], { ...opts, allowFail: true }) ?? 'an unknown commit'}`
+    : found.exact ? found.name : `${found.name}+${found.distance} (${found.short})`;
 
   if (!target) {
     log.fail(`upgrade: ${remote} has no release tags${flags.pre ? '' : ' (prereleases need --pre)'}`);
@@ -715,7 +722,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
 
   if (flags.check) {
     log.step(behind
-      ? `${latest} available (you are on ${localTag ?? 'an untagged commit'})`
+      ? `${latest} available (you are on ${fromLabel})`
       : `up to date (${localTag ?? latest})`);
     return behind ? EXIT_BEHIND : EXIT_OK;
   }
@@ -783,7 +790,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   const date = git(root, ['log', '-1', '--format=%cs', target], { ...opts, allowFail: true });
 
   log.step(renderPlan({
-    from: localTag ?? 'an untagged commit', to: target,
+    from: fromLabel, to: target,
     commits: Number.isFinite(commits) ? commits : null, date, tagInfo, floor, steps, store, estimate,
     restart: 'restart claude (the MCP server binary changed) — or run /mcp → servicenow → reconnect',
   }));
