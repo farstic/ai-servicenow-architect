@@ -283,6 +283,7 @@ test('ARC-09-C170 — the from-label is a release tag or the commit, never an im
 
   // A commit no release tag describes at all, with the import/* tag moved onto it.
   git(w.user, ['checkout', '--orphan', 'c170-orphan']);
+  assert.equal(git(w.user, ['symbolic-ref', '--short', 'HEAD']), 'c170-orphan', 'the orphan checkout did not take');
   git(w.user, ['commit', '-m', 'an orphan development commit']);
   git(w.user, ['tag', '-f', IMPORT]);
   const orphan = git(w.user, ['rev-parse', '--short=7', 'HEAD']);
