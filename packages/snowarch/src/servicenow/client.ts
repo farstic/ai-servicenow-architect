@@ -1085,7 +1085,10 @@ export class ServiceNowClient {
     const haystack = `${sn?.message ?? (error instanceof Error ? error.message : '')} ${detail ?? ''}`.toLowerCase();
 
     const ACL = /acl|aborted|insufficient (rights|privilege)|not authorized|security|write operation .* not permitted|no permission|operation against file/;
-    const CONSTRAINT = /referenced by|cannot be deleted because|cascade|referential integrity|foreign|child record|in use by|dependent|constraint/;
+    // ARC-09-C177: the instance words an ACL refusal "ACL Exception Delete Failed due to security constraints"
+    // (PN-16). That wording decides before the constraint pattern, which no longer matches the bare word.
+    const ACL_WORDING = /acl exception|security constraints/;
+    const CONSTRAINT = /referenced by|cannot be deleted because|cascade|referential integrity|foreign|child record|in use by|dependent/;
     const NOT_FOUND = /no record|record not found|does not exist|not found/;
     const suffix = detail ? ` ServiceNow detail: ${detail}` : '';
 
@@ -1095,7 +1098,7 @@ export class ServiceNowClient {
         message: `Cannot delete ${table}/${sysId}: the record does not exist (it may have already been deleted).`,
       };
     }
-    if (CONSTRAINT.test(haystack)) {
+    if (!ACL_WORDING.test(haystack) && CONSTRAINT.test(haystack)) {
       return {
         code: 'DELETE_CONSTRAINT',
         message:
