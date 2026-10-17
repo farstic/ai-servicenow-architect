@@ -90,7 +90,8 @@ with both on. The order, and what each step costs in approval:
 4. **Read-backs, after each call.** Each tool checks what it can before its first write, and a refusal says
    "Nothing was written.". It reads every record back, reports the configuration and the version the
    instance created by itself, and reports any difference as a warning. A failure after the first record
-   names every record created and deletes nothing. Report each result, warnings first, before the next call.
+   names the step it stopped at and every record created, and deletes nothing. Report each result, warnings
+   first, before the next call.
 5. **Verify.** `snow_us_update_set_preview` on the build's update set, as §2.2 step 4.
 6. **Restore the capture target.** Pointing capture at the build's update set also moved the user's own UI
    session to it (PN-18). Offer to point it back at `previous` — `snow_us_capture_target_set` again, a write with its own
