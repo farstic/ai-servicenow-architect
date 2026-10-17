@@ -482,8 +482,9 @@ whole, and nothing removes a field), so the platform withholds it.
 the `sys_policy` column; verify it on the instance. The record's `access` value, `package_private` ("Accessible
 from: This application scope only", lines 93–103), governs calling it from another scope, not reading it.
 **Evidence:** the owner's read on `tgdev`, 2026-10-17, which is engagement-local and not committed.
-**Engine consequence:** none in the tools. A design cannot read a Protected script and must not depend on its
-contents. ARC-09-C178 (OPEN) would name a requested field the instance did not return.
+**Engine consequence:** a design cannot read a Protected script and must not depend on its contents. Since
+ARC-09-C178 a read that passes `fields` names the requested fields the instance did not return, as
+`fields_not_returned`.
 
 ## Windows notes — this repository, not ServiceNow
 
