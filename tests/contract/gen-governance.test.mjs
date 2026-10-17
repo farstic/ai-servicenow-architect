@@ -102,8 +102,12 @@ test('criterion 1 — the rule file is written, is short, and has no frontmatter
     // ARC-09-C105 costs that one line (the engagement question before a session's first instance write,
     // approved by the owner as one bullet in §2.1): 72. The file now stands ON the cap, so the next line
     // added to it needs a ruling on the cap and not a quiet move of it.
+    //
+    // ARC-09-C182 is that line (INSTANCE_REFUSED's remedy): 73. Owner's ruling 2026-10-17: cap 80 with headroom,
+    // so one new code does not stall a release; the architect spends it with measurement, each new line a ruling
+    // of the architect's, and the owner resets it at 80.
     const lines = text.trimEnd().split('\n').length;
-    assert.ok(lines <= 72, `${lines} lines, budget 72`);
+    assert.ok(lines <= 80, `${lines} lines, budget 80`);
     console.log(`    rule file: ${lines} lines`);
   } finally { cleanup(dir); }
 });

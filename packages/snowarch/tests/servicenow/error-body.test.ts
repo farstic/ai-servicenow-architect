@@ -57,7 +57,8 @@ describe('ARC-09-C176 — a refusal carries the instance\'s own error text', () 
     respond(http, refusal(403, 'Operation Failed', detail));
     const text = await failureText(() => client().createRecord('sn_aia_agent_tool_m2m', { agent: 'a' }));
     expect(text).toContain(detail);
-    expect(text).toMatch(/\(Code: INSUFFICIENT_PRIVILEGES\)$/);
+    // ARC-09-C182: the instance's own rule refused it, so the code is INSTANCE_REFUSED, not the access decision.
+    expect(text).toMatch(/\(Code: INSTANCE_REFUSED\)$/);
   });
 
   it('a 400 with a detail: the same', async () => {

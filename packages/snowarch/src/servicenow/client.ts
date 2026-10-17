@@ -24,7 +24,21 @@ import { currentInstanceOrNull } from './context.js';
  * Errors the retry loop rethrows at once: the instance answered, and asking again gets the same
  * answer. `INSUFFICIENT_PRIVILEGES` (a 403) is an access decision, not a fault (ARC-09-C99).
  */
-const NOT_RETRIED: readonly string[] = ['AUTHENTICATION_FAILED', 'INVALID_REQUEST', 'NOT_FOUND', 'INSUFFICIENT_PRIVILEGES'];
+const NOT_RETRIED: readonly string[] = ['AUTHENTICATION_FAILED', 'INVALID_REQUEST', 'NOT_FOUND', 'INSUFFICIENT_PRIVILEGES',
+  'INSTANCE_REFUSED'];
+
+/**
+ * ARC-09-C182 — what refused a 403, read from its text (the message and the detail). The ACL wording is an access
+ * decision and decides first; a data policy or a business rule is the instance's own rule, whose remedy is the record,
+ * not the roles. Anything else stays the access decision it was.
+ */
+const ACL_REFUSAL = /acl exception|security constraints|insufficient rights/;
+const RULE_REFUSAL = /data policy exception|aborted by business rule|was aborted by|the following fields are mandatory/;
+function refusalCode(text: string): 'INSUFFICIENT_PRIVILEGES' | 'INSTANCE_REFUSED' {
+  const t = text.toLowerCase();
+  if (ACL_REFUSAL.test(t)) return 'INSUFFICIENT_PRIVILEGES';
+  return RULE_REFUSAL.test(t) ? 'INSTANCE_REFUSED' : 'INSUFFICIENT_PRIVILEGES';
+}
 
 /** How much of a refusal's non-JSON body the message shows (ARC-09-C176): enough to name a gateway, not a page. */
 const NON_JSON_BODY_SHOWN = 200;
@@ -372,7 +386,7 @@ export class ServiceNowClient {
           if (response.status === 401) {
             errorCode = 'AUTHENTICATION_FAILED';
           } else if (response.status === 403) {
-            errorCode = 'INSUFFICIENT_PRIVILEGES';
+            errorCode = refusalCode(`${errorMessage} ${errorDetail ?? ''}`);
           } else if (response.status === 404) {
             errorCode = 'NOT_FOUND';
           } else if (response.status === 400) {

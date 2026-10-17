@@ -229,6 +229,13 @@
       "showInRule": true
     },
     {
+      "code": "INSTANCE_REFUSED",
+      "meaning": "The instance's own rule — a data policy or a business rule — refused the record. This is not a role.",
+      "remedy": "the instance's own rule refused the record — read the message, correct the fields it names and send the write again, as a new write with its own approval; do not change roles",
+      "showInRule": true,
+      "httpStatus": 403
+    },
+    {
       "code": "INSTANCE_UNUSABLE",
       "meaning": "The store entry parsed but no client could be built from it.",
       "remedy": "the message says which field is impossible",

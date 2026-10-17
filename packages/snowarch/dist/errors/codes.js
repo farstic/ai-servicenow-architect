@@ -164,6 +164,14 @@ export const ERROR_CODES = [
         httpStatus: 403,
     },
     {
+        // ARC-09-C182 — a 403 whose detail is the instance's own rule, not an access decision (the client's 403 arm).
+        code: 'INSTANCE_REFUSED',
+        meaning: "The instance's own rule — a data policy or a business rule — refused the record. This is not a role.",
+        remedy: "the instance's own rule refused the record — read the message, correct the fields it names and send the write again, as a new write with its own approval; do not change roles",
+        showInRule: true,
+        httpStatus: 403,
+    },
+    {
         code: 'NOT_FOUND',
         meaning: "The record or table does not exist on this instance.",
         remedy: "check the sys_id and the table name",
