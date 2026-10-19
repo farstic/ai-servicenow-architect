@@ -29,7 +29,7 @@ test('criterion 2 — the four surfaces that had to leave', () => {
   // Not spelled here where a spelling would make this file a detector: the retired vocabulary
   // comes from the fixture the lint reads, and the harness-specific phrase is the one ARC-02-S06
   // replaced with "dispatch the sub-agent".
-  const vocab = JSON.parse(readFileSync(join(root, 'tests/fixtures/retired-vocabulary.json'), 'utf8'))
+  const vocab = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/lint-data/retired-vocabulary.json'), 'utf8'))
     .tokens.map((t) => t.pattern);
   const banned = [...vocab, ...vocab.map((v) => v.replace(/^mcp__/, '').replace(/__$/, '')),
     'Task tool', 'context-mode', 'claude-ai-projects'];

@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { collectRoster, RosterError } from '../../roster.mjs';
-import { lintAgents, lintSkills } from '../../../../../tests/lib/lint-rules.mjs';
+import { lintAgents, lintSkills } from '../../lint-rules.mjs';
 import { defineCheck } from '../registry.mjs';
 
 import { fail, ok } from './result.mjs';
@@ -26,8 +26,8 @@ const json = (root, rel) => JSON.parse(readFileSync(join(root, rel), 'utf8'));
  */
 export function lintOptions(root, config) {
   const safe = (rel, fallback) => { try { return json(root, rel); } catch { return fallback; } };
-  const allow = safe('tests/fixtures/skills-lint-allowlist.json', { length: [], version: [] });
-  const builtins = safe('tests/fixtures/claude-builtin-commands.json', { commands: [] });
+  const allow = safe('tools/snowarch/lib/lint-data/skills-lint-allowlist.json', { length: [], version: [] });
+  const builtins = safe('tools/snowarch/lib/lint-data/claude-builtin-commands.json', { commands: [] });
   return {
     root,
     lengthAllow: new Set(allow.length ?? []),

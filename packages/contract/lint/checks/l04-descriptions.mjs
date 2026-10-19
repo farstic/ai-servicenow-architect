@@ -8,7 +8,7 @@
  * drops the agent from the registry with no error anywhere (`.claude/agents/now-assist-specialist.md`
  * lost a whole persona to that once).
  *
- * The rules come from `tests/lib/lint-rules.mjs` — ARC-02-S02's SK-02 and AG-02 — rather than a
+ * The rules come from `tools/snowarch/lib/lint-rules.mjs` — ARC-02-S02's SK-02 and AG-02 — rather than a
  * second implementation. Two implementations of "too long" is two answers to the same question.
  */
 import { readFileSync } from 'node:fs';

@@ -425,7 +425,7 @@ test('ARC-02-S02 AC 8 — every SK-xx and AG-xx rule id is documented in CONTRIB
   // (`fail.push(\`SK-01 ${rel}: …\`)`), so the source of truth is the module's own text. Reading it
   // is the honest way to ask "which rules exist": a hand-kept list here would be a second
   // definition, and this file has already learned what those do.
-  const source = read('tests/lib/lint-rules.mjs');
+  const source = read('tools/snowarch/lib/lint-rules.mjs');
   const ids = [...new Set([...source.matchAll(/\b((?:SK|AG)-\d\d)\b/g)].map((m) => m[1]))].sort();
   assert.ok(ids.length >= 15, `only ${ids.length} rule id(s) found — the scan is wrong`);
 
@@ -524,7 +524,7 @@ test('ARC-02-S10 criterion 1 — the platform notes carry nothing from an instan
   assert.deepEqual(leaks, []);
 
   // The retired vocabulary and the old config surface, from the fixture rather than spelled here.
-  const vocab = JSON.parse(read('tests/fixtures/retired-vocabulary.json')).tokens.map((t) => t.pattern);
+  const vocab = JSON.parse(read('tools/snowarch/lib/lint-data/retired-vocabulary.json')).tokens.map((t) => t.pattern);
   const banned = [...vocab, ...vocab.map((v) => v.replace(/^mcp__/, '').replace(/__$/, '')),
     'claude_desktop_config'].map((v) => new RegExp(v));
   assert.deepEqual(doc.split('\n').filter((l) => banned.some((re) => re.test(l))), []);
@@ -596,7 +596,7 @@ test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it mu
   // the first attempt. Bare product names are derived by unwrapping the `mcp__…__` patterns —
   // `servicenow-mcp` is deliberately NOT retired repo-wide (D-01's npm record is nameable), it is
   // forbidden in THIS file, so the criterion needs the bare form and the fixture holds the prefix.
-  const vocab = JSON.parse(read('tests/fixtures/retired-vocabulary.json')).tokens.map((t) => t.pattern);
+  const vocab = JSON.parse(read('tools/snowarch/lib/lint-data/retired-vocabulary.json')).tokens.map((t) => t.pattern);
   const bare = vocab.map((v) => v.replace(/^mcp__/, '').replace(/__$/, ''));
   const banned = [...new Set([...vocab, ...bare])].map((v) => new RegExp(v));
   // ONE exemption, and it is a PATH rather than vocabulary: ARC-07-S10 added the migration
@@ -665,7 +665,7 @@ test('ARC-02-S06 criterion 5 — governance §2 names no retired tool', () => {
   // covers the seven names whoever wrote it happened to remember and silently stops covering
   // anything renamed afterwards; and a test file that spells retired names becomes a detector
   // its own sweep has to exempt, which would blind the L03 check to every other line in this
-  // file. `tests/lib/lint-rules.mjs` made the same call for the vocabulary tokens.
+  // file. `tools/snowarch/lib/lint-rules.mjs` made the same call for the vocabulary tokens.
   const retired = Object.keys(JSON.parse(read('packages/contract/retired-names.json')));
   const hits = [];
   read('governance/governance-rules.md').split('\n').forEach((line, i) => {

@@ -1,6 +1,6 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-// ARC-02-S02 — the skill roster, checked against the rules in tests/lib/lint-rules.mjs.
+// ARC-02-S02 — the skill roster, checked against the rules in tools/snowarch/lib/lint-rules.mjs.
 // The rules live there so tests/lint-negatives.test.mjs can prove each one REJECTS a broken fixture.
 // This file supplies the real tree and the fixtures, and asserts the failure list is empty.
 import { test } from 'node:test';
@@ -8,13 +8,13 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { lintSkills, lintPaths, lintVocabulary, lintRootless, MAX_DESCRIPTION } from './lib/lint-rules.mjs';
+import { lintSkills, lintPaths, lintVocabulary, lintRootless, MAX_DESCRIPTION } from '../tools/snowarch/lib/lint-rules.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const json = (p) => JSON.parse(readFileSync(join(root, p), 'utf8'));
 const cfg = json('engine.config.json');
-const allow = json('tests/fixtures/skills-lint-allowlist.json');
-const builtins = json('tests/fixtures/claude-builtin-commands.json');
+const allow = json('tools/snowarch/lib/lint-data/skills-lint-allowlist.json');
+const builtins = json('tools/snowarch/lib/lint-data/claude-builtin-commands.json');
 
 // engine.config.json.roster.utility is where a non-persona skill (the `snowarch` skill ARC-02-S11
 // adds) is exempted from the EXAMPLES.md and roster-count rules. It does not exist yet: all 28

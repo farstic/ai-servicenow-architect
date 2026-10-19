@@ -96,6 +96,9 @@ export const POLICY_FILES = [
   // cannot name what it detects cannot detect it, and keeping them in JSON rather than in the
   // check body is what makes the exemption one file rather than a check.
   'tools/snowarch/lib/doctor/checks/stale-registrations.json',
+  // SK-09's token list, for the same reason: the skills lint's own data, which names each retired word to detect it.
+  // It moved under tools/snowarch/lib with the lint (ARC-09-C185a), because E-18 runs that lint in a user's install.
+  'tools/snowarch/lib/lint-data/retired-vocabulary.json',
   // ARC-10-S01's migration page. It is the one document written FOR a user of the old install, and
   // every step of it names something being removed — the registrations by the names the old
   // scripts wrote, the store by its path. A page that said "run the command the doctor printed"

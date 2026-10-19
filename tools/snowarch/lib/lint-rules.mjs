@@ -8,8 +8,8 @@
 // rule id — the ARC-08 doctor quotes those ids.
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
-import { parseFrontmatter, asList } from '../../packages/contract/lib/frontmatter.mjs';
-import { findRootlessCitations } from '../../tools/snowarch/lib/docs/citations.mjs';
+import { parseFrontmatter, asList } from '../../../packages/contract/lib/frontmatter.mjs';
+import { findRootlessCitations } from './docs/citations.mjs';
 
 export const MAX_DESCRIPTION = 500;
 export const ALLOWED_TOP_LEVEL = new Set(['name', 'description', 'allowed-tools', 'argument-hint',
@@ -76,7 +76,7 @@ const PATH_TOKEN = /`((?:\.claude\/(?:skills|agents)|governance|templates|docs)\
 // Exempting one small data file is honest; exempting this whole module would blind that ratchet to
 // every other line in it.
 export const RETIRED = JSON.parse(
-  readFileSync(new URL('../fixtures/retired-vocabulary.json', import.meta.url), 'utf8'),
+  readFileSync(new URL('./lint-data/retired-vocabulary.json', import.meta.url), 'utf8'),
 ).tokens.map(({ pattern, why }) => [new RegExp(pattern, 'g'), why]);
 
 export function lintVocabulary({ root, files, allow = [] }) {

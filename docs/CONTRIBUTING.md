@@ -465,7 +465,7 @@ while proving nothing.
 
 Every skill and agent in `.claude/` is linted on every push. Each rule has a stable id; a failure quotes
 it, so `git grep SK-04` finds both the rule and the tests that prove it. The rules are functions in
-`tests/lib/lint-rules.mjs` — deliberately *not* inlined in the test bodies, because the negative cases in
+`tools/snowarch/lib/lint-rules.mjs` — deliberately *not* inlined in the test bodies, because the negative cases in
 `tests/lint-negatives.test.mjs` must run **the same code** as the real-tree checks. A negative case that
 re-implements its rule proves only that the re-implementation works.
 
@@ -479,7 +479,7 @@ re-implements its rule proves only that the re-implementation works.
 | SK-06 | every skill ships an `EXAMPLES.md` | the roster's own standard |
 | SK-07 | directory count matches `engine.config.json` `roster.skills` | one number, one place |
 | SK-08 | no skill name collides with a Claude Code built-in command | the built-in wins and the skill is unreachable |
-| SK-09 | no retired vocabulary under `.claude/` — the token list is `RETIRED` in `tests/lib/lint-rules.mjs`, not repeated here | the v3 rebuild dropped the old permission-tier and product names; the rule stops them coming back while ARC-02-S06 sweeps the governing documents. Spelling the tokens in prose would trip the separate legacy-name ratchet, which is the point of keeping one source of truth |
+| SK-09 | no retired vocabulary under `.claude/` — the token list is `RETIRED` in `tools/snowarch/lib/lint-rules.mjs`, not repeated here | the v3 rebuild dropped the old permission-tier and product names; the rule stops them coming back while ARC-02-S06 sweeps the governing documents. Spelling the tokens in prose would trip the separate legacy-name ratchet, which is the point of keeping one source of truth |
 | SK-10 | every `.claude/…`, `governance/…`, `templates/…`, `docs/…` path quoted in a skill body, agent body or governing document resolves | a dead path routes the reader — or the model — to nothing |
 | SK-13 | each project skill's `description` ≤ 250 chars, and the roster's together ≤ 7,500 — `lintDescriptionBudget`, `tests/skill-description-budget.test.mjs` | Claude Code's 30,000-character listing budget counts the user's own skills too (S-13 measures the whole session); the engine bounds its share |
 | AG-01 | `name` equals the agent's file stem | as SK-01 |
@@ -2517,7 +2517,7 @@ differently. An entry that changes nothing about how the engine works is a note,
 The v3 rebuild retired four strings. **SK-09** (`.claude/`) and the criterion-2 sweep in
 `tests/no-legacy-surfaces.test.mjs` (`CLAUDE.md`, `governance/`, `docs/`) both refuse them, and
 `packages/contract/lint/checks/l03-retired.mjs` refuses the tool-name half everywhere else. Three
-checks, one list: `tests/fixtures/retired-vocabulary.json`.
+checks, one list: `tools/snowarch/lib/lint-data/retired-vocabulary.json`.
 
 The words are not spelled out here. A file that spells a forbidden string becomes a detector its own
 sweep then has to exempt, and an exemption in a document about the rule is the least defensible

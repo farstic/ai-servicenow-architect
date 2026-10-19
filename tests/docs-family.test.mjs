@@ -187,9 +187,6 @@ const ENGINE_TREES = [
   ['packages/contract', 'packages/contract'],
   ['packages/snowarch/dist', 'packages/snowarch/dist'],
   ['tests/lib', 'tests/lib'],
-  // Data, not code: the engine lint reads `retired-vocabulary.json` from here. Found the same way
-  // — an explicit ENOENT naming the path, which is why this list is iterated rather than guessed.
-  ['tests/fixtures', 'tests/fixtures'],
 ];
 
 function withEngine(ws) {

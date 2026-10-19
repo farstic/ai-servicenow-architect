@@ -365,7 +365,7 @@ test('ARC-05-S06 criteria 4 and 5 — the tool table, and no retired vocabulary'
     assert.ok(live.has(t.name), `${t.name} is pinned but not in the contract`);
   }
   // The retired capture vocabulary, from the fixture rather than spelled here.
-  const vocab = JSON.parse(readFileSync(join(root, 'tests/fixtures/retired-vocabulary.json'), 'utf8'))
+  const vocab = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/lint-data/retired-vocabulary.json'), 'utf8'))
     .tokens.map((t) => t.pattern);
   const banned = [...vocab, ...vocab.map((v) => v.replace(/^mcp__/, '').replace(/__$/, ''))];
   assert.deepEqual(banned.filter((v) => new RegExp(v).test(doc)), []);

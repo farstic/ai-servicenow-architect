@@ -50,9 +50,9 @@ function rosterTree(t) {
   const root = tempDir('snowarch-doctor-roster-', t);
   cpSync(join(REAL_ROOT, '.claude'), join(root, '.claude'), { recursive: true });
   cpSync(join(REAL_ROOT, 'engine.config.json'), join(root, 'engine.config.json'));
-  mkdirSync(join(root, 'tests', 'fixtures'), { recursive: true });
-  for (const rel of ['tests/fixtures/skills-lint-allowlist.json',
-    'tests/fixtures/claude-builtin-commands.json']) {
+  mkdirSync(join(root, 'tools', 'snowarch', 'lib', 'lint-data'), { recursive: true });
+  for (const rel of ['tools/snowarch/lib/lint-data/skills-lint-allowlist.json',
+    'tools/snowarch/lib/lint-data/claude-builtin-commands.json']) {
     cpSync(join(REAL_ROOT, rel), join(root, rel));
   }
   return root;
