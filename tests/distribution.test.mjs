@@ -71,6 +71,10 @@ function plantedTree(t) {
     + 'Write an image as ' + BT + '![Figure N](../../../docs/figure-N.png)' + BT + ': an example in code, not a link.\n');
   put(root, 'docs/relative-guide.md', '# guide\n');
   git(root, ['init', '-q', '-b', 'main']);
+  // The archive and the work tree agree only when git converts neither: a Windows runner's core.autocrlf makes
+  // `git archive` write CRLF where the files were written LF. The export's claim is "as HEAD has them".
+  git(root, ['config', 'core.autocrlf', 'false']);
+  assert.equal(git(root, ['config', '--get', 'core.autocrlf']).trim(), 'false');
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'fixture']);
   return root;
