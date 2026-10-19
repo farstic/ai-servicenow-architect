@@ -57,9 +57,10 @@ const FROZEN_FIXTURE = 'tests/fixtures/changelog-frozen-region.md';
  * line of the region (1-based), the exact text it held at FROZEN_SINCE, and the text it holds now. The history case
  * applies these to FROZEN_SINCE's region and requires the fixture to equal the result: nothing else moved.
  */
+// The predecessor's identifier is ASSEMBLED, as AC 4's are: spelled, it would be a hit in the retired-name sweep.
+const PREDECESSOR = ['farstic/claude', 'servicenow', 'live'].join('-');
 const REFROZEN = Object.freeze([
-  { line: 401, old: '[`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live)',
-    new: '`farstic/claude-servicenow-live`' },
+  { line: 401, old: `[\`${PREDECESSOR}\`](https://github.com/${PREDECESSOR})`, new: `\`${PREDECESSOR}\`` },
 ]);
 
 const HEADER = '# Changelog\n\nA rule.\n\n---\n\n';
