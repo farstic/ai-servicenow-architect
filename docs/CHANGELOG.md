@@ -56,9 +56,9 @@ has both).
   own rules before it moves anything, so a release that needs a newer git or Node is refused with nothing changed, not
   after the move. `--force-floor` now completes the upgrade it allows: the bootstrap is told to skip its Claude Code
   check (ARC-09-C194).
-- On Windows, `snowarch.cmd` runs the command and exits on one line, so an upgrade that replaces it no longer leaves the
-  running launcher reading the new file at the old place, which printed `|| was unexpected at this time.` or ran the
-  command a second time (ARC-09-C194).
+- On Windows, `snowarch.cmd` runs the command and returns its exit code on one line, so an upgrade that replaces the
+  launcher while it runs no longer leaves it reading the new file at the old place, which printed `|| was unexpected at
+  this time.` or ran the command again, thousands of times when the file grew (ARC-09-C194).
 - From this release, after a move from a release, the command an upgrade names to return to it is `./snowarch upgrade
   --to` that release, which checks and records it again; `git checkout` would have left the record naming the newer one
   (ARC-09-C194).
