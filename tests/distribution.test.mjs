@@ -67,7 +67,8 @@ function plantedTree(t) {
   put(root, 'docs/unlisted-doc.md', '# x\n');
   // A shipped page that links a sibling by a relative path: no prefix for L05's extractor to read.
   put(root, '.claude/skills/x/linked.md', 'See [the guide](../../../docs/relative-guide.md#a-section) and [x](SKILL.md).\n'
-    + 'Write an image as ' + BT + '![Figure N](diagrams/figure-N.png)' + BT + ': an example in code, not a link.\n');
+    // The example's path lands outside the coverage, so a guard that read it as a link would report it.
+    + 'Write an image as ' + BT + '![Figure N](../../../docs/figure-N.png)' + BT + ': an example in code, not a link.\n');
   put(root, 'docs/relative-guide.md', '# guide\n');
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['add', '-A']);
