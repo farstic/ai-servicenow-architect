@@ -150,3 +150,13 @@ test('ARC-09-C59 — the server step\'s remedy does not name the command it just
   assert.match(generated, /run npm run gen and commit the result/,
     'the generated step\'s remedy changed — it is correct as it stands and this test relies on it');
 });
+
+test('ARC-09-C185a — the generated step also runs the distribution guard, after the generators', () => {
+  // What ships is derived from COVERAGE as the generated texts are derived from their sources, so a path the runtime
+  // reaches that does not ship fails the same step. Read from the gate itself: the step list is the gate's contract.
+  const src = readFileSync(GATE, 'utf8');
+  const step = src.slice(src.indexOf("id: 'generated'"), src.indexOf("id: 'engine'"));
+  assert.ok(step.includes("'scripts/distribution.mjs'"), 'the generated step does not run the distribution guard');
+  assert.ok(step.includes("'--check'"), 'the guard runs without --check');
+  assert.ok(step.indexOf("'gen:check'") < step.indexOf("'scripts/distribution.mjs'"), 'the generators run first');
+});
