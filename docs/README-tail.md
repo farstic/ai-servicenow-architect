@@ -13,7 +13,6 @@
 | `packages/snowarch/` | the MCP server that talks to a ServiceNow instance |
 | `docs/ARCHITECTURE.md` | how the repository is laid out and how the engine works |
 | `docs/PLATFORM-NOTES.md` | platform behaviour learned on real instances, and the Windows notes |
-| `docs/CONTRIBUTING.md` | how to change it |
 
 ## Licence and attribution
 

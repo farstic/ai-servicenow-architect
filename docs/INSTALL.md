@@ -286,7 +286,6 @@ Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a sp
 prints how to return to your branch; a diverged branch is reported, and a file in the release's way is named; a failed
 fetch prints git's error and a [proxy](TROUBLESHOOTING.md#proxy_unreachable) or [TLS](TROUBLESHOOTING.md#tls_ca_untrusted)
 remedy. The banner mentions a newer release only from a check you already ran — it never fetches.
-Full detail: [CONTRIBUTING.md](CONTRIBUTING.md#upgrading-the-product).
 
 ### Uninstall
 
