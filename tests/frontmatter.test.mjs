@@ -4,7 +4,7 @@
 // writes and names anything else, so it cannot quietly stop catching mistakes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFrontmatter, asList, FrontmatterError } from './lib/frontmatter.mjs';
+import { parseFrontmatter, asList, FrontmatterError } from '../packages/contract/lib/frontmatter.mjs';
 
 const fm = (body) => `---\n${body}\n---\nbody\n`;
 

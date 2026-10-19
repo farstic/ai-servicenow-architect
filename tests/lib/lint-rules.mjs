@@ -8,7 +8,7 @@
 // rule id — the ARC-08 doctor quotes those ids.
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
-import { parseFrontmatter, asList } from './frontmatter.mjs';
+import { parseFrontmatter, asList } from '../../packages/contract/lib/frontmatter.mjs';
 import { findRootlessCitations } from '../../tools/snowarch/lib/docs/citations.mjs';
 
 export const MAX_DESCRIPTION = 500;

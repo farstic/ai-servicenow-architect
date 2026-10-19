@@ -10,7 +10,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { lintAgents } from './lib/lint-rules.mjs';
-import { parseFrontmatter } from './lib/frontmatter.mjs';
+import { parseFrontmatter } from '../packages/contract/lib/frontmatter.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ENFORCE_S04 = true;    // flipped by ARC-02-S04, which set model: inherit and added skills:

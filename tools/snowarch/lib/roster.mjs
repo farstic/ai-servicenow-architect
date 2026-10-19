@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { parseFrontmatter } from '../../../tests/lib/frontmatter.mjs';
+import { parseFrontmatter } from '../../../packages/contract/lib/frontmatter.mjs';
 
 /**
  * Frontmatter that does not parse is a roster problem, not a crash.

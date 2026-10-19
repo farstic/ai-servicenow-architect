@@ -14,7 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { parseFrontmatter } from '../../../../tests/lib/frontmatter.mjs';
+import { parseFrontmatter } from '../../lib/frontmatter.mjs';
 
 export const id = 'L04';
 export const title = 'skill and agent descriptions register and are not truncated';
