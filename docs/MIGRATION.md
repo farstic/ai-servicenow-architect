@@ -58,10 +58,10 @@ The licence, the instance store and the audit trail of instance writes (`audit.j
 rotates into) carry over, and the new install continues the trail. The carried `.claude/settings.local.json` keeps your
 permissions, environment and other hooks; its SessionStart hook is the bootstrap's, and it follows the new folder. An
 install that ran design-only (no instance) leaves out `--mode live`. With the carried store, `--mode live` keeps its
-default instance and does not run the wizard. Other folders of your own that git ignores
-(`deliverables/`, `memory/`, `reports/`) are copied the same way if you have them; everything else under
-`.local/` is a cache the bootstrap rebuilds. Once the new install's `./snowarch status` reads as the old one did,
-delete `snowarch-2.2.0`.
+default instance and does not run the wizard. Other folders of your own that git ignores (`deliverables/`, `memory/`,
+`reports/`) are copied the same way if you have them. Do not copy the rest of `.local/`: it describes the old folder,
+and a copied bootstrap record makes the new install skip steps it needs. Once the new install's `./snowarch status`
+reads as the old one did, delete `snowarch-2.2.0`.
 
 ## An install made with `clone --branch` of a 2.2.1 release candidate, or later
 
