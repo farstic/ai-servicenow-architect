@@ -54,9 +54,15 @@ test('B05-05 AC 2 — a stale pin throws ContractPinMismatch naming both shas; v
       assert.equal(err.pinned, 'f'.repeat(64));
       assert.notEqual(err.actual, err.pinned);
       assert.match(err.message, /contract sha mismatch: pinned f{12}… committed [0-9a-f]{12}…/);
-      assert.match(err.message, /run node packages\/contract\/pin\.mjs and review the proposal/);
+      // ARC-09-C185a: this fixture is shaped as an install, where pin.mjs is not shipped and is not named.
+      assert.doesNotMatch(err.message, /pin\.mjs/);
       return true;
     });
+    // The engineering checkout (tests/ and .github/) names the maintainer's tool.
+    mkdirSync(join(dir, 'tests'));
+    mkdirSync(join(dir, '.github'));
+    assert.throws(() => loadContract({ root: dir }),
+      /— run node packages\/contract\/pin\.mjs and review the proposal$/);
 
     // …and the escape hatch still loads the SAME contract, which is what makes it an escape hatch
     // rather than a second code path.
