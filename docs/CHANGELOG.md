@@ -52,6 +52,18 @@ has both).
   install, and a release push checked the same way (ARC-09-C192). The release gate also refuses a manifest signed with
   another coverage than the release's own; an install of 2.2.0 or earlier keeps its own rule and is replaced once (see
   the Notes).
+- From this release, an upgrade checks every floor its target states (Claude Code, git and Node) with the bootstrap's
+  own rules before it moves anything, so a release that needs a newer git or Node is refused with nothing changed, not
+  after the move. `--force-floor` now completes the upgrade it allows: the bootstrap is told to skip its Claude Code
+  check (ARC-09-C194).
+- On Windows, `snowarch.cmd` runs the command and exits on one line, so an upgrade that replaces it no longer leaves the
+  running launcher reading the new file at the old place, which printed `|| was unexpected at this time.` or ran the
+  command a second time (ARC-09-C194).
+- From this release, the way back an upgrade names after a move from a release is `./snowarch upgrade --to` that
+  release, which checks and records it again; `git checkout` would have left the record naming the newer one
+  (ARC-09-C194).
+- From this release, an install on a branch moves to the release tag the upgrade verified, never past it to an
+  unreleased commit, or is refused with nothing changed (ARC-09-C194).
 - `Status` reads the release family and pin from the `Docs:` line of the `./snowarch status` panel. The session
   looked for a git branch in the corpus checkout, which has none, and reported the corpus as not a git checkout
   (ARC-09-C188).
