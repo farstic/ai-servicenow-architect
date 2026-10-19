@@ -9,6 +9,7 @@ import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
 import type { ToolDefinition } from './types.js';
+import { glideDateTime } from '../utils/glide-time.js';
 
 export function reportingToolManifest(): ToolDefinition[] {
   return [
@@ -411,8 +412,7 @@ export async function dispatchReportingAction(
       requireWrite();
       if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
       // Trigger by setting next_action to now and ensuring it's active
-      const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-      const result = await client.updateRecord('sysauto', args.sys_id, { next_action: now, active: true });
+      const result = await client.updateRecord('sysauto', args.sys_id, { next_action: glideDateTime(), active: true });
       return { ...result, summary: `Triggered scheduled job ${args.sys_id} — set next_action to now` };
     }
     case 'snow_rpt_report_add': {

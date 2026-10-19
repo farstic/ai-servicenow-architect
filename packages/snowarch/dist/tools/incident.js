@@ -1,5 +1,6 @@
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import { glideDateTime } from '../utils/glide-time.js';
 export function incidentToolManifest() {
     return [
         {
@@ -149,7 +150,7 @@ export async function dispatchIncidentAction(client, name, args) {
                 state: '6',
                 close_code: args.resolution_code,
                 close_notes: args.resolution_notes,
-                resolved_at: new Date().toISOString(),
+                resolved_at: glideDateTime(), // ARC-09-C184: the instance's format, in UTC — an ISO string was stored as the date alone
             });
             return { ...result, summary: `Resolved incident ${args.sys_id}` };
         }
