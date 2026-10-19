@@ -77,7 +77,7 @@ which is safe. `bypassPermissions` skips both — never with a live write preset
 
 The wizard never silently applies a preset. For a `pdi` / `dev` / `test` instance it *proposes*
 `full` — non-production environments start with every capability available (D-05,
-`docs/decisions/ADR-0005-permission-posture.md`) — then shows a
+the permission-posture decision) — then shows a
 per-flag review screen, each flag pre-set ON and annotated with its live probe result:
 
 <!-- generated:review-screen-nonprod -->
@@ -121,7 +121,7 @@ Enter = accept. To raise this instance later:
 ```
 <!-- /generated:review-screen-prod -->
 
-**Propose, don't impose.** Design principle 10, recorded in `docs/decisions/ADR-0005-permission-posture.md`. The system proposes at every step; the user reviews and can change any single value at any level;
+**Propose, don't impose.** Design principle 10, recorded in the permission-posture decision (ADR-0005). The system proposes at every step; the user reviews and can change any single value at any level;
 only then is anything applied. Enter accepts as shown, so the common path costs one keystroke and nothing is written
 that the user has not seen. `--yes` accepts every proposal without the review screen — for CI, where nobody is there
 to review.
@@ -210,7 +210,7 @@ server reads here. Plain `list` shows the store in use and a footer naming what 
 
 **A store inside a cloud-sync folder** (OneDrive, Dropbox, Google Drive, iCloud Drive) is warned about BEFORE anything
 is written: `0600` is a *local* permission and the sync client runs as the same user, so the mode does not stop the
-file leaving the machine (D-04, `docs/decisions/ADR-0004-credential-policy.md`). The warning names the provider and
+file leaving the machine (D-04, the credential-policy decision, ADR-0004). The warning names the provider and
 the exact folder, and the option Enter picks is **stop**, which says what it costs (ARC-07-W6):
 
 ```
@@ -234,7 +234,7 @@ the environment or a transcript. When stdin is not a terminal the command **refu
 password read from an unexpected stdin is a password in a CI log — and prints the `NO_TTY:` line, which names
 `--password-stdin` and shows the password manager form (`op read "op://vault/item/password" | ./snowarch instance add
 …`). `--password`, `--client-secret` and `--secret` are rejected before the arguments are parsed at all. Should a
-Windows console turn out not to support masked input (spike S-04, `docs/spikes/S-04-raw-mode-masked-input/README.md`),
+Windows console turn out not to support masked input (spike S-04),
 that console gets the same `--password-stdin` line instead of a prompt that cannot work.
 
 **A password manager, if you use one.** Each of these is optional and none of them is required to use the wizard; the
