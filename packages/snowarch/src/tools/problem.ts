@@ -8,6 +8,7 @@ import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
 import type { ToolDefinition } from './types.js';
+import { glideDateTime } from '../utils/glide-time.js';
 
 export function problemToolManifest(): ToolDefinition[] {
   return [
@@ -110,7 +111,7 @@ export async function dispatchProblemAction(
         state: '107',
         cause_notes: args.root_cause,
         fix_notes: args.resolution_notes,
-        resolved_at: new Date().toISOString(),
+        resolved_at: glideDateTime(),   // ARC-09-C184: the instance's format, in UTC — an ISO string was stored as the date alone
       });
       return { ...result, summary: `Resolved problem ${args.sys_id}` };
     }
