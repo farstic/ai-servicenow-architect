@@ -196,8 +196,12 @@ export function stage(root, clone, ref, { onto = null, tag = false, coverage = C
 const IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s+)['"](\.{1,2}\/[^'"]+)['"]/g;
 /** A file read relative to the module itself: `new URL('../fixtures/x.json', import.meta.url)`. */
 const URL_READ = /new URL\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g;
-/** A repository path written as a string literal in code. */
-const LITERAL = /['"`]((?:\.claude|scripts|tests|docs|templates|governance|packages|tools|vendor)\/[A-Za-z0-9_.\/-]*[A-Za-z0-9_\/-])['"`]/g;
+/**
+ * A repository path anywhere in a line of code: a string that is the path, or one that carries it mid-sentence, as a
+ * printed remedy does (`'run node scripts/build-dist.mjs, then …'`). Not after a `/`, `.`, letter or digit, so a
+ * relative import's tail or a URL's path is not read as one; comments are blanked before this runs.
+ */
+const LITERAL = /(?<![\w./@$-])((?:\.claude|scripts|tests|docs|templates|governance|packages|tools|vendor)\/[A-Za-z0-9_.\/-]*[A-Za-z0-9_\/-])/g;
 /** A repository path built from literal segments after a root: `join(root, 'packages', 'contract', 'x.json')`. */
 const JOINED = /\b(?:join|resolve)\(\s*[^'"`,()]+,((?:\s*['"][^'"]+['"]\s*,)*\s*['"][^'"]+['"])\s*\)/g;
 const TOP = /^(?:\.claude|scripts|tests|docs|templates|governance|packages|tools|vendor)$/;
