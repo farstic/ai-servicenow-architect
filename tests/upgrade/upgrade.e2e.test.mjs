@@ -329,8 +329,10 @@ test('ARC-09-C185c — a release install moved to a new origin keeps its tag, th
   assert.equal(moved.status, 0, moved.text);
   const target = execFileSync('git', ['-C', distribution, 'rev-parse', 'v9.1.0^{commit}'], { encoding: 'utf8' }).trim();
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), target, 'the tree is not at the new origin\'s v9.1.0');
-  assert.equal(JSON.parse(readFileSync(join(w.user, 'package.json'), 'utf8')).version, '9.1.0');
-  assert.match(snowarch(w.user, ['version'], { bin: w.bin }).stdout, /tag:\s+v9\.1\.0 \(exact\)/);
+  // The version of record, as the product reads it (ARC-09-C137: a banner test does not open the file itself).
+  const version = snowarch(w.user, ['version'], { bin: w.bin }).stdout;
+  assert.match(version, /^snowarch 9\.1\.0 · /m, version);
+  assert.match(version, /tag:\s+v9\.1\.0 \(exact\)/, version);
   // The integrity check reads the new tag's signed manifest, whose commit is the one the new origin's tag names.
   const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
   const e32 = (report.checks ?? []).find((c) => c.id === 'E-32');
