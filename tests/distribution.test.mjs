@@ -65,6 +65,9 @@ function plantedTree(t) {
     + '.claude/skills/x/SKILL.md' + BT + '.\nMaintainers run ' + BT + 'tests/maintainers.test.mjs' + BT
     + ' (in the engineering checkout).\n');
   put(root, 'docs/unlisted-doc.md', '# x\n');
+  // A shipped page that links a sibling by a relative path: no prefix for L05's extractor to read.
+  put(root, '.claude/skills/x/linked.md', 'See [the guide](../../../docs/relative-guide.md#a-section) and [x](SKILL.md).\n');
+  put(root, 'docs/relative-guide.md', '# guide\n');
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'fixture']);
@@ -96,7 +99,7 @@ test('the guard finds an import, a spawn, a read (whole or in join segments), a 
   const refs = unlistedReferences(root, { coverage: COV, entries: ['tools/snowarch/bin/snowarch.mjs'],
     surfaces: ['.claude/skills/'], exceptions: GATED });
   const paths = refs.map((r) => r.path).sort();
-  assert.deepEqual(paths, ['docs/unlisted-data.json', 'docs/unlisted-doc.md', 'docs/unlisted/joined.json',
+  assert.deepEqual(paths, ['docs/relative-guide.md', 'docs/unlisted-data.json', 'docs/unlisted-doc.md', 'docs/unlisted/joined.json',
     'scripts/lib/unlisted.mjs', 'scripts/unlisted-remedy.mjs', 'scripts/unlisted-spawn.mjs']);
   assert.ok(refs.every((r) => r.from && r.line > 0), 'each finding names the file and line that reaches it');
 });
@@ -135,7 +138,8 @@ test('the export writes the shipped files, byte for byte, and nothing else — n
   const root = plantedTree(t);
   const out = join(tempDir('snowarch-export-', t), 'tree');
   const shipped = shippedFiles(root, COV);
-  assert.deepEqual(shipped, ['.claude/skills/x/SKILL.md', 'tools/snowarch/bin/snowarch.mjs', 'tools/snowarch/lib/a.mjs']);
+  assert.deepEqual(shipped, ['.claude/skills/x/SKILL.md', '.claude/skills/x/linked.md', 'tools/snowarch/bin/snowarch.mjs',
+    'tools/snowarch/lib/a.mjs']);
   assert.equal(exportTree(root, out, COV), shipped.length);
   for (const rel of shipped) assert.deepEqual(readFileSync(join(out, rel)), readFileSync(join(root, rel)));
   assert.equal(existsSync(join(out, '.git')), false);
