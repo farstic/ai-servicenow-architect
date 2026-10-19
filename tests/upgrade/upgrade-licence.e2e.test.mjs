@@ -261,3 +261,22 @@ test('ARC-09-C140 — 2.1 to 2.1: the plan and the run agree on B01, after an in
   assert.match(again.text, /\[B01\/09\][^\n]*ok \(cached\)/, again.text);
   assert.equal(ran(again.text).includes('B01'), false, again.text);
 }, 3 * MINUTES);
+
+// ── ARC-09-C194 — the way back named after a move is the one that re-verifies ────────────────────────────────────────
+
+test('ARC-09-C194 — after a move from a release, the way back named is upgrade --to it, and it re-verifies', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  // The target's manifest is cached at U5, so `git checkout v9.0.0` would leave the cache naming v9.1.0: integrity
+  // reads 'other' and every command is refused. The upgrade back fetches, verifies and caches v9.0.0's own.
+  assert.match(up.text, /HEAD is detached at v9\.1\.0 — return with: \S+ upgrade --to v9\.0\.0/, up.text);
+  assert.doesNotMatch(up.text, /HEAD is detached at v9\.1\.0 — return with: git checkout/, up.text);
+  const back = snowarch(w.user, ['upgrade', '--to', 'v9.0.0', '--yes'], { bin: w.bin });
+  assert.equal(back.status, 0, back.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.0.0', back.text);
+  const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
+  const e32 = (report.checks ?? []).find((c) => c.id === 'E-32');
+  assert.match(e32?.detail ?? '', /^Integrity: verified · v9\.0\.0 · \d+ files$/, JSON.stringify(e32));
+}, 2 * MINUTES);

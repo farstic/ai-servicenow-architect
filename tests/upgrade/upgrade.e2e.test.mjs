@@ -349,6 +349,52 @@ test('ARC-09-C185c — a release install moved to a new origin keeps its tag, th
   assert.match(after.text, /v9\.2\.0 available \(you are on v9\.1\.0\)/, after.text);
 }, MINUTES);
 
+// ARC-09-C194 — A BRANCH INSTALL MOVES TO THE VERIFIED TAG. U5 used to `pull --ff-only origin <branch>`: the branch
+// went wherever the remote branch was, never checked against the manifest U4 had just verified, and finish() then
+// reported a move to the tag. A main that leads or lags its newest tag (INSTALL.md makes branch installs from main)
+// put a branch install on a commit nobody signed.
+test('ARC-09-C194 — a branch install fast-forwards to the verified tag, never past it, or is refused unmoved', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  // origin's main one commit PAST its newest tag.
+  const ahead = join(w.scratch, 'ahead');
+  git(w.scratch, ['clone', '-q', '--no-hardlinks', pathToFileURL(w.origin).href, ahead]);
+  git(ahead, ['checkout', '-q', '-B', 'main', 'v9.2.0']);
+  writeFileSync(join(ahead, 'NEXT.md'), 'a commit after the release\n');
+  git(ahead, ['add', 'NEXT.md']);
+  git(ahead, ['commit', '-q', '-m', 'after v9.2.0']);
+  git(ahead, ['push', '-q', '--force', 'origin', 'main']);
+  const past = git(ahead, ['rev-parse', 'HEAD']);
+  assert.notEqual(past, git(ahead, ['rev-parse', 'v9.2.0^{commit}']), 'origin main is not past the tag');
+  // The install, on a branch at v9.0.0 that tracks origin's main.
+  git(w.user, ['fetch', '-q', 'origin', '+refs/heads/main:refs/remotes/origin/main']);
+  git(w.user, ['checkout', '-q', '-B', 'main', 'v9.0.0']);
+  git(w.user, ['branch', '--set-upstream-to', 'origin/main', 'main']);
+  assert.equal(git(w.user, ['rev-parse', '--abbrev-ref', 'main@{upstream}']), 'origin/main');
+
+  // A branch with a commit of its own cannot fast-forward to the tag: refused, and nothing moves.
+  writeFileSync(join(w.user, 'MINE.md'), 'a local commit\n');
+  git(w.user, ['add', 'MINE.md']);
+  git(w.user, ['commit', '-q', '-m', 'mine']);
+  const mine = git(w.user, ['rev-parse', 'HEAD']);
+  const refused = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
+  assert.equal(refused.status, 1, refused.text);
+  assert.match(refused.text, /upgrade: main cannot fast-forward to v9\.2\.0 — resolve with git, or use --to v9\.2\.0 to check out the release tag; nothing was changed/);
+  assert.deepEqual([git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['status', '--porcelain'])], [mine, ''], 'the refusal moved the tree');
+
+  // Without it, the branch moves to the verified tag's commit exactly, not to origin's main past it.
+  git(w.user, ['reset', '-q', '--hard', 'v9.0.0']);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['rev-parse', 'v9.0.0^{commit}']));
+  const moved = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
+  assert.equal(moved.status, 0, moved.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['rev-parse', 'v9.2.0^{commit}']), 'the branch is not at the verified tag');
+  assert.notEqual(git(w.user, ['rev-parse', 'HEAD']), past, 'the branch went past the tag to origin\'s main');
+  assert.equal(git(w.user, ['branch', '--show-current']), 'main', 'the install left its branch');
+  const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
+  const e32 = (report.checks ?? []).find((c) => c.id === 'E-32');
+  assert.match(e32?.detail ?? '', /^Integrity: verified · v9\.2\.0 · \d+ files$/, JSON.stringify(e32));
+}, 2 * MINUTES);
+
 // ARC-09-C109 — what counts as an acceptance at `Proceed? [Y/n]`.
 //
 // `promptLine` in upgrade.mjs read a line and returned '' when stdin ended, and '' does not match
