@@ -2,11 +2,12 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadContract, flagNames, presetNames, errorCodes } from '../../packages/contract/lib/contract.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * Engine tooling reads names from the contract, never from a list of its own.
@@ -112,9 +113,11 @@ test('and every preset the contract declares has its prose entry', () => {
   }
 });
 
-test('criterion 4 negative — a planted list and a planted code are both caught', () => {
-  // Planted where ARC-06 and ARC-07 will write, because that is the code the guard exists for.
-  const dir = join(root, 'tools/snowarch/lib');
+test('criterion 4 negative — a planted list and a planted code are both caught', (t) => {
+  // Named for where ARC-06 and ARC-07 write, because that is the code the guard exists for, and written in a temp
+  // tree of that shape: the case reads the probe back itself, so the repository never holds it (ARC-09-C189).
+  const dir = join(tempDir('snowarch-guard-probe-', t), 'tools/snowarch/lib');
+  mkdirSync(dir, { recursive: true });
   const planted = join(dir, '__guard-probe.mjs');
   // ARC-09-C189 — never in the real tree. L05 walks tools/snowarch/lib on disk, and a run in parallel lists the probe
   // that this case then deletes: ENOENT on macos node 20 (run 39225261450, "L05 answers from git in THIS repository").
