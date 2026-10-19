@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { isEngineeringCheckout } from '../tools/snowarch/lib/engineering-checkout.mjs';
-import { exportTree, shippedFiles, unlistedReferences } from '../scripts/lib/distribution.mjs';
+import { exportTree, shippedFiles, stage, unlistedReferences } from '../scripts/lib/distribution.mjs';
 import { engineContractChecks } from '../tools/snowarch/lib/doctor/checks/engine-contract.mjs';
 
 const REAL_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -122,4 +122,73 @@ test('the export writes the shipped files, byte for byte, and nothing else — n
   for (const rel of shipped) assert.deepEqual(readFileSync(join(out, rel)), readFileSync(join(root, rel)));
   assert.equal(existsSync(join(out, '.git')), false);
   assert.equal(existsSync(join(out, 'scripts')), false);
+});
+
+/** A small engineering repository with a corpus gitlink, a CRLF-attributed script and two annotated release tags. */
+const PIN = 'a'.repeat(40);
+function releaseTree(t) {
+  const root = tempDir('snowarch-stage-src-', t);
+  put(root, 'tools/snowarch/bin/snowarch.mjs', "console.log('x');\n");
+  put(root, 'tools/snowarch/x.ps1', 'Write-Output a\nWrite-Output b\n');
+  put(root, '.gitattributes', '*.ps1 text eol=crlf\n');
+  put(root, '.gitmodules', '[submodule "vendor/ServiceNowDocs"]\n\tpath = vendor/ServiceNowDocs\n');
+  put(root, 'tests/not-shipped.test.mjs', '\n');
+  git(root, ['init', '-q', '-b', 'main']);
+  git(root, ['add', '-A']);
+  git(root, ['update-index', '--add', '--cacheinfo', `160000,${PIN},vendor/ServiceNowDocs`]);
+  git(root, ['commit', '-q', '-m', 'release one']);
+  const tagged = (name, pin) => {
+    put(root, `.tag-${name}`, `snowarch ${name}\n\ncontract: ${'c'.repeat(64)}\ndocs-pin: ${pin}\n`);
+    execFileSync('git', ['-c', 'user.email=f@example.com', '-c', 'user.name=f', 'tag', '-a', '--no-sign',
+      '--cleanup=verbatim', '-F', join(root, `.tag-${name}`), name], { cwd: root, stdio: 'pipe',
+      env: { ...process.env, GIT_COMMITTER_DATE: '@1792243591 +0300' } });
+  };
+  tagged('v9.9.8', 'b'.repeat(40));   // its message disagrees with its tree
+  tagged('v9.9.9', PIN);
+  put(root, 'tools/snowarch/bin/snowarch.mjs', "console.log('y');\n");
+  git(root, ['add', 'tools/snowarch/bin/snowarch.mjs']);   // not -a: the gitlink has no directory, and -a would drop it
+  git(root, ['commit', '-q', '-m', 'release two']);
+  tagged('v9.9.10', PIN);
+  return root;
+}
+const SCOV = { covers: ['tools/snowarch/', '.gitattributes', '.gitmodules'], excludes: [], ignores: [] };
+const at = (dir, args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
+
+test('stage is reproducible: the same tag twice gives the same commit and tag, blobs copied, never pushed', (t) => {
+  const root = releaseTree(t);
+  const [a, b] = [join(tempDir('snowarch-stage-a-', t), 'clone'), join(tempDir('snowarch-stage-b-', t), 'clone')];
+  const one = stage(root, a, 'v9.9.9', { coverage: SCOV, tag: true });
+  const two = stage(root, b, 'v9.9.9', { coverage: SCOV, tag: true });
+  assert.equal(one.commit, two.commit, 'two stagings of one tag on one parent are one commit');
+  assert.equal(at(a, ['rev-parse', 'v9.9.9']), at(b, ['rev-parse', 'v9.9.9']), 'and one tag object');
+  assert.equal(one.parent, null);
+  assert.equal(one.files, 4);
+  // The blob, not a re-encoding: .gitattributes gives the script CRLF in a checkout, and its blob is the source's.
+  assert.equal(at(a, ['rev-parse', 'HEAD:tools/snowarch/x.ps1']), at(root, ['rev-parse', 'v9.9.9:tools/snowarch/x.ps1']));
+  assert.match(at(a, ['ls-tree', 'HEAD', 'vendor/ServiceNowDocs']), new RegExp(`^160000 commit ${PIN}\\t`));
+  assert.equal(at(a, ['ls-tree', '--name-only', 'HEAD', 'tests']), '', 'nothing outside the coverage');
+  assert.equal(at(a, ['log', '-1', '--format=%an <%ae> %s']), 'snowarch release <release@snowarch.invalid> v9.9.9');
+  // Two stagings in one second would agree on the runner's clock too; the dates are the tag's, by construction.
+  assert.equal(at(a, ['log', '-1', '--format=%at %ct']), '1792243591 1792243591');
+  assert.equal(at(a, ['cat-file', '-p', 'v9.9.9']).split('\n\n').slice(1).join('\n\n'),
+    at(root, ['cat-file', '-p', 'v9.9.9']).split('\n\n').slice(1).join('\n\n'), 'the tag message is verbatim');
+  assert.equal(at(a, ['remote']), '', 'stage adds no remote and pushes nothing');
+  assert.equal(at(a, ['status', '--porcelain']), '', 'the work tree is the commit');
+});
+
+test('stage puts the next release onto the clone\'s main, and refuses what would lose or misstate a release', (t) => {
+  const root = releaseTree(t);
+  const clone = join(tempDir('snowarch-stage-next-', t), 'clone');
+  const first = stage(root, clone, 'v9.9.9', { coverage: SCOV, tag: true });
+  assert.throws(() => stage(root, clone, 'v9.9.10', { coverage: SCOV }), /has history: name the new commit's parent/);
+  const next = stage(root, clone, 'v9.9.10', { coverage: SCOV, onto: 'main', tag: true });
+  assert.equal(next.parent, first.commit);
+  assert.equal(at(clone, ['rev-parse', 'main']), next.commit);
+  assert.throws(() => stage(root, clone, 'v9.9.10', { coverage: SCOV, onto: first.commit }), /not at --onto/);
+  put(clone, 'tools/snowarch/bin/snowarch.mjs', 'edited\n');
+  assert.throws(() => stage(root, clone, 'v9.9.10', { coverage: SCOV, onto: 'main' }), /uncommitted changes/);
+  const fresh = join(tempDir('snowarch-stage-pin-', t), 'clone');
+  assert.throws(() => stage(root, fresh, 'v9.9.8', { coverage: SCOV, tag: true }),
+    new RegExp(`pins the corpus at ${'b'.repeat(40)}, its tree at ${PIN}`));
+  assert.throws(() => stage(root, fresh, 'main', { coverage: SCOV, tag: true }), /--tag needs an annotated tag/);
 });

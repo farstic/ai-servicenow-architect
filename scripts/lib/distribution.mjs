@@ -17,7 +17,8 @@
  * checkout.
  */
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 import { COVERAGE, isCovered, tarEntries } from '../../tools/snowarch/lib/licence/manifest.mjs';
 import { citedPaths } from '../../packages/contract/lint/lib/cited-paths.mjs';
@@ -78,6 +79,112 @@ export function exportTree(root, dir, coverage = COVERAGE) {
     written += 1;
   }
   return written;
+}
+
+/** The corpus submodule: a gitlink in the tree, not a file, so `git archive` and the export leave it out. */
+export const CORPUS_GITLINK = 'vendor/ServiceNowDocs';
+
+/** Who the distribution commit and tag say made them: a release identity, never the runner's, so two stagings agree. */
+export const RELEASE_IDENTITY = Object.freeze({ name: 'snowarch release', email: 'release@snowarch.invalid' });
+
+const gitIn = (dir, args, { input, env } = {}) => execFileSync('git', ['-C', dir, ...args], {
+  encoding: 'utf8', maxBuffer: 1 << 28, input, env: env ? { ...process.env, ...env } : process.env,
+  stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+}).trim();
+const tryGit = (dir, args) => { try { return gitIn(dir, args); } catch { return null; } };
+
+/** An annotated tag's message, verbatim, without a signature block; `null` for a ref that is not an annotated tag. */
+function tagOf(root, ref) {
+  if (tryGit(root, ['cat-file', '-t', `refs/tags/${ref}`]) !== 'tag') return null;
+  const raw = execFileSync('git', ['-C', root, 'cat-file', 'tag', `refs/tags/${ref}`], { encoding: 'utf8' });
+  const split = raw.indexOf('\n\n');
+  const tagger = /^tagger .* (\d+ [+-]\d{4})$/m.exec(raw.slice(0, split));
+  const sig = raw.search(/^-----BEGIN (PGP|SSH) SIGNATURE-----$/m);
+  return { message: raw.slice(split + 2, sig === -1 ? raw.length : sig), date: tagger?.[1] ?? null };
+}
+
+/**
+ * ARC-09-C185a — stage `ref` of the engineering checkout `root` as one commit in the distribution clone `clone`:
+ * the shipped files, byte for byte as git stores them (the blobs are copied, never re-encoded, so a file
+ * `.gitattributes` gives CRLF in a checkout keeps the engineering repository's blob), the corpus gitlink at `ref`'s
+ * own pin, and nothing else. It never pushes.
+ *
+ * REPRODUCIBLE by construction: the release identity, the date of `ref`'s tag (or of its commit, for a ref that is not
+ * a tag), the message `ref`, and the parent named by `onto` (none in a fresh clone). Staging the same ref twice on the
+ * same parent gives the same commit. With `tag`, an annotated tag `ref` carries the engineering tag's message verbatim.
+ *
+ * `clone` is created with `git init` when it does not exist; an existing one must be clean, on a branch that is at
+ * `onto` (or unborn, with no `onto`). Returns `{ commit, tree, parent, files, pin, tag }`.
+ */
+export function stage(root, clone, ref, { onto = null, tag = false, coverage = COVERAGE } = {}) {
+  const commit = tryGit(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]);
+  if (!commit) throw new Error(`${ref} is not a commit in ${root}`);
+  const annotated = tagOf(root, ref);
+  if (tag && !annotated) throw new Error(`--tag needs an annotated tag; ${ref} is not one`);
+
+  const entries = gitIn(root, ['ls-tree', '-r', '-z', commit]).split('\0').filter(Boolean).map((line) => {
+    const [meta, path] = line.split('\t');
+    const [mode, type, sha] = meta.split(' ');
+    return { mode, type, sha, path };
+  });
+  const link = entries.find((e) => e.type === 'commit' && e.path === CORPUS_GITLINK);
+  if (!link) throw new Error(`${ref} has no ${CORPUS_GITLINK} gitlink: the install could not pin its corpus`);
+  const pinned = annotated && /^docs-pin: ([0-9a-f]{40})$/m.exec(annotated.message)?.[1];
+  if (annotated && pinned !== link.sha) {
+    throw new Error(`${ref}'s message pins the corpus at ${pinned ?? '(no docs-pin line)'}, its tree at ${link.sha}`);
+  }
+  const blobs = entries.filter((e) => e.type === 'blob' && isCovered(e.path, coverage));
+
+  // The clone: made here, or one that is clean and whose branch is where the new commit's parent says.
+  if (!existsSync(clone)) { mkdirSync(dirname(clone), { recursive: true }); gitIn(dirname(clone), ['init', '-q', '-b', 'main', clone]); }
+  if (tryGit(clone, ['rev-parse', '--is-inside-work-tree']) !== 'true') throw new Error(`${clone} is not a git work tree`);
+  if (gitIn(clone, ['status', '--porcelain']) !== '') throw new Error(`${clone} has uncommitted changes: staging needs a clean clone`);
+  const branch = tryGit(clone, ['symbolic-ref', '-q', 'HEAD']);
+  if (!branch) throw new Error(`${clone} is not on a branch`);
+  const head = tryGit(clone, ['rev-parse', '--verify', '--quiet', 'HEAD']);
+  const parent = onto === null ? null : tryGit(clone, ['rev-parse', '--verify', '--quiet', `${onto}^{commit}`]);
+  if (onto !== null && !parent) throw new Error(`--onto ${onto} is not a commit in ${clone}`);
+  if (head !== parent) {
+    throw new Error(onto === null ? `${clone} has history: name the new commit's parent with --onto`
+      : `${branch} is at ${head ?? '(no commit)'}, not at --onto ${onto}`);
+  }
+  if (tag && tryGit(clone, ['rev-parse', '--verify', '--quiet', `refs/tags/${ref}`])) throw new Error(`${clone} already has ${ref}`);
+
+  // The blobs, copied: read from the engineering repository as stored, written into the clone without filters.
+  const tmp = mkdtempSync(join(tmpdir(), 'snowarch-stage-'));
+  try {
+    const files = blobs.map((b, i) => {
+      const file = join(tmp, String(i));
+      writeFileSync(file, execFileSync('git', ['-C', root, 'cat-file', 'blob', b.sha], { maxBuffer: 1 << 30 }));
+      return file;
+    });
+    const written = blobs.length === 0 ? [] : gitIn(clone, ['hash-object', '-w', '--no-filters', '--stdin-paths'],
+      { input: `${files.join('\n')}\n` }).split('\n');
+    blobs.forEach((b, i) => {
+      if (written[i] !== b.sha) throw new Error(`${b.path} did not copy byte for byte (${written[i]} ≠ ${b.sha})`);
+    });
+    const index = join(tmp, 'index');
+    const lines = [...blobs.map((b) => `${b.mode} ${b.sha}\t${b.path}`), `160000 ${link.sha}\t${link.path}`];
+    gitIn(clone, ['update-index', '--add', '--index-info'], { input: `${lines.join('\n')}\n`, env: { GIT_INDEX_FILE: index } });
+    const tree = gitIn(clone, ['write-tree'], { env: { GIT_INDEX_FILE: index } });
+
+    const date = annotated?.date ?? gitIn(root, ['show', '-s', '--format=%ct %cz', commit]);
+    const who = { GIT_AUTHOR_NAME: RELEASE_IDENTITY.name, GIT_AUTHOR_EMAIL: RELEASE_IDENTITY.email,
+      GIT_COMMITTER_NAME: RELEASE_IDENTITY.name, GIT_COMMITTER_EMAIL: RELEASE_IDENTITY.email,
+      GIT_AUTHOR_DATE: `@${date}`, GIT_COMMITTER_DATE: `@${date}` };
+    const made = gitIn(clone, ['commit-tree', '--no-gpg-sign', tree, ...(parent ? ['-p', parent] : []), '-m', ref],
+      { env: who });
+    gitIn(clone, ['update-ref', branch, made, ...(head ? [head] : [])]);
+    gitIn(clone, ['reset', '-q', '--hard']);
+    if (tag) {
+      const msg = join(tmp, 'tag-message');
+      writeFileSync(msg, annotated.message);
+      gitIn(clone, ['tag', '-a', '--no-sign', '--cleanup=verbatim', '-F', msg, ref, made], { env: who });
+    }
+    return { commit: made, tree, parent, files: blobs.length, pin: link.sha, tag: tag ? ref : null };
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 /** A relative import specifier, or a literal dynamic one, per line. */
