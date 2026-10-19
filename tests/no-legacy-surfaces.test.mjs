@@ -318,9 +318,10 @@ test('ARC-10-S04 — CLAUDE.md and CONTRIBUTING agree on the four homes', () => 
     assert.ok(claude.includes(home), `CLAUDE.md § 11 does not name ${home}`);
     assert.ok(contributing.includes(home), `the CONTRIBUTING table does not name ${home}`);
   }
-  // The promise that replaced the exclusion, in both places.
+  // The promise that replaced the exclusion, in both places. What is asserted is that each SAYS the exclusion is gone,
+  // not a word order: CLAUDE.md's owner-approved trim (ARC-09-C185a) words it "no category is excluded".
   for (const [name, doc] of [['CLAUDE.md', claude], ['docs/CONTRIBUTING.md', contributing]]) {
-    assert.match(doc, /no excluded category/, `${name} does not say the exclusion is gone`);
+    assert.match(doc, /no excluded category|no category is excluded/, `${name} does not say the exclusion is gone`);
     assert.match(doc, /same pull request as the fix or the test/, `${name} does not say when to record`);
   }
 
