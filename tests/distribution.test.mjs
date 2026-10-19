@@ -108,6 +108,14 @@ test('control: the same tree with everything listed has nothing to report', (t) 
     surfaces: ['.claude/skills/'], exceptions: [] }), []);
 });
 
+test('no shipped path runs through a test or fixture directory: a covered prefix cannot carry one in', () => {
+  // A class assertion, not a list: packages/contract/lint/ is a covered prefix, and its tests/fixtures shipped under
+  // it until the coverage excluded them. Any covered prefix that holds such a directory fails here, by name.
+  const leaked = shippedFiles(REAL_ROOT)
+    .filter((p) => p.split('/').slice(0, -1).some((dir) => /^(tests?|__tests__|spec|fixtures?)$/.test(dir)));
+  assert.deepEqual(leaked, [], `${leaked.length} test or fixture file(s) ship`);
+});
+
 test('every workspace the root package.json and package-lock.json name ships its package.json (npm ci needs it)', () => {
   const pkg = JSON.parse(readFileSync(join(REAL_ROOT, 'package.json'), 'utf8'));
   const lock = JSON.parse(readFileSync(join(REAL_ROOT, 'package-lock.json'), 'utf8'));
