@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { loadContract, flagNames, presetNames, errorCodes } from '../../packages/contract/lib/contract.mjs';
@@ -116,6 +116,9 @@ test('criterion 4 negative — a planted list and a planted code are both caught
   // Planted where ARC-06 and ARC-07 will write, because that is the code the guard exists for.
   const dir = join(root, 'tools/snowarch/lib');
   const planted = join(dir, '__guard-probe.mjs');
+  // ARC-09-C189 — never in the real tree. L05 walks tools/snowarch/lib on disk, and a run in parallel lists the probe
+  // that this case then deletes: ENOENT on macos node 20 (run 39225261450, "L05 answers from git in THIS repository").
+  assert.ok(!resolve(planted).startsWith(`${resolve(root)}${sep}`), `the probe is planted in the real tree: ${planted}`);
   try {
     writeFileSync(planted, [
       '// A probe for the ARC-05-S10 guard. Deleted by the test that wrote it.',
