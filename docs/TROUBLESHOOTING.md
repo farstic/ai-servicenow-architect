@@ -2,9 +2,9 @@
 # Troubleshooting
 
 Every error code this server can return, with what it means and what to do about
-it. Nothing per code is written by hand: the source is the error registry in
-`packages/snowarch/src/errors/codes.ts`, which is also what the session rule file, the instance
-wizard and the doctor render from. If a remedy is wrong, correct it there and every surface follows.
+it. Nothing per code is written by hand: the source is the server's error registry (in the engineering
+checkout), which is also what the session rule file, the instance wizard and the doctor render from. If
+a remedy is wrong, correct it there and every surface follows.
 
 **Where you will see a code.** In a Claude session, as the `code` of a refused tool call. In the
 terminal, from `./snowarch instance …` while configuring an instance. And from `./snowarch doctor`,
