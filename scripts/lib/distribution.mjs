@@ -32,6 +32,9 @@ export const RUNTIME_ENTRIES = Object.freeze([
   'packages/snowarch/dist/server.js',
 ]);
 
+/** The reason a maintainer's command is excused: the code prints it only in the engineering checkout. */
+const MAINTAINER = 'a maintainer\'s command, printed only where isEngineeringCheckout(root) holds; an install reads E-32\'s remedy';
+
 /**
  * Named exceptions: a path the runtime reaches that does not ship, and why that is right. Each is one reference,
  * `from` the file that reaches it `to` the path it reaches. Nothing else is excused.
@@ -42,6 +45,16 @@ export const EXCEPTIONS = Object.freeze([
   { from: 'tools/snowarch/lib/doctor/checks/engine-contract.mjs',
     to: 'packages/contract/lint/checks/l06-generated.mjs',
     reason: 'E-21 imports L06 only behind isEngineeringCheckout: it runs the generators, maintainers\' tools' },
+  { from: 'packages/contract/lib/contract.mjs', to: 'packages/contract/pin.mjs', reason: MAINTAINER },
+  { from: 'tools/snowarch/lib/doctor/checks/engine-contract.mjs', to: 'packages/contract/pin.mjs', reason: MAINTAINER },
+  { from: 'packages/contract/lint/lib/context.mjs', to: 'scripts/build-dist.mjs', reason: MAINTAINER },
+  { from: 'tools/snowarch/lib/doctor/checks/engine-contract.mjs', to: 'scripts/build-dist.mjs', reason: MAINTAINER },
+  { from: 'tools/snowarch/lib/docs/status.mjs', to: 'scripts/docs-bump.mjs', reason: MAINTAINER },
+  { from: 'tools/snowarch/lib/doctor/checks/engine-docs.mjs', to: 'scripts/docs-bump.mjs', reason: MAINTAINER },
+  { from: 'tools/snowarch/lib/doctor/checks/engine-roster.mjs', to: 'tests/skills-lint.test.mjs', reason: MAINTAINER },
+  { from: 'tools/snowarch/lib/doctor/checks/engine-roster.mjs', to: 'tests/agents-lint.test.mjs', reason: MAINTAINER },
+  { from: 'tools/snowarch/lib/docs/recipe-block.mjs', to: 'scripts/gen-docs-recipe.mjs',
+    reason: 'the marker that opens ARCHITECTURE.md\'s generated region: an HTML comment matched to find it, not a pointer' },
 ]);
 
 /**
@@ -238,7 +251,8 @@ function codeLines(text) {
     const t = line.trim();
     if (PATH_LIST_MARKER.test(line)) { list = -1; return ''; }
     if (list !== 0) {
-      for (const ch of line) {
+      const code = t.startsWith('//') || t.startsWith('*') ? '' : line.replace(/\/\/.*$/, '');
+      for (const ch of code) {
         if (ch === '[') list = list === -1 ? 1 : list + 1;
         else if (ch === ']' && list > 0) list -= 1;
       }
