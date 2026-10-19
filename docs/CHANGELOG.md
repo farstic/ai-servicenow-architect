@@ -38,6 +38,9 @@ beyond `./snowarch upgrade`.
   send it literally (ARC-09-C172).
 - `./snowarch upgrade` names the version it upgrades from by the doctor's rule — the release tag, the tag and the
   commits past it, or `a development tree at <sha>` — and never an `import/*` tag (ARC-09-C170).
+- `./snowarch doctor --no-network` makes no network call. The release-currency check (E-28) read the flag where the
+  doctor never put it and still asked `origin` for its tags, so every report taken with `--no-network` before 2.2.1,
+  the release evidence included, made that one call (ARC-09-C187).
 
 ### Changed
 

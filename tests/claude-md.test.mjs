@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gatewayDirs } from './lib/gateways.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { writeMarker } from '../scripts/lib/release/writers.mjs';
 
 /**
  * `CLAUDE.md` is loaded into every session, so its size is a running cost and its wording is
@@ -19,17 +20,27 @@ const lines = doc.trimEnd().split('\n');
 
 const MARKER = /^\*\*Version:\*\* /;
 
-test('criterion 1 — the budget', () => {
+test('criterion 1 — the budget, in the state a release cut writes', () => {
   assert.ok(lines.length <= 200, `${lines.length} lines, cap 200`);
   assert.ok(Buffer.byteLength(doc) <= 20_000, `${Buffer.byteLength(doc)} bytes, cap 20,000`);
-  console.log(`    CLAUDE.md: ${lines.length} lines · ${Buffer.byteLength(doc)} bytes`);
+  // ARC-09-C185a — a release cut rewrites the Version marker (writers.mjs writeMarker), and the file the cut leaves
+  // is the one the release's own suite reads. A -dev tree at the cap went green while `release.mjs 2.2.1-rc.99`
+  // rolled back on this very case. So the budget is held at the longest version the cut writes for this release: an
+  // rc, by the vX.Y.Z-rc.N convention, with a two-digit N, written by the writer the cut uses.
+  const base = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version.replace(/-.*$/, '');
+  const longest = `${base}-rc.99`;
+  const cut = writeMarker(doc, longest);
+  assert.ok(cut.ok, cut.message);
+  assert.ok(Buffer.byteLength(cut.text) <= 20_000,
+    `${Buffer.byteLength(cut.text)} bytes once the cut writes ${longest}, cap 20,000`);
+  console.log(`    CLAUDE.md: ${lines.length} lines · ${Buffer.byteLength(doc)} bytes · ${Buffer.byteLength(cut.text)} at ${longest}`);
 });
 
 test('criterion 2 — the four surfaces that had to leave', () => {
   // Not spelled here where a spelling would make this file a detector: the retired vocabulary
   // comes from the fixture the lint reads, and the harness-specific phrase is the one ARC-02-S06
   // replaced with "dispatch the sub-agent".
-  const vocab = JSON.parse(readFileSync(join(root, 'tests/fixtures/retired-vocabulary.json'), 'utf8'))
+  const vocab = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/lint-data/retired-vocabulary.json'), 'utf8'))
     .tokens.map((t) => t.pattern);
   const banned = [...vocab, ...vocab.map((v) => v.replace(/^mcp__/, '').replace(/__$/, '')),
     'Task tool', 'context-mode', 'claude-ai-projects'];

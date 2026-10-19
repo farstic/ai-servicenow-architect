@@ -25,7 +25,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { buildTagMessage } from '../../scripts/lib/release/tag.mjs';
+import { buildTagMessage } from '../../tools/snowarch/lib/release/tag.mjs';
 import { releaseTags, upgradeCommand } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { git } from './harness.mjs';
 import { tempDir, trackTempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';

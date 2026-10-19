@@ -4,14 +4,15 @@
 //
 // Five documents used to disagree about how many skills there are (`00` §3.8, P-12), and every one
 // of those numbers was written by hand and true when written. So neither check here counts
-// anything itself: E-17 calls `scripts/lib/roster.mjs` — the listing `scripts/gen-roster.mjs`
+// anything itself: E-17 calls `tools/snowarch/lib/roster.mjs` — the listing `scripts/gen-roster.mjs`
 // renders into `docs/ARCHITECTURE.md` — and E-18 calls the `lintSkills`/`lintAgents` rules whose
 // ids CI already quotes. A doctor with its own opinion of the roster would be a sixth document.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { collectRoster, RosterError } from '../../../../../scripts/lib/roster.mjs';
-import { lintAgents, lintSkills } from '../../../../../tests/lib/lint-rules.mjs';
+import { collectRoster, RosterError } from '../../roster.mjs';
+import { lintAgents, lintSkills } from '../../lint-rules.mjs';
+import { isEngineeringCheckout } from '../../engineering-checkout.mjs';
 import { defineCheck } from '../registry.mjs';
 
 import { fail, ok } from './result.mjs';
@@ -26,8 +27,8 @@ const json = (root, rel) => JSON.parse(readFileSync(join(root, rel), 'utf8'));
  */
 export function lintOptions(root, config) {
   const safe = (rel, fallback) => { try { return json(root, rel); } catch { return fallback; } };
-  const allow = safe('tests/fixtures/skills-lint-allowlist.json', { length: [], version: [] });
-  const builtins = safe('tests/fixtures/claude-builtin-commands.json', { commands: [] });
+  const allow = safe('tools/snowarch/lib/lint-data/skills-lint-allowlist.json', { length: [], version: [] });
+  const builtins = safe('tools/snowarch/lib/lint-data/claude-builtin-commands.json', { commands: [] });
   return {
     root,
     lengthAllow: new Set(allow.length ?? []),
@@ -114,8 +115,10 @@ export function engineRosterChecks() {
           ? ok(`${lintOptions(ctx.root, ctx.config).roster ?? '—'} skills · ${agents.files} agents clean`,
             data)
           : fail(problems.slice(0, 10).join('; '), {
-            remedy: 'run `node --test tests/skills-lint.test.mjs tests/agents-lint.test.mjs` '
-              + 'for the full report',
+            // ARC-09-C185a: the lint's own tests are in the engineering checkout; an install corrects what it read.
+            remedy: isEngineeringCheckout(ctx.root)
+              ? 'run `node --test tests/skills-lint.test.mjs tests/agents-lint.test.mjs` for the full report'
+              : 'correct what the findings name: each begins with its rule id and its file',
             data,
           });
       },

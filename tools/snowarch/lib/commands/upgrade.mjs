@@ -290,7 +290,7 @@ export function releaseTags(root, { pre = false, opts = {} } = {}) {
 export async function readTag(root, tag, { opts = {} } = {}) {
   const message = git(root, ['tag', '-l', '--format=%(contents)', tag], { ...opts, allowFail: true });
   if (!message) return null;
-  const { parseTagMessage } = await import('../../../../scripts/lib/release/tag.mjs');
+  const { parseTagMessage } = await import('../release/tag.mjs');
   return parseTagMessage(message);
 }
 

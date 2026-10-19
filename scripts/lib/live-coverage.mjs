@@ -94,7 +94,15 @@ export const totalsLine = ({ total: t }) => `live coverage: ${t.tools} tools in 
   + `${t.familiesUnverified} families with no tool verified live`;
 
 const cell = (v) => (v === null || v === undefined || v === '' ? '—' : String(v));
-const path = (p) => (p ? `\`${p}\`` : '—');
+/**
+ * A record cell. A sitting record is named, not cited: the records stay in the engineering checkout, and an install
+ * that ships this page does not have them (ARC-09-C185a). A shipped page, PLATFORM-NOTES, keeps its path.
+ */
+const record = (p) => {
+  if (!p) return '—';
+  const sitting = /^docs\/validation\/(.+)\.md$/.exec(p);
+  return sitting ? sitting[1] : `\`${p}\``;
+};
 
 /** `docs/validation/LIVE-COVERAGE.md`, from the manifest, the ledger and the records. */
 export function render({ tools, ledger, records }) {
@@ -108,8 +116,9 @@ export function render({ tools, ledger, records }) {
     '',
     'Which of the server\'s tools have run against a real ServiceNow instance (ARC-09-C167a). A tool that no sitting',
     'has called can be wrong in a way no unit test sees — ARC-09-C165\'s AI agent tools wrote tables no instance has.',
-    `Each tool's status is kept by hand in \`${LEDGER}\`; this page is generated from it, and \`npm run gen:check\``,
-    'fails when a manifest tool has no entry, or an entry\'s evidence does not hold.',
+    'Each tool\'s status is kept by hand in the ledger, live-coverage.json; this page is generated from it, and',
+    '`npm run gen:check` fails when a manifest tool has no entry, or an entry\'s evidence does not hold. The ledger and',
+    'the sitting records the Record column names are in the engineering checkout.',
     '',
     '- **verified-live** — a sitting called it and it did what it says; the record, its date and the instance\'s release family are named.',
     '- **refused** — a sitting called it and the instance refused it; the same evidence, and the reason.',
@@ -132,7 +141,7 @@ export function render({ tools, ledger, records }) {
     lines.push('', `### \`${f}\``, '', '| Tool | Status | Record | Date | Instance family | Note | Named in |', '|---|---|---|---|---|---|---|');
     for (const tool of tools.filter((x) => familyOf(x) === f).sort()) {
       const e = ledger.tools?.[tool] ?? {};
-      lines.push(`| \`${tool}\` | ${cell(e.status)} | ${path(e.record)} | ${cell(e.date)} | ${cell(e.family)} | ${cell(e.note)} `
+      lines.push(`| \`${tool}\` | ${cell(e.status)} | ${record(e.record)} | ${cell(e.date)} | ${cell(e.family)} | ${cell(e.note)} `
         + `| ${named[tool].length} |`);
     }
   }

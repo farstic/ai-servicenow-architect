@@ -1,6 +1,6 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-// ARC-02-S02 — the agent roster, checked against the rules in tests/lib/lint-rules.mjs.
+// ARC-02-S02 — the agent roster, checked against the rules in tools/snowarch/lib/lint-rules.mjs.
 // ARC-02-S04 made the content change AG-04/AG-05 required and flipped ENFORCE_S04 to true, so every
 // rule is now live. The companion test that used to assert the known-bad state is gone with it — its
 // job was to make the gap visible while it existed, not to outlive the fix.
@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { lintAgents } from './lib/lint-rules.mjs';
-import { parseFrontmatter } from './lib/frontmatter.mjs';
+import { lintAgents } from '../tools/snowarch/lib/lint-rules.mjs';
+import { parseFrontmatter } from '../packages/contract/lib/frontmatter.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ENFORCE_S04 = true;    // flipped by ARC-02-S04, which set model: inherit and added skills:

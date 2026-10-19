@@ -12,6 +12,7 @@ import {
 } from '../tools/snowarch/lib/docs/family.mjs';
 import { AREAS, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { isEngineeringCheckout } from '../tools/snowarch/lib/engineering-checkout.mjs';
 import { tempDir, trackTempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { licensedEnv } from '../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
@@ -174,7 +175,7 @@ const MARKER = '.docs-family-fixture-root';
  * ONCE for this file and re-copied per workspace.
  *
  * `tools/snowarch/lib` alone is not enough — the engine imports out of its own tree, and the first
- * attempt died on `Cannot find module '<ws>/scripts/lib/release/tag.mjs'`. The list below is every
+ * attempt died on `Cannot find module '<ws>/scripts/lib/release/tag.mjs'` (ARC-09-C185a moved it under tools/snowarch/lib). The list below is every
  * directory those imports reach (`grep -rhoE "from '\.\./\.\./\.\./[^']+'"` over `bin` and
  * `lib`). IF A NEW OUT-OF-TREE IMPORT APPEARS, this fixture fails with ERR_MODULE_NOT_FOUND naming
  * the missing path — loud and diagnosable, which is the right failure for a list that has to track
@@ -187,9 +188,6 @@ const ENGINE_TREES = [
   ['packages/contract', 'packages/contract'],
   ['packages/snowarch/dist', 'packages/snowarch/dist'],
   ['tests/lib', 'tests/lib'],
-  // Data, not code: the engine lint reads `retired-vocabulary.json` from here. Found the same way
-  // — an explicit ENOENT naming the path, which is why this list is iterated rather than guessed.
-  ['tests/fixtures', 'tests/fixtures'],
 ];
 
 function withEngine(ws) {
@@ -199,6 +197,10 @@ function withEngine(ws) {
     return d;
   })();
   cpSync(ENGINE_SRC, ws, { recursive: true });
+  // `docs family` is a maintainers' command and refuses outside the engineering checkout's shape, tests/ and .github/
+  // both present (ARC-09-C185a). tests/ arrives with tests/lib; .github/ is made here.
+  mkdirSync(join(ws, '.github'), { recursive: true });
+  assert.ok(isEngineeringCheckout(ws), 'the workspace has the engineering checkout\'s shape');
 
   // THE PRECONDITION THE COPY EXISTS FOR. `lib/config.mjs` resolves the root from its OWN location,
   // deliberately — "cwd is used for exactly one thing: telling them when it differs". So a CLI

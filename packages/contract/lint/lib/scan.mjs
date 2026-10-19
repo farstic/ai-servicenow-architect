@@ -54,6 +54,7 @@ export const NEVER_SCANNED = [
  * L01 (tool tokens), L02 (prefix) and L03 (retired names) skip these; every other check that
  * reads files still sees them, and the pin/server-key checks do not read the tree at all.
  */
+// distribution: path list — names the lint compares a scanned file against, not files it opens; an absent one is not scanned
 export const HISTORY_PATHS = ['docs/plans', 'docs/spikes', 'docs/CHANGELOG.md',
   // The relicensing consent record. Its file list is quoted VERBATIM, inside an indented
   // block, naming each file as it was named when consent was given — so the per-line marker
@@ -73,6 +74,7 @@ export const HISTORY_PATHS = ['docs/plans', 'docs/spikes', 'docs/CHANGELOG.md',
  * Every entry is here for that reason and no other. The line to hold is that a file qualifies
  * only if naming the dead thing is *what the file is for* — not merely convenient.
  */
+// distribution: path list — names the lint compares a scanned file against, not files it opens; an absent one is not scanned
 export const POLICY_FILES = [
   // The ratchet: its FORBIDDEN array IS the list, and its allow-list names the exempt files.
   'tests/no-legacy-names.test.mjs',
@@ -96,6 +98,9 @@ export const POLICY_FILES = [
   // cannot name what it detects cannot detect it, and keeping them in JSON rather than in the
   // check body is what makes the exemption one file rather than a check.
   'tools/snowarch/lib/doctor/checks/stale-registrations.json',
+  // SK-09's token list, for the same reason: the skills lint's own data, which names each retired word to detect it.
+  // It moved under tools/snowarch/lib with the lint (ARC-09-C185a), because E-18 runs that lint in a user's install.
+  'tools/snowarch/lib/lint-data/retired-vocabulary.json',
   // ARC-10-S01's migration page. It is the one document written FOR a user of the old install, and
   // every step of it names something being removed — the registrations by the names the old
   // scripts wrote, the store by its path. A page that said "run the command the doctor printed"
@@ -111,6 +116,7 @@ export function isPolicyFile(rel) {
 }
 
 /** Files where a line may name a retired IDENTIFIER if it carries the marker (S02). */
+// distribution: path list — names the lint compares a scanned file against, not files it opens; an absent one is not scanned
 export const HISTORICAL_MARKER_FILES = [
   'docs/ARCHITECTURE.md', 'docs/CHANGELOG.md', 'docs/decisions',
 ];

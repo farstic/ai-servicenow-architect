@@ -2,16 +2,16 @@
 
 Platform behaviour learned on real instances, each with the corpus page it is grounded in. These are
 facts about **ServiceNow**, not about this repository's server — a bug in a tool is a failing test in
-`packages/snowarch`, and `packages/snowarch/CHANGELOG.md` carries the ones not yet fixed.
+`packages/snowarch`, and the server's changelog carries the ones not yet fixed (in the engineering checkout).
 
 Ids are stable and chronological. Where the corpus has no page stating the behaviour the `Grounding:`
 line says so and names the nearest page for the baseline concept — never an invented path.
 
 **This file is one of four homes, not the home for everything.** A finding about this repository's
-own server is a failing test under `packages/snowarch/tests/`; an install or Claude Code behaviour is
-`docs/TROUBLESHOOTING.md` or a rule in `docs/CONTRIBUTING.md`; anything instance-specific is never
-committed at all. The table in `docs/CONTRIBUTING.md` § *Where a finding goes* is the authority, and
-`CLAUDE.md` § 11 is the short form a session reads.
+own server is a failing test in the server's suite; an install or Claude Code behaviour is
+`docs/TROUBLESHOOTING.md` or a rule in the contributor guide; anything instance-specific is never
+committed at all. The guide's table *Where a finding goes* is the authority (the guide and the suite are in the
+engineering checkout), and `CLAUDE.md` § 11 is the short form a session reads.
 
 ## PN-01 — REST capture follows the user preference, not the "current" update set
 
@@ -120,7 +120,7 @@ instance. The API does not reject over-length input for a short label field; it 
 **Grounding:** none in ServiceNowDocs (`markdown/application-development/c_FixScripts.md` for the
 baseline concept); observed behaviour
 **Evidence:** observed on PDI, one POST; the server's handling of a cut value is covered by
-`packages/snowarch/tests/tools/silent-truncation.test.ts` (PN-10)
+the server's test `silent-truncation.test.ts` (PN-10)
 **Engine consequence:** keep `sys_script_fix.name` at 40 characters or fewer when authoring by hand.
 The Developer skill (`.claude/skills/developer/SKILL.md`) carries no such rule — checked while
 ARC-09-C93 was written. A write through this server that comes back cut now returns a `VALUE_TRUNCATED`
@@ -141,7 +141,7 @@ path that still works on an instance hardened this way.
 **Grounding:**
 `markdown/platform-security/instance-security-hardening-settings/sc-disable-resource-owner-password-credentials-ropc-in-oauth-2-token-grants.md`
 **Evidence:** the page above states the property and its effect; regression test — the wizard's
-ROPC error table is unit-tested against `packages/snowarch/tests/fixtures/oauth-ropc-errors.json`
+ROPC error table is unit-tested against the server's fixture `oauth-ropc-errors.json`
 **Engine consequence:** an integration design that assumes ROPC checks the property before promising
 it, and the fallback is named in the design rather than discovered during a cutover.
 
@@ -179,13 +179,13 @@ observed behaviour. Reading `sys_dictionary` needs the `personalize_dictionary` 
 **Evidence:** the owner's live test. **Not reproduced here** — this repository's tests have no
 instance. PN-07 observed, on a PDI, one POST whose response carried the CUT value; that the response
 for `sys_script`, and for a PATCH, does too was **assumed, not seen**, and it was the single point of
-failure of the design below. **Seen on 2026-10-08:** the live run in `packages/snowarch/tests/live/README.md`,
+failure of the design below. **Seen on 2026-10-08:** the server's live suite,
 on `v2.0.11-rc.1`, showed the response carrying the cut value on the POST and on the PATCH, with
-`sys_dictionary` stating `max_length` 40 (`confirmed: true`) — `docs/validation/2.0.11-rc.1-live-sitting.md`. Regression tests, with a fake that stores a shorter value:
-`packages/snowarch/tests/tools/silent-truncation.test.ts`,
-`packages/snowarch/tests/servicenow/stored-values.test.ts` and, over the real client with the HTTP seam
-mocked, `packages/snowarch/tests/servicenow/silent-truncation-http.test.ts`
-**Engine consequence:** `packages/snowarch/src/servicenow/stored-values.ts` compares what a
+`sys_dictionary` stating `max_length` 40 (`confirmed: true`) — engineering record 2.0.11-rc.1-live-sitting. Regression tests, with a fake that stores a shorter value:
+the server's `silent-truncation.test.ts`,
+`stored-values.test.ts` and, over the real client with the HTTP seam
+mocked, `silent-truncation-http.test.ts` (in the engineering checkout)
+**Engine consequence:** the server's `stored-values.ts` compares what a
 `createRecord` or `updateRecord` stored with what it sent and returns `warnings[].code =
 VALUE_TRUNCATED` with the field, both lengths and a limit. It cannot stop the cut: by the time the
 response says so the record exists (and, if update-set capture was on, so does the entry), so the
@@ -281,7 +281,7 @@ in the entry.
 `markdown/application-development/system-update-sets/using-system-update-sets.md` ("This action ensures that
 the latest version of the object is included in the desired update set and prevents duplicate updates for
 the same object in a single update set"), which says so of a UI procedure, not of REST writes.
-**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, step 5 — the preview, then the
+**Evidence:** engineering record 2.0.11-rc.1-live-sitting, step 5 — the preview, then the
 `sys_update_xml` rows read with `snow_core_records_query`.
 **Engine consequence:** the `VALUE_TRUNCATED` warning's advice (PN-10) holds: **modify** the record rather
 than add it again, and the update set then carries the corrected value. That is true only while the same
@@ -296,7 +296,7 @@ update set is still the capture target.
 is rendered as `<filter_condition table="incident">number=INC0000000<item … field="number" operator="="
 value="INC0000000"/></filter_condition>`: the platform adds the `<item>` child to the XML only.
 **Grounding:** none in ServiceNowDocs (`markdown/api-reference/business-rules-classic/c_BusinessRules.md` describes a business rule's conditions and names no `filter_condition` column); observed behaviour.
-**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, steps 2 and 5.
+**Evidence:** engineering record 2.0.11-rc.1-live-sitting, steps 2 and 5.
 **Engine consequence:** the stored-value check (PN-10) compares the column read back, which is the plain
 string, so the payload's `<item>` raises no `VALUE_TRUNCATED` or `FIELD_NOT_STORED`. A reader of update-set
 payloads must not compare the payload's XML text with the column's value.
@@ -308,7 +308,7 @@ payloads must not compare the payload's XML text with the column's value.
 **Behaviour:** A rule created with `filter_condition` `number=INC0000000^` read back as `number=INC0000000^`:
 the trailing `^` was kept, not trimmed.
 **Grounding:** none in ServiceNowDocs (`markdown/api-reference/business-rules-classic/c_BusinessRules.md` describes a business rule's conditions and names no `filter_condition` column); observed behaviour.
-**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, step 6.
+**Evidence:** engineering record 2.0.11-rc.1-live-sitting, step 6.
 **Engine consequence:** the cut-value detector (`looksCut`) needs no exemption for a trailing `^` on this
 release. If a release trims it, the detector would flag a benign shape; that has not been observed.
 
@@ -322,9 +322,9 @@ with HTTP 400, which the client reports as `INVALID_REQUEST`. The status follows
 does not. A path that does exist answered differently: `GET /api/sn_cicd/progress/{progress_id}` from the
 Explorer answered "User is not authenticated".
 **Grounding:** none in ServiceNowDocs (`markdown/api-reference/rest-apis/cicd-api.md` lists 404 for its own endpoints as "Not found. The requested item wasn't found." and gives no message for a path that is not served); observed behaviour.
-**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, § ARC-09-C94, steps 6 to 8. After the fix, on
+**Evidence:** engineering record 2.0.11-rc.1-live-sitting, § ARC-09-C94, steps 6 to 8. After the fix, on
 `v2.0.11-rc.3` (2026-10-09), the CI/CD path ran a one-test suite to `outcome: "success"`
-(`docs/validation/2.0.11-rc.3-live-sitting.md`, § ARC-09-C94).
+(engineering record 2.0.11-rc.3-live-sitting, § ARC-09-C94).
 **Engine consequence:** the ATF exec tools use this message, not the status, to tell "the CI/CD API is not
 served here" from "the suite was not found" (`src/tools/atf-cicd.ts`, ARC-09-C94). A 400 that carries it
 means a missing path, not a malformed body.
@@ -356,8 +356,8 @@ the 2.0.11-rc.3 live sitting (ARC-09-C95), and again on 2.0.12-rc.2 (ARC-09-C122
 names the step's Jasmine version and Test script fields by their labels. The rest is not documented in the
 bundled corpus — that an insert creates the input rows from defaults, the default expressions, the refused
 delete, the cascade and the variables' limits: observed behaviour.
-**Evidence:** `docs/validation/2.0.11-rc.3-live-sitting.md`, § ARC-09-C95: W2, the follow-up read and the
-teardown. `docs/validation/2.0.12-rc.2-live-sitting.md`, § ARC-09-C122: R2, W3 and the teardown.
+**Evidence:** engineering record 2.0.11-rc.3-live-sitting, § ARC-09-C95: W2, the follow-up read and the
+teardown. Engineering record 2.0.12-rc.2-live-sitting, § ARC-09-C122: R2, W3 and the teardown.
 **Engine consequence:** `snow_atf_atf_step_add` updates a row the insert created rather than adding a second
 (ARC-09-C95). Since ARC-09-C122 its output lists every input row of the step, the rows the instance defaulted
 included; before it, they were invisible to the caller. A teardown removes the step, not its input rows. Since
@@ -418,7 +418,7 @@ verify on the instance's family.
 **Evidence:** the owner's trial record, which is engagement-local and not committed; the owner's continued run on
 `tgdev`, 2026-10-17, engagement-local, summarised by the Architect in the engagement folder and not committed; the
 owner's v2.2.0-rc.2 and rc.3 checks on `tgdev`, 2026-10-17, whose session transcript is engagement-local; and
-`docs/validation/2.2.0-rc.1-live-sitting.md`, the run with the fixed tools.
+engineering record 2.2.0-rc.1-live-sitting, the run with the fixed tools.
 **Engine consequence:** since ARC-09-C165 `snow_ai_ai_agent_add` reads the configuration and the version back
 rather than creating them, and reports a missing one as a warning; `active: false` modifies the configuration.
 `snow_ai_agentic_workflow_add` creates the team first and sets it on the workflow's insert: 2 + N inserts and no
@@ -513,7 +513,7 @@ bundled corpus; they were confirmed on Brazil patch 0, 2026-10-19:
 - `sys_data_policy_rule` has `sys_data_policy`, `field` and `mandatory`, among `table` and `disabled`.
 
 **Evidence:** the owner's v2.2.0-rc.3 check on `tgdev`, 2026-10-17, which is engagement-local and not committed, and
-`docs/validation/2026-10-19-itsm-sweep.md`, step 0b.
+engineering record 2026-10-19-itsm-sweep, step 0b.
 **Engine consequence:** since ARC-09-C183 every create reads the active data policies of its table and the tables it
 extends, once per table per session, and refuses a field an unconditional rule requires and the create would not send,
 before anything is written. A conditional policy, a field the dictionary defaults and a check it could not make are
@@ -531,9 +531,9 @@ The write was accepted, and `resolved_at` was stored as `2026-10-19 00:00:00`. `
 default, "is inserted using the GMT timezone"; "Date fields: The database value is in UTC format") and
 `markdown/api-reference/server-api-reference/c_GlideDateTimeScoped.md` ("the internal format (yyyy-MM-dd HH:mm:ss)").
 That an ISO string keeps only its date is observed behaviour, not documented.
-**Evidence:** `docs/validation/2026-10-19-itsm-sweep.md`, step 4.
+**Evidence:** engineering record 2026-10-19-itsm-sweep, step 4.
 **Engine consequence:** since ARC-09-C184 the server writes a date-time it stamps as `yyyy-MM-dd HH:mm:ss` in UTC
-(`glideDateTime()` in `packages/snowarch/src/utils/glide-time.ts`): incident and problem resolve, and the scheduled-job
+(`glideDateTime()` in the server's `glide-time.ts`): incident and problem resolve, and the scheduled-job
 trigger. A date a caller passes is sent as given.
 
 ## PN-23 — A close code is the instance's own list
@@ -545,7 +545,7 @@ although the corpus names it as an example. A resolve with a code the list lacks
 (`markdown/it-service-management/itsm-virtual-agent/itsm-va-fulfiller-topics.md`,
 `markdown/it-service-management/now-assist-for-it-service-management-itsm/resolve-incident-now-assist.md`). That this
 instance lacks it is observed behaviour.
-**Evidence:** `docs/validation/2026-10-19-itsm-sweep.md`, step 4.
+**Evidence:** engineering record 2026-10-19-itsm-sweep, step 4.
 **Engine consequence:** none in the tools. Before a resolve, the Architect reads the active `incident.close_code`
 choices from `sys_choice`, does not guess, and asks the user, as it did in the sweep.
 
@@ -584,7 +584,7 @@ by rebuilding PATH; exit codes 0/2/3 from `cmd` and from `powershell.exe`; Node 
 PowerShell wrote; `snowarch.cmd` with and without Node; and the POSIX launcher under Git Bash
 answering `MINGW64_NT` and printing the `winget` remedies rather than `apt`.
 
-Pending the owner's Windows sitting, and recorded in `docs/spikes/OWNER-SITTING.md` rather than
+Pending the owner's Windows sitting, and recorded in the owner-sitting list (in the engineering checkout) rather than
 assumed: the **double-click** experience (the `%CMDCMDLINE%` pause detection is a cmd convention,
 not a documented contract), **Ctrl-C** propagation through `cmd` → `powershell` → `node`, a
 **GPO-locked** `MachinePolicy` (which no runner can apply), and whether Claude Code expands

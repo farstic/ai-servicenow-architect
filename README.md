@@ -294,7 +294,6 @@ Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a sp
 prints how to return to your branch; a diverged branch is reported, and a file in the release's way is named; a failed
 fetch prints git's error and a [proxy](docs/TROUBLESHOOTING.md#proxy_unreachable) or [TLS](docs/TROUBLESHOOTING.md#tls_ca_untrusted)
 remedy. The banner mentions a newer release only from a check you already ran — it never fetches.
-Full detail: [CONTRIBUTING.md](docs/CONTRIBUTING.md#upgrading-the-product).
 
 ### Uninstall
 
@@ -329,7 +328,6 @@ a path that no longer exists.
 | `packages/snowarch/` | the MCP server that talks to a ServiceNow instance |
 | `docs/ARCHITECTURE.md` | how the repository is laid out and how the engine works |
 | `docs/PLATFORM-NOTES.md` | platform behaviour learned on real instances, and the Windows notes |
-| `docs/CONTRIBUTING.md` | how to change it |
 
 ## Licence and attribution
 
@@ -337,8 +335,8 @@ Licensed under the **Business Source License 1.1** (`BUSL-1.1`) from 2.1.0; 2.0.
 **Apache-2.0**. See `LICENSE` and `NOTICE`.
 
 What that allows, in plain language, is in [LICENSING.md](LICENSING.md); the name and logo are covered by
-[TRADEMARKS.md](TRADEMARKS.md). Contributions need the signed Contributor Licence Agreement, [CLA.md](CLA.md):
-see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md). Contact: see `NOTICE`.
+[TRADEMARKS.md](TRADEMARKS.md). Contributions need the signed Contributor Licence Agreement: ask through
+the contact in `NOTICE`.
 
 ServiceNow platform documentation is vendored from **ServiceNowDocs**
 (<https://github.com/ServiceNow/ServiceNowDocs>) at a pinned commit and is the property of ServiceNow,

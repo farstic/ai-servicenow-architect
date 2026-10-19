@@ -16,6 +16,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { scanFiles } from './scan.mjs';
+import { isEngineeringCheckout } from '../../../../tools/snowarch/lib/engineering-checkout.mjs';
 
 /** Raised by the default `cannotRun` — a caller that wants an exit code passes its own. */
 export class LintInputError extends Error {
@@ -43,8 +44,9 @@ export function buildLintContext({ root, selfRoot = root, requireClaude = false,
   const mcpPath = join(root, '.mcp.json');
 
   if (!existsSync(contractPath)) {
-    cannotRun(`${contractPath} is missing — the contract is a build artefact; `
-      + 'run node scripts/build-dist.mjs');
+    // ARC-09-C185a: the build is a maintainer's tool; in an install the contract is a shipped file, E-32's to restore.
+    cannotRun(`${contractPath} is missing — the contract is a build artefact`
+      + (isEngineeringCheckout(root) ? '; run node scripts/build-dist.mjs' : ' the release ships'));
   }
   for (const p of [pinPath, retiredPath, configPath]) {
     if (!existsSync(p)) cannotRun(`${p} is missing`);

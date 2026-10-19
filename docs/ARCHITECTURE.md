@@ -837,7 +837,7 @@ tree that does not already carry its own version everywhere.
 **The tag is the record, because a release outlives its repository state.** Six months later a
 release is a tarball and an annotated tag, so the tag message carries what the tree can no longer be
 asked: the contract sha, the docs pin, and the three floors (Claude Code, Node, git). Three
-different readers parse it back through `parseTagMessage` in `scripts/lib/release/tag.mjs` —
+different readers parse it back through `parseTagMessage` in `tools/snowarch/lib/release/tag.mjs` —
 `./snowarch version`, `release.yml`, and `./snowarch upgrade` when it resolves a target. A lightweight
 tag has no message and is refused for that reason.
 

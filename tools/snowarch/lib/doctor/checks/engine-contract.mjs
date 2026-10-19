@@ -17,11 +17,12 @@ import { fileURLToPath } from 'node:url';
 
 import * as l02 from '../../../../../packages/contract/lint/checks/l02-prefix.mjs';
 import * as l03 from '../../../../../packages/contract/lint/checks/l03-retired.mjs';
-import * as l06 from '../../../../../packages/contract/lint/checks/l06-generated.mjs';
 import { buildLintContext, LintInputError } from '../../../../../packages/contract/lint/lib/context.mjs';
 import { prefix } from '../../../../../packages/contract/lib/contract.mjs';
 import { checkContract } from '../../steps/B05.mjs';
 import { defineCheck } from '../registry.mjs';
+import { isEngineeringCheckout } from '../../engineering-checkout.mjs';
+import { restoreRemedy } from '../../licence/manifest.mjs';
 
 import { fail, ok, skip } from './result.mjs';
 
@@ -55,13 +56,20 @@ export function lintContextFor(ctx) {
 
 const where = (f) => (f.line ? `${f.file}:${f.line}` : f.file);
 
+/**
+ * ARC-09-C185a — the contract, the pin and the lint's inputs are shipped files. In an install a wrong one is E-32's
+ * business, and its remedy is E-32's; the build and the pin are maintainers' tools, named in the engineering checkout.
+ * No command in an install: `doctor --fix` would list one under REFUSED while E-32's own restore is the action it runs.
+ */
+const repair = (ctx, maintainer) => (isEngineeringCheckout(ctx.root) ? maintainer : { remedy: restoreRemedy(cliOf(ctx)) });
+
 /** One lint check, as a doctor result. `lines` shapes the findings a reader sees first. */
 function runLint(ctx, check, { remedy, command, describe }) {
   const lint = lintContextFor(ctx);
   if (!lint.ctx) {
     return fail(`the lint inputs could not be read — ${lint.error}`, {
-      remedy: 'run node scripts/build-dist.mjs, then re-run the doctor',
-      command: 'node scripts/build-dist.mjs',
+      ...repair(ctx, { remedy: 'run node scripts/build-dist.mjs, then re-run the doctor',
+        command: 'node scripts/build-dist.mjs' }),
       data: { ran: false },
     });
   }
@@ -154,6 +162,15 @@ export function engineContractChecks() {
       spawns: true,
       fixable: false,
       run: async (ctx) => {
+        // ARC-09-C185a — L06 runs every generator, and the generators are maintainers' tools that do not ship. Outside
+        // the engineering checkout the generated files are what the signed manifest verifies (E-32), so this skips with
+        // that reason. L06 is imported only here, behind the predicate: it imports scripts/lib/generators.mjs, which a
+        // distribution install does not have, and a static import would stop the doctor loading before any skip ran.
+        if (!isEngineeringCheckout(ctx.root)) {
+          return skip("the generated files are verified by the signed manifest (E-32); their generators are maintainers' "
+            + 'tools, run in the engineering checkout', { ran: false });
+        }
+        const l06 = await import('../../../../../packages/contract/lint/checks/l06-generated.mjs');
         const result = runLint(ctx, l06, {
           remedy: 'maintainer: npm run gen && node scripts/gen-docs-areas.mjs',
           command: 'npm run gen',
@@ -194,8 +211,8 @@ export function engineContractChecks() {
         const lint = lintContextFor(ctx);
         if (!lint.ctx) {
           return fail(`the contract could not be read — ${lint.error}`, {
-            remedy: `users: ${cliOf(ctx)} upgrade · maintainer: node scripts/build-dist.mjs`,
-            command: 'node scripts/build-dist.mjs',
+            ...repair(ctx, { remedy: 'node scripts/build-dist.mjs, then re-run the doctor',
+              command: 'node scripts/build-dist.mjs' }),
             data: { ran: false },
           });
         }
@@ -206,8 +223,7 @@ export function engineContractChecks() {
         return problems.length === 0
           ? ok(`${pinned}… · ${data.required} required of ${data.declared} declared`, data)
           : fail(problems.join(' '), {
-            remedy: 'maintainer: node packages/contract/pin.mjs after reviewing the diff; '
-              + `users: ${cliOf(ctx)} upgrade`,
+            ...repair(ctx, { remedy: 'node packages/contract/pin.mjs, after reviewing the diff' }),
             data: { ...data, problems },
           });
       },

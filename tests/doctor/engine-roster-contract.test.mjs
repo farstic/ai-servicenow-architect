@@ -16,6 +16,7 @@ import { engineContractChecks, PREFIX_FILES,
   SELF_ROOT } from '../../tools/snowarch/lib/doctor/checks/engine-contract.mjs';
 import { engineRosterChecks } from '../../tools/snowarch/lib/doctor/checks/engine-roster.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { isEngineeringCheckout } from '../../tools/snowarch/lib/engineering-checkout.mjs';
 import { contextFor, REAL_ROOT, runById, writeJson } from './helpers/tree.mjs';
 
 const roster = engineRosterChecks();
@@ -38,6 +39,10 @@ function lintTree(t, extra = {}) {
     mkdirSync(join(root, dirname(rel)), { recursive: true });
     writeFileSync(join(root, rel), text);
   }
+  // ARC-09-C185a: E-21 runs L06 only in the engineering checkout, which is told by its tree (tests/ and .github/).
+  // These fixtures are trees being linted as one.
+  mkdirSync(join(root, 'tests'), { recursive: true });
+  mkdirSync(join(root, '.github'), { recursive: true });
   return root;
 }
 
@@ -46,9 +51,9 @@ function rosterTree(t) {
   const root = tempDir('snowarch-doctor-roster-', t);
   cpSync(join(REAL_ROOT, '.claude'), join(root, '.claude'), { recursive: true });
   cpSync(join(REAL_ROOT, 'engine.config.json'), join(root, 'engine.config.json'));
-  mkdirSync(join(root, 'tests', 'fixtures'), { recursive: true });
-  for (const rel of ['tests/fixtures/skills-lint-allowlist.json',
-    'tests/fixtures/claude-builtin-commands.json']) {
+  mkdirSync(join(root, 'tools', 'snowarch', 'lib', 'lint-data'), { recursive: true });
+  for (const rel of ['tools/snowarch/lib/lint-data/skills-lint-allowlist.json',
+    'tools/snowarch/lib/lint-data/claude-builtin-commands.json']) {
     cpSync(join(REAL_ROOT, rel), join(root, rel));
   }
   return root;
@@ -245,6 +250,9 @@ test('E-22 fails a contract whose sha no longer matches the pin', async (t) => {
 test('a contract check whose inputs are absent says so, and does not take the report down', async (t) => {
   const root = tempDir('snowarch-doctor-bare-', t);
   writeJson(root, 'engine.config.json', JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8')));
+  // The engineering checkout's shape: outside it E-21 skips before it reads anything (ARC-09-C185a).
+  mkdirSync(join(root, 'tests'));
+  mkdirSync(join(root, '.github'));
   const ctx = contextFor(root);
   for (const id of ['E-19', 'E-20', 'E-21', 'E-22']) {
     const r = await runById(contract, id, ctx);
@@ -252,4 +260,58 @@ test('a contract check whose inputs are absent says so, and does not take the re
     assert.match(r.detail, /could not be read/);
     assert.equal(r.data.ran, false);
   }
+});
+
+// ── ARC-09-C185a: in an install, a remedy sends nobody to a file the install does not have ───────────────────────
+// The maintainers' remedies (the build, the pin, the skills lint) name files that live in the engineering checkout. An
+// install has E-32 for a shipped file that is wrong, so it reads E-32's own remedy instead.
+const MAINTAINERS = /scripts\/(build-dist|docs-bump)\.mjs|packages\/contract\/pin\.mjs|\btests\//;
+const RESTORE = /^Put the signed files back with .+ doctor --fix; .+ doctor --json lists every one\.$/;
+const shown = (r) => [r.detail, r.remedy, r.command].filter(Boolean).join('\n');
+const asInstall = (root) => {
+  rmSync(join(root, 'tests'), { recursive: true, force: true });
+  rmSync(join(root, '.github'), { recursive: true, force: true });
+  assert.equal(isEngineeringCheckout(root), false, 'the fixture is shaped as an install');
+  return root;
+};
+
+test('in an install, a contract check whose inputs are absent names E-32\'s restore, never a maintainer\'s script', async (t) => {
+  const root = asInstall(tempDir('snowarch-doctor-install-', t));
+  writeJson(root, 'engine.config.json', JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8')));
+  const ctx = contextFor(root);
+  for (const id of ['E-19', 'E-20', 'E-22']) {
+    const r = await runById(contract, id, ctx);
+    assert.equal(r.status, 'fail', id);
+    assert.match(r.remedy ?? '', RESTORE, `${id}: ${r.remedy}`);
+    assert.doesNotMatch(shown(r), MAINTAINERS, `${id} names a maintainer's file:\n${shown(r)}`);
+  }
+});
+
+test('...and in the engineering checkout the same failure still names the build', async (t) => {
+  const root = tempDir('snowarch-doctor-eng-', t);
+  writeJson(root, 'engine.config.json', JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8')));
+  mkdirSync(join(root, 'tests'));
+  mkdirSync(join(root, '.github'));
+  const r = await runById(contract, 'E-19', contextFor(root));
+  assert.match(r.remedy, /node scripts\/build-dist\.mjs/);
+});
+
+test('in an install, E-22\'s pin mismatch names E-32\'s restore, not pin.mjs', async (t) => {
+  const root = asInstall(lintTree(t));
+  const pin = JSON.parse(readFileSync(join(root, 'packages/contract/required-tools.json'), 'utf8'));
+  pin.contractSha256 = 'f'.repeat(64);
+  writeJson(root, 'packages/contract/required-tools.json', pin);
+  const r = await runById(contract, 'E-22', contextFor(root));
+  assert.equal(r.status, 'fail');
+  assert.match(r.remedy, RESTORE, r.remedy);
+  assert.doesNotMatch(shown(r), MAINTAINERS);
+});
+
+test('in an install, E-18 points at the findings it printed, not at a test the install does not have', async (t) => {
+  const root = rosterTree(t);
+  assert.equal(isEngineeringCheckout(root), false, 'the roster fixture is shaped as an install');
+  renameSync(join(root, '.claude/skills/developer'), join(root, '.claude/skills/develpoer'));
+  const r = await runById(roster, 'E-18', contextFor(root));
+  assert.equal(r.status, 'fail');
+  assert.doesNotMatch(shown(r), MAINTAINERS, shown(r));
 });

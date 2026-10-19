@@ -75,7 +75,7 @@ export function defineCheck(check) {
   // four are declarations every check must make, this one is an exception a check may claim.
   //
   // `offline: true` means "I have an answer that costs no network, and I will give it when
-  // `ctx.noNetwork` is set". It does NOT exempt the check from `--quick`: that is a cost contract
+  // `ctx.flags.noNetwork` is set". It does NOT exempt the check from `--quick`: that is a cost contract
   // about spawning, and a check may be offline and still expensive. A check that claims it and
   // then reaches the network under `--no-network` is a defect the flag cannot catch, so E-28's
   // test counts its subprocess calls.

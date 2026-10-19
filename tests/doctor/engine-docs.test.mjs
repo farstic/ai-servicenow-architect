@@ -8,6 +8,8 @@
 // the only way to assert the absent-corpus cases without deleting the developer's own checkout.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
 /**
@@ -169,13 +171,26 @@ test('E-13 separates the user\'s mismatch from the maintainer\'s', async (t) => 
   assert.equal(moved.command, `${SPELLED_CLI} docs sync`);
   assert.equal(moved.data.fix.kind, 'head-off-pin');
 
-  const repinned = await run(t, 'E-13', {
-    status: { gitlink: 'c'.repeat(40), pinMatchesGitlink: false },
-  });
+  // Moving the pin is the maintainer's, in the engineering checkout (tests/ and .github/, ARC-09-C185a).
+  const engineering = greenTree(t);
+  mkdirSync(join(engineering, 'tests'));
+  mkdirSync(join(engineering, '.github'));
+  const repinned = await runById(checks, 'E-13', contextFor(engineering, {
+    docsStatus: () => status({ gitlink: 'c'.repeat(40), pinMatchesGitlink: false }),
+  }));
   assert.equal(repinned.status, 'fail');
   assert.match(repinned.detail, /pin \w+ ≠ committed gitlink/);
   assert.match(repinned.command, /^node scripts\/docs-bump\.mjs --to c{40}$/);
   assert.equal(repinned.data.fix, null, 'moving the pin was offered as a --fix');
+});
+
+test('in an install, E-13\'s pin ≠ gitlink names E-32\'s restore, never the maintainer\'s bump (ARC-09-C185a)', async (t) => {
+  const r = await run(t, 'E-13', { status: { gitlink: 'c'.repeat(40), pinMatchesGitlink: false } });
+  assert.equal(r.status, 'fail');
+  assert.match(r.detail, /pin \w+ ≠ committed gitlink/);
+  assert.match(r.remedy, /^Put the signed files back with .+ doctor --fix; .+ doctor --json lists every one\.$/);
+  assert.doesNotMatch(`${r.remedy}\n${r.command ?? ''}`, /docs-bump/);
+  assert.equal(r.data.fix, null, 'the pin is not a corpus repair');
 });
 
 test('E-13 says when the gitlink is staged rather than committed', async (t) => {

@@ -15,7 +15,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildTagMessage } from '../scripts/lib/release/tag.mjs';
+import { buildTagMessage } from '../tools/snowarch/lib/release/tag.mjs';
 import { describe as gitDescribe, isShallow, resetGitBinary } from '../tools/snowarch/lib/git.mjs';
 import { renderVersion, versionInfo } from '../tools/snowarch/lib/version-info.mjs';
 import { licensedEnv } from '../tools/snowarch/tests/helpers/licence-hook/index.mjs';

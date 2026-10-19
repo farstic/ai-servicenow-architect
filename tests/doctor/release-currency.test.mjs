@@ -26,6 +26,14 @@ import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
 import { runChecks } from '../../tools/snowarch/lib/doctor/runner.mjs';
 import { writeUpgradeCheck } from '../../tools/snowarch/lib/upgrade-check.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runDoctor } from '../../tools/snowarch/lib/doctor/index.mjs';
+import { createRegistry } from '../../tools/snowarch/lib/doctor/registry.mjs';
+
+const REAL_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const E28 = hostChecks().find((c) => c.id === 'E-28');
 
@@ -58,7 +66,7 @@ async function e28(t, { tags = [], localTag = null, head = 'abc1234', now = real
   cache = null, noNetwork = false } = {}) {
   const root = tempDir('snowarch-e28-', t);
   if (cache) writeUpgradeCheck(root, { ...cache, now: () => new Date() });
-  return E28.run({ root, noNetwork, now, exec: gitStub({ tags, localTag, head }) });
+  return E28.run({ root, flags: { noNetwork }, now, exec: gitStub({ tags, localTag, head }) });
 }
 
 test('C31 — a newer release tag is a warn, with the clock the runner actually passes', async (t) => {
@@ -119,7 +127,7 @@ test('C31 — a cache that says BEHIND still warns, without asking the remote ag
   // test's own message claims: a REMOTE call. E-28 now also runs `git describe` to notice a
   // record left behind by an interrupted upgrade; that is local, and the property being
   // protected here — "without asking the remote again" — is untouched by it.
-  const r = await E28.run({ root, noNetwork: false, now: realClock,
+  const r = await E28.run({ root, flags: { noNetwork: false }, now: realClock,
     exec: (_cmd, args) => {
       if (args.includes('describe')) return 'v9.0.0-rc.1\n';
       asked += 1;
@@ -133,7 +141,7 @@ test('C31 — a cache that says BEHIND still warns, without asking the remote ag
 test('C31 — --no-network says what the last check saw, and asks nothing', async (t) => {
   let asked = 0;
   const root = tempDir('snowarch-e28-', t);
-  const r = await E28.run({ root, noNetwork: true, now: realClock,
+  const r = await E28.run({ root, flags: { noNetwork: true }, now: realClock,
     exec: () => { asked += 1; return ''; } });
   assert.equal(r.status, 'skip');
   assert.match(r.detail, /--no-network/);
@@ -160,7 +168,7 @@ test('C31 — --no-network says what the last check saw, and asks nothing', asyn
 test('C32 — the empty outcome is cached: three runs, one remote call', async (t) => {
   const root = tempDir('snowarch-e28-', t);
   let calls = 0;
-  const ctx = { root, noNetwork: false, now: realClock,
+  const ctx = { root, flags: { noNetwork: false }, now: realClock,
     exec: (cmd, args) => { if (args[0] === 'ls-remote') calls += 1; return lsRemote(['v9.0.0-rc.1']); } };
 
   const first = await E28.run(ctx);
@@ -182,7 +190,7 @@ test('C32 — a cached empty outcome never reads as "up to date"', async (t) => 
   const root = tempDir('snowarch-e28-', t);
   writeUpgradeCheck(root, { latestTag: null, localTag: null, behind: false, now: () => new Date() });
 
-  const r = await E28.run({ root, noNetwork: false, now: realClock, exec: () => lsRemote([]) });
+  const r = await E28.run({ root, flags: { noNetwork: false }, now: realClock, exec: () => lsRemote([]) });
   assert.equal(r.status, 'skip');
   assert.match(r.detail, /^origin advertised no release tags · last checked /);
   // The sentence this replaces, which claimed currency with something that does not exist.
@@ -211,7 +219,7 @@ test('C32 — --no-network tells a checked-and-empty run from one that never ran
   let execCalls = 0;
   const through = async (root) => {
     const { results } = await runChecks([E28],
-      { root, noNetwork: true, now: realClock, exec: () => { execCalls += 1; return ''; } },
+      { root, flags: { noNetwork: true }, now: realClock, exec: () => { execCalls += 1; return ''; } },
       { noNetwork: true });
     return results.find((r) => r.id === 'E-28');
   };
@@ -233,7 +241,7 @@ test('C32 — a network check WITHOUT `offline` is still skipped by the flag', a
   // getting one.
   const plain = { ...E28, id: 'E-27', offline: false };
   const { results } = await runChecks([plain],
-    { root: '/nonexistent', noNetwork: true, now: realClock, exec: () => { throw new Error('ran'); } },
+    { root: '/nonexistent', flags: { noNetwork: true }, now: realClock, exec: () => { throw new Error('ran'); } },
     { noNetwork: true });
   const r = results.find((x) => x.id === 'E-27');
   assert.equal(r.status, 'skip');
@@ -241,7 +249,7 @@ test('C32 — a network check WITHOUT `offline` is still skipped by the flag', a
   // ...and `--quick` still skips E-28 itself, offline or not: that is a cost contract about
   // spawning, and this check spawns git.
   const quick = await runChecks([E28],
-    { root: '/nonexistent', noNetwork: false, now: realClock, exec: () => { throw new Error('ran'); } },
+    { root: '/nonexistent', flags: { noNetwork: false }, now: realClock, exec: () => { throw new Error('ran'); } },
     { quick: true });
   assert.equal(quick.results.find((x) => x.id === 'E-28').status, 'skip');
 });
@@ -255,7 +263,7 @@ test('C32 — the window expiring asks again, and a release that appeared is fou
   writeUpgradeCheck(root, { latestTag: null, localTag: null, behind: false, now: () => twentyFiveHoursAgo });
 
   let calls = 0;
-  const r = await E28.run({ root, noNetwork: false, now: realClock,
+  const r = await E28.run({ root, flags: { noNetwork: false }, now: realClock,
     exec: (cmd, args) => {
       if (args[0] === 'ls-remote') calls += 1;
       return gitStub({ tags: ['v9.1.0'], localTag: 'v9.0.0' })(cmd, args);
@@ -270,7 +278,7 @@ test('C32 — the window expiring asks again, and a release that appeared is fou
   writeUpgradeCheck(fresh, { latestTag: null, localTag: null, behind: false,
     now: () => new Date(Date.now() - 60 * 60 * 1000) });
   let freshCalls = 0;
-  const still = await E28.run({ root: fresh, noNetwork: false, now: realClock,
+  const still = await E28.run({ root: fresh, flags: { noNetwork: false }, now: realClock,
     exec: (cmd, args) => { if (args[0] === 'ls-remote') freshCalls += 1; return lsRemote(['v9.1.0']); } });
   assert.equal(freshCalls, 0, 'a one-hour-old cache spent a remote call');
   assert.match(still.detail, /^origin advertised no release tags · last checked /);
@@ -287,7 +295,7 @@ test('C32 — the release-tag paths are unchanged, in both directions', async (t
   writeUpgradeCheck(current, { latestTag: 'v9.0.0', localTag: 'v9.0.0', behind: false, now: () => new Date() });
   // The tree IS on v9.0.0 in this scenario, so `describe` says so; a stub that answered
   // ls-remote output to that question would be describing a tree nobody has.
-  const r = await E28.run({ root: current, noNetwork: false, now: realClock,
+  const r = await E28.run({ root: current, flags: { noNetwork: false }, now: realClock,
     exec: gitStub({ tags: ['v9.0.0'], localTag: 'v9.0.0' }) });
   assert.equal(r.status, 'ok');
   assert.match(r.detail, /^up to date \(v9\.0\.0\) · last checked /);
@@ -317,7 +325,7 @@ const gitFor = ({ describe: tag, tags = [] }) => (_cmd, args) => (
 async function e28With(t, { cache, describe, tags = [], noNetwork = false }) {
   const root = tempDir('snowarch-c47-', t);
   writeUpgradeCheck(root, { ...cache, now: () => new Date() });
-  return E28.run({ root, noNetwork, now: realClock, exec: gitFor({ describe, tags }) });
+  return E28.run({ root, flags: { noNetwork }, now: realClock, exec: gitFor({ describe, tags }) });
 }
 
 test('ARC-09-C47 — an upgrade\'s own record is not a currency measurement', async (t) => {
@@ -353,7 +361,7 @@ test('ARC-09-C47 — a record describing another tree is not used (the interrupt
     source: 'upgrade-check', now: () => new Date() });
 
   let askedRemote = 0;
-  const r = await E28.run({ root, noNetwork: false, now: realClock,
+  const r = await E28.run({ root, flags: { noNetwork: false }, now: realClock,
     exec: (_cmd, args) => {
       if (args.includes('describe')) return 'v9.1.0\n';
       askedRemote += 1;
@@ -467,4 +475,22 @@ test('E-28 — a development checkout writes behind:false, so the banner does no
   assert.equal(r.data?.behind, false, 'a development checkout cached behind:true');
   assert.equal(r.data?.latestTag, 'v9.1.0', 'the latest release was not recorded');
   assert.equal(r.data?.localTag ?? null, null);
+});
+
+test('E-28 under the doctor\'s own --no-network spawns nothing: the flag reaches it as the doctor passes it', async (t) => {
+  // The cases above build the check's context by hand. The doctor builds it with the flag at `ctx.flags.noNetwork`
+  // (doctor/index.mjs), and only a run through runDoctor proves the check reads it where the doctor puts it. A clone
+  // with no origin makes a spawned `ls-remote` fail loudly instead of quietly reaching the network.
+  const root = tempDir('snowarch-e28-flags-', t);
+  execFileSync('git', ['init', '-q', '-b', 'main', root]);
+  assert.equal(spawnSync('git', ['-C', root, 'remote', 'get-url', 'origin']).status === 0, false,
+    'the fixture has no origin');
+  const config = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
+  writeFileSync(join(root, 'engine.config.json'), `${JSON.stringify(config, null, 2)}\n`);
+  writeFileSync(join(root, 'package.json'), readFileSync(join(REAL_ROOT, 'package.json')));
+  const { report } = await runDoctor({ root, config, registry: createRegistry([E28]), noNetwork: true,
+    writeCache: false });
+  const r = report.checks.find((c) => c.id === 'E-28');
+  assert.equal(r.status, 'skip', `E-28 under --no-network: ${r.status} — ${r.detail}`);
+  assert.match(r.detail, /^--no-network, and nothing has been checked yet$/);
 });

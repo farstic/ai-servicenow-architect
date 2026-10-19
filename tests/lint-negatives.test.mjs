@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { lintSkills, lintAgents, lintPaths, lintVocabulary, lintRootless } from './lib/lint-rules.mjs';
+import { lintSkills, lintAgents, lintPaths, lintVocabulary, lintRootless } from '../tools/snowarch/lib/lint-rules.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const SKILL_OK = { name: 'thing', description: 'Does a thing.' };
@@ -83,7 +83,7 @@ test('SK-07 rejects a roster count that disagrees with engine.config.json', () =
 
 test('SK-08 rejects a skill named after a built-in command — criterion 3, with the real fixture list', () => {
   // Criterion 3 names `status` specifically (R-17): it is the collision actually proven on the CLI.
-  const builtins = new Set(JSON.parse(readFileSync(new URL('./fixtures/claude-builtin-commands.json', import.meta.url), 'utf8')).commands);
+  const builtins = new Set(JSON.parse(readFileSync(new URL('../tools/snowarch/lib/lint-data/claude-builtin-commands.json', import.meta.url), 'utf8')).commands);
   assert.ok(builtins.has('status'), 'the fixture must contain the one collision R-17 proved');
   const f = skillFails({ status: { frontmatter: fm({ ...SKILL_OK, name: 'status' }) } }, { builtins });
   assert.ok(has(f, 'SK-08'), `expected SK-08, got ${JSON.stringify(f)}`);
@@ -96,7 +96,7 @@ test('SK-09 rejects retired vocabulary, and an exemption must be anchored to bot
   // The broken content is built from the fixture's own samples rather than typed here: a forbidden
   // token spelled in this file would trip the separate legacy-name ratchet, and only the fixture is
   // exempt as a detector. This also means the negative tracks the fixture as ARC-02-S06 edits it.
-  const vocab = JSON.parse(readFileSync(new URL('./fixtures/retired-vocabulary.json', import.meta.url), 'utf8')).tokens;
+  const vocab = JSON.parse(readFileSync(new URL('../tools/snowarch/lib/lint-data/retired-vocabulary.json', import.meta.url), 'utf8')).tokens;
   for (const t of vocab) {
     assert.match(t.sample, new RegExp(t.pattern), `fixture sample "${t.sample}" does not match its own pattern`);
   }

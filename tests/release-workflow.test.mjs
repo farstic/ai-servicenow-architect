@@ -15,7 +15,7 @@ import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildTagMessage, isPrerelease } from '../scripts/lib/release/tag.mjs';
+import { buildTagMessage, isPrerelease } from '../tools/snowarch/lib/release/tag.mjs';
 import { FROZEN_HEADING } from '../scripts/lib/release/changelog.mjs';
 import { collect, directorySize, megabytes, seconds, table } from '../scripts/ci/install-metrics.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';

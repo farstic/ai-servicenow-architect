@@ -176,3 +176,11 @@ export function signedRelease(tag) {
   for (let i = 0; i < 3; i++) if (here[i] !== from[i]) return here[i] > from[i];
   return true;
 }
+
+/**
+ * E-32's remedy for a shipped file that is not as signed, spelled for `cli`: one wording, read by every check that
+ * finds a shipped file wrong in an install (ARC-09-C185a), so a user meets one repair, not several.
+ */
+export const restoreRemedy = (cli) => `Put the signed files back with ${cli} doctor --fix; ${cli} doctor --json lists every one.`;
+/** The command that remedy runs. */
+export const restoreCommand = (cli) => `${cli} doctor --fix`;
