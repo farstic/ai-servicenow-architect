@@ -361,8 +361,9 @@ other) value is dropped rather than carried.
 explicitly off (the old wizard never had it), production is capped whatever the legacy file said,
 and `aiApiKey` is listed as dropped **by name** — its value is never printed. **It deletes nothing:**
 the closing advice names the directory and the `tokens.json` beside the store, and the deleting is
-yours. The full walkthrough is `docs/snippets/import-from-legacy.md`, and a user arriving from the
-old two-repository install wants [MIGRATION.md](MIGRATION.md), which quotes it as one step of nine.
+yours. The plan above is the import's whole output. A user arriving from the old two-repository
+install wants [MIGRATION.md, step 3](MIGRATION.md#3-bring-your-instance-across), which runs the
+same import as one step of nine.
 
 ## 11. Known limitations
 
