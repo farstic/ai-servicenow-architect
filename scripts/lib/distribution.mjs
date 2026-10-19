@@ -186,6 +186,11 @@ export function stage(root, clone, ref, { onto = null, tag = false, coverage = C
   if (!commit) throw new Error(`${ref} is not a commit in ${root}`);
   const annotated = tagOf(root, ref);
   if (tag && !annotated) throw new Error(`--tag needs an annotated tag; ${ref} is not one`);
+  // ARC-09-C185c: the distribution's history names nothing the install may not, so neither message may.
+  if (namesEngineering(ref)) throw new Error(`the commit message would be ${ref}, which names the engineering repository`);
+  if (annotated && namesEngineering(annotated.message)) {
+    throw new Error(`${ref}'s message names the engineering repository: the distribution tag would carry it`);
+  }
 
   const entries = treeEntries(root, commit);
   const link = entries.find((e) => e.type === 'commit' && e.path === CORPUS_GITLINK);
