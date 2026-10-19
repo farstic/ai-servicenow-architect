@@ -21,7 +21,7 @@ import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
-import { COVERAGE, isCovered, tarEntries } from '../../tools/snowarch/lib/licence/manifest.mjs';
+import { COVERAGE, isCovered } from '../../tools/snowarch/lib/licence/manifest.mjs';
 import { citedPaths } from '../../packages/contract/lint/lib/cited-paths.mjs';
 import { isHistory } from '../../packages/contract/lint/lib/scan.mjs';
 
@@ -96,23 +96,32 @@ export function shippedFiles(root, coverage = COVERAGE) {
   return trackedFiles(root).filter((p) => isCovered(p, coverage));
 }
 
+/** Every entry of `ref`'s tree, recursively: `{ mode, type, sha, path }`. */
+function treeEntries(root, ref) {
+  return git(root, ['ls-tree', '-r', '-z', ref]).split('\0').filter(Boolean).map((line) => {
+    const [meta, path] = line.split('\t');
+    const [mode, type, sha] = meta.split(' ');
+    return { mode, type, sha, path };
+  });
+}
+
+/** A blob's bytes as git stores them: no conversion the machine's configuration would make on the way out. */
+const blobOf = (root, sha) => execFileSync('git', ['-C', root, 'cat-file', 'blob', sha], { maxBuffer: 1 << 30 });
+
 /**
- * Write the shipped files into `dir`, byte for byte as HEAD has them (from `git archive`, the signer's own source),
- * with the executable bit where git records it. No `.git`, no history. Returns how many files were written.
+ * Write the shipped files into `dir`, byte for byte as HEAD stores them: each blob copied, as `stage` copies it, never
+ * through `git archive`, whose bytes follow the exporting machine's core.autocrlf (a Windows runner wrote CRLF where
+ * the blob holds LF). The executable bit where git records it. No `.git`, no history. Returns how many were written.
  */
 export function exportTree(root, dir, coverage = COVERAGE) {
-  const shipped = new Set(shippedFiles(root, coverage));
-  const modes = new Map(git(root, ['ls-tree', '-r', '-z', 'HEAD']).split('\0').filter(Boolean)
-    .map((line) => { const [meta, path] = line.split('\t'); return [path, meta.split(' ')[0]]; }));
-  const archive = execFileSync('git', ['-C', root, 'archive', '--format=tar', 'HEAD'],
-    { maxBuffer: 1 << 30, stdio: ['ignore', 'pipe', 'ignore'] });
   let written = 0;
-  for (const entry of tarEntries(archive)) {
-    if (entry.type !== '0' || !shipped.has(entry.path)) continue;
+  for (const entry of treeEntries(root, 'HEAD')) {
+    if (entry.type !== 'blob' || !isCovered(entry.path, coverage)) continue;
+    if (entry.mode === '120000') throw new Error(`${entry.path} is a symlink: the export writes files, and a link is not one`);
     const to = join(dir, entry.path);
     mkdirSync(dirname(to), { recursive: true });
-    writeFileSync(to, entry.data);
-    if (modes.get(entry.path) === '100755' && process.platform !== 'win32') chmodSync(to, 0o755);
+    writeFileSync(to, blobOf(root, entry.sha));
+    if (entry.mode === '100755' && process.platform !== 'win32') chmodSync(to, 0o755);
     written += 1;
   }
   return written;
@@ -163,11 +172,7 @@ export function stage(root, clone, ref, { onto = null, tag = false, coverage = C
   const annotated = tagOf(root, ref);
   if (tag && !annotated) throw new Error(`--tag needs an annotated tag; ${ref} is not one`);
 
-  const entries = gitIn(root, ['ls-tree', '-r', '-z', commit]).split('\0').filter(Boolean).map((line) => {
-    const [meta, path] = line.split('\t');
-    const [mode, type, sha] = meta.split(' ');
-    return { mode, type, sha, path };
-  });
+  const entries = treeEntries(root, commit);
   const link = entries.find((e) => e.type === 'commit' && e.path === CORPUS_GITLINK);
   if (!link) throw new Error(`${ref} has no ${CORPUS_GITLINK} gitlink: the install could not pin its corpus`);
   const pinned = annotated && /^docs-pin: ([0-9a-f]{40})$/m.exec(annotated.message)?.[1];
@@ -196,7 +201,7 @@ export function stage(root, clone, ref, { onto = null, tag = false, coverage = C
   try {
     const files = blobs.map((b, i) => {
       const file = join(tmp, String(i));
-      writeFileSync(file, execFileSync('git', ['-C', root, 'cat-file', 'blob', b.sha], { maxBuffer: 1 << 30 }));
+      writeFileSync(file, blobOf(root, b.sha));
       return file;
     });
     const written = blobs.length === 0 ? [] : gitIn(clone, ['hash-object', '-w', '--no-filters', '--stdin-paths'],
