@@ -38,9 +38,9 @@ const readReal = (p) => readFileSync(join(REAL_ROOT, p), 'utf8');
  * the assertion failed nine times on a repository where nothing was wrong — `fatal: invalid object
  * name`. A test that needs history to say anything says nothing on most machines.
  *
- * So the region is a COMMITTED FIXTURE, written once from that commit:
- * `tests/fixtures/changelog-frozen-region.md`, sha256
- * 65943e7086d5c9618f7c24c13c4a4ae895a2185d8657fe196110fddf57b09beb. Comparing against a file rather
+ * So the region is a COMMITTED FIXTURE, written from that commit and re-frozen once, deliberately, with the
+ * substitutions in REFROZEN applied (ARC-09-C185c): `tests/fixtures/changelog-frozen-region.md`, sha256
+ * 82d3e942a2f2f38c1549880f73a5171ac2941031ef9d9d59f0b329db3e076577. Comparing against a file rather
  * than against a hash is the difference between a failure that says "these two lines changed" and
  * one that says "the hash is different" — and this is a region whose failure mode is somebody
  * editing history by accident, where seeing WHAT changed is the whole point.
@@ -50,6 +50,17 @@ const readReal = (p) => readFileSync(join(REAL_ROOT, p), 'utf8');
  */
 const FROZEN_SINCE = 'bcd4dcd';
 const FROZEN_FIXTURE = 'tests/fixtures/changelog-frozen-region.md';
+
+/**
+ * ARC-09-C185c — the one deliberate re-freeze, as data. The owner's rule: no shipped file links a repository other than
+ * the two the product uses, so the imported history keeps the predecessor's NAME and loses its link. Each entry is a
+ * line of the region (1-based), the exact text it held at FROZEN_SINCE, and the text it holds now. The history case
+ * applies these to FROZEN_SINCE's region and requires the fixture to equal the result: nothing else moved.
+ */
+const REFROZEN = Object.freeze([
+  { line: 401, old: '[`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live)',
+    new: '`farstic/claude-servicenow-live`' },
+]);
 
 const HEADER = '# Changelog\n\nA rule.\n\n---\n\n';
 const FROZEN = `${FROZEN_HEADING}\n\nimported history, untouched\n`;
@@ -217,10 +228,15 @@ test('AC 7 (history) — the fixture is what bcd4dcd holds, where the object is 
   }
   const at = base.indexOf(`\n${FROZEN_HEADING}`);
   assert.notEqual(at, -1);
-  assert.equal(base.slice(at).replace(/^\n/, ''), readReal(FROZEN_FIXTURE),
-    `${FROZEN_FIXTURE} is not what ${FROZEN_SINCE} holds`);
+  const lines = base.slice(at).replace(/^\n/, '').split('\n');
+  for (const { line, old, new: now } of REFROZEN) {
+    assert.equal(lines[line - 1].split(old).length - 1, 1, `${FROZEN_SINCE}'s region line ${line} does not hold the text once`);
+    lines[line - 1] = lines[line - 1].replace(old, now);
+  }
+  assert.equal(lines.join('\n'), readReal(FROZEN_FIXTURE),
+    `${FROZEN_FIXTURE} is not what ${FROZEN_SINCE} holds with the REFROZEN substitutions applied`);
   assert.equal(createHash('sha256').update(readReal(FROZEN_FIXTURE)).digest('hex'),
-    '65943e7086d5c9618f7c24c13c4a4ae895a2185d8657fe196110fddf57b09beb');
+    '82d3e942a2f2f38c1549880f73a5171ac2941031ef9d9d59f0b329db3e076577');
 });
 
 // ── AC 4, on the committed file ────────────────────────────────────────────────────────────────
