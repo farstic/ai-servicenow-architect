@@ -25,7 +25,8 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
-import { bootstrapUser, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
+import { bootstrapUser, buildWorld, fakeClaude, git, republishManifests, snowarch } from './harness.mjs';
+import { stage } from '../../scripts/lib/distribution.mjs';
 import { COVERAGE, isCovered } from '../../tools/snowarch/lib/licence/manifest.mjs';
 
 const isWindows = process.platform === 'win32';
@@ -297,17 +298,30 @@ test('ARC-09-C170 — the from-label is a release tag or the commit, never an im
   assert.doesNotMatch(plan2.text, /import\//);
 }, MINUTES);
 
-// ARC-09-C185c — an install moved to the distribution repository, the move MIGRATION's "An install made before 2.2.1"
-// describes. Its origin is set to a repository that starts at a later release. `git fetch --tags --prune` does NOT drop
-// a tag the new origin lacks (only --prune-tags would): measured, so the install keeps naming the release it is on.
-test('ARC-09-C185c — a release install moved to a new origin keeps its tag, then upgrades from it', async (t) => {
+// ARC-09-C185c — an install moved to the distribution repository, the move MIGRATION's "An install of a 2.2.1 release
+// candidate, or later" describes. Its origin is set to a repository that starts at a later release. `git fetch --tags
+// --prune` does NOT drop a tag the new origin lacks (only --prune-tags would): measured, so the install keeps naming the
+// release it is on.
+//
+// ARC-09-C192 — THE DISTRIBUTION IS STAGED, as farstic/snowarch is: each release one commit of its own history, which
+// shares nothing with the engineering repository's, and each manifest signed over that commit. The case first used a
+// bare clone of the engineering origin, whose shared history proved a move the real repository never makes.
+test('ARC-09-C185c — an install moved to a staged distribution, unrelated in history, keeps its tag and upgrades', async (t) => {
   const w = await buildWorld(t);
   bootstrapUser(w.user);
+  const staged = join(w.scratch, 'staged');
+  stage(w.work, staged, 'v9.1.0', { tag: true });
+  stage(w.work, staged, 'v9.2.0', { onto: 'main', tag: true });
   const distribution = join(w.scratch, 'distribution.git');
   // Through the harness's git(), as every git call here is: core.longpaths on Windows (C27b).
-  git(w.scratch, ['clone', '-q', '--bare', '--no-hardlinks', w.origin, distribution]);
-  git(distribution, ['tag', '-d', 'v9.0.0']);
+  git(w.scratch, ['clone', '-q', '--bare', '--no-hardlinks', staged, distribution]);
   assert.equal(git(distribution, ['tag', '--list', 'v9.0.0']), '');
+  republishManifests(w.licences, staged, ['v9.1.0', 'v9.2.0']);
+  // An install made with `clone --branch` before those releases existed: its own tag, and none of the later ones.
+  for (const tag of ['v9.1.0', 'v9.2.0']) {
+    git(w.user, ['tag', '-d', tag]);
+    assert.equal(git(w.user, ['tag', '--list', tag]), '', `${tag} is still here`);
+  }
   git(w.user, ['remote', 'set-url', 'origin', pathToFileURL(distribution).href]);
   assert.equal(git(w.user, ['remote', 'get-url', 'origin']), pathToFileURL(distribution).href);
 
@@ -315,6 +329,23 @@ test('ARC-09-C185c — a release install moved to a new origin keeps its tag, th
   assert.match(check.text, /v9\.2\.0 available \(you are on v9\.0\.0\)/, check.text);
   // The fetch kept the tag the install was cut from: MIGRATION's sentence, measured.
   assert.equal(git(w.user, ['tag', '--list', 'v9.0.0']), 'v9.0.0', 'the fetch dropped the install\'s own tag');
+  // No common ancestor: the release the install moves to shares no history with the one it is on.
+  assert.equal(git(w.user, ['merge-base', 'HEAD', 'v9.1.0'], { allowFail: true }), null, 'the histories are related');
+  // An install on a BRANCH pulls, and a fast-forward across unrelated histories is refused at U5 with the tag checkout
+  // as the remedy. Nothing moves: HEAD, the branch and the working tree are as they were (measured: of `.local/`, only
+  // the currency cache every fetch writes changed).
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  git(w.user, ['checkout', '-q', '-B', 'main', 'v9.0.0']);
+  assert.equal(git(w.user, ['branch', '--show-current']), 'main');
+  git(w.user, ['fetch', '-q', 'origin', '+refs/heads/main:refs/remotes/origin/main']);
+  git(w.user, ['branch', '--set-upstream-to', 'origin/main', 'main']);
+  assert.equal(git(w.user, ['rev-parse', '--abbrev-ref', 'main@{upstream}']), 'origin/main');
+  const pulled = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
+  assert.equal(pulled.status, 1, pulled.text);
+  assert.match(pulled.text, /upgrade: main has diverged from origin\/main — resolve with git, or use --to v9\.2\.0 to check out the release tag/);
+  assert.deepEqual([git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['status', '--porcelain'])], [head, ''], 'the refusal moved the tree');
+  git(w.user, ['checkout', '-q', '--detach', 'v9.0.0']);
+  assert.equal(git(w.user, ['branch', '--show-current']), '', 'the install is not back on its tag');
   const plan = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin });
   assert.match(plan.text, /Upgrade plan: v9\.0\.0 → v9\.1\.0/, plan.text);
 
