@@ -16,7 +16,7 @@
 import { existsSync, writeSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { exportTree, shippedFiles, stage, trackedFiles, unlistedReferences } from './lib/distribution.mjs';
+import { engineeringNames, exportTree, shippedFiles, stage, trackedFiles, unlistedReferences } from './lib/distribution.mjs';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Synchronous writes and an exit code, never process.exit(): a piped report is never cut off (ARC-09-C6).
@@ -31,8 +31,12 @@ function main(argv) {
     if (argv.includes('--list')) for (const p of shipped) out(p);
     const refs = unlistedReferences(ROOT);
     for (const r of refs) err(`UNSHIPPED ${r.path} — reached by ${r.from}:${r.line} (${r.kind})`);
-    out(`distribution: shipped ${shipped.length} · not shipped ${notShipped} · unshipped references ${refs.length}`);
-    return refs.length === 0 ? 0 : 1;
+    // ARC-09-C185c: and no shipped file names the engineering repository.
+    const names = engineeringNames(ROOT);
+    for (const n of names) err(`NAMED ${n.file}:${n.line} — ${n.text}`);
+    out(`distribution: shipped ${shipped.length} · not shipped ${notShipped} · unshipped references ${refs.length} `
+      + `· engineering names ${names.length}`);
+    return refs.length === 0 && names.length === 0 ? 0 : 1;
   }
   if (cmd === 'export' && arg) {
     const dir = resolve(arg);
