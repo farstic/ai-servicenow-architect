@@ -33,7 +33,7 @@ import { localDir, storePath } from '../local-paths.mjs';
 import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from '../exit.mjs';
 import { branchState, describe, git, isShallow, versionTag } from '../git.mjs';
 import { askOnce, isYes } from '../ask.mjs';
-import { childEnv } from '../spawn-env.mjs';
+import { childEnv, NO_PROMPT_ENV } from '../spawn-env.mjs';
 import { loadConfig, root as defaultRoot, version as readVersion } from '../config.mjs';
 import { loadState } from '../state.mjs';
 // ARC-08-C29 — the runner's own step list, so the plan and the run are one computation.
@@ -247,6 +247,12 @@ export function classifyGitFetchError(stderr = '', { remote = 'origin' } = {}) {
     return { kind: 'proxy-auth', line: 'upgrade: the proxy demanded authentication (407) — put the '
       + 'credentials in HTTPS_PROXY, or ask for an exception for this host '
       + '(docs/TROUBLESHOOTING.md#proxy_auth_required)' };
+  }
+  // ARC-09-C190 — the remote wanted a credential it was not given, or says it has no such repository, which is how a
+  // private one answers a stranger. The fetch runs with prompts off, so this is git's answer at once, not a wait.
+  if (/could not read Username|Authentication failed|Repository not found|terminal prompts disabled/i.test(text)) {
+    return { kind: 'auth', line: `upgrade: ${remote} asked for credentials, or was not found — it may be private or `
+      + `moved; check it with git remote get-url ${remote}; nothing was changed` };
   }
   // A refused connection is the shape a dead proxy makes, and it is the one AC 4 exercises.
   if (/connection refused|failed to connect|couldn't connect to server|unable to access/i.test(text)) {
@@ -667,7 +673,9 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   // ── U2 fetch ──────────────────────────────────────────────────────────────────────────────
   log.step(stepLine(2, `fetch tags from ${remote}`));
   const fetchArgs = ['fetch', '--tags', '--prune', ...(shallow ? ['--unshallow'] : []), remote];
-  const fetched = run('git', fetchArgs, { cwd: root, encoding: 'utf8', env: childEnv(root, env),
+  // ARC-09-C190 — with prompts off: a remote that wants a credential no helper holds fails now, with git's reason,
+  // instead of waiting on a prompt until FETCH_TIMEOUT_MS. A helper's stored credential still applies.
+  const fetched = run('git', fetchArgs, { cwd: root, encoding: 'utf8', env: childEnv(root, { ...env, ...NO_PROMPT_ENV }),
     timeout: FETCH_TIMEOUT_MS, stdio: 'pipe' });
   if (fetched.status !== 0) {
     const stderr = String(fetched.stderr ?? fetched.error?.message ?? '').trim();
