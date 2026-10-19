@@ -10,7 +10,8 @@
  * THE GUARD reads what the runtime reaches, by scanning, never from a hand list:
  *   1. imports — the import graph from the runtime's entry points: static imports, `export … from`, and literal
  *      dynamic imports;
- *   2. literal repo paths in runtime code — a script it spawns, a file it reads, a page it names in a printed line;
+ *   2. literal repo paths in runtime code — a script it spawns, a file it reads, a page it names in a printed line —
+ *      whole, or as literal segments after a root (`join(root, 'packages', 'contract', 'x.json')`);
  *   3. paths a shipped document cites, by L05's own extraction (`citedPaths`).
  * A path any of them reaches that `COVERAGE` leaves out is a finding, unless it is a named exception with its reason:
  * a maintainers' module reached only behind `isEngineeringCheckout`, or a pointer for whoever works in the engineering
@@ -193,6 +194,9 @@ const IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s+)['"](\.{1,2}\/[^'"]+
 const URL_READ = /new URL\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g;
 /** A repository path written as a string literal in code. */
 const LITERAL = /['"`]((?:\.claude|scripts|tests|docs|templates|governance|packages|tools|vendor)\/[A-Za-z0-9_.\/-]*[A-Za-z0-9_\/-])['"`]/g;
+/** A repository path built from literal segments after a root: `join(root, 'packages', 'contract', 'x.json')`. */
+const JOINED = /\b(?:join|resolve)\(\s*[^'"`,()]+,((?:\s*['"][^'"]+['"]\s*,)*\s*['"][^'"]+['"])\s*\)/g;
+const TOP = /^(?:\.claude|scripts|tests|docs|templates|governance|packages|tools|vendor)$/;
 const CODE = /\.(mjs|cjs|js)$/;
 
 /** Lines of code, with the comment lines blanked: a path a comment names is not a reference. */
@@ -249,6 +253,12 @@ export function unlistedReferences(root, { coverage = COVERAGE, entries = RUNTIM
       }
       for (const m of line.matchAll(URL_READ)) {
         report(posix.normalize(posix.join(posix.dirname(file), m[1])), file, i + 1, 'read');
+      }
+      for (const m of line.matchAll(JOINED)) {
+        const segments = [...m[1].matchAll(/['"]([^'"]+)['"]/g)].map((x) => x[1]);
+        // One segment is LITERAL's to read; a path that does not start at a top-level directory is not the repo's.
+        if (segments.length < 2 || !TOP.test(segments[0].split('/')[0])) continue;
+        report(segments.join('/'), file, i + 1, 'literal');
       }
       for (const m of line.matchAll(LITERAL)) {
         const to = m[1];
