@@ -763,3 +763,59 @@ test('B09-02 — the Windows git remedy is the constant the CI step can only ass
   assert.equal(floor, '2.34.1', 'the git floor moved — B09-02 quotes it in its row');
   assert.notEqual(floor, '2.25');
 });
+
+// ── ARC-09-C194 — snowarch.cmd hands back node's exit code once, though the run replaces the launcher ─────────────────
+//
+// cmd.exe reads a batch file one line at a time, by byte offset, and goes back to the file after each command. With
+// `node …` and `exit /b` on two lines, an `upgrade` that replaced snowarch.cmd under the running launcher left cmd
+// reading the NEW file at the OLD offset: any later release that changed a byte before that line would make a 2.2.1
+// Windows install run a fragment of a line, or the CLI a second time, after its upgrade. On one line, cmd has already
+// read the `exit /b` when node starts. A stand-in CLI records each run, rewrites the launcher as an upgrade does, and
+// exits with the code it is given.
+const CMD_CLI = [
+  "import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';",
+  "import { dirname, join } from 'node:path';",
+  "import { fileURLToPath } from 'node:url';",
+  "const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');",
+  "appendFileSync(join(root, 'runs.txt'), 'run\\n');",
+  'const [code, rewrite] = process.argv.slice(2);',
+  "if (rewrite === 'rewrite') {",
+  "  const cmd = join(root, 'snowarch.cmd');",
+  "  const text = readFileSync(cmd, 'latin1');",
+  "  writeFileSync(cmd, text.replace('\\r\\n', '\\r\\nrem a line a later release added, which moves every byte after it\\r\\n'), 'latin1');",
+  '}',
+  'process.exit(Number(code));',
+].join('\n');
+
+test('ARC-09-C194 — snowarch.cmd returns node\'s exit code once, even when the run replaces the launcher', {
+  skip: process.platform === 'win32' ? false : 'cmd.exe re-reads a batch file by offset; only a Windows cell can show it',
+}, (t) => {
+  const dir = tempDir('snowarch-cmd-', t);
+  mkdirSync(join(dir, 'tools', 'snowarch', 'bin'), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'snowarch', 'bin', 'snowarch.mjs'), `${CMD_CLI}\n`);
+  const runs = join(dir, 'runs.txt');
+  const launch = (args, path = null) => {
+    copyFileSync(join(root, 'snowarch.cmd'), join(dir, 'snowarch.cmd'));
+    rmSync(runs, { force: true });
+    // One PATH key: a spread `process.env` keeps Windows' `Path`, and a second `PATH` beside it is ambiguous.
+    const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== 'PATH'));
+    env.Path = path ?? (process.env.Path ?? process.env.PATH);
+    // unlicensed start: the launcher runs a stand-in CLI this case wrote, which reads no licence and starts nothing
+    const r = spawnSync('cmd.exe', ['/d', '/c', 'snowarch.cmd', ...args], { cwd: dir, encoding: 'utf8', env });
+    return { status: r.status, text: `${r.stdout}${r.stderr}`, runs: existsSync(runs) ? readFileSync(runs, 'utf8') : '' };
+  };
+  for (const code of [0, 1, 2, 3]) {
+    const r = launch([String(code)]);
+    assert.equal(r.status, code, `exit ${code} came back as ${r.status}: ${r.text}`);
+    assert.equal(r.runs, 'run\n', `exit ${code}: the CLI ran ${r.runs.split('\n').length - 1} times`);
+  }
+  const replaced = launch(['2', 'rewrite']);
+  assert.equal(replaced.runs, 'run\n', `the replaced launcher ran the CLI again: ${replaced.text}`);
+  assert.equal(replaced.status, 2, `the replaced launcher's exit was ${replaced.status}: ${replaced.text}`);
+  assert.doesNotMatch(replaced.text, /is not recognized/, 'cmd ran a fragment of the replaced file');
+  // Node absent is still 3, the code the engine reserves for a missing prerequisite.
+  const noNode = launch(['0'], join(process.env.SystemRoot ?? 'C:\\Windows', 'System32'));
+  assert.equal(noNode.status, 3, noNode.text);
+  assert.match(noNode.text, /Node\.js 20\+ is required/);
+  assert.equal(noNode.runs, '', 'the CLI ran with no node on PATH');
+});
