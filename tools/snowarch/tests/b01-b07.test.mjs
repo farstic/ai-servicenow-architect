@@ -123,6 +123,40 @@ test('a registration that is not `project` is rejected whatever the mode says', 
   }
 });
 
+test('ARC-09-C192 — a settings.local.json carried from an older install ends with one SessionStart hook, the rest kept', async () => {
+  // MIGRATION's fresh install carries the user's `.claude/settings.local.json` into the new tree. As a 2.2.0 install
+  // leaves it: our hook (its command unchanged since 2.0) beside the user's own keys and hooks, and, for the stale case,
+  // a second entry naming the OLD folder by an absolute path.
+  const root = makeCheckout();
+  // Derived, not spelled: the hook's command is the same in 2.2.0 (measured at its tag), and a test that spelled the hook's
+  // path would be counted among the banner tests, which may not name the version-of-record file (ARC-09-C137).
+  const ours = hookEntry().SessionStart[0].hooks[0];
+  const carried = {
+    permissions: { allow: ['Bash(git status:*)'] },
+    env: { NODE_EXTRA_CA_CERTS: '/etc/ssl/corporate.pem' },
+    disabledMcpjsonServers: [KEY],
+    hooks: {
+      SessionStart: [
+        { matcher: 'startup|resume', hooks: [ours] },
+        { matcher: 'startup', hooks: [{ type: 'command', command: ours.command.replace('${CLAUDE_PROJECT_DIR}', '/home/someone/snowarch-2.2.0') }] },
+      ],
+      PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine' }] }],
+    },
+  };
+  writeFileSync(join(root, SETTINGS_LOCAL), `${JSON.stringify(carried, null, 2)}\n`);
+  // Twice: the bootstrap, and the next one. Neither may add a second hook.
+  for (const run of [1, 2]) {
+    const r = await runB07(ctxFor(root));
+    assert.equal(r.status, 'ok', `run ${run}: ${r.detail}`);
+  }
+  const after = readJson(root, SETTINGS_LOCAL);
+  assert.deepEqual(after.hooks.SessionStart, hookEntry().SessionStart, 'the SessionStart hook is not exactly ours');
+  assert.equal(after.hooks.SessionStart.flatMap((e) => e.hooks).length, 1, 'more than one SessionStart hook');
+  assert.equal(after.hooks.SessionStart[0].hooks[0].command, ours.command, 'the hook does not follow the tree it is in');
+  assert.deepEqual([after.permissions, after.env, after.hooks.PreToolUse],
+    [carried.permissions, carried.env, carried.hooks.PreToolUse], 'a key of the user\'s was not kept');
+});
+
 test('AC 3 — invalid JSON is the one failure mode, and the bytes are untouched', async () => {
   const root = makeCheckout();
   const broken = '{ not json';

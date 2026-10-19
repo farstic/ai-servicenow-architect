@@ -425,6 +425,24 @@ function publishManifests(work, licences, tags, { unsigned = [], altered = [] } 
   git(clone, ['push', '--quiet', licences.bare, 'main']);
 }
 
+/**
+ * ARC-09-C192 — `tags`' manifests signed again from `dir`, over ITS commits: a distribution clone's, as a final from
+ * 2.2.1 is signed from the staged clone (ARC-09-C185b). One commit on the world's licences repository, over what is
+ * there, so the upgrade and the doctor read these from now on.
+ */
+export function republishManifests(licences, dir, tags) {
+  const work = join(dirname(licences.bare), `licences-${tags.join('-')}`);
+  gitRaw(['clone', '--quiet', licences.url, work]);
+  const { primary } = licenceFixture();
+  for (const tag of tags) {
+    const doc = signManifest(manifestFromArchive(dir, tag), primary.privateKey);
+    writeFileSync(join(work, 'releases', `${tag}.json`), `${JSON.stringify(doc, null, 2)}\n`);
+  }
+  git(work, ['add', '-A']);
+  git(work, ['commit', '--quiet', '-m', 'the distribution manifests']);
+  git(work, ['push', '--quiet', licences.bare, 'main']);
+}
+
 export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null,
   unsigned = [], altered = [] } = {}) {
   const marks = [];

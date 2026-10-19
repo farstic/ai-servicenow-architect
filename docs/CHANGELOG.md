@@ -29,9 +29,11 @@ The server's contract keeps its 399 tools and gains one error code, 75 in all. T
 under its cap of 80. The licence format is unchanged. The signed manifest now covers every file a release ships, 455
 of them: governance, templates, the scripts the Architect runs and the user documentation joined it, so the doctor
 restores any of them as it restores the engine. From this release the Architect is installed and upgraded from
-`https://github.com/farstic/snowarch`, where the Release and its evidence are published. An install made before 2.2.1
-moves once, from its folder: `git remote set-url origin https://github.com/farstic/snowarch.git`, then
-`./snowarch upgrade` (see MIGRATION.md).
+`https://github.com/farstic/snowarch`, where the Release and its evidence are published. An install of 2.2.0 or earlier
+checks a release by its own older rule and refuses this one, changing nothing, so it is replaced once by a fresh install
+that carries over the licence, the instance store and the engagement folders. An install of a 2.2.1 release candidate
+moves with `git remote set-url origin https://github.com/farstic/snowarch.git`, then `./snowarch upgrade` (MIGRATION.md
+has both).
 
 ### Fixed
 
@@ -45,6 +47,11 @@ moves once, from its folder: `git remote set-url origin https://github.com/farst
 - `./snowarch doctor --no-network` makes no network call. The release-currency check (E-28) read the flag where the
   doctor never put it and still asked `origin` for its tags, so every report taken with `--no-network` before 2.2.1,
   the release evidence included, made that one call (ARC-09-C187).
+- A release is checked against the coverage its own signed manifest carries, as the manifest's format says, not against
+  the coverage of the code doing the checking. Before this, an upgrade refused a release that covers more files than the
+  install, and a release push checked the same way (ARC-09-C192). The release gate also refuses a manifest signed with
+  another coverage than the release's own; an install of 2.2.0 or earlier keeps its own rule and is replaced once (see
+  the Notes).
 - `Status` reads the release family and pin from the `Docs:` line of the `./snowarch status` panel. The session
   looked for a git branch in the corpus checkout, which has none, and reported the corpus as not a git checkout
   (ARC-09-C188).
