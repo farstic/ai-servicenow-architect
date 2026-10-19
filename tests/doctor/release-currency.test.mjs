@@ -482,7 +482,7 @@ test('E-28 under the doctor\'s own --no-network spawns nothing: the flag reaches
   // (doctor/index.mjs), and only a run through runDoctor proves the check reads it where the doctor puts it. A clone
   // with no origin makes a spawned `ls-remote` fail loudly instead of quietly reaching the network.
   const root = tempDir('snowarch-e28-flags-', t);
-  execFileSync('git', ['init', '-q', root]);
+  execFileSync('git', ['init', '-q', '-b', 'main', root]);
   assert.equal(spawnSync('git', ['-C', root, 'remote', 'get-url', 'origin']).status === 0, false,
     'the fixture has no origin');
   const config = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
