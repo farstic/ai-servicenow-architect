@@ -345,7 +345,8 @@ export function unlistedReferences(root, { coverage = COVERAGE, entries = RUNTIM
     lines.forEach((text, i) => {
       if (/^\s*(```|~~~)/.test(text)) { fence = !fence; return; }
       if (fence || ENGINEERING_POINTER.test(text)) return;
-      for (const m of text.matchAll(RELATIVE_LINK)) {
+      // A link in inline code is an example of the syntax, not a link.
+      for (const m of text.replace(/`[^`]*`/g, '').matchAll(RELATIVE_LINK)) {
         const target = m[1].split('#')[0].split('?')[0];
         if (target === '') continue;
         const path = posix.normalize(posix.join(posix.dirname(doc), decodeURI(target)));
