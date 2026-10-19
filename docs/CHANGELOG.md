@@ -26,8 +26,12 @@ the resolve defect fixed here. The Architect also knows more about AI Agent Stud
 - a net-new AI agent needs the Prime tier.
 
 The server's contract keeps its 399 tools and gains one error code, 75 in all. The always-loaded rule file is 73 lines,
-under its cap of 80. The licence format and the signed manifest are unchanged. Upgrading from 2.2.0 needs no step
-beyond `./snowarch upgrade`.
+under its cap of 80. The licence format is unchanged. The signed manifest now covers every file a release ships, 455
+of them: governance, templates, the scripts the Architect runs and the user documentation joined it, so the doctor
+restores any of them as it restores the engine. From this release the Architect is installed and upgraded from
+`https://github.com/farstic/snowarch`, where the Release and its evidence are published. An install made before 2.2.1
+moves once, from its folder: `git remote set-url origin https://github.com/farstic/snowarch.git`, then
+`./snowarch upgrade` (see MIGRATION.md).
 
 ### Fixed
 
@@ -50,6 +54,8 @@ beyond `./snowarch upgrade`.
   goes from 72 to 80 lines, by the owner's ruling (ARC-09-C182).
 - The write gate's approval question applies to a browser action that changes the instance, as well as to a tool call
   (ARC-09-C172).
+- The Architect is installed and upgraded from https://github.com/farstic/snowarch, a repository that carries only
+  what a user receives, and the signed manifest covers every file it ships (ARC-09-C185a, ARC-09-C185c).
 
 ### Added
 
@@ -72,6 +78,8 @@ beyond `./snowarch upgrade`.
   unnamed tool link's refusal as a data policy (ARC-09-C172, ARC-09-C183, ARC-09-C184).
 - `docs/validation/2026-10-19-itsm-sweep.md`, the first ITSM run (ARC-09-C167b, group 1, partial). The live-coverage
   ledger moves to 5 tools verified live.
+- `scripts/distribution.mjs` checks, exports and stages the distribution tree; the contract gate's generated step runs
+  its check (ARC-09-C185a).
 
 ## 2.2.0 — 2026-10-17
 

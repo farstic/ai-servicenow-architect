@@ -8,6 +8,31 @@ losing engagement content and without leaving a password behind.
 Read it once before you start. Nothing in your old setup is modified until step 6, so you can stop
 after any earlier step and still have exactly what you had this morning.
 
+## An install made before 2.2.1
+
+From 2.2.1 the Architect is installed and upgraded from `https://github.com/farstic/snowarch.git`. An
+install cloned before that still points at the previous address, and moves once, from its folder.
+
+macOS / Linux:
+
+```sh
+git remote set-url origin https://github.com/farstic/snowarch.git
+./snowarch upgrade
+```
+
+Windows PowerShell:
+
+```powershell
+git remote set-url origin https://github.com/farstic/snowarch.git
+.\snowarch.cmd upgrade
+```
+
+The release tags your install already has stay where they are, so the upgrade's plan names the
+version you are on as before, for example `v2.2.0 → v2.2.1`, and goes ahead as usual.
+Your `.local/`, your instances and your engagement folders stay where they are.
+
+The rest of this page is for the two-repository setup that came before 2.0.
+
 ## Who this is for
 
 - You cloned `farstic/claude-servicenow-live`, or
