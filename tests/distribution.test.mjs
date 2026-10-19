@@ -139,6 +139,7 @@ function releaseTree(t) {
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['add', '-A']);
   git(root, ['update-index', '--add', '--cacheinfo', `160000,${PIN},vendor/ServiceNowDocs`]);
+  assert.match(git(root, ['ls-files', '--stage', 'vendor/ServiceNowDocs']), new RegExp(`^160000 ${PIN} 0\t`));
   git(root, ['commit', '-q', '-m', 'release one']);
   const tagged = (name, pin) => {
     put(root, `.tag-${name}`, `snowarch ${name}\n\ncontract: ${'c'.repeat(64)}\ndocs-pin: ${pin}\n`);
@@ -170,7 +171,9 @@ test('stage is reproducible: the same tag twice gives the same commit and tag, b
   assert.equal(at(a, ['rev-parse', 'HEAD:tools/snowarch/x.ps1']), at(root, ['rev-parse', 'v9.9.9:tools/snowarch/x.ps1']));
   assert.match(at(a, ['ls-tree', 'HEAD', 'vendor/ServiceNowDocs']), new RegExp(`^160000 commit ${PIN}\\t`));
   assert.equal(at(a, ['ls-tree', '--name-only', 'HEAD', 'tests']), '', 'nothing outside the coverage');
-  assert.equal(at(a, ['log', '-1', '--format=%an <%ae> %s']), 'snowarch release <release@snowarch.invalid> v9.9.9');
+  const owner = 'Cvetomir Grigorov <cvetomirgrigorov@yahoo.bg>';   // NOTICE's name and contact
+  assert.equal(at(a, ['log', '-1', '--format=%an <%ae>|%cn <%ce>|%s']), `${owner}|${owner}|v9.9.9`);
+  assert.match(at(a, ['cat-file', '-p', 'v9.9.9']), new RegExp(`^tagger ${owner} 1792243591 \\+0300$`, 'm'));
   // Two stagings in one second would agree on the runner's clock too; the dates are the tag's, by construction.
   assert.equal(at(a, ['log', '-1', '--format=%at %ct']), '1792243591 1792243591');
   assert.equal(at(a, ['cat-file', '-p', 'v9.9.9']).split('\n\n').slice(1).join('\n\n'),

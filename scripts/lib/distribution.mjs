@@ -85,8 +85,12 @@ export function exportTree(root, dir, coverage = COVERAGE) {
 /** The corpus submodule: a gitlink in the tree, not a file, so `git archive` and the export leave it out. */
 export const CORPUS_GITLINK = 'vendor/ServiceNowDocs';
 
-/** Who the distribution commit and tag say made them: a release identity, never the runner's, so two stagings agree. */
-export const RELEASE_IDENTITY = Object.freeze({ name: 'snowarch release', email: 'release@snowarch.invalid' });
+/**
+ * Who the distribution commit and tag say made them: the owner, by the name and the contact address NOTICE gives (the
+ * owner's ruling, 2026-10-19). Fixed here, never read from the runner's git configuration, so two stagings agree
+ * wherever they run.
+ */
+export const RELEASE_IDENTITY = Object.freeze({ name: 'Cvetomir Grigorov', email: 'cvetomirgrigorov@yahoo.bg' });
 
 const gitIn = (dir, args, { input, env } = {}) => execFileSync('git', ['-C', dir, ...args], {
   encoding: 'utf8', maxBuffer: 1 << 28, input, env: env ? { ...process.env, ...env } : process.env,
