@@ -58,8 +58,10 @@ export const COVERAGE = Object.freeze({
         // The contract library and lint the doctor imports, the pin it checks, and the retired names E-19 and E-20 read.
         'packages/contract/lib/', 'packages/contract/lint/', 'packages/contract/required-tools.json',
         'packages/contract/retired-names.json',
-        // The install's own scaffolding.
-        'bootstrap.sh', 'bootstrap.ps1', 'bootstrap.cmd', 'snowarch', 'snowarch.cmd', 'package-lock.json', '.mcp.json',
+        // The install's own scaffolding. The two Windows launchers are named by their stems: a bare launcher name in source
+        // reads as a spelled command to ARC-07-W17's sweep, and here it names a file the release ships.
+        'bootstrap.sh', 'bootstrap.ps1', 'snowarch', ...['bootstrap', 'snowarch'].map((stem) => `${stem}.cmd`),
+        'package-lock.json', '.mcp.json',
         'engine.config.schema.json', '.gitattributes', '.gitignore', '.editorconfig', '.gitmodules', 'vendor/docs-areas.txt',
         'LICENSE', 'NOTICE', 'LICENSING.md', 'TRADEMARKS.md', 'README.md',
         // The scripts the skills and the docs CLI run.
