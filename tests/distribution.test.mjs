@@ -21,6 +21,8 @@ import { exportTree, shippedFiles, unlistedReferences } from '../scripts/lib/dis
 import { engineContractChecks } from '../tools/snowarch/lib/doctor/checks/engine-contract.mjs';
 
 const REAL_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// A backtick, built here so the fixtures' cited paths are not citations of this file (L05 reads it too).
+const BT = String.fromCharCode(96);
 
 function put(root, rel, text) {
   mkdirSync(dirname(join(root, rel)), { recursive: true });
@@ -41,7 +43,7 @@ function plantedTree(t) {
     'export async function go(root) {',
     "  spawnSync(process.execPath, [join(root, 'scripts/unlisted-spawn.mjs')]);",
     "  readFileSync(join(root, 'docs/unlisted-data.json'), 'utf8');",
-    "  // a comment naming `docs/only-in-a-comment.md` is not a reference",
+    '  // a comment naming ' + BT + 'docs/only-in-a-comment.md' + BT + ' is not a reference',
     "  if (isEngineeringCheckout(root)) await import('../../../scripts/lib/gated.mjs');",
     '  return b;',
     '}',
@@ -51,7 +53,8 @@ function plantedTree(t) {
   put(root, 'scripts/lib/gated.mjs', 'export const g = 1;\n');
   put(root, 'scripts/unlisted-spawn.mjs', '\n');
   put(root, 'docs/unlisted-data.json', '{}\n');
-  put(root, '.claude/skills/x/SKILL.md', 'Read `docs/unlisted-doc.md` first, then `.claude/skills/x/SKILL.md`.\n');
+  put(root, '.claude/skills/x/SKILL.md', 'Read ' + BT + 'docs/unlisted-doc.md' + BT + ' first, then ' + BT
+    + '.claude/skills/x/SKILL.md' + BT + '.\n');
   put(root, 'docs/unlisted-doc.md', '# x\n');
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['add', '-A']);
