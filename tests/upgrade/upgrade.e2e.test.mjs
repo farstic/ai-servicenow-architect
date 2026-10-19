@@ -317,13 +317,21 @@ test('ARC-09-C185c — an install moved to a staged distribution, unrelated in h
   git(w.scratch, ['clone', '-q', '--bare', '--no-hardlinks', staged, distribution]);
   assert.equal(git(distribution, ['tag', '--list', 'v9.0.0']), '');
   republishManifests(w.licences, staged, ['v9.1.0', 'v9.2.0']);
+  git(w.user, ['remote', 'set-url', 'origin', pathToFileURL(distribution).href]);
+  assert.equal(git(w.user, ['remote', 'get-url', 'origin']), pathToFileURL(distribution).href);
+  // THE UPGRADE NEVER FORCE-FETCHES A TAG (the architect's rule): a tag moved by a remote is U4's to judge, not U2's to
+  // replace. An install still holding the engineering tags of the same names stops at the fetch, and nothing moves;
+  // MIGRATION's rc section quotes this line and gives `git tag -d`.
+  const before = git(w.user, ['rev-parse', 'HEAD']);
+  const clobber = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.equal(clobber.status, 1, clobber.text);
+  assert.match(clobber.text, /! \[rejected\] +v9\.1\.0 +-> v9\.1\.0 +\(would clobber existing tag\)/, clobber.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), before, 'the refused fetch moved the tree');
   // An install made with `clone --branch` before those releases existed: its own tag, and none of the later ones.
   for (const tag of ['v9.1.0', 'v9.2.0']) {
     git(w.user, ['tag', '-d', tag]);
     assert.equal(git(w.user, ['tag', '--list', tag]), '', `${tag} is still here`);
   }
-  git(w.user, ['remote', 'set-url', 'origin', pathToFileURL(distribution).href]);
-  assert.equal(git(w.user, ['remote', 'get-url', 'origin']), pathToFileURL(distribution).href);
 
   const check = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
   assert.match(check.text, /v9\.2\.0 available \(you are on v9\.0\.0\)/, check.text);
@@ -349,7 +357,7 @@ test('ARC-09-C185c — an install moved to a staged distribution, unrelated in h
   const plan = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin });
   assert.match(plan.text, /Upgrade plan: v9\.0\.0 → v9\.1\.0/, plan.text);
 
-  // THE FULL MOVE, as the owner's and the colleague's installs make it (MIGRATION § "An install made before 2.2.1").
+  // THE FULL MOVE, as MIGRATION § "An install made with `clone --branch` of a 2.2.1 release candidate, or later" makes it.
   const licence = join(w.user, '.local/licence.json');
   const licenceBefore = existsSync(licence) ? sha256(licence) : null;
   const storeBefore = sha256(storePath(w.user));
