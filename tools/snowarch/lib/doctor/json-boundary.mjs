@@ -37,7 +37,7 @@ export const HOME_MASK = '~';
  * ARC-08-C1, second pass. The label and the host were masked here from the start; the checkout PATH was not, and
  * it carries the user's account name on every platform. Measured on a real (non-fixture) report:
  * three fields — `checks[].detail`, `checks[].data.root`, `checks[].data.toplevel` — each reading
- * `/Users/<me>/work/ai-servicenow-architect`.
+ * `/Users/<me>/work/snowarch`.
  *
  * Only the home prefix goes. What follows it is the part a maintainer reading a pasted report
  * actually uses — how deep the checkout is, whether the path has a space in it, which drive it is

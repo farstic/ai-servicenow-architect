@@ -8,7 +8,7 @@
 ## The target tree
 
 ```
-ai-servicenow-architect/                      farstic/ai-servicenow-architect · one git tag per release
+snowarch/                                     farstic/snowarch · one git tag per release
 ├── CLAUDE.md                                 ≤200 lines: identity, routing protocol (Phase 1/2), §1.1 summary, the `Status` trigger (→ `/snowarch status`); imports nothing large
 ├── README.md                                 the ONE install page (2 commands, 2 dialogs, what you will see)
 ├── LICENSE · NOTICE                          single licence (BUSL-1.1 from 2.1.0, ADR-0011; Apache-2.0 before, D-02); Apache-2.0 attribution for ServiceNow/ServiceNowDocs
@@ -1504,8 +1504,8 @@ remain readable at their source.
 
 | Predecessor | Where it landed | Import tag | Source archive |
 |---|---|---|---|
-| Claude ServiceNow Architecture Engine **v2.8.0** | the repository ROOT — `CLAUDE.md`, `.claude/`, `governance/`, `docs/` | `import/engine-v2.8.0-worktree` → `7f99a3a` | [`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live) — *(to be archived by ARC-10-S09; date recorded there)* |
-| `snow-mcp` **1.0.0** | `packages/snowarch/` | `import/snow-mcp-1.0.0` → `58a66e0` | [`farstic/snow-mcp`](https://github.com/farstic/snow-mcp) — *(to be archived by ARC-10-S09; date recorded there)* |
+| Claude ServiceNow Architecture Engine **v2.8.0** | the repository ROOT — `CLAUDE.md`, `.claude/`, `governance/`, `docs/` | `import/engine-v2.8.0-worktree` → `7f99a3a` | `farstic/claude-servicenow-live` — *(to be archived by ARC-10-S09; date recorded there)* |
+| `snow-mcp` **1.0.0** | `packages/snowarch/` | `import/snow-mcp-1.0.0` → `58a66e0` | `farstic/snow-mcp` — *(to be archived by ARC-10-S09; date recorded there)* |
 
 **The server was NOT grafted with `git subtree add`.** That was tried first and rejected on the
 evidence recorded above: it places the tree at a prefix without recording a rename, and

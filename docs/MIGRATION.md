@@ -21,7 +21,7 @@ to a fresh machine.
 
 | Old | New |
 |---|---|
-| Two clones, kept in step by hand | One repository — `farstic/ai-servicenow-architect` |
+| Two clones, kept in step by hand | One repository — `farstic/snowarch` |
 | `claude mcp add servicenow-mcp …` with 12 `-e SERVICENOW_*` environment keys | A committed `.mcp.json`, server key `servicenow`. You never register anything |
 | Credentials in `~/.claude.json` and `~/.config/servicenow-mcp/instances.json` | `<checkout>/.local/instances.json`, mode `0600`, never committed, never in argv |
 | Tier 0 / Tier 1 / Tier 2 | Mode `design-only` or `live`, and a preset — `read-only`, `pdi-developer`, `full` or `custom` |
@@ -84,14 +84,14 @@ Get-ChildItem memory, scratchpad, deliverables, diagram-preview -ErrorAction Sil
 macOS / Linux:
 
 ```sh
-git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
+git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/snowarch.git && cd snowarch && ./bootstrap.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/ai-servicenow-architect.git
-cd ai-servicenow-architect
+git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/snowarch.git
+cd snowarch
 .\bootstrap.cmd
 ```
 

@@ -33,7 +33,7 @@ export const EXPECTED_DIALOGS = 1;
  * page shows SAMPLE_ROOT, so a reader sees what the line looks like rather than a placeholder.
  */
 export const ROOT_SLOT = '{root}';
-export const SAMPLE_ROOT = '/Users/you/ai-servicenow-architect';
+export const SAMPLE_ROOT = '/Users/you/snowarch';
 
 /**
  * The spelling itself lives in `launcher-spelling.mjs` — ARC-07-C31, and the move is the row.

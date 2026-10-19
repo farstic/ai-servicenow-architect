@@ -29,7 +29,7 @@ the doctor, the live wizard and the MCP server are what wait for Node.
 ### Path A — terminal first
 
 ```sh
-git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
+git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/snowarch.git && cd snowarch && ./bootstrap.sh
 ```
 
 **The `--branch` is not optional, and it names a release.** A plain `git clone` checks out this repository's default branch, which is not a release line and is a long way behind — cloning it installs a development tree with none of the released fixes. The tag above is the current release, and it is written by the release itself, so this page never names a version that has not shipped. The `-c advice.detachedHead=false` is there because a release tag is a *tag*: without it
@@ -43,12 +43,12 @@ you have one.
 On Windows, three lines instead — or double-click `bootstrap.cmd` in the folder:
 
 ```bat
-git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/ai-servicenow-architect.git
-cd ai-servicenow-architect
+git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/snowarch.git
+cd snowarch
 .\bootstrap.cmd
 ```
 
-Then run `claude` in that same folder, `ai-servicenow-architect` — the bootstrap's Next line prints its full path, such as `C:\Users\you\ai-servicenow-architect`. Started from any other folder, the one above it included, Claude Code loads none of this product, and `/mcp` shows nothing.
+Then run `claude` in that same folder, `snowarch` — the bootstrap's Next line prints its full path, such as `C:\Users\you\snowarch`. Started from any other folder, the one above it included, Claude Code loads none of this product, and `/mcp` shows nothing.
 
 ### What you will see
 
@@ -84,7 +84,7 @@ It ends with the block below — the tool's own text, inserted here from its sou
 ```
 DOCTOR: unavailable until Node 20+ is installed (design-only is complete)
 Mode: design-only
-Next: run `claude` in this folder: /Users/you/ai-servicenow-architect
+Next: run `claude` in this folder: /Users/you/snowarch
       You will see one workspace-trust dialog — answer Yes.
       (If you are already inside Claude Code in this folder: exit it and start `claude` again.)
       Add a live instance later: run ./snowarch mode live, or /snowarch setup-instance inside Claude.
@@ -121,10 +121,10 @@ mkdir my-engagement && cd my-engagement && claude
 
 Accept the workspace-trust dialog, then paste exactly this:
 
-> Install the AI ServiceNow Architect from https://github.com/farstic/ai-servicenow-architect into
+> Install the AI ServiceNow Architect from https://github.com/farstic/snowarch into
 > this folder, from release tag v2.2.0.
 
-Claude runs two commands — `git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/ai-servicenow-architect.git .` and
+Claude runs two commands — `git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/snowarch.git .` and
 `./bootstrap.sh --mode design --yes --skip-claude-check` — asking your permission for each unless the
 session already allows them. They are written out here for a reason: if Claude proposes anything else
 — cloning into a *subfolder* is the common variation — paste them yourself and you are back on the
@@ -135,7 +135,7 @@ result is reached the long way:
 
 ```sh
 git init
-git remote add origin https://github.com/farstic/ai-servicenow-architect.git
+git remote add origin https://github.com/farstic/snowarch.git
 git fetch --depth 1 origin main
 git checkout -b main --track origin/main
 ```
@@ -270,7 +270,7 @@ first is what you read, the second is what the disk loses. `--docs full` takes t
 instead: **447 MB and 48,997 files** (measured 2026-09-09 on the reference
 macOS machine — ARC-00 S-07 did not measure full mode). Every release re-measures all three
 platforms and attaches the same table as `install-metrics.md` —
-[releases](https://github.com/farstic/ai-servicenow-architect/releases), the first one pending.
+[releases](https://github.com/farstic/snowarch/releases), the first one pending.
 
 ### Upgrading
 

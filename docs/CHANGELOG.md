@@ -4366,7 +4366,7 @@ cut from (ARC-09-C15). It describes the engine this project superseded.
 
 All notable changes to the Claude ServiceNow Architecture Engine are documented in this file.
 
-**Repository:** [`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live)
+**Repository:** `farstic/claude-servicenow-live`
 **Last updated:** 3 June 2026
 
 The engine follows a minor-version cadence where the **first digit** signals a major architectural shift, and the **second digit** signals an additive or corrective patch within that architecture.
@@ -4771,4 +4771,4 @@ This is a documentation-only release. No changes to `CLAUDE.md`, the orchestrato
 
 ---
 
-*Maintained by the Enterprise Architecture Team. Repository: [`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live).*
+*Maintained by the Enterprise Architecture Team. Repository: `farstic/claude-servicenow-live`.*
