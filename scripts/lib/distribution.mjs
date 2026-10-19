@@ -71,6 +71,9 @@ const RUNTIME_LOCAL = Object.freeze(['.local/', '.claude/settings.local.json', '
 const madeAtRunTime = (path) => RUNTIME_LOCAL.some((x) => path === x || path.startsWith(x))
   || path.startsWith('node_modules/') || path.includes('/node_modules/');   // `npm ci` makes these
 
+/** A Markdown link whose target is a path in the repository: not a URL, not an in-page anchor. */
+const RELATIVE_LINK = /\]\((?!https?:|mailto:|#|[a-z][a-z0-9+.-]*:)([^)\s]+)\)/gi;
+
 /** A doc line that says where the path lives names it for a maintainer; it does not send a user to it. */
 const ENGINEERING_POINTER = /\bin the engineering checkout\b/i;
 
@@ -330,10 +333,26 @@ export function unlistedReferences(root, { coverage = COVERAGE, entries = RUNTIM
     // An HTML comment is not rendered: a generated file's header naming its generator points nobody anywhere.
     const lines = readFileSync(join(root, doc), 'utf8').replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '))
       .split('\n');
+    const seenHere = new Set();
     for (const { path, line } of citedPaths(lines)) {
       if (ENGINEERING_POINTER.test(lines[line - 1] ?? '')) continue;
+      seenHere.add(`${path}:${line}`);
       report(path, doc, line, 'doc');
     }
+    // 3b: a relative Markdown link, resolved against the page's own directory. L05's extractor reads only a path with
+    // a known prefix, so `[guide](CONTRIBUTING.md#x)` beside it was invisible.
+    let fence = false;
+    lines.forEach((text, i) => {
+      if (/^\s*(```|~~~)/.test(text)) { fence = !fence; return; }
+      if (fence || ENGINEERING_POINTER.test(text)) return;
+      for (const m of text.matchAll(RELATIVE_LINK)) {
+        const target = m[1].split('#')[0].split('?')[0];
+        if (target === '') continue;
+        const path = posix.normalize(posix.join(posix.dirname(doc), decodeURI(target)));
+        if (path.startsWith('../') || seenHere.has(`${path}:${i + 1}`)) continue;
+        report(path, doc, i + 1, 'link');
+      }
+    });
   }
   return findings.sort((a, b) => a.path.localeCompare(b.path) || a.from.localeCompare(b.from) || a.line - b.line);
 }
