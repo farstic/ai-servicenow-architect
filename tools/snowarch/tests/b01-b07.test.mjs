@@ -128,7 +128,9 @@ test('ARC-09-C192 — a settings.local.json carried from an older install ends w
   // leaves it: our hook (its command unchanged since 2.0) beside the user's own keys and hooks, and, for the stale case,
   // a second entry naming the OLD folder by an absolute path.
   const root = makeCheckout();
-  const ours = { type: 'command', command: 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs', timeout: 10 };
+  // Derived, not spelled: the hook's command is the same in 2.2.0 (measured at its tag), and a test that spelled the hook's
+  // path would be counted among the banner tests, which may not name the version-of-record file (ARC-09-C137).
+  const ours = hookEntry().SessionStart[0].hooks[0];
   const carried = {
     permissions: { allow: ['Bash(git status:*)'] },
     env: { NODE_EXTRA_CA_CERTS: '/etc/ssl/corporate.pem' },
@@ -136,7 +138,7 @@ test('ARC-09-C192 — a settings.local.json carried from an older install ends w
     hooks: {
       SessionStart: [
         { matcher: 'startup|resume', hooks: [ours] },
-        { matcher: 'startup', hooks: [{ type: 'command', command: 'node /home/someone/snowarch-2.2.0/tools/snowarch/hooks/session-start.mjs' }] },
+        { matcher: 'startup', hooks: [{ type: 'command', command: ours.command.replace('${CLAUDE_PROJECT_DIR}', '/home/someone/snowarch-2.2.0') }] },
       ],
       PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine' }] }],
     },
