@@ -822,3 +822,72 @@ test('ARC-09-C194 — snowarch.cmd returns node\'s exit code once, even when the
   assert.match(noNode.text, /Node\.js 20\+ is required/);
   assert.equal(noNode.runs, '', 'the CLI ran with no node on PATH');
 });
+
+// ── ARC-09-C194 PROBE (temporary, removed with the fix): which launcher form returns node's code and runs it once ───
+//
+// The stand-in records its argv and exits with the code it is given; `grow` and `shrink` rewrite the launcher as an
+// upgrade does, moving every byte before the exec line by +200 or -200 (the long comment line is what changes size).
+const PROBE_CLI = [
+  "import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';",
+  "import { dirname, join } from 'node:path';",
+  "import { fileURLToPath } from 'node:url';",
+  "const root = dirname(fileURLToPath(import.meta.url));",
+  "appendFileSync(join(root, 'runs.txt'), JSON.stringify(process.argv.slice(2)) + '\\n');",
+  'const [code, how] = process.argv.slice(2);',
+  "if (how === 'grow' || how === 'shrink') {",
+  "  const cmd = join(root, 'snowarch.cmd');",
+  "  const probeText = readFileSync(cmd, 'latin1');",
+  "  const long = 'rem ' + 'x'.repeat(300);",
+  "  writeFileSync(cmd, probeText.replace(long, 'rem ' + 'x'.repeat(how === 'grow' ? 500 : 100)), 'latin1');",
+  '}',
+  'process.exit(Number(code));',
+].join('\n');
+// The stand-in sits beside the launcher: this measures cmd.exe, and names no path of the product's.
+const CLI_PATH = '"%~dp0cli.mjs"';
+const FORMS = {
+  'A exit-b': [`node ${CLI_PATH} %* & exit /b`],
+  'B goto-eof': [`node ${CLI_PATH} %* & goto :eof`],
+  'C call-exit': [`node ${CLI_PATH} %* & call exit /b %%ERRORLEVEL%%`],
+  'D delayed': [`node ${CLI_PATH} %* & exit /b !ERRORLEVEL!`],
+  'E two-lines': [`node ${CLI_PATH} %*`, 'exit /b %ERRORLEVEL%'],
+  'F paren-early': [`(node ${CLI_PATH} %*) & exit /b %ERRORLEVEL%`],
+};
+
+test('ARC-09-C194 PROBE — launcher forms under cmd /c: codes, a replaced file both ways, special characters', {
+  skip: process.platform === 'win32' ? false : 'a Windows measurement',
+}, (t) => {
+  const probeSetup = (name, lines) => {
+    const probeDir = tempDir('snowarch-cmd-probe-', t);
+    writeFileSync(join(probeDir, 'cli.mjs'), `${PROBE_CLI}\n`);
+    const probeHeader = ['@echo off', ...(name.startsWith('D') ? ['setlocal EnableDelayedExpansion'] : []),
+      `rem ${'x'.repeat(300)}`, 'where node >nul 2>nul || goto :no_node'];
+    return { probeDir, probeText: [...probeHeader, ...lines, '', ':no_node', 'echo no node', 'exit /b 3', ''].join('\r\n') };
+  };
+  for (const [name, lines] of Object.entries(FORMS)) {
+    const { probeDir, probeText } = probeSetup(name, lines);
+    const probeRuns = join(probeDir, 'runs.txt');
+    const probeLaunch = (args) => {
+      writeFileSync(join(probeDir, 'snowarch.cmd'), probeText);
+      rmSync(probeRuns, { force: true });
+      // unlicensed start: a probe of cmd.exe's own behaviour with a stand-in CLI that reads no licence
+      const r = spawnSync('cmd.exe', ['/d', '/c', 'snowarch.cmd', ...args], { cwd: probeDir, encoding: 'utf8' });
+      const probeRan = existsSync(probeRuns) ? readFileSync(probeRuns, 'utf8').trim().split('\n') : [];
+      const err = r.stderr.trim() ? ` err[${r.stderr.trim().split('\n')[0].slice(0, 60)}]` : '';
+      return { line: `${r.status}/${probeRan.length}${err}`, out: r.stdout.trim(), probeRan };
+    };
+    const probeCodes = [0, 1, 2, 3].map((c) => probeLaunch([String(c)]).line);
+    const probeGrow = probeLaunch(['2', 'grow']).line;
+    const probeShrink = probeLaunch(['2', 'shrink']).line;
+    const probeSpecial = probeLaunch(['0', 'x!y%z^w']).probeRan.join(' ');
+    t.diagnostic(`C194 PROBE ${name}: codes ${probeCodes.join(' ')} | grow ${probeGrow} | shrink ${probeShrink} | argv ${probeSpecial}`);
+  }
+  // G: B twice in ONE cmd session, the first replacing the file: :eof must not re-scan the replaced file.
+  const { probeDir, probeText } = probeSetup('B goto-eof', FORMS['B goto-eof']);
+  writeFileSync(join(probeDir, 'snowarch.cmd'), probeText);
+  rmSync(join(probeDir, 'runs.txt'), { force: true });
+  // unlicensed start: a probe of cmd.exe's own behaviour with a stand-in CLI that reads no licence
+  const g = spawnSync('cmd.exe', ['/d', '/v:on', '/c', 'call snowarch.cmd 2 grow & echo e1=!errorlevel! & call snowarch.cmd 3 & echo e2=!errorlevel!'],
+    { cwd: probeDir, encoding: 'utf8', windowsVerbatimArguments: true });
+  const probeGRuns = existsSync(join(probeDir, 'runs.txt')) ? readFileSync(join(probeDir, 'runs.txt'), 'utf8').trim().split('\n').length : 0;
+  t.diagnostic(`C194 PROBE G goto-eof twice: status ${g.status} | ${g.stdout.trim().replace(/\r?\n/g, ' ')} | runs ${probeGRuns}${g.stderr.trim() ? ` err[${g.stderr.trim().slice(0, 60)}]` : ''}`);
+});
