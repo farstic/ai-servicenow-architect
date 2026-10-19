@@ -38,6 +38,10 @@ function lintTree(t, extra = {}) {
     mkdirSync(join(root, dirname(rel)), { recursive: true });
     writeFileSync(join(root, rel), text);
   }
+  // ARC-09-C185a: E-21 runs L06 only in the engineering checkout, which is told by its tree (tests/ and .github/).
+  // These fixtures are trees being linted as one.
+  mkdirSync(join(root, 'tests'), { recursive: true });
+  mkdirSync(join(root, '.github'), { recursive: true });
   return root;
 }
 
@@ -245,6 +249,9 @@ test('E-22 fails a contract whose sha no longer matches the pin', async (t) => {
 test('a contract check whose inputs are absent says so, and does not take the report down', async (t) => {
   const root = tempDir('snowarch-doctor-bare-', t);
   writeJson(root, 'engine.config.json', JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8')));
+  // The engineering checkout's shape: outside it E-21 skips before it reads anything (ARC-09-C185a).
+  mkdirSync(join(root, 'tests'));
+  mkdirSync(join(root, '.github'));
   const ctx = contextFor(root);
   for (const id of ['E-19', 'E-20', 'E-21', 'E-22']) {
     const r = await runById(contract, id, ctx);

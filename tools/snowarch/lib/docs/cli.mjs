@@ -20,6 +20,7 @@ import { docsStatus, formatStatus } from './status.mjs';
 import { syncUpstream, formatUpstream } from './upstream.mjs';
 import { planFamilySwitch, formatPlan, applyFamilySwitch, EXIT_NEEDS_YES } from './family.mjs';
 import { root } from '../config.mjs';
+import { isEngineeringCheckout } from '../engineering-checkout.mjs';
 import { spellings } from '../launcher-spelling.mjs';
 
 /**
@@ -144,6 +145,12 @@ export function runDocs(argv, { spell = spellings() } = {}) {
   }
 
   if (cmd === 'family') {
+    // ARC-09-C185a — switching the corpus family re-runs the skills lint and the areas generator, maintainers' tools
+    // that live in the engineering checkout. A user's install refuses, saying where the command belongs.
+    if (!isEngineeringCheckout(root)) {
+      console.error("snowarch docs family is a maintainers' command, run in the engineering checkout.");
+      return (2);
+    }
     const [name, ...flags] = rest;
     const has = (f) => flags.includes(f);
     const val = (f) => { const i = flags.indexOf(f); return i === -1 ? undefined : flags[i + 1]; };

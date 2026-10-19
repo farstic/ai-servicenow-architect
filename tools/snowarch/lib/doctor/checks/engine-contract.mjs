@@ -17,11 +17,11 @@ import { fileURLToPath } from 'node:url';
 
 import * as l02 from '../../../../../packages/contract/lint/checks/l02-prefix.mjs';
 import * as l03 from '../../../../../packages/contract/lint/checks/l03-retired.mjs';
-import * as l06 from '../../../../../packages/contract/lint/checks/l06-generated.mjs';
 import { buildLintContext, LintInputError } from '../../../../../packages/contract/lint/lib/context.mjs';
 import { prefix } from '../../../../../packages/contract/lib/contract.mjs';
 import { checkContract } from '../../steps/B05.mjs';
 import { defineCheck } from '../registry.mjs';
+import { isEngineeringCheckout } from '../../engineering-checkout.mjs';
 
 import { fail, ok, skip } from './result.mjs';
 
@@ -154,6 +154,15 @@ export function engineContractChecks() {
       spawns: true,
       fixable: false,
       run: async (ctx) => {
+        // ARC-09-C185a — L06 runs every generator, and the generators are maintainers' tools that do not ship. Outside
+        // the engineering checkout the generated files are what the signed manifest verifies (E-32), so this skips with
+        // that reason. L06 is imported only here, behind the predicate: it imports scripts/lib/generators.mjs, which a
+        // distribution install does not have, and a static import would stop the doctor loading before any skip ran.
+        if (!isEngineeringCheckout(ctx.root)) {
+          return skip("the generated files are verified by the signed manifest (E-32); their generators are maintainers' "
+            + 'tools, run in the engineering checkout', { ran: false });
+        }
+        const l06 = await import('../../../../../packages/contract/lint/checks/l06-generated.mjs');
         const result = runLint(ctx, l06, {
           remedy: 'maintainer: npm run gen && node scripts/gen-docs-areas.mjs',
           command: 'npm run gen',
