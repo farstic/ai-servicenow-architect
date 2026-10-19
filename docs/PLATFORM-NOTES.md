@@ -489,7 +489,7 @@ ARC-09-C178 a read that passes `fields` names the requested fields the instance 
 ## PN-21 — A mandatory field over the REST Table API is a data policy's, not the dictionary's
 
 **Applies to:** every table a create writes · every family · the documented rule, and observed on `tgdev`, Brazil patch
-0, 2026-10-17 (ARC-09-C183)
+0, 2026-10-17 (ARC-09-C183), and on `pditestdoit`, the same PDI, 2026-10-19
 **Behaviour:**
 - **The dictionary's Mandatory is a form rule.** "Using a dictionary entry to make a field mandatory does not work
   when using web services or background scripts. You can use a data policy instead." A create over the Table API is
@@ -498,18 +498,56 @@ ARC-09-C178 a read that passes `fields` names the requested fields the instance 
   field. A parent table's policy applies to an extending table only when its Inherit is set.
 - **Observed:** an `sn_aia_agent_tool_m2m` insert without `name` was refused, 403 "Operation Failed: Data Policy
   Exception: The following fields are mandatory: Name" (PN-17).
+- **The ITSM policies found were all conditional.** On 2026-10-19 the active policies were incident 1 ("Make close info
+  mandatory when resolved or closed", `stateIN6,7`: `close_code`, `close_notes`), problem 8 (on state or resolution
+  code), and change_request 1 (read-only rules only). None was inherited from `task`. So on this family the pre-write
+  check's "may be required" note is the normal case, and a create is not refused before writing.
 
 **Grounding:** `markdown/platform-administration/t_MakingAFieldMandatory.md` (About this task);
 `markdown/platform-administration/c_DataPolicy.md` (applied to the REST Table API by default);
 `markdown/platform-administration/r_DataPolicyFields.md` (Inherit); `markdown/platform-administration/c_InstalledWithDataPolicy.md`
 (the tables `sys_data_policy2` and `sys_data_policy_rule`). The column names the server reads are not documented in the
-bundled corpus — verify on the instance.
-**Evidence:** the owner's v2.2.0-rc.3 check on `tgdev`, 2026-10-17, which is engagement-local and not committed.
+bundled corpus; they were confirmed on Brazil patch 0, 2026-10-19:
+- `sys_data_policy2` has `model_table`, `conditions`, `inherit` and `active`, among `short_description`, `description`,
+  `model_id`, `enforce_ui`, `apply_import_set`, `apply_soap`, `reverse_if_false`, `sys_policy` and `sys_overrides`;
+- `sys_data_policy_rule` has `sys_data_policy`, `field` and `mandatory`, among `table` and `disabled`.
+
+**Evidence:** the owner's v2.2.0-rc.3 check on `tgdev`, 2026-10-17, which is engagement-local and not committed, and
+`docs/validation/2026-10-19-itsm-sweep.md`, step 0b.
 **Engine consequence:** since ARC-09-C183 every create reads the active data policies of its table and the tables it
 extends, once per table per session, and refuses a field an unconditional rule requires and the create would not send,
 before anything is written. A conditional policy, a field the dictionary defaults and a check it could not make are
 noted on the result as `mandatory_fields`. A conditional policy or a business rule can still refuse, which is why the
 instance's own text is shown (ARC-09-C176, ARC-09-C182).
+
+## PN-22 — A date-time sent as an ISO string is stored as the date alone
+
+**Applies to:** any date-time field a write sets, e.g. `incident.resolved_at` · Brazil patch 0 · observed on
+`pditestdoit`, 2026-10-19 (ARC-09-C184)
+**Behaviour:** `snow_inc_incident_resolve` sent `resolved_at` as `new Date().toISOString()` — `2026-10-19T06:31:…Z`.
+The write was accepted, and `resolved_at` was stored as `2026-10-19 00:00:00`. `calendar_stc` came out negative
+(−23217) and `calendar_duration` at 1970-01-01 17:33:03, so every duration measured from it is wrong.
+**Grounding:** `markdown/api-reference/rest-apis/c_TableAPI.md` (sysparm_input_display_value: an actual value, the
+default, "is inserted using the GMT timezone"; "Date fields: The database value is in UTC format") and
+`markdown/api-reference/server-api-reference/c_GlideDateTimeScoped.md` ("the internal format (yyyy-MM-dd HH:mm:ss)").
+That an ISO string keeps only its date is observed behaviour, not documented.
+**Evidence:** `docs/validation/2026-10-19-itsm-sweep.md`, step 4.
+**Engine consequence:** since ARC-09-C184 the server writes a date-time it stamps as `yyyy-MM-dd HH:mm:ss` in UTC
+(`glideDateTime()` in `packages/snowarch/src/utils/glide-time.ts`): incident and problem resolve, and the scheduled-job
+trigger. A date a caller passes is sent as given.
+
+## PN-23 — A close code is the instance's own list
+
+**Applies to:** `incident.close_code` and its choices · Brazil patch 0 · observed on `pditestdoit`, 2026-10-19
+**Behaviour:** the instance listed 20 active `incident.close_code` choices, and "Solved (Permanently)" was not among them,
+although the corpus names it as an example. A resolve with a code the list lacks is not a resolve the instance expects.
+**Grounding:** the corpus names "Solved (Permanently)" as a close code
+(`markdown/it-service-management/itsm-virtual-agent/itsm-va-fulfiller-topics.md`,
+`markdown/it-service-management/now-assist-for-it-service-management-itsm/resolve-incident-now-assist.md`). That this
+instance lacks it is observed behaviour.
+**Evidence:** `docs/validation/2026-10-19-itsm-sweep.md`, step 4.
+**Engine consequence:** none in the tools. Before a resolve, the Architect reads the active `incident.close_code`
+choices from `sys_choice`, does not guess, and asks the user, as it did in the sweep.
 
 ## Windows notes — this repository, not ServiceNow
 

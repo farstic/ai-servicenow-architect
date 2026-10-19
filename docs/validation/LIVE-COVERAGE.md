@@ -547,7 +547,7 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | `snow_inc_incident_close` | unverified | — | — | — | — | 0 |
 | `snow_inc_incident_modify` | verified-live | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | — | 1 |
 | `snow_inc_incident_read` | unverified | — | — | — | — | 1 |
-| `snow_inc_incident_resolve` | named-only | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | ARC-09-C184 found (resolved_at stored as the date alone); re-run on the next rc | 1 |
+| `snow_inc_incident_resolve` | named-only | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | ARC-09-C184 found (resolved_at stored as the date alone); re-run on the next rc | 2 |
 | `snow_inc_work_note_annotate` | unverified | — | — | — | — | 0 |
 
 ### `kb`
