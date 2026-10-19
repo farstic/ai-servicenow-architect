@@ -13,12 +13,27 @@
  */
 import { manifestSays, refreshManifest } from '../../../tools/snowarch/lib/licence/fetch.mjs';
 import { PRODUCT_KEYS } from '../../../tools/snowarch/lib/licence/keys.mjs';
-import { archiveDiffers } from '../../../tools/snowarch/lib/licence/manifest.mjs';
+import { COVERAGE, archiveDiffers } from '../../../tools/snowarch/lib/licence/manifest.mjs';
+
+/**
+ * ARC-09-C192 — why `manifest` was not signed with `coverage`, or `null`: the same `covers`, `excludes` and `ignores`,
+ * as sets. The signer and this gate are the same release, so a manifest of another coverage is the wrong manifest,
+ * however well it records its own files, which is all `archiveDiffers` asks now that it reads a manifest on its own terms.
+ */
+export function coverageDiffers(manifest, coverage = COVERAGE) {
+  for (const key of ['covers', 'excludes', 'ignores']) {
+    const theirs = new Set(manifest[key] ?? []);
+    const ours = new Set(coverage[key]);
+    const first = [...new Set([...theirs, ...ours])].sort().find((p) => theirs.has(p) !== ours.has(p));
+    if (first !== undefined) return `it was signed with another coverage than this release's, ${key} first differing at ${first}`;
+  }
+  return null;
+}
 
 /** `{ ok: true, files }`, or `{ ok: false, reason }`: is the manifest published for `tag` the record of this tag's tree? */
 export function publishedManifestMatches(root, tag, { config, keys = PRODUCT_KEYS, env = process.env, fetcher } = {}) {
   const fetched = refreshManifest(root, { config, tag, keys, env, write: false, ...(fetcher ? { fetcher } : {}) });
   if (fetched.outcome !== 'fetched') return { ok: false, reason: manifestSays(fetched) };
-  const reason = archiveDiffers(root, tag, fetched.entry.doc.manifest);
+  const reason = coverageDiffers(fetched.entry.doc.manifest) ?? archiveDiffers(root, tag, fetched.entry.doc.manifest);
   return reason ? { ok: false, reason } : { ok: true, files: fetched.files };
 }

@@ -140,9 +140,15 @@ export function manifestFromArchive(root, tag, { coverage = COVERAGE, run = spaw
  * Why `manifest` is not the record of `tag`'s own tree, or `null` when it is: the same commit, files and hashes as
  * `git archive <tag>` gives here. The release's push gate and `upgrade`'s U4 both ask it, before anything leaves or
  * moves.
+ *
+ * ARC-09-C192 — ON THE MANIFEST'S OWN COVERAGE, as the header says a tree is checked. With this release's COVERAGE in
+ * its place, a 2.2.0 install read 2.2.1's archive with 2.2.0's nine covers and found 72 files the 455-file manifest
+ * held and its own reading did not: every release that covers more than the install was refused, and so was every move
+ * back to one that covers less. `readManifest` has already checked the three lists before a manifest reaches here.
  */
 export function archiveDiffers(root, tag, manifest, { run } = {}) {
-  const local = manifestFromArchive(root, tag, run ? { run } : {});
+  const coverage = { covers: manifest.covers, excludes: manifest.excludes, ignores: manifest.ignores };
+  const local = manifestFromArchive(root, tag, { coverage, ...(run ? { run } : {}) });
   if (manifest.commit !== local.commit) {
     return `the published manifest names ${manifest.commit.slice(0, 7)}, and ${tag} here is ${local.commit.slice(0, 7)}`;
   }
