@@ -1440,6 +1440,15 @@ assets: three `doctor-<os>.json`, three `install-metrics-<os>.json`, and the mer
 `install-metrics.md`. Nothing is published until `assert-assets.mjs` has read every file — a doctor
 report attached to a public Release is permanent in a way a pasted one is not.
 
+**A final from 2.2.1 is released through farstic/snowarch, in this order (ARC-09-C185b):** the rehearsal here, then the
+tag (`--tag-only`, not pushed); `node scripts/distribution.mjs stage` into a clone of farstic/snowarch with the tag and
+`--tag`, adding `--onto main` once that clone has a commit; the owner runs `./snowarch licence sign-release vX.Y.Z` from
+that clone and publishes the manifest; the clone's `main` and tag are pushed;
+`node scripts/release.mjs X.Y.Z --tag-only --push --distribution <clone>` pushes this repository's tag, and refuses a
+clone whose tag is not this tag staged or whose manifest is not signed from it; `release.yml` installs the staged tree on
+three OSes and compares the distribution tag's tree; and the Release with that evidence is published on
+farstic/snowarch. An rc stays in this repository and is never published there.
+
 `release-dryrun` in `ci.yml` runs the same release path on every commit with `--dry-run --offline
 --no-install`, on the same three OSes. It exists because `release.yml` only ever runs on a tag, and
 a path that runs once per release is broken by the time it runs.
