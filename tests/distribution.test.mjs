@@ -98,6 +98,21 @@ test('control: the same tree with everything listed has nothing to report', (t) 
     surfaces: ['.claude/skills/'], exceptions: [] }), []);
 });
 
+test('every workspace the root package.json and package-lock.json name ships its package.json (npm ci needs it)', () => {
+  const pkg = JSON.parse(readFileSync(join(REAL_ROOT, 'package.json'), 'utf8'));
+  const lock = JSON.parse(readFileSync(join(REAL_ROOT, 'package-lock.json'), 'utf8'));
+  const tracked = execFileSync('git', ['-C', REAL_ROOT, 'ls-files', '-z', '--', '*package.json'], { encoding: 'utf8' })
+    .split('\0').filter(Boolean);
+  // `packages/*` names every directory under packages/ that holds a package.json; an exact entry names itself.
+  const fromGlobs = pkg.workspaces.flatMap((w) => tracked.map((p) => p.replace(/\/package\.json$/, ''))
+    .filter((dir) => (w.endsWith('/*') ? dir.startsWith(w.slice(0, -1)) && !dir.slice(w.length - 1).includes('/') : dir === w)));
+  const fromLock = Object.keys(lock.packages).filter((k) => k !== '' && !k.includes('node_modules/'));
+  const workspaces = [...new Set([...fromGlobs, ...fromLock])].sort();
+  assert.ok(workspaces.length >= 2, `the workspaces were derived: ${workspaces.join(', ')}`);
+  const shipped = new Set(shippedFiles(REAL_ROOT));
+  for (const ws of workspaces) assert.ok(shipped.has(`${ws}/package.json`), `${ws}/package.json ships`);
+});
+
 test('the export writes the shipped files, byte for byte, and nothing else — no .git', (t) => {
   const root = plantedTree(t);
   const out = join(tempDir('snowarch-export-', t), 'tree');

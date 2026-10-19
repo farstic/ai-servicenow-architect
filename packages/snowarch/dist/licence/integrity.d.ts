@@ -15,7 +15,11 @@ export interface ManifestBody {
     ignores: string[];
     files: Record<string, string>;
 }
-/** What a release's manifest covers (ARC-11-C7). */
+/**
+ * What a release ships, and so what its manifest covers (ARC-11-C7; ARC-09-C185a). One definition: the signer
+ * (`licence sign-release`), the distribution export and its guard read it, and each manifest stores the copy it was
+ * signed with, which is what the verifier reads. A path ending in `/` is a directory; anything else is one file.
+ */
 export declare const COVERAGE: Readonly<{
     covers: readonly string[];
     excludes: readonly string[];
