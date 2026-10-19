@@ -339,9 +339,9 @@ test('ARC-09-C185c — an install moved to a staged distribution, unrelated in h
   assert.equal(git(w.user, ['tag', '--list', 'v9.0.0']), 'v9.0.0', 'the fetch dropped the install\'s own tag');
   // No common ancestor: the release the install moves to shares no history with the one it is on.
   assert.equal(git(w.user, ['merge-base', 'HEAD', 'v9.1.0'], { allowFail: true }), null, 'the histories are related');
-  // An install on a BRANCH pulls, and a fast-forward across unrelated histories is refused at U5 with the tag checkout
-  // as the remedy. Nothing moves: HEAD, the branch and the working tree are as they were (measured: of `.local/`, only
-  // the currency cache every fetch writes changed).
+  // An install on a BRANCH fast-forwards to the verified tag (ARC-09-C194), and across unrelated histories it cannot:
+  // refused at U5 with the tag checkout as the remedy. Nothing moves: HEAD, the branch and the working tree are as they
+  // were (measured: of `.local/`, only the currency cache every fetch writes changed).
   const head = git(w.user, ['rev-parse', 'HEAD']);
   git(w.user, ['checkout', '-q', '-B', 'main', 'v9.0.0']);
   assert.equal(git(w.user, ['branch', '--show-current']), 'main');
@@ -350,7 +350,7 @@ test('ARC-09-C185c — an install moved to a staged distribution, unrelated in h
   assert.equal(git(w.user, ['rev-parse', '--abbrev-ref', 'main@{upstream}']), 'origin/main');
   const pulled = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
   assert.equal(pulled.status, 1, pulled.text);
-  assert.match(pulled.text, /upgrade: main has diverged from origin\/main — resolve with git, or use --to v9\.2\.0 to check out the release tag/);
+  assert.match(pulled.text, /upgrade: main cannot fast-forward to v9\.2\.0 — resolve with git, or use --to v9\.2\.0 to check out the release tag; nothing was changed/);
   assert.deepEqual([git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['status', '--porcelain'])], [head, ''], 'the refusal moved the tree');
   git(w.user, ['checkout', '-q', '--detach', 'v9.0.0']);
   assert.equal(git(w.user, ['branch', '--show-current']), '', 'the install is not back on its tag');

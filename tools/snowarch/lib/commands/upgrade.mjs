@@ -210,16 +210,14 @@ export function gitReason(stderr) {
 }
 
 /**
- * ARC-09-C120 — the pull's failure line. "Diverged" only when git refused the fast-forward. Anything else — a lock, a
- * permission, a missing ref — is git's reason, quoted: calling every failure a divergence sent the reader to resolve
- * a history that was fine.
+ * ARC-09-C120 — a failed move's line is git's reason, quoted: calling every failure a divergence sent the reader to
+ * resolve a history that was fine. ARC-09-C194 — the branch's move is a fast-forward to the verified tag now, and
+ * whether it CAN fast-forward is asked before (`merge-base --is-ancestor`), so this is only ever a lock, a permission,
+ * a missing object: git's own words.
  */
-export function pullFailureLine(stderr, { branch, remote, target }) {
-  if (/Not possible to fast-forward|diverg/i.test(String(stderr ?? ''))) {
-    return `upgrade: ${branch} has diverged from ${remote}/${branch} — resolve `
-      + `with git, or use --to ${target} to check out the release tag`;
-  }
-  return `upgrade: git pull --ff-only failed — ${gitReason(stderr) ?? 'git gave no reason'}; nothing else was changed`;
+export function fastForwardFailureLine(stderr, { branch, target }) {
+  return `upgrade: git could not fast-forward ${branch} to ${target} — ${gitReason(stderr) ?? 'git gave no reason'}; `
+    + 'nothing else was changed';
 }
 
 /**
@@ -798,8 +796,8 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     log.step(`${target} is from before ${MANIFESTS_FROM}, when releases began to carry a signed manifest: its files are not checked`);
   }
   const ctx = { root, config };
-  // Read here rather than at U5, because the plan depends on it: a move by checkout writes the target's manifest at
-  // U5, and a pull on a branch does not (ARC-09-C140).
+  // Read here rather than at U5, because the plan depends on it (ARC-09-C140). From ARC-09-C194 both moves, the
+  // checkout and the branch's fast-forward to the verified tag, write the target's manifest at U5.
   const branch = branchState(root, opts);
   const onBranch = Boolean(branch.branch) && !branch.detached;
   // ARC-08-C29 — ONE COMPUTATION. `planSteps` asks the runner's own question (hash the tag's
@@ -807,7 +805,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   // cannot be checked out — in which case the plan says so rather than printing the other answer
   // under the same heading.
   const { steps, estimate } = planSteps(root, target, { ctx, state, opts,
-    manifestWritten: manifest !== null && !(!flags.to && onBranch) });
+    manifestWritten: manifest !== null });
   const store = storePlan(root, target, { opts, spell: spellings({ platform, env }) });
   const floor = floorCheck(tagInfo, { exec: probe });
   const commits = Number(git(root, ['rev-list', '--count', `HEAD..${target}`], { ...opts, allowFail: true }) ?? '');
@@ -869,61 +867,76 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
 
   // ── U5 move the tree ──────────────────────────────────────────────────────────────────────
   log.step(stepLine(5, `move the checkout to ${target}`));
-  if (!flags.to && onBranch) {
-    const pulled = run('git', ['pull', '--ff-only', remote, branch.branch],
-      { cwd: root, encoding: 'utf8', env: childEnv(root, env), stdio: 'pipe' });
-    if (pulled.status !== 0) {
-      const stderr = String(pulled.stderr ?? '').trim();
-      if (stderr) for (const line of stderr.split('\n')) log.step(line);
-      log.fail(pullFailureLine(stderr, { branch: branch.branch, remote, target }));
+  /*
+   * ARC-07-C39 — THE RETURN REF IS ONE THE CHECKOUT ACTUALLY HAS, and `main` often is not.
+   *
+   * This said `git checkout ${branch.branch ?? 'main'}`. On a clone made with `--branch v2.0.5` there is no
+   * local `main` at all — the clone has one remote-tracking branch and the tag — so the command handed to
+   * the reader fails with `error: pathspec 'main' did not match any file(s) known to git`, at the exact
+   * moment the message exists to unstick them. `branch.branch` is read BEFORE the move, so it is
+   * right whenever they were on a branch; when they were already detached it is null, and the honest answer
+   * is where HEAD actually was — the tag if it was at one, otherwise the sha, both of which always resolve.
+   *
+   * AND IT SAYS WHAT MOVING HEAD DOES TO THE STORE: nothing. That is the question a reader mid-upgrade
+   * actually has, and a remedy that leaves it unanswered invites them to go looking for their credentials.
+   */
+  const returnTo = returnRef(branch, describe(root, opts));
+  const before = git(root, ['rev-parse', 'HEAD'], { ...opts, allowFail: true });
+  const byBranch = !flags.to && onBranch;
+  const gitRun = (args) => run('git', args, { cwd: root, encoding: 'utf8', env: childEnv(root, env), stdio: 'pipe' });
+  if (byBranch) {
+    /*
+     * ARC-09-C194 — A BRANCH MOVES TO THE VERIFIED TAG. This pulled `origin <branch>`: the branch went wherever the
+     * remote branch was, U4's verified manifest was never asked about the tree it landed on, and finish() reported a
+     * move to the tag. A main that leads or lags its newest tag put a branch install on a commit nobody signed. Now the
+     * branch fast-forwards to the tag's own commit, U2 having fetched it, or nothing moves.
+     */
+    const commit = git(root, ['rev-parse', '--verify', '--quiet', `${target}^{commit}`], { ...opts, allowFail: true });
+    if (!commit || gitRun(['merge-base', '--is-ancestor', 'HEAD', commit]).status !== 0) {
+      log.fail(`upgrade: ${branch.branch} cannot fast-forward to ${target} — resolve with git, or use --to ${target} `
+        + 'to check out the release tag; nothing was changed');
       return EXIT_FAIL;
     }
-    const past = Number(git(root, ['rev-list', '--count', `${target}..HEAD`], { ...opts, allowFail: true }) ?? '0');
-    if (past > 0) {
-      log.step(`${branch.branch} is ${past} commit${past === 1 ? '' : 's'} past ${target} `
-        + '(development commits)');
+    const merged = gitRun(['merge', '--ff-only', '--quiet', commit]);
+    if (merged.status !== 0) {
+      log.fail(fastForwardFailureLine(merged.stderr ?? merged.error?.message, { branch: branch.branch, target }));
+      return EXIT_FAIL;
     }
   } else {
-    /*
-     * ARC-07-C39 — THE RETURN REF IS ONE THE CHECKOUT ACTUALLY HAS, and `main` often is not.
-     *
-     * This said `git checkout ${branch.branch ?? 'main'}`. On a clone made with `--branch v2.0.5` there is no
-     * local `main` at all — the clone has one remote-tracking branch and the tag — so the command handed to
-     * the reader fails with `error: pathspec 'main' did not match any file(s) known to git`, at the exact
-     * moment the message exists to unstick them. `branch.branch` is read BEFORE the checkout above, so it is
-     * right whenever they were on a branch; when they were already detached it is null, and the honest answer
-     * is where HEAD actually was — the tag if it was at one, otherwise the sha, both of which always resolve.
-     *
-     * AND IT SAYS WHAT MOVING HEAD DOES TO THE STORE: nothing. That is the question a reader mid-upgrade
-     * actually has, and a remedy that leaves it unanswered invites them to go looking for their credentials.
-     */
-    const returnTo = returnRef(branch, describe(root, opts));
     // ARC-09-C120 — through `run`, so git's own reason reaches the line that reports the failure: `git()` with
     // `allowFail` dropped it, and "could not check out" alone left the reader to guess.
-    const checkedOut = run('git', ['checkout', '--quiet', target],
-      { cwd: root, encoding: 'utf8', env: childEnv(root, env), stdio: 'pipe' });
+    const checkedOut = gitRun(['checkout', '--quiet', target]);
     if (checkedOut.status !== 0) {
       const reason = gitReason(checkedOut.stderr ?? checkedOut.error?.message);
       log.fail(`upgrade: git could not check out ${target}${reason ? ` — ${reason}` : ''}; nothing else was changed`);
       return EXIT_FAIL;
     }
-    // ARC-11-C7 — the tree is checked after U5 and before U6: what git checked out against what the owner signed, so a
-    // tree that differs (a file the checkout left, a filter, a covered directory with more in it) stops the upgrade
-    // before the bootstrap runs on it.
-    if (manifest) {
-      const tree = checkTree(root, manifest.entry.doc.manifest);
-      if (!tree.ok) {
-        const n = tree.modified.length;
-        log.fail(`upgrade: the tree at ${target} is not what its signed manifest records — ${n} file${n === 1 ? '' : 's'} `
-          + `differ${n === 1 ? 's' : ''}, the first ${tree.modified[0].path} (${tree.modified[0].why}); the upgrade stops before the `
-          + `bootstrap — return with: git checkout ${returnTo}`);
-        return EXIT_FAIL;
-      }
-      writeManifestCache(root, manifest.entry);
-    }
-    log.step(`HEAD is detached at ${target} — return with: git checkout ${returnTo}`);
-    log.step('your instance store lives in .local/, which git ignores, so no checkout touches it');
   }
+  // ARC-11-C7 — the tree is checked after U5 and before U6: what git checked out against what the owner signed, so a
+  // tree that differs (a file the checkout left, a filter, a covered directory with more in it) stops the upgrade
+  // before the bootstrap runs on it. The cache is not written yet, so git alone takes the tree back.
+  if (manifest) {
+    const tree = checkTree(root, manifest.entry.doc.manifest);
+    if (!tree.ok) {
+      const n = tree.modified.length;
+      const back = byBranch ? `git reset --keep ${before}` : `git checkout ${returnTo}`;
+      log.fail(`upgrade: the tree at ${target} is not what its signed manifest records — ${n} file${n === 1 ? '' : 's'} `
+        + `differ${n === 1 ? 's' : ''}, the first ${tree.modified[0].path} (${tree.modified[0].why}); the upgrade stops before the `
+        + `bootstrap — return with: ${back}`);
+      return EXIT_FAIL;
+    }
+    writeManifestCache(root, manifest.entry);
+  }
+  if (byBranch) {
+    log.step(`${branch.branch} is at ${target}`);
+  } else {
+    // ARC-09-C194 — once the target's manifest is cached, `git checkout` back leaves the cache naming the target, so
+    // integrity reads 'other' and every command is refused. From a release, the way back is the upgrade, which
+    // fetches, verifies and caches that release's own; a tree that was not on one has no manifest to disagree with.
+    const back = manifest && here ? `${cli} upgrade --to ${here}` : `git checkout ${returnTo}`;
+    log.step(`HEAD is detached at ${target} — return with: ${back}`);
+  }
+  log.step('your instance store lives in .local/, which git ignores, so no checkout touches it');
 
   return finish({ root, env, log, run, target, latest, remote, now, state,
     skipClaudeCheck: Boolean(flags['force-floor'] && floor.below) });
