@@ -31,6 +31,11 @@ The release tags your install already has stay where they are, so the upgrade's 
 version you are on as before, for example `v2.2.0 → v2.2.1`, and goes ahead as usual.
 Your `.local/`, your instances and your engagement folders stay where they are.
 
+An upgrade run before the move stops with
+`upgrade: v2.2.1 has no verified signed manifest (the published manifest names …, and v2.2.1 here is …) — nothing was changed`,
+and nothing in the install has changed: run `git remote set-url origin https://github.com/farstic/snowarch.git` from
+its folder, then the upgrade again.
+
 The rest of this page is for the two-repository setup that came before 2.0.
 
 ## Who this is for
