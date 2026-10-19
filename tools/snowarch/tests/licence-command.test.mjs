@@ -437,8 +437,10 @@ test('ARC-11-C7 — sign-release signs the tag\'s manifest into the licences clo
   const read = readManifest(doc, { keys: g.keys });
   assert.deepEqual([read.ok, read.manifest.tag, read.key], [true, 'v9.1.0', 'primary']);
   assert.deepEqual(read.manifest.files, manifestFromArchive(w.root, 'v9.1.0').files);
-  assert.deepEqual(Object.keys(read.manifest.files).sort(), ['CLAUDE.md', 'package.json', 'tools/snowarch/lib/a.mjs']);
-  assert.match(r.text, /licence sign-release: v9\.1\.0 \([0-9a-f]{7}, 3 files, the primary key\)/);
+  // .gitattributes ships since ARC-09-C185a, so the manifest covers it.
+  assert.deepEqual(Object.keys(read.manifest.files).sort(), ['.gitattributes', 'CLAUDE.md', 'package.json',
+    'tools/snowarch/lib/a.mjs']);
+  assert.match(r.text, /licence sign-release: v9\.1\.0 \([0-9a-f]{7}, 4 files, the primary key\)/);
   assert.match(r.text, /Publish it before the tag is pushed/);
   assert.match(r.text, /git -C ".+" add releases\/v9\.1\.0\.json/);
   assert.match(r.text, /git -C ".+" commit -m "Release manifest, v9\.1\.0"/);

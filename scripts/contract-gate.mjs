@@ -91,9 +91,17 @@ const STEPS = [
   },
   {
     id: 'generated',
-    label: 'the generated texts are what the generators produce',
-    run: () => runNpm(['run', 'gen:check']),
-    remedy: 'a generated file is stale — run npm run gen and commit the result',
+    label: 'the generated texts are what the generators produce, and what ships is all the runtime reaches',
+    run: () => {
+      const generated = runNpm(['run', 'gen:check']);
+      if (generated.status !== 0) return generated;
+      // ARC-09-C185a — what ships is derived from COVERAGE as these texts are from their sources: a path the runtime
+      // reaches that COVERAGE leaves out is the same kind of drift, so it fails the same step.
+      return spawnSync(process.execPath, [resolve(root, 'scripts/distribution.mjs'), '--check'],
+        { cwd: root, encoding: 'utf8' });
+    },
+    remedy: 'a generated file is stale — run npm run gen and commit the result; or an UNSHIPPED line names a path '
+      + 'the runtime reaches that does not ship — ship it in COVERAGE (integrity.ts) or change the reference',
   },
   {
     id: 'engine',

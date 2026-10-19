@@ -20,7 +20,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { parseTagMessage } from '../lib/release/tag.mjs';
+import { parseTagMessage } from '../../tools/snowarch/lib/release/tag.mjs';
 
 const argv = process.argv.slice(2);
 const value = (n) => (argv.indexOf(n) === -1 ? undefined : argv[argv.indexOf(n) + 1]);

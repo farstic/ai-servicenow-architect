@@ -15,6 +15,8 @@ import { ALWAYS_DIRS, ROOT_FILES } from '../../docs/sync.mjs';
 import { bootstrapOf, cliOf, spellFor } from '../spell.mjs';
 import { docsStatus, E12_ABSENT, SPARSE } from '../../docs/status.mjs';
 import { defineCheck } from '../registry.mjs';
+import { isEngineeringCheckout } from '../../engineering-checkout.mjs';
+import { restoreRemedy } from '../../licence/manifest.mjs';
 
 import { fail, ok, skip } from './result.mjs';
 
@@ -127,8 +129,12 @@ export function engineDocsChecks() {
         if (s.pinMatchesGitlink === false) {
           return fail(`engine.config.json pin ${short(s.pin)} ≠ committed gitlink ${short(s.gitlink)}`
             + `${s.gitlinkStaged ? ' (gitlink staged, not yet committed)' : ''}`, {
-            remedy: `maintainer: node scripts/docs-bump.mjs --to ${s.gitlink}`,
-            command: `node scripts/docs-bump.mjs --to ${s.gitlink}`,
+            // ARC-09-C185a: moving the pin is the maintainer's, in the engineering checkout. In an install the pin and
+            // the gitlink are both the release's, so a mismatch is a shipped file that is wrong: E-32's remedy.
+            ...(isEngineeringCheckout(ctx.root)
+              ? { remedy: `maintainer: node scripts/docs-bump.mjs --to ${s.gitlink}`,
+                command: `node scripts/docs-bump.mjs --to ${s.gitlink}` }
+              : { remedy: restoreRemedy(cliOf(ctx)) }),
             data: { ...data, fix: null },
           });
         }

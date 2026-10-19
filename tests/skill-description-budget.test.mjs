@@ -8,13 +8,13 @@
  * machine on 2026-10-16 it read 38,961, of which the engine's 30 skills were 12,712 (names and descriptions). The
  * engine cannot make that total pass on a machine whose other skills fill it; it can bound its own share. So this
  * guard holds every project skill's description to 250 characters and the roster's total to 7,500, and S-13 is left
- * exactly as it is, the measurement of the whole session. The rule is `lintDescriptionBudget` in tests/lib/lint-rules.mjs.
+ * exactly as it is, the measurement of the whole session. The rule is `lintDescriptionBudget` in tools/snowarch/lib/lint-rules.mjs.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { descriptionLengths, lintDescriptionBudget, MAX_ROSTER_DESCRIPTIONS, MAX_SHARE_DESCRIPTION } from './lib/lint-rules.mjs';
+import { descriptionLengths, lintDescriptionBudget, MAX_ROSTER_DESCRIPTIONS, MAX_SHARE_DESCRIPTION } from '../tools/snowarch/lib/lint-rules.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 

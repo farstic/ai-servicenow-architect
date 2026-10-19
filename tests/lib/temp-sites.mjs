@@ -4,7 +4,7 @@
  * Where a test file makes a directory in the machine's temp location — the scan behind ARC-09-C80.
  *
  * A function here, not inlined in `tests/fixture-leftovers.test.mjs`, for the reason
- * `tests/lib/lint-rules.mjs` gives: the negative cases must run the SAME code the real-tree check
+ * `tools/snowarch/lib/lint-rules.mjs` gives: the negative cases must run the SAME code the real-tree check
  * runs, because a control that re-implements its rule proves only that the re-implementation works.
  *
  * IT PARSES; IT DOES NOT PATTERN-MATCH. The first version stripped comments with the repo's usual

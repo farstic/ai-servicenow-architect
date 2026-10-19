@@ -13,7 +13,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { collectRoster } from '../../scripts/lib/roster.mjs';
+import { collectRoster } from '../../tools/snowarch/lib/roster.mjs';
 
 /** Skill directories the roster classifies as gateways, sorted. One definition, shared with gen-roster. */
 export function gatewayDirs(root) {

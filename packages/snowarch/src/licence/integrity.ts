@@ -63,11 +63,40 @@ export interface ManifestBody {
   files: Record<string, string>;
 }
 
-/** What a release's manifest covers (ARC-11-C7). */
+/**
+ * What a release ships, and so what its manifest covers (ARC-11-C7; ARC-09-C185a). One definition: the signer
+ * (`licence sign-release`), the distribution export and its guard read it, and each manifest stores the copy it was
+ * signed with, which is what the verifier reads. A path ending in `/` is a directory; anything else is one file.
+ */
 export const COVERAGE = Object.freeze({
-  covers: Object.freeze(['packages/snowarch/dist/', 'tools/snowarch/', 'CLAUDE.md', '.claude/rules/', '.claude/skills/',
-    '.claude/agents/', '.claude/settings.json', 'engine.config.json', 'package.json']),
-  excludes: Object.freeze(['tools/snowarch/tests/']),
+  covers: Object.freeze([
+    // What runs the Architect: the server build, the engine, the session's own files, the configuration.
+    'packages/snowarch/dist/', 'tools/snowarch/', 'CLAUDE.md', '.claude/rules/', '.claude/skills/', '.claude/agents/',
+    '.claude/settings.json', 'engine.config.json', 'package.json',
+    // The server's workspace manifest: the root's `workspaces` and package-lock.json name it, so `npm ci` needs it.
+    'packages/snowarch/package.json',
+    // ARC-09-C185a — what the Architect reads at routing time and the templates its skills name.
+    'governance/', 'templates/',
+    // The contract library and lint the doctor imports, the pin it checks, and the retired names E-19 and E-20 read.
+    'packages/contract/lib/', 'packages/contract/lint/', 'packages/contract/required-tools.json',
+    'packages/contract/retired-names.json',
+    // The install's own scaffolding. The two Windows launchers are named by their stems: a bare launcher name in source
+    // reads as a spelled command to ARC-07-W17's sweep, and here it names a file the release ships.
+    'bootstrap.sh', 'bootstrap.ps1', 'snowarch', ...['bootstrap', 'snowarch'].map((stem) => `${stem}.cmd`),
+    'package-lock.json', '.mcp.json',
+    'engine.config.schema.json', '.gitattributes', '.gitignore', '.editorconfig', '.gitmodules', 'vendor/docs-areas.txt',
+    'LICENSE', 'NOTICE', 'LICENSING.md', 'TRADEMARKS.md', 'README.md',
+    // The scripts the skills and the docs CLI run.
+    'scripts/render-drawio.sh', 'scripts/render-diagrams.sh', 'scripts/render-diagrams.ps1', 'scripts/render-pdf.sh',
+    'scripts/render-pdf-pages.ps1', 'scripts/md-to-docx.py', 'scripts/md-to-docx.ps1', 'scripts/mermaid-theme.json',
+    'scripts/README.md', 'scripts/docs.mjs', 'scripts/gen-docs-areas.mjs',
+    // The user's documentation, and the live-coverage ledger.
+    'docs/INSTALL.md', 'docs/USER-GUIDE.md', 'docs/MODES-AND-PRESETS.md', 'docs/TROUBLESHOOTING.md', 'docs/MIGRATION.md',
+    'docs/PLATFORM-NOTES.md', 'docs/CHANGELOG.md', 'docs/CLIENT-ONBOARDING.md', 'docs/KEY-COMPROMISE.md',
+    'docs/RELICENSING.md', 'docs/ARCHITECTURE.md', 'docs/validation/LIVE-COVERAGE.md',
+  ]),
+  // The tests under a covered prefix: the engine's own, and the lint's fixture trees (ARC-09-C185a).
+  excludes: Object.freeze(['tools/snowarch/tests/', 'packages/contract/lint/tests/']),
   ignores: Object.freeze(['.DS_Store', 'Thumbs.db', 'desktop.ini']),
 });
 

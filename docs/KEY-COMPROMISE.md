@@ -27,12 +27,12 @@ anyone else. On Windows PowerShell, type `.\snowarch.cmd` wherever this page say
    - Back up both keys before step 2.
 
 2. **Cut a release that ships only the new public keys.**
-   - Replace both entries in `tools/snowarch/lib/licence/keys.mjs` and in `packages/snowarch/src/licence/keys.ts` with
-     the new primary and recovery. `keygen` printed the two public keys as "to be committed into the product", and
-     wrote them to a file beside the private keys.
+   - In the engineering checkout, replace both entries in `tools/snowarch/lib/licence/keys.mjs` and in the server's
+     `keys.ts` with the new primary and recovery. `keygen` printed the two public keys as "to be committed into the
+     product", and wrote them to a file beside the private keys.
    - Rebuild `dist/`, and cut the release as usual.
-   - `tools/snowarch/tests/licence-keys-guard.test.mjs` holds each file to exactly two keys, and
-     `tools/snowarch/tests/licence-parity.test.mjs` holds the two files equal.
+   - Its tests hold each file to exactly two keys (`licence-keys-guard.test.mjs`) and the two files equal
+     (`licence-parity.test.mjs`).
    - Sign the release's manifest with the new primary: `./snowarch licence sign-release` takes it with `--key`.
 
 3. **Reissue every live licence with the new primary.** Use the same id and the same terms, and send each licensee

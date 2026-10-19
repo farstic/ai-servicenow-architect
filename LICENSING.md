@@ -15,7 +15,7 @@ this page and `LICENSE` differ, `LICENSE` governs.
 | Call your product, service or fork "snowarch" or anything confusingly similar | **Not allowed** without a written trademark licence — see `TRADEMARKS.md`. |
 | Present snowarch as endorsed by, affiliated with, or made by ServiceNow, Inc. or Anthropic | **Not allowed.** |
 | Remove or alter copyright notices, `LICENSE` or `NOTICE` | **Not allowed.** |
-| Contribute code or text to this repository | Allowed, after signing the Contributor Licence Agreement — see `docs/CONTRIBUTING.md`. |
+| Contribute code or text to this repository | Allowed, after signing the Contributor Licence Agreement — ask through the contact in `NOTICE`. |
 
 ## The code
 

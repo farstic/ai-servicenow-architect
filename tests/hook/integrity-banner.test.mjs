@@ -26,12 +26,14 @@ const SENTINEL = 'tools/snowarch/e32-sentinel.txt';
 const STDIN = '{"hook_event_name":"SessionStart","source":"startup"}';
 
 /**
- * The coverage with the fixture's LINKED install excluded. A linked directory under a covered one is a link to this
- * checkout, not a file the release shipped, so a fixture's manifest leaves it out as a signed manifest may — and a
- * restore never writes through it (the link guard refuses first).
+ * The coverage with the fixture's LINKED install excluded. A linked directory that is covered, or that holds covered
+ * files (packages/contract's lib/ and lint/, scripts/docs.mjs, since ARC-09-C185a), is a link to this checkout, not a
+ * file the release shipped, so a fixture's manifest leaves it out as a signed manifest may — and a restore never
+ * writes through it (the link guard refuses first).
  */
 const FIXTURE_COVERAGE = { ...COVERAGE,
-  excludes: [...COVERAGE.excludes, ...LINKED.map((p) => `${p}/`).filter((p) => isCovered(`${p}x`, COVERAGE))] };
+  excludes: [...COVERAGE.excludes, ...LINKED.map((p) => `${p}/`)
+    .filter((p) => isCovered(`${p}x`, COVERAGE) || COVERAGE.covers.some((c) => c.startsWith(p)))] };
 
 /** A release tree, v9.1.0, linked so its CLI and hook run, with its manifest signed by the fixture key. */
 function signedRelease(t, { files = {} } = {}) {

@@ -73,7 +73,7 @@ const EXEMPT_FILES = new Set([
   // ARC-08-S03's E-23 data: the registration names the old installers wrote, for the doctor to
   // find in `~/.claude.json`. A detector's data, exactly like the row below it.
   'tools/snowarch/lib/doctor/checks/stale-registrations.json',
-  'tests/fixtures/retired-vocabulary.json', // SK-09's token list — a detector's data, deliberately its
+  'tools/snowarch/lib/lint-data/retired-vocabulary.json', // SK-09's token list — a detector's data, deliberately its
                                             // own file so this exemption stays one file wide
   // ── ARC-10-S03: ten files moved here from the allow-list ────────────────────────────────────
   //

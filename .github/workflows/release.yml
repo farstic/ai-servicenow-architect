@@ -204,7 +204,7 @@ jobs:
       # bounds it; nothing is appended to `release-notes.md` after this line, and a test asserts it.
       # ARC-09-C22. A prerelease tag must produce a PRERELEASE, or `v2.0.0-rc.0` sits in the
       # Releases list marked "Latest" — which is what a reader trusts. The shape is decided by
-      # `isPrerelease` in `scripts/lib/release/tag.mjs`, the module that already knows what a tag
+      # `isPrerelease` in `tools/snowarch/lib/release/tag.mjs`, the module that already knows what a tag
       # looks like, rather than by a regex written a second time in YAML.
       #
       # The flag travels as a STEP OUTPUT rather than a file read inside the publish command.
@@ -217,7 +217,7 @@ jobs:
         id: prerelease
         shell: bash
         run: |
-          FLAG=$(node -e "import('./scripts/lib/release/tag.mjs').then(m => \
+          FLAG=$(node -e "import('./tools/snowarch/lib/release/tag.mjs').then(m => \
             process.stdout.write(m.isPrerelease('${{ github.ref_name }}') ? '--prerelease' : ''))")
           echo "flag=$FLAG" >> "$GITHUB_OUTPUT"
           echo "prerelease flag: [$FLAG]"

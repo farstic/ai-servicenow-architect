@@ -286,7 +286,7 @@ function regenerate(root) {
 
 /** The tag message S01 writes, with THIS tree's real contract sha and gitlink. */
 async function tagRelease(root, version, { claudeFloor = null } = {}) {
-  const { buildTagMessage } = await import('../../scripts/lib/release/tag.mjs');
+  const { buildTagMessage } = await import('../../tools/snowarch/lib/release/tag.mjs');
   const { createHash } = await import('node:crypto');
   const contract = createHash('sha256')
     .update(readFileSync(join(root, 'packages/snowarch/dist/contract.json'))).digest('hex');

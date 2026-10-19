@@ -24,7 +24,7 @@ import { join } from 'node:path';
 
 import { branchState, describe, gitlink, isShallow, tagMessage, versionTag } from './git.mjs';
 import { loadConfig, version as readVersion } from './config.mjs';
-import { parseTagMessage } from '../../../scripts/lib/release/tag.mjs';
+import { parseTagMessage } from './release/tag.mjs';
 import { spellings } from './launcher-spelling.mjs';
 
 /** The corpus path is config's, not a literal — ARC-03 owns where the submodule lives. */

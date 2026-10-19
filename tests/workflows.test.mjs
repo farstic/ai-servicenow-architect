@@ -162,6 +162,9 @@ const KNOWN_JOBS = [
   // ARC-09-S09, two more (53–54): the line-ending policy proved on a Windows checkout made with
   // the Git-for-Windows default, which is the only place it can actually break.
   'eol',
+  // ARC-09-C185a, three more (55–57): the distribution tree, staged from HEAD, installed and judged on three operating
+  // systems — what a user receives, as a user meets it.
+  'distribution',
 ];
 
 /** The three required contexts `release-dryrun` adds, exactly as a check-run prints them. */
@@ -838,8 +841,9 @@ test('eol adds exactly two required contexts, by the names a check run prints (A
   for (const name of EOL_CONTEXTS) {
     assert.ok(fixture.contexts.includes(name), `${name} is not in required-contexts.json`);
   }
-  // 52 before this story. A generated file is not evidence on its own — the number is the claim.
-  assert.equal(fixture.count, 54, `${fixture.count} contexts — S09 takes 52 to 54`);
+  // 52 before this story. A generated file is not evidence on its own — the number is the claim. ARC-09-C185a's
+  // distribution job adds three more after it.
+  assert.equal(fixture.count, 57, `${fixture.count} contexts — S09 took 52 to 54, and C185a 54 to 57`);
 });
 
 test('publish-npm is dispatch-only, dry by default, and the only OIDC workflow (ARC-09-S10)', () => {
@@ -892,7 +896,7 @@ test('publish-npm adds no required context, and is excluded with its reason (ARC
   assert.ok(why && why.length > 30, 'publish-npm.yml is excluded without a reason');
   assert.match(why, /dispatch/);
   // Unchanged by this story, and the number is the claim.
-  assert.equal(fixture.count, 54, `${fixture.count} contexts — S10 adds none`);
+  assert.equal(fixture.count, 57, `${fixture.count} contexts — S10 adds none; C185a's distribution job adds three`);
 });
 
 
@@ -1410,4 +1414,28 @@ print(m.verdict_line(broken, pos))`;
     .filter(({ l }) => [...l].some((c) => c.charCodeAt(0) > 126));
   assert.deepEqual(printed.map(({ n, l }) => `${n}: ${l.trim()}`), [],
     'a line the harness prints carries a non-ASCII character — it will not survive a cp1252 console');
+});
+
+test('ARC-09-C185a — distribution installs the staged tree on three OSes and judges it, with no licence and no secret', () => {
+  const ci = wf('ci.yml');
+  const job = ci.slice(ci.indexOf('\n  distribution:'));
+  const list = /^\s*os: \[([^\]]+)\]$/m.exec(job);
+  assert.ok(list, 'the matrix is not one os list');
+  assert.deepEqual(list[1].split(',').map((o) => o.trim()), ['ubuntu-latest', 'macos-latest', 'windows-latest']);
+  assert.match(job, /name: distribution \(\$\{\{ matrix\.os \}\}\)/);
+  // The tree under test is the STAGED one, not this checkout: every install step runs in it.
+  assert.ok(job.includes('node scripts/distribution.mjs stage "$RUNNER_TEMP/dist" HEAD'), 'HEAD is not staged');
+  assert.ok(job.split('working-directory: ${{ runner.temp }}/dist').length - 1 >= 4, 'a step runs outside the staged tree');
+  // Both installs, found as the bootstrap cells' test finds them: by an escaped pattern, never a spelled launcher
+  // (the launcher audit reads every literal one as a site to account for).
+  const installs = job.split('\n').map((l) => l.trim())
+    .filter((l) => /^(run: )?(call )?\.[\\/]bootstrap\.(sh|cmd) --mode design --yes --skip-claude-check$/.test(l));
+  assert.equal(installs.length, 2, 'the POSIX and the Windows install of the staged tree');
+  assert.ok(job.includes('doctor --json --no-network --no-cache'), 'a cached or networked doctor');
+  assert.ok(job.includes(`--expect-fail ${EXPECTED_FAIL_ON_RUNNERS.join(',')}`),
+    'the judge allows other failures than the bootstrap cells\' runner-expected ones');
+  assert.ok(job.includes('node scripts/docs.mjs verify'));
+  assert.ok(job.includes('node scripts/docs.mjs family zurich'));
+  assert.match(job, /uses: actions\/upload-artifact@v4\n\s+if: always\(\)/);
+  assert.equal(/secrets\.|NODE_OPTIONS|licence-fixture/.test(job), false, 'the job reads a secret or a licence');
 });

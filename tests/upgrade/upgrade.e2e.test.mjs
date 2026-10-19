@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { bootstrapUser, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
+import { COVERAGE, isCovered } from '../../tools/snowarch/lib/licence/manifest.mjs';
 
 const isWindows = process.platform === 'win32';
 const MINUTES = 10 * 60 * 1000;
@@ -117,15 +118,19 @@ test('AC 3 — a modified tracked file stops the upgrade before anything moves',
   bootstrapUser(w.user);
   const head = git(w.user, ['rev-parse', 'HEAD']);
   // A tracked file the release does not cover: the launcher puts a covered one back before any command runs
-  // (ARC-11-C141), so the user's own dirty tree is the one this refusal is about.
-  writeFileSync(join(w.user, 'README.md'), `${readFileSync(join(w.user, 'README.md'), 'utf8')}\nedited\n`);
+  // (ARC-11-C141), so the user's own dirty tree is the one this refusal is about. DERIVED, never named: the coverage
+  // grows, and README.md, the file this case edited, became a covered one in ARC-09-C185a. Then the launcher restored
+  // it, the upgrade ran, and the case failed for a reason that had nothing to do with the refusal.
+  const uncovered = git(w.user, ['ls-files']).split('\n').find((p) => p.endsWith('.md') && !isCovered(p, COVERAGE));
+  assert.ok(uncovered, 'the fixture has no tracked page the release leaves out');
+  writeFileSync(join(w.user, uncovered), `${readFileSync(join(w.user, uncovered), 'utf8')}\nedited\n`);
 
   const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.equal(r.status, 2, r.text);
   assert.match(r.text, /tracked files are modified — commit or stash them first \(git stash\)/);
   assert.match(r.text, /nothing was changed/);
   // ARC-09-C120: and which ones.
-  assert.match(r.text, /modified: README\.md/);
+  assert.ok(r.text.includes(`modified: ${uncovered}`), r.text);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
 }, MINUTES);
 

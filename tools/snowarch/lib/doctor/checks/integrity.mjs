@@ -15,7 +15,7 @@
 // one bounded `git` call for the tag's commit; the manifest is fetched by the bootstrap and by `licence check
 // --refresh`, never here. The SessionStart hook leaves it out of its doctor run by name: the hook runs the integrity
 // function itself, on its stat key.
-import { integrityLine, integrityStatus } from '../../licence/manifest.mjs';
+import { integrityLine, integrityStatus, restoreCommand, restoreRemedy } from '../../licence/manifest.mjs';
 import { refusalOf, restoreBlocker } from '../../../../../packages/snowarch/dist/licence/integrity.js';
 import { PRODUCT_KEYS } from '../../licence/keys.mjs';
 import { localDir } from '../../local-paths.mjs';
@@ -53,8 +53,8 @@ export function integrityChecks() {
           return fail(integrityLine(s), {
             data: { ...data, fix: { kind: 'integrity-restore' } },
             fixable: true,
-            remedy: `Put the signed files back with ${cli} doctor --fix; ${cli} doctor --json lists every one.`,
-            command: `${cli} doctor --fix`,
+            remedy: restoreRemedy(cli),
+            command: restoreCommand(cli),
           });
         }
         const { reason, remedy } = refusalOf(s, cli);

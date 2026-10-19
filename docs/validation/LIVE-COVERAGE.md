@@ -3,8 +3,9 @@
 
 Which of the server's tools have run against a real ServiceNow instance (ARC-09-C167a). A tool that no sitting
 has called can be wrong in a way no unit test sees — ARC-09-C165's AI agent tools wrote tables no instance has.
-Each tool's status is kept by hand in `docs/validation/live-coverage.json`; this page is generated from it, and `npm run gen:check`
-fails when a manifest tool has no entry, or an entry's evidence does not hold.
+Each tool's status is kept by hand in the ledger, live-coverage.json; this page is generated from it, and
+`npm run gen:check` fails when a manifest tool has no entry, or an entry's evidence does not hold. The ledger and
+the sitting records the Record column names are in the engineering checkout.
 
 - **verified-live** — a sitting called it and it did what it says; the record, its date and the instance's release family are named.
 - **refused** — a sitting called it and the instance refused it; the same evidence, and the reason.
@@ -64,7 +65,7 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 |---|---|---|---|---|---|---|
 | `snow_core_active_events_index` | unverified | — | — | — | — | 0 |
 | `snow_core_analysis_impact` | unverified | — | — | — | — | 0 |
-| `snow_core_capabilities_read` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 5 |
+| `snow_core_capabilities_read` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 5 |
 | `snow_core_ci_relationship_add` | unverified | — | — | — | — | 0 |
 | `snow_core_cmdb_ci_query` | unverified | — | — | — | — | 0 |
 | `snow_core_cmdb_ci_read` | unverified | — | — | — | — | 0 |
@@ -73,17 +74,17 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | `snow_core_discovery_schedules_index` | unverified | — | — | — | — | 0 |
 | `snow_core_group_read` | unverified | — | — | — | — | 0 |
 | `snow_core_health_dashboard_read` | unverified | — | — | — | — | 0 |
-| `snow_core_instance_switch` | named-only | `docs/validation/2026-09-23-macos-sitting-c-rc9.md` | — | — | — | 1 |
+| `snow_core_instance_switch` | named-only | 2026-09-23-macos-sitting-c-rc9 | — | — | — | 1 |
 | `snow_core_instances_index` | unverified | — | — | — | — | 0 |
-| `snow_core_instances_reload` | named-only | `docs/validation/2026-09-23-macos-sitting-c-rc9.md` | — | — | — | 1 |
+| `snow_core_instances_reload` | named-only | 2026-09-23-macos-sitting-c-rc9 | — | — | — | 1 |
 | `snow_core_mid_servers_index` | unverified | — | — | — | — | 0 |
 | `snow_core_natural_language_modify` | unverified | — | — | — | — | 0 |
 | `snow_core_natural_language_query` | unverified | — | — | — | — | 0 |
-| `snow_core_record_add` | named-only | `docs/validation/2.0.11-rc.3-live-sitting.md` | — | — | — | 2 |
+| `snow_core_record_add` | named-only | 2.0.11-rc.3-live-sitting | — | — | — | 2 |
 | `snow_core_record_modify` | unverified | — | — | — | — | 0 |
 | `snow_core_record_read` | named-only | `docs/PLATFORM-NOTES.md` | 2026-10-17 | Brazil patch 0 | — | 1 |
-| `snow_core_record_remove` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 3 |
-| `snow_core_records_query` | verified-live | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | — | 3 |
+| `snow_core_record_remove` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 3 |
+| `snow_core_records_query` | verified-live | 2026-10-19-itsm-sweep | 2026-10-19 | Brazil patch 0 | — | 3 |
 | `snow_core_relationships_index` | unverified | — | — | — | — | 0 |
 | `snow_core_service_mapping_summary_read` | unverified | — | — | — | — | 0 |
 | `snow_core_status_read` | unverified | — | — | — | — | 0 |
@@ -98,9 +99,9 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | `snow_scr_acl_modify` | unverified | — | — | — | — | 0 |
 | `snow_scr_acl_read` | unverified | — | — | — | — | 0 |
 | `snow_scr_acls_index` | unverified | — | — | — | — | 0 |
-| `snow_scr_business_rule_add` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 2 |
-| `snow_scr_business_rule_modify` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 1 |
-| `snow_scr_business_rule_read` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 1 |
+| `snow_scr_business_rule_add` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 2 |
+| `snow_scr_business_rule_modify` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 1 |
+| `snow_scr_business_rule_read` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 1 |
 | `snow_scr_business_rules_index` | unverified | — | — | — | — | 0 |
 | `snow_scr_changeset_commit` | unverified | — | — | — | — | 0 |
 | `snow_scr_changeset_publish` | unverified | — | — | — | — | 0 |
@@ -110,7 +111,7 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | `snow_scr_client_script_modify` | unverified | — | — | — | — | 0 |
 | `snow_scr_client_script_read` | unverified | — | — | — | — | 0 |
 | `snow_scr_client_scripts_index` | unverified | — | — | — | — | 0 |
-| `snow_scr_script_include_add` | named-only | `docs/validation/2026-09-23-macos-sitting-c-rc9.md` | — | — | — | 1 |
+| `snow_scr_script_include_add` | named-only | 2026-09-23-macos-sitting-c-rc9 | — | — | — | 1 |
 | `snow_scr_script_include_modify` | unverified | — | — | — | — | 0 |
 | `snow_scr_script_include_read` | unverified | — | — | — | — | 0 |
 | `snow_scr_script_includes_index` | unverified | — | — | — | — | 0 |
@@ -374,16 +375,16 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | Tool | Status | Record | Date | Instance family | Note | Named in |
 |---|---|---|---|---|---|---|
 | `snow_atf_atf_failure_insight_read` | unverified | — | — | — | — | 0 |
-| `snow_atf_atf_step_add` | named-only | `docs/validation/2.0.11-rc.3-live-sitting.md` | — | — | — | 2 |
-| `snow_atf_atf_suite_exec` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 2 |
-| `snow_atf_atf_suite_read` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 1 |
+| `snow_atf_atf_step_add` | named-only | 2.0.11-rc.3-live-sitting | — | — | — | 2 |
+| `snow_atf_atf_suite_exec` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 2 |
+| `snow_atf_atf_suite_read` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 1 |
 | `snow_atf_atf_suite_result_read` | unverified | — | — | — | — | 0 |
-| `snow_atf_atf_suites_index` | named-only | `docs/validation/2.0.11-rc.3-live-sitting.md` | — | — | — | 1 |
-| `snow_atf_atf_test_add` | named-only | `docs/validation/2.0.11-rc.3-live-sitting.md` | — | — | — | 2 |
-| `snow_atf_atf_test_exec` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 2 |
-| `snow_atf_atf_test_read` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 1 |
+| `snow_atf_atf_suites_index` | named-only | 2.0.11-rc.3-live-sitting | — | — | — | 1 |
+| `snow_atf_atf_test_add` | named-only | 2.0.11-rc.3-live-sitting | — | — | — | 2 |
+| `snow_atf_atf_test_exec` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 2 |
+| `snow_atf_atf_test_read` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 1 |
 | `snow_atf_atf_test_results_index` | unverified | — | — | — | — | 0 |
-| `snow_atf_atf_tests_index` | named-only | `docs/validation/2.0.11-rc.3-live-sitting.md` | — | — | — | 1 |
+| `snow_atf_atf_tests_index` | named-only | 2.0.11-rc.3-live-sitting | — | — | — | 1 |
 
 ### `csm`
 
@@ -479,13 +480,13 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 
 | Tool | Status | Record | Date | Instance family | Note | Named in |
 |---|---|---|---|---|---|---|
-| `snow_us_active_update_set_ensure` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 3 |
-| `snow_us_capture_target_set` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 6 |
+| `snow_us_active_update_set_ensure` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 3 |
+| `snow_us_capture_target_set` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 6 |
 | `snow_us_current_update_set_read` | unverified | — | — | — | — | 0 |
 | `snow_us_update_set_add` | unverified | — | — | — | — | 0 |
 | `snow_us_update_set_complete` | unverified | — | — | — | — | 0 |
 | `snow_us_update_set_export` | unverified | — | — | — | — | 0 |
-| `snow_us_update_set_preview` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 2 |
+| `snow_us_update_set_preview` | named-only | 2.0.11-rc.1-live-sitting | — | — | — | 2 |
 | `snow_us_update_set_switch` | unverified | — | — | — | — | 0 |
 | `snow_us_update_sets_index` | unverified | — | — | — | — | 0 |
 
@@ -543,11 +544,11 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | Tool | Status | Record | Date | Instance family | Note | Named in |
 |---|---|---|---|---|---|---|
 | `snow_inc_comment_annotate` | unverified | — | — | — | — | 0 |
-| `snow_inc_incident_add` | verified-live | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | — | 1 |
+| `snow_inc_incident_add` | verified-live | 2026-10-19-itsm-sweep | 2026-10-19 | Brazil patch 0 | — | 1 |
 | `snow_inc_incident_close` | unverified | — | — | — | — | 0 |
-| `snow_inc_incident_modify` | verified-live | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | — | 1 |
+| `snow_inc_incident_modify` | verified-live | 2026-10-19-itsm-sweep | 2026-10-19 | Brazil patch 0 | — | 1 |
 | `snow_inc_incident_read` | unverified | — | — | — | — | 1 |
-| `snow_inc_incident_resolve` | named-only | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | ARC-09-C184 found (resolved_at stored as the date alone); re-run on the next rc | 2 |
+| `snow_inc_incident_resolve` | named-only | 2026-10-19-itsm-sweep | 2026-10-19 | Brazil patch 0 | ARC-09-C184 found (resolved_at stored as the date alone); re-run on the next rc | 2 |
 | `snow_inc_work_note_annotate` | unverified | — | — | — | — | 0 |
 
 ### `kb`
@@ -578,8 +579,8 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 
 | Tool | Status | Record | Date | Instance family | Note | Named in |
 |---|---|---|---|---|---|---|
-| `snow_ai_agentic_workflow_add` | verified-live | `docs/validation/2.2.0-rc.1-live-sitting.md` | 2026-10-17 | Brazil patch 0 | — | 2 |
-| `snow_ai_ai_agent_add` | verified-live | `docs/validation/2.2.0-rc.1-live-sitting.md` | 2026-10-17 | Brazil patch 0 | — | 2 |
+| `snow_ai_agentic_workflow_add` | verified-live | 2.2.0-rc.1-live-sitting | 2026-10-17 | Brazil patch 0 | — | 2 |
+| `snow_ai_ai_agent_add` | verified-live | 2.2.0-rc.1-live-sitting | 2026-10-17 | Brazil patch 0 | — | 2 |
 | `snow_ai_ai_agent_read` | unverified | — | — | — | — | 0 |
 | `snow_ai_ai_agents_index` | unverified | — | — | — | — | 0 |
 

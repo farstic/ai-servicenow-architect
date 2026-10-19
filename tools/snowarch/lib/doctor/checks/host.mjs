@@ -140,7 +140,7 @@ export function hostChecks() {
             const ca = inspectCa(String(value));
             if (!ca.ok) {
               problems.push(`NODE_EXTRA_CA_CERTS points at a file where ${ca.reason} — `
-                + 'see "Corporate networks" in packages/snowarch/README.md');
+                + 'see "Corporate networks" in docs/MODES-AND-PRESETS.md');
             }
           }
         }
@@ -333,6 +333,9 @@ export function hostChecks() {
         // `.toISOString()` and `.getTime()` on it, so the check crashed on any networked run with
         // either a release tag to compare against or a cache from a previous one.
         const now = () => new Date(ctx.now ? ctx.now() : Date.now());
+        // The doctor passes its flags as `ctx.flags` (doctor/index.mjs), as server.mjs reads them. This read
+        // `ctx.noNetwork`, which the doctor never sets, so `--no-network` still ran `ls-remote` (ARC-09-C185a).
+        const noNetwork = ctx.flags?.noNetwork === true;
 
         // ARC-09-C47 — IS THIS RECORD EVIDENCE ABOUT CURRENCY? Three ways it is not, and each
         // catches a different sighting from the owner's sitting. Only the third works on a record
@@ -351,7 +354,7 @@ export function hostChecks() {
           //    `tests/doctor/release-currency.test.mjs` asserts it — and `git describe` is a
           //    spawn even though it is local. Offline keeps checks 1 and 3, which are pure reads
           //    of the record, and says nothing about a disagreement it did not look for.
-          const here = ctx.noNetwork ? null : describeExact(ctx.root, ctx.exec);
+          const here = noNetwork ? null : describeExact(ctx.root, ctx.exec);
           if (cached.localTag && here && cached.localTag !== here) {
             return `stale record from an interrupted upgrade (it describes ${cached.localTag}, `
               + `this tree is ${here})`;
@@ -366,7 +369,7 @@ export function hostChecks() {
           return null;
         })();
 
-        if (ctx.noNetwork) {
+        if (noNetwork) {
           // ARC-09-C47 — a record that is not a currency measurement cannot answer offline
           // either. Say which one was found rather than reading a verdict out of it.
           if (notCurrency) return skip(`--no-network; ${notCurrency}`);
