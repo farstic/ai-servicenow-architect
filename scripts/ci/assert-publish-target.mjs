@@ -81,8 +81,10 @@ export function problems(pkg, tag) {
   // is checked against — not the spelling of the field.
   const repo = pkg?.repository;
   const repoText = typeof repo === 'string' ? repo : repo?.url ?? '';
-  if (!/farstic\/ai-servicenow-architect(\.git)?$/.test(repoText.replace(/\/+$/, ''))) {
-    out.push(`refusing — repository is "${repoText || '(missing)'}", expected farstic/ai-servicenow-architect`);
+  // ARC-09-C185c: the package ships in farstic/snowarch, and no shipped file names the engineering repository. npm
+  // checks a provenance attestation against this field, so the publishing workflow runs in farstic/snowarch.
+  if (!/farstic\/snowarch(\.git)?$/.test(repoText.replace(/\/+$/, ''))) {
+    out.push(`refusing — repository is "${repoText || '(missing)'}", expected farstic/snowarch`);
   }
 
   // Provenance is requested by the workflow flag AND by the package, and the two must agree: a

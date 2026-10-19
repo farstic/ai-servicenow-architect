@@ -76,7 +76,7 @@
   "homepage": "https://github.com/farstic/snowarch",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/farstic/ai-servicenow-architect.git"
+    "url": "git+https://github.com/farstic/snowarch.git"
   },
   "bugs": "https://github.com/farstic/snowarch/issues",
   "license": "BUSL-1.1",
