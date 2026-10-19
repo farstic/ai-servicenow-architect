@@ -26,6 +26,14 @@ import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
 import { runChecks } from '../../tools/snowarch/lib/doctor/runner.mjs';
 import { writeUpgradeCheck } from '../../tools/snowarch/lib/upgrade-check.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { runDoctor } from '../../tools/snowarch/lib/doctor/index.mjs';
+import { createRegistry } from '../../tools/snowarch/lib/doctor/registry.mjs';
+
+const REAL_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const E28 = hostChecks().find((c) => c.id === 'E-28');
 
@@ -467,4 +475,22 @@ test('E-28 — a development checkout writes behind:false, so the banner does no
   assert.equal(r.data?.behind, false, 'a development checkout cached behind:true');
   assert.equal(r.data?.latestTag, 'v9.1.0', 'the latest release was not recorded');
   assert.equal(r.data?.localTag ?? null, null);
+});
+
+test('E-28 under the doctor\'s own --no-network spawns nothing: the flag reaches it as the doctor passes it', async (t) => {
+  // The cases above hand the check `{ noNetwork: true }` themselves. The doctor builds its context with the flag
+  // at `ctx.flags.noNetwork` (doctor/index.mjs), so only a run through runDoctor can tell the two apart. A clone
+  // with no origin makes a spawned `ls-remote` fail loudly instead of quietly reaching the network.
+  const root = tempDir('snowarch-e28-flags-', t);
+  execFileSync('git', ['init', '-q', root]);
+  assert.equal(spawnSync('git', ['-C', root, 'remote', 'get-url', 'origin']).status === 0, false,
+    'the fixture has no origin');
+  const config = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
+  writeFileSync(join(root, 'engine.config.json'), `${JSON.stringify(config, null, 2)}\n`);
+  writeFileSync(join(root, 'package.json'), readFileSync(join(REAL_ROOT, 'package.json')));
+  const { report } = await runDoctor({ root, config, registry: createRegistry([E28]), noNetwork: true,
+    writeCache: false });
+  const r = report.checks.find((c) => c.id === 'E-28');
+  assert.equal(r.status, 'skip', `E-28 under --no-network: ${r.status} — ${r.detail}`);
+  assert.match(r.detail, /^--no-network, and nothing has been checked yet$/);
 });
