@@ -178,6 +178,22 @@ export function signedRelease(tag) {
 }
 
 /**
+ * The first final release installed from farstic/snowarch (ARC-09-C185b): it is staged there, and its manifest is signed
+ * from that clone. An rc never is (the owner's rule: rc and dev stay in the engineering repository, farstic/snowarch
+ * carries finals, one commit each).
+ */
+export const DISTRIBUTION_FROM = '2.2.1';
+
+/** Is `tag` a FINAL release, `v<major>.<minor>.<patch>` with no prerelease, at or past DISTRIBUTION_FROM? */
+export function distributedRelease(tag) {
+  const at = /^v(\d+)\.(\d+)\.(\d+)$/.exec(String(tag ?? ''));
+  if (!at) return false;
+  const [from, here] = [DISTRIBUTION_FROM.split('.').map(Number), at.slice(1).map(Number)];
+  for (let i = 0; i < 3; i++) if (here[i] !== from[i]) return here[i] > from[i];
+  return true;
+}
+
+/**
  * E-32's remedy for a shipped file that is not as signed, spelled for `cli`: one wording, read by every check that
  * finds a shipped file wrong in an install (ARC-09-C185a), so a user meets one repair, not several.
  */

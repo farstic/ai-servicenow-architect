@@ -255,6 +255,25 @@ export function stage(root, clone, ref, { onto = null, tag = false, coverage = C
 }
 
 /**
+ * ARC-09-C185b — why the tag `ref` in the distribution clone `clone` is not `ref` of the engineering checkout `root`
+ * staged, or `null` when it is: its tree is the tree `stage` builds from `root`, in a clone made and removed here. The
+ * tree is the claim. The distribution commit's parent, date and message are the distribution's own; its files and its
+ * corpus pin are the tag's. `release.mjs --tag-only --push --distribution` asks it before the engineering tag leaves.
+ */
+export function stagedDiffers(root, clone, ref, { coverage = COVERAGE } = {}) {
+  if (tryGit(clone, ['rev-parse', '--git-dir']) === null) return `${clone} is not a git repository`;
+  const there = tryGit(clone, ['rev-parse', '--verify', '--quiet', `refs/tags/${ref}^{tree}`]);
+  if (!there) return `${clone} has no ${ref}: stage it there with --tag`;
+  const tmp = mkdtempSync(join(tmpdir(), 'snowarch-restage-'));
+  try {
+    const { tree } = stage(root, join(tmp, 'clone'), ref, { coverage });
+    return tree === there ? null : `${ref} in ${clone} is tree ${there.slice(0, 7)}, and ${ref} staged from here is ${tree.slice(0, 7)}`;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+/**
  * ARC-09-C185c — the repositories a shipped file may link, each with its reason (the owner's ruling, 2026-10-19). The
  * engineering repository goes private, and its name must not be discoverable from an install at all.
  */
