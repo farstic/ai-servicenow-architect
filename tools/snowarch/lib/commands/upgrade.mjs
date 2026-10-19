@@ -38,7 +38,7 @@ import { loadConfig, root as defaultRoot, version as readVersion } from '../conf
 import { loadState } from '../state.mjs';
 // ARC-08-C29 — the runner's own step list, so the plan and the run are one computation.
 import { STEPS, outputMissingOf } from '../steps/index.mjs';
-import { makeExec } from '../steps/B00.mjs';
+import { checkGit, checkNode, makeExec } from '../steps/B00.mjs';
 import { nodeInfo, stepContext } from '../bootstrap.mjs';
 import { engineChecks } from '../doctor/checks/index.mjs';
 import { nonOkLines } from '../doctor/panel.mjs';
@@ -523,12 +523,14 @@ export function floorCheck(tagInfo, { exec }) {
   const want = tagInfo?.floors?.claudeCode ?? null;
   if (!want) return { line: null, below: false };
   const r = exec('claude', ['--version']);
+  // ARC-09-C194 — absent or unreadable is BELOW, not unknown-and-through: the target's B00 refuses both unless its
+  // Claude Code check is skipped, which only --force-floor asks for.
   if (!r.found || !r.ok) {
     return { line: `claude-floor ${want} (installed: not found — install Claude Code, or pass `
-      + '--force-floor)', below: false, unknown: true };
+      + '--force-floor)', below: true, unknown: true };
   }
   const { ok: passes, found } = meetsFloor(r.stdout, want);
-  if (!found) return { line: `claude-floor ${want} (installed version not understood)`, below: false, unknown: true };
+  if (!found) return { line: `claude-floor ${want} (installed version not understood)`, below: true, unknown: true };
   // `formatVersion`, because `meetsFloor` answers with a parsed OBJECT and a template literal
   // turns that into `[object Object]` — which is what the first run of this printed.
   const shown = formatVersion(found);
@@ -536,6 +538,27 @@ export function floorCheck(tagInfo, { exec }) {
     ? { line: `claude-floor ${want} (installed ${shown} ok)`, below: false }
     : { line: `claude-floor ${want} (installed ${shown} — BELOW the floor; upgrade Claude Code first)`,
       below: true };
+}
+
+/**
+ * ARC-09-C194 — the git and Node floors the tag states, judged at U4 with B00's own predicates, or `null` when both
+ * hold. The target's B00 judges them again after U5, where a refusal leaves the tree moved and the bootstrap not run,
+ * and the next `upgrade` reads "up to date". Git is required in every mode and Node only for live, as B00 has it, and
+ * an unreadable version refuses there too. No flag waives either: --force-floor covers Claude Code alone, the one check
+ * B00 can skip.
+ */
+export function toolFloorRefusal(tagInfo, { exec, mode, platform = process.platform, locate = undefined }) {
+  const floors = tagInfo?.floors ?? {};
+  if (floors.git) {
+    const r = checkGit({ exec, floors: { git: floors.git }, plat: platform });
+    if (r.status === 'fail') return r.detail;
+  }
+  if (floors.node) {
+    const r = checkNode({ exec, ...(locate ? { locate } : {}), floors: { node: floors.node }, plat: platform,
+      mode: mode === 'live' ? 'live' : 'design-only' });
+    if (r.status === 'fail') return r.detail;
+  }
+  return null;
 }
 
 const short = (sha) => (sha ? String(sha).slice(0, 7) : '—');
@@ -738,7 +761,8 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   }
   if (unfinished) {
     log.step(`already at ${target}; the last run stopped at ${unfinished} — continuing from there`);
-    return finish({ root, env, log, run, target, latest, remote, now, state });
+    return finish({ root, env, log, run, target, latest, remote, now, state,
+      skipClaudeCheck: Boolean(flags['force-floor']) });
   }
 
   // ── U4 the plan, computed before anything moves ───────────────────────────────────────────
@@ -799,9 +823,18 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     log.fail('upgrade: nothing was changed');
     return EXIT_FAIL;
   }
+  const tools = toolFloorRefusal(tagInfo, { exec: probe, mode: state?.mode, platform });
+  if (tools) {
+    log.fail(`upgrade: ${target} needs what this machine does not have — ${tools}; nothing was changed `
+      + '(--force-floor covers Claude Code only)');
+    return EXIT_USAGE;
+  }
   if (floor.below && !flags['force-floor']) {
-    log.fail('upgrade: the installed Claude Code is below the floor this release wants — upgrade it '
-      + 'first, or pass --force-floor; nothing was changed');
+    log.fail(floor.unknown
+      ? `upgrade: Claude Code was not found, or its version not understood, and ${target} wants `
+        + `${tagInfo.floors.claudeCode} or later — install or upgrade it first, or pass --force-floor; nothing was changed`
+      : 'upgrade: the installed Claude Code is below the floor this release wants — upgrade it '
+        + 'first, or pass --force-floor; nothing was changed');
     return EXIT_USAGE;
   }
   // ARC-11-C6 — said with --yes and without, before the question: the move is still the reader's to make.
@@ -892,7 +925,8 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     log.step('your instance store lives in .local/, which git ignores, so no checkout touches it');
   }
 
-  return finish({ root, env, log, run, target, latest, remote, now, state });
+  return finish({ root, env, log, run, target, latest, remote, now, state,
+    skipClaudeCheck: Boolean(flags['force-floor'] && floor.below) });
 }
 
 /**
@@ -924,12 +958,14 @@ export function returnRef(branch, described) {
 export async function finish({ root, env, log, run, target, latest, remote, now, state,
   // ARC-07-C31 slice 4 — `platform` beside the `env` this already had; the two sentences below are a
   // terminal's, so the reader's own shell, and both come from ONE spelling rather than two calls.
-  platform = process.platform }) {
+  platform = process.platform,
+  // ARC-09-C194 — --force-floor's promise kept: the target's bootstrap skips the Claude Code check it would refuse.
+  skipClaudeCheck = false }) {
   const spell = spellings({ platform, env });
   log.step(stepLine(6, 'bootstrap (only the steps whose inputs changed)'));
   const mode = state?.mode === 'live' ? 'live' : 'design';
   const bootstrap = run(process.execPath, [join(root, 'tools/snowarch/bin/snowarch.mjs'),
-    'bootstrap', '--mode', mode, '--yes'],
+    'bootstrap', '--mode', mode, '--yes', ...(skipClaudeCheck ? ['--skip-claude-check'] : [])],
   { cwd: root, stdio: 'inherit', env: childEnv(root, env) });
   if (bootstrap.status !== 0) {
     log.fail(`upgrade: the bootstrap stopped (exit ${bootstrap.status ?? 'abnormally'}) — the tree `
