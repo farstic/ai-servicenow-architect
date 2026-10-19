@@ -407,7 +407,7 @@ test('C21: an oversized section keeps the GROUPS and truncates the prose', () =>
   assert.match(body, /the generated groups, which are what the release IS/);
   assert.match(body, /_trailer_/);
   assert.ok(body.startsWith('## 9.9.9'), 'the version heading was truncated away');
-  assert.match(body, /_Notes continue in \[docs\/CHANGELOG\.md § 9\.9\.9\]\(https:\/\/github\.com\/farstic\/ai-servicenow-architect\/blob\/v9\.9\.9\/docs\/CHANGELOG\.md\)\._/);
+  assert.match(body, /_Notes continue in \[docs\/CHANGELOG\.md § 9\.9\.9\]\(https:\/\/github\.com\/farstic\/snowarch\/blob\/v9\.9\.9\/docs\/CHANGELOG\.md\)\._/);
   assert.match(body, /\| os \| s \|/);
   assert.match(body, /E-00 is expected there/);
   // And the prose really was cut, or the fixture proves nothing.

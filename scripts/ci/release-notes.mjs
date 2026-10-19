@@ -38,7 +38,7 @@ import { sectionFor } from '../lib/release/changelog.mjs';
 export const RELEASE_BODY_MAX = 125_000;
 
 /** The repository the continuation link points into. */
-const REPO = 'farstic/ai-servicenow-architect';
+const REPO = 'farstic/snowarch';
 
 /** The sentence ARC-09-C19 puts beside the numbers, wherever the body is assembled. */
 const DOCTOR_NOTE = '\n_The attached doctor JSONs come from hosted runners without Claude Code — '

@@ -398,4 +398,4 @@ This is a documentation-only release. No changes to `CLAUDE.md`, the orchestrato
 
 ---
 
-*Maintained by the Enterprise Architecture Team. Repository: [`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live).*
+*Maintained by the Enterprise Architecture Team. Repository: `farstic/claude-servicenow-live`.*

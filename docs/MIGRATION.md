@@ -8,6 +8,31 @@ losing engagement content and without leaving a password behind.
 Read it once before you start. Nothing in your old setup is modified until step 6, so you can stop
 after any earlier step and still have exactly what you had this morning.
 
+## An install made before 2.2.1
+
+From 2.2.1 the Architect is installed and upgraded from `https://github.com/farstic/snowarch.git`. An
+install cloned before that still points at the previous address, and moves once, from its folder.
+
+macOS / Linux:
+
+```sh
+git remote set-url origin https://github.com/farstic/snowarch.git
+./snowarch upgrade
+```
+
+Windows PowerShell:
+
+```powershell
+git remote set-url origin https://github.com/farstic/snowarch.git
+.\snowarch.cmd upgrade
+```
+
+The release tags your install already has stay where they are, so the upgrade's plan names the
+version you are on as before, for example `v2.2.0 → v2.2.1`, and goes ahead as usual.
+Your `.local/`, your instances and your engagement folders stay where they are.
+
+The rest of this page is for the two-repository setup that came before 2.0.
+
 ## Who this is for
 
 - You cloned `farstic/claude-servicenow-live`, or
@@ -21,7 +46,7 @@ to a fresh machine.
 
 | Old | New |
 |---|---|
-| Two clones, kept in step by hand | One repository — `farstic/ai-servicenow-architect` |
+| Two clones, kept in step by hand | One repository — `farstic/snowarch` |
 | `claude mcp add servicenow-mcp …` with 12 `-e SERVICENOW_*` environment keys | A committed `.mcp.json`, server key `servicenow`. You never register anything |
 | Credentials in `~/.claude.json` and `~/.config/servicenow-mcp/instances.json` | `<checkout>/.local/instances.json`, mode `0600`, never committed, never in argv |
 | Tier 0 / Tier 1 / Tier 2 | Mode `design-only` or `live`, and a preset — `read-only`, `pdi-developer`, `full` or `custom` |
@@ -84,14 +109,14 @@ Get-ChildItem memory, scratchpad, deliverables, diagram-preview -ErrorAction Sil
 macOS / Linux:
 
 ```sh
-git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
+git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/snowarch.git && cd snowarch && ./bootstrap.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/ai-servicenow-architect.git
-cd ai-servicenow-architect
+git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/snowarch.git
+cd snowarch
 .\bootstrap.cmd
 ```
 
