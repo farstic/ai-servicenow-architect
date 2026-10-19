@@ -95,7 +95,8 @@ export const COVERAGE = Object.freeze({
     'docs/PLATFORM-NOTES.md', 'docs/CHANGELOG.md', 'docs/CLIENT-ONBOARDING.md', 'docs/KEY-COMPROMISE.md',
     'docs/RELICENSING.md', 'docs/ARCHITECTURE.md', 'docs/validation/LIVE-COVERAGE.md',
   ]),
-  excludes: Object.freeze(['tools/snowarch/tests/']),
+  // The tests under a covered prefix: the engine's own, and the lint's fixture trees (ARC-09-C185a).
+  excludes: Object.freeze(['tools/snowarch/tests/', 'packages/contract/lint/tests/']),
   ignores: Object.freeze(['.DS_Store', 'Thumbs.db', 'desktop.ini']),
 });
 
