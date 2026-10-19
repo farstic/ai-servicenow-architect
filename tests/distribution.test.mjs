@@ -71,10 +71,10 @@ function plantedTree(t) {
     + 'Write an image as ' + BT + '![Figure N](../../../docs/figure-N.png)' + BT + ': an example in code, not a link.\n');
   put(root, 'docs/relative-guide.md', '# guide\n');
   git(root, ['init', '-q', '-b', 'main']);
-  // The archive and the work tree agree only when git converts neither: a Windows runner's core.autocrlf makes
-  // `git archive` write CRLF where the files were written LF. The export's claim is "as HEAD has them".
-  git(root, ['config', 'core.autocrlf', 'false']);
-  assert.equal(git(root, ['config', '--get', 'core.autocrlf']).trim(), 'false');
+  // A Windows runner's condition, on every OS: git converting text to CRLF on its way out. The export's claim is
+  // "as HEAD has them", so it must not depend on this, as `stage` does not.
+  git(root, ['config', 'core.autocrlf', 'true']);
+  assert.equal(git(root, ['config', '--get', 'core.autocrlf']).trim(), 'true');
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'fixture']);
   return root;
@@ -153,7 +153,10 @@ test('the export writes the shipped files, byte for byte, and nothing else — n
   assert.deepEqual(shipped, ['.claude/skills/x/SKILL.md', '.claude/skills/x/linked.md', 'tools/snowarch/bin/snowarch.mjs',
     'tools/snowarch/lib/a.mjs']);
   assert.equal(exportTree(root, out, COV), shipped.length);
-  for (const rel of shipped) assert.deepEqual(readFileSync(join(out, rel)), readFileSync(join(root, rel)));
+  // Byte for byte with the blob HEAD holds: no conversion the exporting machine's git is configured to make.
+  for (const rel of shipped) {
+    assert.deepEqual(readFileSync(join(out, rel)), execFileSync('git', ['-C', root, 'cat-file', 'blob', `HEAD:${rel}`]), rel);
+  }
   assert.equal(existsSync(join(out, '.git')), false);
   assert.equal(existsSync(join(out, 'scripts')), false);
 });
