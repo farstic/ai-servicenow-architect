@@ -33,6 +33,38 @@ import {
 const isWindows = process.platform === 'win32';
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+// ── ARC-09-C194 — every floor the tag states is judged at U4, before anything moves ──────────────────────────────
+
+/** A probe that answers `--version` for the tools it is given, and finds nothing else. */
+const versions = (map) => (cmd) => (map[cmd] === undefined
+  ? { found: false, ok: false, stdout: '' }
+  : { found: true, ok: true, stdout: map[cmd] });
+const TAG = { floors: { claudeCode: '2.1.214', node: '20.0.0', git: '2.34.1' } };
+const NPM = () => '/usr/bin/npm';
+
+test('ARC-09-C194 — U4 judges the git and Node floors with B00\'s own predicates', async () => {
+  const { toolFloorRefusal } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const judge = (map, mode = 'design') => toolFloorRefusal(TAG, { exec: versions(map), mode, platform: 'linux', locate: NPM });
+  assert.equal(judge({ git: 'git version 2.43.0', node: 'v22.11.0' }), null);
+  // git, in every mode: below, unreadable, absent. B00 refuses each, so U4 does.
+  assert.match(judge({ git: 'git version 2.30.0', node: 'v22.11.0' }) ?? '', /git 2\.30\.0 found, ≥ 2\.34\.1 required/);
+  assert.match(judge({ git: 'git, a build of some kind', node: 'v22.11.0' }) ?? '', /git version not understood/);
+  assert.match(judge({ node: 'v22.11.0' }) ?? '', /git not found/);
+  // Node: B00 refuses it only for live mode, so U4 does the same; design-only notes it and goes on.
+  assert.match(judge({ git: 'git version 2.43.0', node: 'v18.20.0' }, 'live') ?? '', /live mode needs Node\.js 20\+/);
+  assert.equal(judge({ git: 'git version 2.43.0', node: 'v18.20.0' }, 'design'), null);
+  assert.match(judge({ git: 'git version 2.43.0', node: 'node, unreadable' }, 'live') ?? '', /live mode needs Node\.js 20\+/);
+});
+
+test('ARC-09-C194 — a Claude Code that cannot be read is below the floor, not past it', async () => {
+  const { floorCheck } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  // B00 refuses an absent or unreadable Claude Code unless its check is skipped, so U4 may not wave either through.
+  assert.equal(floorCheck(TAG, { exec: versions({}) }).below, true, 'absent');
+  assert.equal(floorCheck(TAG, { exec: versions({ claude: 'some build' }) }).below, true, 'unreadable');
+  assert.equal(floorCheck(TAG, { exec: versions({ claude: '2.1.100 (Claude Code)' }) }).below, true, 'below');
+  assert.equal(floorCheck(TAG, { exec: versions({ claude: '2.1.300 (Claude Code)' }) }).below, false, 'at or above');
+});
+
 test('the classifier names a remedy only for a shape it recognises', () => {
   // Git's own words are printed by the CALLER, always. What this decides is whether a second,
   // actionable line is added — and a confident wrong remedy costs more than none.

@@ -389,7 +389,7 @@ test('ARC-09-C109 control — Enter at the prompt is still yes: the default has 
   assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0');
 }, MINUTES);
 
-test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --force-floor does not',
+test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --force-floor completes it',
   async (t) => {
     const w = await buildWorld(t, { claudeFloor: '9.9.9' });
     bootstrapUser(w.user);
@@ -405,17 +405,16 @@ test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --for
     assert.match(r.text, /nothing was changed/);
     assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
 
-    // `--force-floor` gets past THIS command's refusal — and then the bootstrap's own preflight
-    // refuses, because `engine.config.json`'s floor is a separate promise the release does not
-    // get to waive. That is the right layering and worth asserting rather than working around:
-    // the flag overrides the TAG's request, not the engine's requirement.
+    // ARC-09-C194 — `--force-floor` DOES WHAT ITS HELP SAYS: "upgrade even though the release wants a newer Claude
+    // Code". It used to get past this command's refusal and then meet the target's B00, which refused the same Claude
+    // Code after U5 had moved the tree: a half state, asserted here as layering. The flag now also tells the target's
+    // bootstrap to skip that check, the one B00 can skip, so the upgrade it waves through is one that completes.
     const forced = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes', '--force-floor'], { env });
     assert.match(forced.text, /BELOW the floor/, 'the line is still printed when the flag is used');
-    assert.match(forced.text, /\[U5\/7\] move the checkout/, '--force-floor did not get past the plan');
-    assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0',
-      'the tree did not move');
-    assert.notEqual(forced.status, 0, 'the bootstrap preflight must still enforce the engine floor');
-    assert.match(forced.text, /Claude Code 2\.1\.100 found, ≥ 2\.1\.214 required/);
+    assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0', 'the tree did not move');
+    assert.match(forced.text, /Claude Code check skipped \(--skip-claude-check\)/, 'the bootstrap was not told to skip it');
+    assert.doesNotMatch(forced.text, /the bootstrap stopped/, 'the forced move ended in a half state');
+    assert.match(forced.text, /\[U7\/7\] doctor/, 'the forced move did not reach the doctor');
   }, MINUTES);
 
 test('a target that is not a release tag of this product is refused by name', async (t) => {
