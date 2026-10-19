@@ -126,11 +126,11 @@ Baseline first: a custom table, scoped app or state extension requires explicit,
 
 ## 10. Confidentiality
 
-Never echo client content into shared files. When sequencing several builders, confirm the folder before the first dispatch.
+Never echo client content into shared files. When sequencing builders, confirm the folder before the first dispatch.
 
 ## 11. Standing rule — where a finding goes
 
-Record it in the same pull request as the fix or the test. There is no excluded category.
+Record it in the same pull request as the fix or the test; no category is excluded.
 
 - **A ServiceNow platform behaviour** → `docs/PLATFORM-NOTES.md`, a `PN-xx` entry. `Grounding:` is a real path under `vendor/ServiceNowDocs/` or the words `observed behaviour` — never an invented path.
 - **This server's own behaviour** → a failing test under `packages/snowarch/tests/`, then the fix; a `packages/snowarch/CHANGELOG.md` row until fixed (in the engineering checkout).
