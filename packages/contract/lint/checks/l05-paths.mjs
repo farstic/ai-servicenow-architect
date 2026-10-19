@@ -17,6 +17,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { isHistory, readLines } from '../lib/scan.mjs';
+import { citedPaths } from '../lib/cited-paths.mjs';
 
 /**
  * Paths that are real when the tool RUNS and are never in the repository.
@@ -26,7 +27,6 @@ import { isHistory, readLines } from '../lib/scan.mjs';
  * effect — no scanned prefix begins with them today, so they cannot reach the resolver — and
  * naming them means adding such a prefix later cannot quietly turn a correct citation red.
  */
-const RUNTIME_PREFIXES = ['.local/', '~/', '%APPDATA%', '%USERPROFILE%'];
 
 /**
  * What the repository CONTAINS, asked of git rather than of this machine's disk.
@@ -134,28 +134,6 @@ function forthcoming(root) {
 export const id = 'L05';
 export const title = 'every repository path cited in prose resolves';
 
-const PREFIXES = ['CLAUDE.md', 'README.md', '.claude/', 'governance/', 'docs/', 'templates/',
-  'tools/', 'packages/', 'scripts/', 'tests/', 'engine.config.json', 'vendor/docs-areas.txt'];
-
-// Backticked paths and markdown link targets. Both are how a path is written to be followed.
-const BACKTICK = /`([^`\n]+)`/g;
-const LINK = /\]\(([^)\s]+)\)/g;
-
-const isCandidate = (p) => PREFIXES.some((x) => p === x || p.startsWith(x));
-
-function skip(p) {
-  return p.startsWith('vendor/ServiceNowDocs')      // ARC-03's gate checks these against the corpus
-    || RUNTIME_PREFIXES.some((x) => p.startsWith(x) || p.includes(x))   // real at run time, never here
-    || /\.local\.json$/.test(p)
-    || /[*?{}]/.test(p)                             // a glob is a shape, not a path
-    || /[<>]/.test(p)                               // `<label>`, `docs/<name>.md`
-    || p.endsWith('/**')
-    || p.includes('…')
-    // A path is cited as a file (it has an extension) or as a directory (trailing slash). Anything
-    // else under a scanned prefix is a name that merely looks like one: `tools/list` is an MCP
-    // method, a bare `packages/<name>` is a package. Requiring the shape is what tells them apart.
-    || !(p.endsWith('/') || /\.[A-Za-z0-9]+$/.test(p));
-}
 
 /**
  * Files whose subject is paths that do not exist.
@@ -170,18 +148,6 @@ function skip(p) {
  */
 const ABOUT_ABSENT_PATHS = ['docs/decisions/'];
 
-/**
- * A row that names the ARC which creates the path.
- *
- * `docs/ARCHITECTURE.md`'s owner table is one row per directory with its owning story beside it —
- * the same declaration `forthcoming-paths.json` carries, written where the reader sees it rather
- * than in a fixture they will not open. Treating it as a citation would demand that a document
- * about who builds what may only name things already built.
- */
-const DECLARES_OWNER = /\*\*ARC-\d\d\*\*/;
-
-/** True once a line is at or below a heading whose subject is what used to be here. */
-const HISTORY_HEADING = /^#{2,3} (History|The D-03 cut ledger|Before \d)/;
 
 export function run(ctx) {
   const findings = [];
@@ -194,34 +160,13 @@ export function run(ctx) {
     // both correct about the moment they describe. `isHistory` is the one predicate — L01, L03 and
     // now L05 cannot drift apart about what counts as a record.
     if (isHistory(file) || ABOUT_ABSENT_PATHS.some((p) => file === p || file.startsWith(p))) continue;
-    let fenced = false;
-    let historical = false;
-    readLines(ctx.root, file).forEach((line, i) => {
-      if (line.trimStart().startsWith('```')) { fenced = !fenced; return; }
-      if (fenced) return;
-      // A document may be current above its history section and historical below it — the same
-      // boundary `docs/CHANGELOG.md` uses. Below it, a path that no longer exists is the subject.
-      if (HISTORY_HEADING.test(line)) historical = true;
-      if (historical || DECLARES_OWNER.test(line)) return;
-      const seen = new Set();
-      for (const re of [BACKTICK, LINK]) {
-        re.lastIndex = 0;
-        let m;
-        while ((m = re.exec(line)) !== null) {
-          // Trim what prose puts next to a path: a trailing full stop, comma or bracket.
-          const raw = m[1].trim().replace(/[).,;:]+$/, '');
-          // `docs/README.md:157-159` cites a line range; the path is the part before it.
-          const path = raw.replace(/^\.\//, '').split('#')[0].replace(/:\d+(-\d+)?$/, '');
-          if (!path || seen.has(path) || !isCandidate(path) || skip(path)) continue;
-          seen.add(path);
-          if (planned.has(`${file}\u0000${path}`)) continue;
-          checked += 1;
-          if (!resolve.has(path)) {
-            findings.push({ file, line: i + 1, message: `dead path ${path}` });
-          }
-        }
+    for (const { path, line } of citedPaths(readLines(ctx.root, file))) {
+      if (planned.has(`${file}\u0000${path}`)) continue;
+      checked += 1;
+      if (!resolve.has(path)) {
+        findings.push({ file, line, message: `dead path ${path}` });
       }
-    });
+    }
   }
   // What was CHECKED, on the status line: "L05 ok" alone cannot be told from "L05 read nothing",
   // and this check's scope is a filter over a filter over a regex.
