@@ -9,6 +9,66 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A patch release: a refused write says why, a missing mandatory field is caught before anything is written, and the
+first ITSM tools are proven on an instance.** When the instance refuses a write because of its own data policy or
+business rule, the error now has its own code, `INSTANCE_REFUSED`. Its remedy is to correct the record, so the
+Architect no longer advises a change of roles against the instance's own words. Before the first write, every create
+reads the data policies of its table. A field one requires that the call would not send is refused there, naming the
+policy, so the Architect asks for the value instead of stopping halfway through a build. Resolving an incident or a
+problem now stores the resolution time, not midnight. A read that asks for fields names any the instance did not
+return, and the upgrade names the version it starts from as the doctor does. The first ITSM run against a real instance
+verified adding, modifying and querying incidents: 5 of the server's 399 tools are now verified live, and the run found
+the resolve defect fixed here. The Architect also knows more about AI Agent Studio:
+- an agent is switched on by a record modify;
+- the Studio access-rules step is a write with its own approval;
+- a browser already open needs a new login after capture moves;
+- a net-new AI agent needs the Prime tier.
+
+The server's contract keeps its 399 tools and gains one error code, 75 in all. The always-loaded rule file is 73 lines,
+under its cap of 80. The licence format and the signed manifest are unchanged. Upgrading from 2.2.0 needs no step
+beyond `./snowarch upgrade`.
+
+### Fixed
+
+- Incident and problem resolve store `resolved_at` with its time, in the instance's format and in UTC. They sent an
+  ISO string, which the instance stored as the date alone, at midnight (ARC-09-C184).
+- The query guard accepts every documented GlideSystem `…Ago` function, the `…Start`, `…End` and `…Local` forms
+  included. Any other `javascript:` expression is still refused, and the refusal now says to compute the value and
+  send it literally (ARC-09-C172).
+- `./snowarch upgrade` names the version it upgrades from by the doctor's rule — the release tag, the tag and the
+  commits past it, or `a development tree at <sha>` — and never an `import/*` tag (ARC-09-C170).
+
+### Changed
+
+- A 403 that the instance's own rule gave — a data policy or a business rule — is `INSTANCE_REFUSED`, with the
+  remedy "read the message, correct the fields it names and send the write again, as a new write with its own
+  approval; do not change roles". An ACL refusal stays `INSUFFICIENT_PRIVILEGES`. The always-loaded rule file's cap
+  goes from 72 to 80 lines, by the owner's ruling (ARC-09-C182).
+- The write gate's approval question applies to a browser action that changes the instance, as well as to a tool call
+  (ARC-09-C172).
+
+### Added
+
+- Before a create, the server reads the active data policies of the table and of the tables it extends, and refuses
+  a field an unconditional rule requires that the create would not send. The refusal names the policy and says to
+  ask the user. A conditional rule, a defaulted field and a check that could not be made go on the result as
+  `mandatory_fields`. The AI agent, workflow and ATF step builds check every table before their first write
+  (ARC-09-C183).
+- `snow_core_record_read` and `snow_core_records_query` name, as `fields_not_returned`, the requested fields the
+  instance did not return (ARC-09-C178).
+- The Architect knows the AI Agent Studio steps from the owner's live run: activation through
+  `snow_core_record_modify`, the access-rules step in the browser as a write with its own approval, the new login a
+  browser needs after capture moves, and what Studio's save does by itself. The Licensing Specialist names the Prime
+  tier for a net-new AI agent (ARC-09-C172).
+
+### Internal
+
+- Platform notes PN-19 to PN-23: Studio's access-rules step, a Protected Script Include's script, a mandatory field
+  over the REST Table API, a date-time sent as an ISO string, and the instance's own close codes. PN-17 now gives the
+  unnamed tool link's refusal as a data policy (ARC-09-C172, ARC-09-C183, ARC-09-C184).
+- `docs/validation/2026-10-19-itsm-sweep.md`, the first ITSM run (ARC-09-C167b, group 1, partial). The live-coverage
+  ledger moves to 5 tools verified live.
+
 ## 2.2.0 — 2026-10-17
 
 ### Notes
