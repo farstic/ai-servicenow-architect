@@ -261,6 +261,8 @@ test('E-26 masks the proxy credential and warns about a CA file that is not one'
   assert.match(r.data.vars.HTTPS_PROXY, /http:\/\/\*\*\*@proxy\.corp\.example:8080/);
   assert.match(r.detail, /NODE_EXTRA_CA_CERTS points at a file where the file does not exist/);
   assert.match(r.detail, /as seen by this shell/);
+  // ARC-09-C185a: the page it names ships; packages/snowarch/README.md does not.
+  assert.match(r.detail, /see "Corporate networks" in docs\/MODES-AND-PRESETS\.md/);
 });
 
 test('E-26 warns about a variable set to an empty string', async (t) => {
