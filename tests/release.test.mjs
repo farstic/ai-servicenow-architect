@@ -23,7 +23,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { release } from '../scripts/release.mjs';
 import { allowedCloneTags, cloneTagsIn } from './lib/install-tag.mjs';
-import { buildTagMessage, parseTagMessage, tagIsComplete } from '../scripts/lib/release/tag.mjs';
+import { buildTagMessage, parseTagMessage, tagIsComplete } from '../tools/snowarch/lib/release/tag.mjs';
 import { compareVersions, latestFinalTag, latestTag, preflight } from '../scripts/lib/release/preflight.mjs';
 import { badgeLine, writeHead, writeInstallTag, writeMarker } from '../scripts/lib/release/writers.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';

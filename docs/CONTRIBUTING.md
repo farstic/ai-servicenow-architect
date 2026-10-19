@@ -1731,7 +1731,7 @@ name a tree that does not carry its own version.
 
 **What the tag records**, and why the trailers are not decoration: a release downloaded six months
 later is a tarball and a tag, and `./snowarch version`, `release.yml` and `./snowarch upgrade` all
-read these back through `parseTagMessage` in `scripts/lib/release/tag.mjs`.
+read these back through `parseTagMessage` in `tools/snowarch/lib/release/tag.mjs`.
 
 ```
 snowarch v2.0.0

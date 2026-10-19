@@ -4,13 +4,13 @@
 //
 // Five documents used to disagree about how many skills there are (`00` §3.8, P-12), and every one
 // of those numbers was written by hand and true when written. So neither check here counts
-// anything itself: E-17 calls `scripts/lib/roster.mjs` — the listing `scripts/gen-roster.mjs`
+// anything itself: E-17 calls `tools/snowarch/lib/roster.mjs` — the listing `scripts/gen-roster.mjs`
 // renders into `docs/ARCHITECTURE.md` — and E-18 calls the `lintSkills`/`lintAgents` rules whose
 // ids CI already quotes. A doctor with its own opinion of the roster would be a sixth document.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { collectRoster, RosterError } from '../../../../../scripts/lib/roster.mjs';
+import { collectRoster, RosterError } from '../../roster.mjs';
 import { lintAgents, lintSkills } from '../../../../../tests/lib/lint-rules.mjs';
 import { defineCheck } from '../registry.mjs';
 

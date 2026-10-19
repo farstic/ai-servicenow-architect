@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { parseFrontmatter } from '../../tests/lib/frontmatter.mjs';
+import { parseFrontmatter } from '../../../tests/lib/frontmatter.mjs';
 
 /**
  * Frontmatter that does not parse is a roster problem, not a crash.
@@ -132,8 +132,8 @@ export function collectAgents(root) {
 /**
  * Everything `--json` prints, which is everything E-17 reports.
  *
- * `problems` is the same list `--check` prints: a count that disagrees with
- * `engine.config.json.roster`, an agent preloading a skill that does not exist, and an agent that
+ * `problems` is the same list `--check` prints: a count that disagrees with the `roster` block of
+ * `engine.config.json`, an agent preloading a skill that does not exist, and an agent that
  * does not preload its own persona. The doctor turns a non-empty list into a FAIL; the generator
  * exits 1 on it.
  */

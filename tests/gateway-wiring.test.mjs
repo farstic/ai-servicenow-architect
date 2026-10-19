@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectRoster } from '../scripts/lib/roster.mjs';
+import { collectRoster } from '../tools/snowarch/lib/roster.mjs';
 import { gatewayDirs, gatewayTableRows, read, tableUnder } from './lib/gateways.mjs';
 
 /**

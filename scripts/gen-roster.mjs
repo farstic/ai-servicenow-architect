@@ -26,9 +26,9 @@ import { fileURLToPath } from 'node:url';
 
 // `fileURLToPath`, never `new URL(...).pathname` — the latter is `/C:/…` on Windows.
 import { unifiedDiff } from './lib/diff.mjs';
-// The listing itself lives in `lib/roster.mjs`, because the doctor's E-17/E-18 read the same
+// The listing itself lives in `tools/snowarch/lib/roster.mjs`, because the doctor's E-17/E-18 read the same
 // roster (ARC-08-S02) and a second reading would be a second definition of it (P-12).
-import { collectRoster, RosterError } from './lib/roster.mjs';
+import { collectRoster, RosterError } from '../tools/snowarch/lib/roster.mjs';
 
 // `--root <dir>` points every read at a fixture tree; without it, the repository this script
 // lives in. The tests drive the CLI rather than the functions, because the exit code and the

@@ -42,7 +42,7 @@ import { askOnce, isYes } from '../tools/snowarch/lib/ask.mjs';
 import { EXIT_GATE, gatePlan, makeGateRunner, modulesAreLinked, runGates }
   from './lib/release/gates.mjs';
 import { EXIT_PREFLIGHT, preflight } from './lib/release/preflight.mjs';
-import { buildTagMessage } from './lib/release/tag.mjs';
+import { buildTagMessage } from '../tools/snowarch/lib/release/tag.mjs';
 import { publishedManifestMatches } from './lib/release/manifest-gate.mjs';
 import { PRODUCT_KEYS } from '../tools/snowarch/lib/licence/keys.mjs';
 import { signedRelease } from '../tools/snowarch/lib/licence/manifest.mjs';

@@ -174,7 +174,7 @@ const MARKER = '.docs-family-fixture-root';
  * ONCE for this file and re-copied per workspace.
  *
  * `tools/snowarch/lib` alone is not enough — the engine imports out of its own tree, and the first
- * attempt died on `Cannot find module '<ws>/scripts/lib/release/tag.mjs'`. The list below is every
+ * attempt died on `Cannot find module '<ws>/scripts/lib/release/tag.mjs'` (ARC-09-C185a moved it under tools/snowarch/lib). The list below is every
  * directory those imports reach (`grep -rhoE "from '\.\./\.\./\.\./[^']+'"` over `bin` and
  * `lib`). IF A NEW OUT-OF-TREE IMPORT APPEARS, this fixture fails with ERR_MODULE_NOT_FOUND naming
  * the missing path — loud and diagnosable, which is the right failure for a list that has to track
