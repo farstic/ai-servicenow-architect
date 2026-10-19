@@ -399,6 +399,7 @@ test('ARC-09-C194 — a branch install fast-forwards to the verified tag, never 
   const ahead = join(w.scratch, 'ahead');
   git(w.scratch, ['clone', '-q', '--no-hardlinks', pathToFileURL(w.origin).href, ahead]);
   git(ahead, ['checkout', '-q', '-B', 'main', 'v9.2.0']);
+  assert.equal(git(ahead, ['rev-parse', 'HEAD']), git(ahead, ['rev-parse', 'v9.2.0^{commit}']), 'the clone is not at the tag');
   writeFileSync(join(ahead, 'NEXT.md'), 'a commit after the release\n');
   git(ahead, ['add', 'NEXT.md']);
   git(ahead, ['commit', '-q', '-m', 'after v9.2.0']);
