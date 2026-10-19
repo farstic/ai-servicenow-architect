@@ -276,9 +276,20 @@ test('ARC-09-C185c — a GitHub origin that is not the releases\' gets the set-u
   const said = `upgrade: origin is ${old}, and releases are published at ${home} — git remote set-url origin ${home}`;
   // A GitHub-shaped origin and no network: `insteadOf` sends git to the world's own origin, while the URL the install
   // has configured, the one the product reads, stays the GitHub one.
-  const via = (url, to) => git(w.user, ['config', `url.${pathToFileURL(to).href}.insteadOf`, url]);
-  const unvia = (to) => git(w.user, ['config', '--unset', `url.${pathToFileURL(to).href}.insteadOf`]);
-  git(w.user, ['remote', 'set-url', 'origin', old]);
+  const key = (to) => `url.${pathToFileURL(to).href}.insteadOf`;
+  const via = (url, to) => {
+    git(w.user, ['config', key(to), url]);
+    assert.equal(git(w.user, ['config', '--get', key(to)]), url, 'the insteadOf did not take');
+  };
+  const unvia = (to) => {
+    git(w.user, ['config', '--unset', key(to)]);
+    assert.equal(git(w.user, ['config', '--get', key(to)], { allowFail: true }), null, 'the insteadOf is still set');
+  };
+  const origin = (url) => {
+    git(w.user, ['remote', 'set-url', 'origin', url]);
+    assert.equal(git(w.user, ['config', '--get', 'remote.origin.url']), url, 'the origin did not move');
+  };
+  origin(old);
   via(old, w.origin);
 
   // U4: the published manifest names another commit than the tag here.
@@ -296,11 +307,11 @@ test('ARC-09-C185c — a GitHub origin that is not the releases\' gets the set-u
   unvia(join(w.scratch, 'gone.git'));
 
   // Controls, refused at U4 the same way: the releases' own repository, and an origin that is not on GitHub.
-  git(w.user, ['remote', 'set-url', 'origin', home]);
+  origin(home);
   via(home, w.origin);
   const own = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
   unvia(w.origin);
-  git(w.user, ['remote', 'set-url', 'origin', pathToFileURL(w.origin).href]);
+  origin(pathToFileURL(w.origin).href);
   const mirror = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
   for (const r of [own, mirror]) {
     assert.equal(r.status, 1, r.text);
