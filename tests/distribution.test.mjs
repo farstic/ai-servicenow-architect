@@ -121,6 +121,12 @@ test('no shipped path runs through a test or fixture directory: a covered prefix
   assert.deepEqual(leaked, [], `${leaked.length} test or fixture file(s) ship`);
 });
 
+test('this tree: nothing the runtime reaches is left out of what ships', () => {
+  // The guard over the real tree, in the suite as well as in the contract gate: a reference added anywhere fails here.
+  const refs = unlistedReferences(REAL_ROOT);
+  assert.deepEqual(refs.map((r) => `${r.path} — ${r.from}:${r.line} (${r.kind})`), []);
+});
+
 test('every workspace the root package.json and package-lock.json name ships its package.json (npm ci needs it)', () => {
   const pkg = JSON.parse(readFileSync(join(REAL_ROOT, 'package.json'), 'utf8'));
   const lock = JSON.parse(readFileSync(join(REAL_ROOT, 'package-lock.json'), 'utf8'));
