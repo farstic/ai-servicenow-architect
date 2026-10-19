@@ -11,13 +11,13 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 - **named-only** — a record names it, and no sitting has yet confirmed a call.
 - **unverified** — nothing shows it has run against an instance.
 
-**live coverage: 399 tools in 37 families — verified-live 2, refused 0, named-only 25, unverified 372; 27 tools named in a record, 29 families with none; 36 families with no tool verified live.**
+**live coverage: 399 tools in 37 families — verified-live 5, refused 0, named-only 25, unverified 369; 32 tools named in a record, 27 families with none; 34 families with no tool verified live.**
 
 ## By family
 
 | Family | Tools | Verified live | Refused | Named only | Unverified | Named in a record |
 |---|---|---|---|---|---|---|
-| `core` | 27 | 0 | 0 | 7 | 20 | 7 |
+| `core` | 27 | 1 | 0 | 6 | 20 | 7 |
 | `scr` | 27 | 0 | 0 | 4 | 23 | 4 |
 | `intg` | 19 | 0 | 0 | 0 | 19 | 0 |
 | `sec` | 19 | 0 | 0 | 0 | 19 | 0 |
@@ -43,18 +43,18 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | `chg` | 7 | 0 | 0 | 0 | 7 | 0 |
 | `devops` | 7 | 0 | 0 | 0 | 7 | 0 |
 | `fluent` | 7 | 0 | 0 | 1 | 6 | 1 |
-| `inc` | 7 | 0 | 0 | 0 | 7 | 0 |
+| `inc` | 7 | 2 | 0 | 1 | 4 | 4 |
 | `kb` | 7 | 0 | 0 | 0 | 7 | 0 |
 | `va` | 7 | 0 | 0 | 0 | 7 | 0 |
 | `ai` | 4 | 2 | 0 | 0 | 2 | 2 |
 | `cmdb` | 4 | 0 | 0 | 0 | 4 | 0 |
 | `nas` | 4 | 0 | 0 | 0 | 4 | 0 |
-| `prb` | 4 | 0 | 0 | 0 | 4 | 0 |
+| `prb` | 4 | 0 | 0 | 0 | 4 | 1 |
 | `studio` | 4 | 0 | 0 | 0 | 4 | 0 |
 | `tsk` | 4 | 0 | 0 | 0 | 4 | 0 |
 | `orch` | 3 | 0 | 0 | 1 | 2 | 1 |
 | `disco` | 1 | 0 | 0 | 1 | 0 | 1 |
-| **all** | **399** | **2** | **0** | **25** | **372** | **27** |
+| **all** | **399** | **5** | **0** | **25** | **369** | **32** |
 
 ## By tool
 
@@ -83,7 +83,7 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | `snow_core_record_modify` | unverified | — | — | — | — | 0 |
 | `snow_core_record_read` | named-only | `docs/PLATFORM-NOTES.md` | 2026-10-17 | Brazil patch 0 | — | 1 |
 | `snow_core_record_remove` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 3 |
-| `snow_core_records_query` | named-only | `docs/validation/2.0.11-rc.1-live-sitting.md` | — | — | — | 2 |
+| `snow_core_records_query` | verified-live | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | — | 3 |
 | `snow_core_relationships_index` | unverified | — | — | — | — | 0 |
 | `snow_core_service_mapping_summary_read` | unverified | — | — | — | — | 0 |
 | `snow_core_status_read` | unverified | — | — | — | — | 0 |
@@ -543,11 +543,11 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | Tool | Status | Record | Date | Instance family | Note | Named in |
 |---|---|---|---|---|---|---|
 | `snow_inc_comment_annotate` | unverified | — | — | — | — | 0 |
-| `snow_inc_incident_add` | unverified | — | — | — | — | 0 |
+| `snow_inc_incident_add` | verified-live | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | — | 1 |
 | `snow_inc_incident_close` | unverified | — | — | — | — | 0 |
-| `snow_inc_incident_modify` | unverified | — | — | — | — | 0 |
-| `snow_inc_incident_read` | unverified | — | — | — | — | 0 |
-| `snow_inc_incident_resolve` | unverified | — | — | — | — | 0 |
+| `snow_inc_incident_modify` | verified-live | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | — | 1 |
+| `snow_inc_incident_read` | unverified | — | — | — | — | 1 |
+| `snow_inc_incident_resolve` | named-only | `docs/validation/2026-10-19-itsm-sweep.md` | 2026-10-19 | Brazil patch 0 | ARC-09-C184 found (resolved_at stored as the date alone); re-run on the next rc | 1 |
 | `snow_inc_work_note_annotate` | unverified | — | — | — | — | 0 |
 
 ### `kb`
@@ -608,7 +608,7 @@ fails when a manifest tool has no entry, or an entry's evidence does not hold.
 | `snow_prb_problem_add` | unverified | — | — | — | — | 0 |
 | `snow_prb_problem_modify` | unverified | — | — | — | — | 0 |
 | `snow_prb_problem_read` | unverified | — | — | — | — | 0 |
-| `snow_prb_problem_resolve` | unverified | — | — | — | — | 0 |
+| `snow_prb_problem_resolve` | unverified | — | — | — | — | 1 |
 
 ### `studio`
 
