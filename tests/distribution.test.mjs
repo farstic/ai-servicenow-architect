@@ -45,6 +45,10 @@ function plantedTree(t) {
     "  readFileSync(join(root, 'docs/unlisted-data.json'), 'utf8');",
     "  readFileSync(join(root, 'docs', 'unlisted', 'joined.json'), 'utf8');",
     "  const remedy = 'run node scripts/unlisted-remedy.mjs, then re-run the doctor';",
+    '  // distribution: path list — the files a scan classifies, by name; an absent one is simply not scanned',
+    "  const roots = ['docs/listed-root.md',",
+    "    'docs/listed-root-2.md'];",
+    "  existsSync(join(root, 'packages', 'x', 'node_modules', '@y', 'z', 'package.json'));",
     '  // a comment naming ' + BT + 'docs/only-in-a-comment.md' + BT + ' is not a reference',
     "  if (isEngineeringCheckout(root)) await import('../../../scripts/lib/gated.mjs');",
     '  return b;',
@@ -58,7 +62,8 @@ function plantedTree(t) {
   put(root, 'docs/unlisted/joined.json', '{}\n');
   put(root, 'scripts/unlisted-remedy.mjs', '\n');
   put(root, '.claude/skills/x/SKILL.md', 'Read ' + BT + 'docs/unlisted-doc.md' + BT + ' first, then ' + BT
-    + '.claude/skills/x/SKILL.md' + BT + '.\n');
+    + '.claude/skills/x/SKILL.md' + BT + '.\nMaintainers run ' + BT + 'tests/maintainers.test.mjs' + BT
+    + ' (in the engineering checkout).\n');
   put(root, 'docs/unlisted-doc.md', '# x\n');
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['add', '-A']);
