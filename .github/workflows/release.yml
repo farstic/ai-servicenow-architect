@@ -59,27 +59,59 @@ jobs:
       - name: The committed dist/ is what the source builds
         run: node scripts/contract-gate.mjs
 
-      # A real design-only install, on this platform, at this version — which is what makes the
-      # metrics below a measurement rather than an estimate.
-      # ARC-08-C27 — `always()` here too, because the doctor below reports on WHAT THIS STEP MADE.
+      # ARC-09-C185b — THE INSTALL HALF RUNS ON THE STAGED DISTRIBUTION TREE. From 2.2.1 a user installs farstic/snowarch,
+      # whose tree is this tag's shipped files staged as one commit, not this repository's checkout. So the gates above
+      # test the source here, and everything below installs, verifies and measures what a user gets: the tag staged as
+      # `scripts/distribution.mjs stage` stages it, with no tag of its own, so E-32 checks every file against the signed
+      # manifest by its hash. An rc's tree is staged too, though it is never published there: every rc proves the
+      # distribution's shape, and a final meets nothing for the first time.
       #
-      # `npm test` runs before it, so rc.8's failure skipped this, which skipped the doctor, which
-      # left the `always()` upload with `No files were found`. Making only the doctor unconditional
-      # would have produced a report about a tree that was never installed — an answer to a
-      # different question from the one the artifact exists for, and `install-metrics.mjs` measures
-      # the same install.
-      #
-      # If the bootstrap itself fails, all three fail and say so, which is the truth about that run.
-      - name: Install, design-only
+      # ARC-08-C27 — `always()` on the stage, the install and the doctor, because the doctor reports on WHAT THEY MADE.
+      # `npm test` runs before them, so rc.8's failure skipped the install, which skipped the doctor, which left the
+      # `always()` upload with `No files were found`: a red release run carried no evidence at all, and the artifact
+      # exists to explain a failure. If the install itself fails, all three fail and say so, which is the truth about
+      # that run.
+      - name: Stage the tag as the distribution tree
         if: always()
-        run: node tools/snowarch/bin/snowarch.mjs bootstrap --mode design --yes --skip-claude-check
+        shell: bash
+        run: node scripts/distribution.mjs stage "$RUNNER_TEMP/dist" "${{ github.ref_name }}"
+      # ARC-09-C185b — a final's distribution tag is pushed before this one (CONTRIBUTING's release checklist), so it is
+      # there to compare, and the tree a user clones must be the tree staged here. Read-only, over the network this job
+      # already uses for `npm ci`; for a final a fetch that fails fails the job. An rc stays in this repository and is
+      # never published there (the owner's rule), so it has no distribution tag, and the step says so.
+      - name: The distribution's tag is this tag staged
+        shell: bash
+        run: |
+          TAG='${{ github.ref_name }}'
+          if node -e "import('./tools/snowarch/lib/release/tag.mjs').then(m => process.exit(m.isPrerelease('$TAG') ? 0 : 1))"; then
+            echo "$TAG is an rc: rcs stay in this repository and the distribution carries finals, so there is no tag to compare"
+            exit 0
+          fi
+          REPO=$(node -p "require('./engine.config.json').repo")
+          git -C "$RUNNER_TEMP/dist" fetch --no-tags "https://github.com/$REPO.git" "refs/tags/$TAG"
+          public=$(git -C "$RUNNER_TEMP/dist" rev-parse 'FETCH_HEAD^{tree}')
+          staged=$(git -C "$RUNNER_TEMP/dist" rev-parse 'HEAD^{tree}')
+          echo "$REPO $TAG is tree $public; staged here, tree $staged"
+          [ "$public" = "$staged" ]
+      - name: Install the distribution tree, design-only
+        if: always() && runner.os != 'Windows'
+        working-directory: ${{ runner.temp }}/dist
+        run: ./bootstrap.sh --mode design --yes --skip-claude-check
+      - name: Install the distribution tree, design-only (Windows)
+        if: always() && runner.os == 'Windows'
+        working-directory: ${{ runner.temp }}/dist
+        shell: cmd
+        run: |
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check
+          if not "%ERRORLEVEL%"=="0" exit /b 1
       # ARC-11-C6: the launcher's `docs verify` is outside the allowed set, and this job holds no licence.
       # `scripts/docs.mjs verify` is the same function with the same arguments and the same report, which
       # the release gate already runs (tests/release-docs-gate.test.mjs holds the parity).
       - name: Every citation resolves against the pinned corpus
+        working-directory: ${{ runner.temp }}/dist
         run: node scripts/docs.mjs verify
 
-      # `--no-network --no-cache`: the report has to be about this checkout and nothing else, and it
+      # `--no-network --no-cache`: the report has to be about this install and nothing else, and it
       # is about to be published where anyone can read it.
       # ARC-09-C19. Exit 1 means "a check FAILED", and one does here on purpose: a hosted runner has
       # no Claude Code, so E-00 reports it missing. The step used to let `-e` decide, so rehearsal
@@ -93,16 +125,6 @@ jobs:
       #
       # Nothing here fakes a Claude Code to make the number nicer: the asset is published where
       # anyone can read it, and a lie in it would be worse than a FAIL that is explained.
-      # ARC-08-C27 — `if: always()`, on the doctor and on everything that reads it.
-      #
-      # v2.0.0-rc.8's `verify` failed at `npm test`, so this step never ran, so
-      # `doctor-<os>.json` was never written — and the `always()` upload below then failed on
-      # `No files were found`. **A red release run carried no evidence at all**, which is the run
-      # where the evidence matters most: the artifact exists to explain a failure, and it was
-      # collected only when there was nothing to explain.
-      #
-      # Same reasoning as `ci.yml`'s doctor artifact, which has said `if: always()` since it was
-      # written — this workflow simply never had the failure that shows why.
       #
       # ARC-11-C6 step 5 — THE EVIDENCE IS THE LICENSED PICTURE (the architect's ruling). From 2.0.13 E-31 FAILs
       # where no licence is in force, and a FAIL on every tag's evidence would teach everyone to ignore a FAIL.
@@ -119,6 +141,7 @@ jobs:
       - name: The doctor, on the install just made
         if: always()
         shell: bash
+        working-directory: ${{ runner.temp }}/dist
         env:
           NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}
           SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}
@@ -127,7 +150,7 @@ jobs:
           set +e
           if [ -d .local ]; then cp -Rn .local/. "$SNOWARCH_STATE_ROOT/.local/"; fi
           node tools/snowarch/bin/snowarch.mjs doctor --json --no-network --no-cache \
-            > doctor-${{ matrix.os }}.json
+            > "$GITHUB_WORKSPACE/doctor-${{ matrix.os }}.json"
           code=$?
           set -e
           echo "doctor exit: $code"
@@ -137,18 +160,22 @@ jobs:
       # what started this row — a judgement step that runs anyway adds a second red step that is not
       # the cause, and on a job whose INSTALL failed it would judge a garbage report loudly. The
       # artifact carries the doctor either way, which is what was actually missing.
+      #
+      # `--deps` stays at its default, `absent` (ARC-09-C185b): `npm ci` ran in this checkout for the gates above,
+      # never in the distribution tree, so a server check that answers there means something installed too early.
+      # And E-32 must read ok: a FAIL is already refused by `--expect-fail E-00`, and a skip would mean the tree was
+      # taken for a development one, so the file-by-file verification is asserted, not inferred.
       - name: Judge the report — E-00 is this environment's, nothing else is
         shell: bash
-        # `--deps installed` (ARC-09-C20): this job runs `npm ci` before the doctor, for its lint
-        # and test gates, so the server checks legitimately answer here. The bootstrap cells keep
-        # the default, `absent`, where an answering SV check means something installed too early.
         run: |
-          node scripts/ci/assert-doctor.mjs --in doctor-${{ matrix.os }}.json \
-            --expect-fail E-00 --deps installed
+          node scripts/ci/assert-doctor.mjs --in doctor-${{ matrix.os }}.json --expect-fail E-00
+          node -e "const r = require('./doctor-${{ matrix.os }}.json'); const c = r.checks.find((x) => x.id === 'E-32');
+            if (c?.status !== 'ok') { console.error('E-32 is ' + (c?.status ?? 'absent') + ': ' + (c?.detail ?? '')); process.exit(1); }
+            console.log(c.detail);"
       - name: What the install cost here
         if: always()
         shell: bash
-        run: node scripts/ci/install-metrics.mjs ${{ matrix.os }} > install-metrics-${{ matrix.os }}.json
+        run: node scripts/ci/install-metrics.mjs ${{ matrix.os }} --root "$RUNNER_TEMP/dist" > install-metrics-${{ matrix.os }}.json
 
       - uses: actions/upload-artifact@v4
         if: always()

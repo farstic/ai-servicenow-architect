@@ -13,6 +13,7 @@
  *   node scripts/release.mjs <x.y.z> [--dry-run] [--yes] [--push] [--tag-only]
  *                                    [--allow-branch <name>] [--allow-prerelease]
  *                                    [--offline] [--no-install] [--sign]
+ *                                    [--distribution <clone>]
  *
  * Exit 0 released (or nothing to do) · 1 a gate failed · 2 preflight refused.
  *
@@ -26,6 +27,11 @@
  *   2. A pull request to `main`. CI runs the required checks on the release commit itself.
  *   3. `node scripts/release.mjs <x.y.z> --tag-only` on `main` at the merge commit — the tag.
  *   4. `git push origin v<x.y.z>`.
+ *
+ * ARC-09-C185b — from 2.2.1 a FINAL is installed from farstic/snowarch, so between steps 3 and 4 the tag is staged into a
+ * clone of it, signed from that clone, and pushed there first; step 4 is then `--tag-only --push --distribution <clone>`,
+ * which pushes this repository's tag only when the clone's tag is this tag staged and its signed manifest is published.
+ * An rc stays in this repository and keeps the gate it had.
  *
  * Stdlib only, and no shell anywhere: a maintainer may release from Windows, where there is no
  * bash and `npm` is `npm.cmd`.
@@ -45,7 +51,8 @@ import { EXIT_PREFLIGHT, preflight } from './lib/release/preflight.mjs';
 import { buildTagMessage } from '../tools/snowarch/lib/release/tag.mjs';
 import { publishedManifestMatches } from './lib/release/manifest-gate.mjs';
 import { PRODUCT_KEYS } from '../tools/snowarch/lib/licence/keys.mjs';
-import { signedRelease } from '../tools/snowarch/lib/licence/manifest.mjs';
+import { distributedRelease, DISTRIBUTION_FROM, signedRelease } from '../tools/snowarch/lib/licence/manifest.mjs';
+import { stagedDiffers } from './lib/distribution.mjs';
 import { spellings } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { applyWrites, rollback, STAGED } from './lib/release/writers.mjs';
 
@@ -53,7 +60,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 const FLAGS = ['--dry-run', '--yes', '--push', '--tag-only', '--allow-prerelease', '--offline',
   '--no-install', '--sign'];
-const VALUE_FLAGS = ['--allow-branch', '--root'];
+const VALUE_FLAGS = ['--allow-branch', '--root', '--distribution'];
 
 export function parseArgs(argv) {
   const flags = {};
@@ -100,6 +107,15 @@ export async function release({
   const parsed = parseArgs(argv);
   if (parsed.error) { fail(parsed.error); return EXIT_PREFLIGHT; }
   const { version, flags } = parsed;
+  // ARC-09-C185b — the distribution clone is read only by the pass that pushes a tag.
+  if ('distribution' in flags && !(flags['tag-only'] && flags.push)) {
+    fail('release: --distribution goes with --tag-only --push');
+    return EXIT_PREFLIGHT;
+  }
+  if ('distribution' in flags && !flags.distribution) {
+    fail('release: --distribution needs the path of your clone of farstic/snowarch');
+    return EXIT_PREFLIGHT;
+  }
 
   // `git` returns stdout, `null` when the command failed and the caller allowed it to — and THROWS
   // otherwise. An earlier version returned an empty string for an unexpected failure, and the
@@ -197,6 +213,19 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
       return EXIT_PREFLIGHT;
     }
     if (flags['dry-run']) { write(tagMessage); return 0; }
+    // ARC-09-C185b — refused before anything is made: a final from 2.2.1 leaves only beside its staged distribution, and
+    // an rc, or a final before it, never has one.
+    const distributed = distributedRelease(tag);
+    if (flags.push && distributed && !flags.distribution) {
+      fail(`release: from ${DISTRIBUTION_FROM} a final release is installed from farstic/snowarch — give --distribution and `
+        + `the path of your clone of it, where ${tag} is staged and its manifest signed; nothing was pushed`);
+      return EXIT_PREFLIGHT;
+    }
+    if (flags.distribution && !distributed) {
+      fail(`release: ${tag} is released from this repository alone — --distribution is for a final from `
+        + `${DISTRIBUTION_FROM} on; nothing was pushed`);
+      return EXIT_PREFLIGHT;
+    }
     if (existing) write(`${tag} is already tagged, at HEAD`);
     else createTag({ root, version, tagMessage, sign: flags.sign });
     if (!signedRelease(tag)) {
@@ -206,15 +235,27 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
     }
     const cli = spellings({ platform }).cli;
     if (!flags.push) {
-      write(`Tagged ${tag}. Before it is pushed, sign its manifest with ${cli} licence sign-release ${tag}, giving --key `
+      write(distributed ? `Tagged ${tag}. Before it is pushed, ${toDistribution(tag, cli)}`
+        : `Tagged ${tag}. Before it is pushed, sign its manifest with ${cli} licence sign-release ${tag}, giving --key `
         + 'the path of your primary key and --list your clone of the licences repository, and publish it as that command '
         + `prints. Then run this again with --tag-only --push.`);
       return 0;
     }
-    const signed = publishedManifestMatches(root, tag, { config, keys });
+    // The manifest of a distributed final is the CLONE's: signed there, over the distribution commit. So the clone is
+    // first shown to be this tag staged, and only then is its manifest asked about.
+    let signedIn = root;
+    if (distributed) {
+      signedIn = resolve(flags.distribution);
+      const differs = stagedDiffers(root, signedIn, tag);
+      if (differs) { fail(`release: ${differs} — nothing was pushed`); return EXIT_PREFLIGHT; }
+      write(`distribution: ${tag} in ${signedIn} is this tag staged (tree `
+        + `${gitRun(['-C', signedIn, 'rev-parse', `refs/tags/${tag}^{tree}`]).trim().slice(0, 7)})`);
+    }
+    const signed = publishedManifestMatches(signedIn, tag, { config, keys });
     if (!signed.ok) {
-      fail(`release: ${tag} has no verified signed manifest (${signed.reason}) — nothing was pushed. Sign it with `
-        + `${cli} licence sign-release ${tag}, publish it, and run --tag-only --push again.`);
+      fail(`release: ${tag} has no verified signed manifest (${signed.reason}) — nothing was pushed. Sign it `
+        + `${distributed ? 'from that clone ' : ''}with ${cli} licence sign-release ${tag}, publish it, and run `
+        + `--tag-only --push${distributed ? ' --distribution' : ''} again.`);
       return EXIT_PREFLIGHT;
     }
     write(`release manifest: ${tag} is signed, and it is the record of this tag's tree (${signed.files} files)`);
@@ -350,8 +391,11 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   // ARC-11-C7 — a tag from 2.1 on leaves this machine only with its signed manifest published, and it cannot have one
   // yet: the manifest is signed from the tag. So this pass stops at the tag, and `--tag-only --push` pushes it.
   if (signedRelease(`v${version}`)) {
-    write(`Released v${version} (commit ${short}), tagged and not pushed. Sign its manifest with `
-      + `${spellings({ platform }).cli} licence sign-release v${version}, publish it, then run this again with --tag-only --push.`);
+    const cli = spellings({ platform }).cli;
+    write(distributedRelease(`v${version}`)
+      ? `Released v${version} (commit ${short}), tagged and not pushed. Before it is pushed, ${toDistribution(`v${version}`, cli)}`
+      : `Released v${version} (commit ${short}), tagged and not pushed. Sign its manifest with `
+        + `${cli} licence sign-release v${version}, publish it, then run this again with --tag-only --push.`);
     if (flags.push) {
       fail(`release: v${version} is pushed only with its signed manifest published — nothing was pushed`);
       return EXIT_PREFLIGHT;
@@ -361,6 +405,19 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   write(`Released v${version} (commit ${short}) — push with: git push origin ${pre.branch} --follow-tags`);
   if (flags.push) runChild(['git', 'push', 'origin', pre.branch, '--follow-tags']);
   return 0;
+}
+
+/**
+ * ARC-09-C185b — what a final from DISTRIBUTION_FROM on needs between its tag and its push, one wording for both passes
+ * that stop at the tag. The steps are the order CONTRIBUTING's release checklist gives, in words rather than with a
+ * placeholder a maintainer could paste.
+ */
+function toDistribution(tag, cli) {
+  return `stage it into your clone of farstic/snowarch: node scripts/distribution.mjs stage, then that clone's path, `
+    + `then ${tag} --tag, with --onto main once the clone has a commit. Sign its manifest from that clone with ${cli} `
+    + `licence sign-release ${tag}, giving --key the path of your primary key and --list your clone of the licences `
+    + `repository, and publish it as that command prints. Push that clone's main and ${tag}. Then run this again with `
+    + `--tag-only --push --distribution and that clone's path.`;
 }
 
 /** `git tag -a -F <file>`: the message goes through a file, never through argv. */

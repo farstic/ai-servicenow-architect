@@ -83,6 +83,10 @@ moves once, from its folder: `git remote set-url origin https://github.com/farst
   ledger moves to 5 tools verified live.
 - `scripts/distribution.mjs` checks, exports and stages the distribution tree; the contract gate's generated step runs
   its check (ARC-09-C185a).
+- `scripts/release.mjs --tag-only --push` pushes a final from 2.2.1 only with `--distribution` and a clone of
+  farstic/snowarch whose tag is that tag staged and whose manifest is signed from it. `release.yml` installs, judges and
+  measures the staged tree on three OSes and compares the distribution tag's tree. An rc keeps the gate it had
+  (ARC-09-C185b).
 
 ## 2.2.0 — 2026-10-17
 
