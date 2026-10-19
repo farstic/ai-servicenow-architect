@@ -44,8 +44,28 @@ export const EXCEPTIONS = Object.freeze([
     reason: 'E-21 imports L06 only behind isEngineeringCheckout: it runs the generators, maintainers\' tools' },
 ]);
 
+/**
+ * Documents the guard does not read for citations, each with its reason. One today: ARCHITECTURE.md maps the
+ * engineering tree for whoever reads the design, and its preamble says those paths are in the engineering checkout.
+ */
+export const DOC_EXEMPTIONS = Object.freeze([
+  { doc: 'docs/ARCHITECTURE.md', reason: 'it maps the engineering checkout, and its preamble says the paths it cites '
+    + 'under tests/, scripts/, docs/plans, docs/spikes and docs/decisions exist there, not in an install' },
+]);
+
 /** Paths a user's install creates at run time: never in the repository, so never shipped. */
 const RUNTIME_LOCAL = Object.freeze(['.local/', '.claude/settings.local.json', 'clients/']);
+const madeAtRunTime = (path) => RUNTIME_LOCAL.some((x) => path === x || path.startsWith(x))
+  || path.startsWith('node_modules/') || path.includes('/node_modules/');   // `npm ci` makes these
+
+/** A doc line that says where the path lives names it for a maintainer; it does not send a user to it. */
+const ENGINEERING_POINTER = /\bin the engineering checkout\b/i;
+
+/**
+ * The named marker for a path list a scan classifies by — `// distribution: path list — <reason>` above it. The
+ * list's paths are names the scan compares against, not files it opens; an absent one is simply not scanned.
+ */
+const PATH_LIST_MARKER = /\/\/\s*distribution: path list\b/;
 
 const git = (root, args) => execFileSync('git', ['-C', root, ...args],
   { encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -207,11 +227,23 @@ const JOINED = /\b(?:join|resolve)\(\s*[^'"`,()]+,((?:\s*['"][^'"]+['"]\s*,)*\s*
 const TOP = /^(?:\.claude|scripts|tests|docs|templates|governance|packages|tools|vendor)$/;
 const CODE = /\.(mjs|cjs|js)$/;
 
-/** Lines of code, with the comment lines blanked: a path a comment names is not a reference. */
+/**
+ * Lines of code, with the comment lines blanked: a path a comment names is not a reference. A path list under the
+ * named marker is blanked too, from its opening `[` to the bracket that closes it.
+ */
 function codeLines(text) {
   let block = false;
+  let list = 0;          // 0 outside a marked list; otherwise the bracket depth inside it (-1: marker seen, no `[` yet)
   return text.split('\n').map((line) => {
     const t = line.trim();
+    if (PATH_LIST_MARKER.test(line)) { list = -1; return ''; }
+    if (list !== 0) {
+      for (const ch of line) {
+        if (ch === '[') list = list === -1 ? 1 : list + 1;
+        else if (ch === ']' && list > 0) list -= 1;
+      }
+      return '';
+    }
     if (block) { if (t.includes('*/')) block = false; return ''; }
     if (t.startsWith('/*')) { if (!t.includes('*/')) block = true; return ''; }
     if (t.startsWith('//') || t.startsWith('*')) return '';
@@ -240,7 +272,8 @@ export function unlistedReferences(root, { coverage = COVERAGE, entries = RUNTIM
   const findings = [];
   const report = (path, from, line, kind) => {
     if (path.startsWith('vendor/ServiceNowDocs')) return;          // the corpus: fetched by the docs pin, not shipped
-    if (RUNTIME_LOCAL.some((x) => path === x || path.startsWith(x))) return;   // the user's own files, made at run time
+    if (madeAtRunTime(path)) return;                                // the user's own files and dependencies
+    if (coverage.excludes.includes(path)) return;                   // the coverage naming what it leaves out
     if (ships(path, coverage, shipped) || excepted(exceptions, from, path)) return;
     findings.push({ path, from, line, kind });
   };
@@ -277,12 +310,14 @@ export function unlistedReferences(root, { coverage = COVERAGE, entries = RUNTIM
   }
 
   // 3: what the shipped documents cite.
-  const docs = shipped.filter((p) => p.endsWith('.md') && !isHistory(p)
+  const docs = shipped.filter((p) => p.endsWith('.md') && !isHistory(p) && !DOC_EXEMPTIONS.some((e) => e.doc === p)
     && (surfaces === null || surfaces.some((s) => p === s || p.startsWith(s))));
   for (const doc of docs) {
     // An HTML comment is not rendered: a generated file's header naming its generator points nobody anywhere.
-    const rendered = readFileSync(join(root, doc), 'utf8').replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '));
-    for (const { path, line } of citedPaths(rendered.split('\n'))) {
+    const lines = readFileSync(join(root, doc), 'utf8').replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '))
+      .split('\n');
+    for (const { path, line } of citedPaths(lines)) {
+      if (ENGINEERING_POINTER.test(lines[line - 1] ?? '')) continue;
       report(path, doc, line, 'doc');
     }
   }
