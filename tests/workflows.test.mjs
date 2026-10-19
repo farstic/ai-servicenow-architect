@@ -1426,8 +1426,11 @@ test('ARC-09-C185a — distribution installs the staged tree on three OSes and j
   // The tree under test is the STAGED one, not this checkout: every install step runs in it.
   assert.ok(job.includes('node scripts/distribution.mjs stage "$RUNNER_TEMP/dist" HEAD'), 'HEAD is not staged');
   assert.ok(job.split('working-directory: ${{ runner.temp }}/dist').length - 1 >= 4, 'a step runs outside the staged tree');
-  assert.ok(job.includes('./bootstrap.sh --mode design --yes --skip-claude-check'));
-  assert.ok(job.includes('call .\\bootstrap.cmd --mode design --yes --skip-claude-check'));
+  // Both installs, found as the bootstrap cells' test finds them: by an escaped pattern, never a spelled launcher
+  // (the launcher audit reads every literal one as a site to account for).
+  const installs = job.split('\n').map((l) => l.trim())
+    .filter((l) => /^(run: )?(call )?\.[\\/]bootstrap\.(sh|cmd) --mode design --yes --skip-claude-check$/.test(l));
+  assert.equal(installs.length, 2, 'the POSIX and the Windows install of the staged tree');
   assert.ok(job.includes('doctor --json --no-network --no-cache'), 'a cached or networked doctor');
   assert.ok(job.includes(`--expect-fail ${EXPECTED_FAIL_ON_RUNNERS.join(',')}`),
     'the judge allows other failures than the bootstrap cells\' runner-expected ones');
