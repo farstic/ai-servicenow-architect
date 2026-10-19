@@ -10,14 +10,15 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { fileURLToPath } from 'node:url';
 
 import {
   classifyGitFetchError, doctorLines, licenceNotice, parseSemver, refusesTarget, renderPlan, returnRef, sortTags,
-  targetRefusalLines,
+  targetRefusalLines, upgradeCommand,
 } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { LAST_UNENFORCED_RELEASE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
 import { branchState, describe } from '../../tools/snowarch/lib/git.mjs';
@@ -55,6 +56,68 @@ test('the classifier names a remedy only for a shape it recognises', () => {
     { kind: 'unknown', line: null });
   assert.deepEqual(classifyGitFetchError(''), { kind: 'unknown', line: null });
   assert.deepEqual(classifyGitFetchError(undefined), { kind: 'unknown', line: null });
+});
+
+// ── ARC-09-C190 — the fetch never asks ───────────────────────────────────────────────────────────────────────────
+
+const AUTH_LINE = 'upgrade: origin asked for credentials, or was not found — it may be private or moved; check it with '
+  + 'git remote get-url origin; nothing was changed';
+
+test('ARC-09-C190 — the classifier names an origin that wants a credential, or is not there, as auth', () => {
+  // Git's words for the three answers, as measured: prompts off, a refused credential, and GitHub on a private repository.
+  for (const stderr of [
+    "fatal: could not read Username for 'https://github.com': terminal prompts disabled",
+    "remote: Invalid username or password.\nfatal: Authentication failed for 'https://github.com/o/n.git/'",
+    "remote: Repository not found.\nfatal: repository 'https://github.com/o/n.git/' not found",
+  ]) {
+    assert.deepEqual(classifyGitFetchError(stderr, { remote: 'origin' }), { kind: 'auth', line: AUTH_LINE }, stderr);
+  }
+  // A proxy's 407 is still the proxy's, and a refused connection still a refused connection.
+  assert.equal(classifyGitFetchError('Received HTTP code 407 from proxy after CONNECT').kind, 'proxy-auth');
+  assert.equal(classifyGitFetchError('fatal: unable to access \'https://x/\': Failed to connect to 127.0.0.1 port 9: Connection refused').kind, 'proxy');
+});
+
+test('ARC-09-C190 — an origin that wants a credential is answered at once: no askpass, no prompt, the auth line', async (t) => {
+  // A remote that asks for a credential, with no network: a child process answers every request with 401. It is a
+  // separate process because the upgrade's git runs synchronously, and a server in this one could not answer it.
+  const server = spawn(process.execPath, ['-e', [
+    "const s = require('node:http').createServer((q, r) => {",
+    "  r.writeHead(401, { 'WWW-Authenticate': 'Basic realm=\"fixture\"' }); r.end(); });",
+    "s.listen(0, '127.0.0.1', () => process.stdout.write(s.address().port + '\\n'));",
+  ].join('\n')], { stdio: ['ignore', 'pipe', 'inherit'] });
+  t.after(() => server.kill());
+  const port = await new Promise((resolve, reject) => {
+    server.stdout.once('data', (d) => resolve(Number(String(d).trim())));
+    server.once('error', reject);
+  });
+
+  const root = tempDir('snowarch-c190-', t);
+  harnessGit(root, ['init', '-q', '-b', 'main']);
+  writeFileSync(join(root, 'engine.config.json'), readFileSync(join(REPO, 'engine.config.json')));
+  harnessGit(root, ['add', 'engine.config.json']);
+  harnessGit(root, ['commit', '-q', '-m', 'fixture']);
+  harnessGit(root, ['remote', 'add', 'origin', `http://127.0.0.1:${port}/fixture.git`]);
+
+  // An askpass program that leaves a mark: git runs it when it would ask, and the fix is that it never asks. No global
+  // or system configuration, so no credential helper answers in its place on this machine or on a runner.
+  const aside = tempDir('snowarch-c190-askpass-', t);
+  const marker = join(aside, 'asked');
+  const askpass = join(aside, 'askpass.sh');
+  writeFileSync(askpass, `#!/bin/sh\necho asked >> '${marker}'\necho\n`);
+  chmodSync(askpass, 0o755);
+  const empty = join(aside, 'gitconfig');
+  writeFileSync(empty, '');
+  const env = { ...process.env, GIT_ASKPASS: askpass, GIT_CONFIG_GLOBAL: empty, GIT_CONFIG_NOSYSTEM: '1' };
+  for (const k of ['GIT_TERMINAL_PROMPT', 'SSH_ASKPASS', 'GCM_INTERACTIVE']) delete env[k];
+
+  const lines = [];
+  const log = { step: (l) => lines.push(l), fail: (l) => lines.push(`FAIL ${l}`),
+    warn: (l) => lines.push(`WARN ${l}`), ok: (l) => lines.push(String(l)) };
+  const code = await upgradeCommand({ flags: { check: true }, log, root, env, cwd: root });
+  const text = lines.join('\n');
+  assert.equal(existsSync(marker), false, `git ran the askpass program, so a terminal would have prompted:\n${text}`);
+  assert.ok(text.includes(`FAIL ${AUTH_LINE}`), text);
+  assert.notEqual(code, 0, text);
 });
 
 test('a prerelease sorts BELOW the release it precedes, and a non-tag is not a tag', () => {

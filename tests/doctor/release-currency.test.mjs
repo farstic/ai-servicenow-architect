@@ -69,6 +69,24 @@ async function e28(t, { tags = [], localTag = null, head = 'abc1234', now = real
   return E28.run({ root, flags: { noNetwork }, now, exec: gitStub({ tags, localTag, head }) });
 }
 
+test('ARC-09-C190 — E-28 asks the remote with prompts off, and leaves a stored credential to its helper', async (t) => {
+  const root = tempDir('snowarch-e28-', t);
+  const seen = [];
+  const answer = gitStub({ tags: ['v9.1.0'], localTag: 'v9.0.0' });
+  const exec = (cmd, args, opts) => {
+    if (args.includes('ls-remote')) seen.push({ args, env: opts?.env ?? null });
+    return answer(cmd, args);
+  };
+  const r = await E28.run({ root, flags: { noNetwork: false }, now: realClock, exec, env: { MARK: 'kept' } });
+  assert.equal(r.status, 'warn', r.detail);
+  assert.equal(seen.length, 1, 'E-28 did not ask the remote');
+  const { args, env } = seen[0];
+  assert.deepEqual([env?.GIT_TERMINAL_PROMPT, env?.GIT_ASKPASS, env?.SSH_ASKPASS, env?.GCM_INTERACTIVE],
+    ['0', '', '', 'never'], 'git may still prompt');
+  assert.equal(env?.MARK, 'kept', 'the doctor\'s own environment was dropped');
+  assert.equal(args.some((a) => /credential\.helper/.test(a)), false, 'a stored credential would no longer apply');
+});
+
 test('C31 — a newer release tag is a warn, with the clock the runner actually passes', async (t) => {
   const r = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
   assert.equal(r.status, 'warn', `crashed or skipped instead: ${r.detail}`);
