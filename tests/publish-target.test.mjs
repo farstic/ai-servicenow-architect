@@ -87,9 +87,9 @@ test('both repository spellings npm accepts are accepted here (ARC-09-S10)', () 
   // matters is what the field RESOLVES to. npm takes the object and the `github:` shorthand alike,
   // and this repository used the shorthand until this story.
   for (const repository of [
-    'github:farstic/ai-servicenow-architect',
-    { type: 'git', url: 'git+https://github.com/farstic/ai-servicenow-architect.git' },
-    { type: 'git', url: 'https://github.com/farstic/ai-servicenow-architect' },
+    'github:farstic/snowarch',
+    { type: 'git', url: 'git+https://github.com/farstic/snowarch.git' },
+    { type: 'git', url: 'https://github.com/farstic/snowarch' },
   ]) {
     assert.deepEqual(problems(broken({ repository }), `v${manifest.version}`), [], String(JSON.stringify(repository)));
   }

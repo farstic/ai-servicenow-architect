@@ -22,7 +22,7 @@ import {
   existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { bootstrapUser, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
@@ -295,6 +295,58 @@ test('ARC-09-C170 — the from-label is a release tag or the commit, never an im
   const plan2 = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin });
   assert.match(plan2.text, new RegExp(`Upgrade plan: a development tree at ${orphan} → v9\\.1\\.0`), plan2.text);
   assert.doesNotMatch(plan2.text, /import\//);
+}, MINUTES);
+
+// ARC-09-C185c — an install moved to the distribution repository, the move MIGRATION's "An install made before 2.2.1"
+// describes. Its origin is set to a repository that starts at a later release. `git fetch --tags --prune` does NOT drop
+// a tag the new origin lacks (only --prune-tags would): measured, so the install keeps naming the release it is on.
+test('ARC-09-C185c — a release install moved to a new origin keeps its tag, then upgrades from it', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const distribution = join(w.scratch, 'distribution.git');
+  // Through the harness's git(), as every git call here is: core.longpaths on Windows (C27b).
+  git(w.scratch, ['clone', '-q', '--bare', '--no-hardlinks', w.origin, distribution]);
+  git(distribution, ['tag', '-d', 'v9.0.0']);
+  assert.equal(git(distribution, ['tag', '--list', 'v9.0.0']), '');
+  git(w.user, ['remote', 'set-url', 'origin', pathToFileURL(distribution).href]);
+  assert.equal(git(w.user, ['remote', 'get-url', 'origin']), pathToFileURL(distribution).href);
+
+  const check = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.match(check.text, /v9\.2\.0 available \(you are on v9\.0\.0\)/, check.text);
+  // The fetch kept the tag the install was cut from: MIGRATION's sentence, measured.
+  assert.equal(git(w.user, ['tag', '--list', 'v9.0.0']), 'v9.0.0', 'the fetch dropped the install\'s own tag');
+  const plan = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin });
+  assert.match(plan.text, /Upgrade plan: v9\.0\.0 → v9\.1\.0/, plan.text);
+
+  // THE FULL MOVE, as the owner's and the colleague's installs make it (MIGRATION § "An install made before 2.2.1").
+  const licence = join(w.user, '.local/licence.json');
+  const licenceBefore = existsSync(licence) ? sha256(licence) : null;
+  const storeBefore = sha256(storePath(w.user));
+  const engagement = join(w.user, 'clients/acme/acme-engagement-state.md');
+  mkdirSync(join(w.user, 'clients/acme'), { recursive: true });
+  writeFileSync(engagement, '# acme\n');
+  assert.equal(readFileSync(engagement, 'utf8'), '# acme\n');
+  const moved = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(moved.status, 0, moved.text);
+  const target = git(distribution, ['rev-parse', 'v9.1.0^{commit}']);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), target, 'the tree is not at the new origin\'s v9.1.0');
+  // The version of record, as the product reads it (ARC-09-C137: a banner test does not open the file itself).
+  const version = snowarch(w.user, ['version'], { bin: w.bin }).stdout;
+  assert.match(version, /^snowarch 9\.1\.0 · /m, version);
+  assert.match(version, /tag:\s+v9\.1\.0 \(exact\)/, version);
+  // The integrity check reads the new tag's signed manifest, whose commit is the one the new origin's tag names.
+  const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
+  const e32 = (report.checks ?? []).find((c) => c.id === 'E-32');
+  assert.match(e32?.detail ?? '', /^Integrity: verified · v9\.1\.0 · \d+ files$/, JSON.stringify(e32));
+  // What the move leaves alone: the licence, the instance store, an engagement folder.
+  assert.equal(existsSync(licence) ? sha256(licence) : null, licenceBefore, 'the licence state changed');
+  assert.equal(sha256(storePath(w.user)), storeBefore, 'the move touched the credential store');
+  assert.equal(readFileSync(engagement, 'utf8'), '# acme\n', 'the move touched an engagement folder');
+  // The kept tag points at a commit the install already holds, and nothing reads it after the move: currency is read
+  // from the release the tree is on.
+  assert.equal(git(w.user, ['tag', '--list', 'v9.0.0']), 'v9.0.0');
+  const after = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.match(after.text, /v9\.2\.0 available \(you are on v9\.1\.0\)/, after.text);
 }, MINUTES);
 
 // ARC-09-C109 — what counts as an acceptance at `Proceed? [Y/n]`.
