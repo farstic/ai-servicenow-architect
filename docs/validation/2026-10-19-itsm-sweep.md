@@ -19,6 +19,12 @@ The engagement's name, which prefixed the update set, is written `<engagement>`.
 | **Preset** | custom |
 | **Writes allowed** | each write approved in the session, one question per call |
 
+## Install timeline
+
+A development tree at develop `23f85222` (2.2.1-dev), run live against `pditestdoit`. A development tree is exempt
+from the integrity check, which is why E-32 was skipped, and the licence is enforced. The install's own steps were not
+transcribed.
+
 ## Doctor summary
 
 Status printed `Mode: live — instance=pditestdoit (pdi) preset=custom`, with the Engine at 2.2.1-dev and the roster
