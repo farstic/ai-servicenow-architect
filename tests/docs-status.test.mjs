@@ -106,7 +106,7 @@ test('criterion 4 — pin ≠ gitlink: the docs-bump remedy, not the sync one', 
 
   const s = docsStatus({ root: w.root });
   assert.equal(s.pinMatchesGitlink, false);
-  const f = formatStatus(s);
+  const f = formatStatus(s, spellings(), { engineering: true });   // the maintainer's case, in the engineering checkout
   assert.equal(f.code, 1);
   assert.match(f.text, new RegExp(`maintainer: node scripts/docs-bump\\.mjs --to ${upstream.pin}`));
 });

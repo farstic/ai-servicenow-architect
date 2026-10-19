@@ -14,6 +14,7 @@ import { statePath } from '../local-paths.mjs';
 import { ALWAYS_DIRS, CORPUS_DIR, MODE, ROOT_FILES, readAreas } from './sync.mjs';
 import { verifyCitations } from './verify.mjs';
 import { needSpell, spellings } from '../text.mjs';
+import { restoreRemedy } from '../licence/manifest.mjs';
 
 /**
  * The doctor's E-12 line, owned here and imported by ARC-08 — never retyped.
@@ -306,7 +307,9 @@ const mb = (b) => (b === null ? '—' : `${Math.round(b / 1_000_000)} MB`);
   // which; everything else takes the spelling required. `loadState` is why the rule is that
   // narrow — it had ten callers and seven held a ctx, and a default would have handed each the
   // process.
-export function formatStatus(s, spell = spellings()) {
+// ARC-09-C185a — `engineering`: whether this tree is the engineering checkout, where the maintainer moves the pin. The
+// caller says so (isEngineeringCheckout); an install reads E-32's remedy instead, because its pin is a shipped file.
+export function formatStatus(s, spell = spellings(), { engineering = false } = {}) {
   if (!s.present) {
     return {
       text: [
@@ -327,7 +330,7 @@ export function formatStatus(s, spell = spellings()) {
     s.headMatchesPin && s.pinMatchesGitlink !== false,
     s.pinMatchesGitlink === false
       // S01's lint prints this sentence too; the two must not diverge. S07/S09 own the script.
-      ? `maintainer: node scripts/docs-bump.mjs --to ${s.gitlink ?? '<gitlink>'}`
+      ? (engineering ? `maintainer: node scripts/docs-bump.mjs --to ${s.gitlink ?? '<gitlink>'}` : restoreRemedy(spell.cli))
       : 'run node scripts/docs.mjs sync');
 
   add('family', `${s.family}  branch ${s.branch ?? '—'}`, s.familyMatches === true,

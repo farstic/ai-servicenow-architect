@@ -22,6 +22,7 @@ import { prefix } from '../../../../../packages/contract/lib/contract.mjs';
 import { checkContract } from '../../steps/B05.mjs';
 import { defineCheck } from '../registry.mjs';
 import { isEngineeringCheckout } from '../../engineering-checkout.mjs';
+import { restoreRemedy } from '../../licence/manifest.mjs';
 
 import { fail, ok, skip } from './result.mjs';
 
@@ -55,13 +56,20 @@ export function lintContextFor(ctx) {
 
 const where = (f) => (f.line ? `${f.file}:${f.line}` : f.file);
 
+/**
+ * ARC-09-C185a — the contract, the pin and the lint's inputs are shipped files. In an install a wrong one is E-32's
+ * business, and its remedy is E-32's; the build and the pin are maintainers' tools, named in the engineering checkout.
+ * No command in an install: `doctor --fix` would list one under REFUSED while E-32's own restore is the action it runs.
+ */
+const repair = (ctx, maintainer) => (isEngineeringCheckout(ctx.root) ? maintainer : { remedy: restoreRemedy(cliOf(ctx)) });
+
 /** One lint check, as a doctor result. `lines` shapes the findings a reader sees first. */
 function runLint(ctx, check, { remedy, command, describe }) {
   const lint = lintContextFor(ctx);
   if (!lint.ctx) {
     return fail(`the lint inputs could not be read — ${lint.error}`, {
-      remedy: 'run node scripts/build-dist.mjs, then re-run the doctor',
-      command: 'node scripts/build-dist.mjs',
+      ...repair(ctx, { remedy: 'run node scripts/build-dist.mjs, then re-run the doctor',
+        command: 'node scripts/build-dist.mjs' }),
       data: { ran: false },
     });
   }
@@ -203,8 +211,8 @@ export function engineContractChecks() {
         const lint = lintContextFor(ctx);
         if (!lint.ctx) {
           return fail(`the contract could not be read — ${lint.error}`, {
-            remedy: `users: ${cliOf(ctx)} upgrade · maintainer: node scripts/build-dist.mjs`,
-            command: 'node scripts/build-dist.mjs',
+            ...repair(ctx, { remedy: 'node scripts/build-dist.mjs, then re-run the doctor',
+              command: 'node scripts/build-dist.mjs' }),
             data: { ran: false },
           });
         }
@@ -215,8 +223,7 @@ export function engineContractChecks() {
         return problems.length === 0
           ? ok(`${pinned}… · ${data.required} required of ${data.declared} declared`, data)
           : fail(problems.join(' '), {
-            remedy: 'maintainer: node packages/contract/pin.mjs after reviewing the diff; '
-              + `users: ${cliOf(ctx)} upgrade`,
+            ...repair(ctx, { remedy: 'node packages/contract/pin.mjs, after reviewing the diff' }),
             data: { ...data, problems },
           });
       },

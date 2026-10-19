@@ -140,7 +140,7 @@ export function hostChecks() {
             const ca = inspectCa(String(value));
             if (!ca.ok) {
               problems.push(`NODE_EXTRA_CA_CERTS points at a file where ${ca.reason} — `
-                + 'see "Corporate networks" in packages/snowarch/README.md');
+                + 'see "Corporate networks" in docs/MODES-AND-PRESETS.md');
             }
           }
         }

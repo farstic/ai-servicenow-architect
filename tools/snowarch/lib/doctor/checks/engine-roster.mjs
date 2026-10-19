@@ -12,6 +12,7 @@ import { join } from 'node:path';
 
 import { collectRoster, RosterError } from '../../roster.mjs';
 import { lintAgents, lintSkills } from '../../lint-rules.mjs';
+import { isEngineeringCheckout } from '../../engineering-checkout.mjs';
 import { defineCheck } from '../registry.mjs';
 
 import { fail, ok } from './result.mjs';
@@ -114,8 +115,10 @@ export function engineRosterChecks() {
           ? ok(`${lintOptions(ctx.root, ctx.config).roster ?? '—'} skills · ${agents.files} agents clean`,
             data)
           : fail(problems.slice(0, 10).join('; '), {
-            remedy: 'run `node --test tests/skills-lint.test.mjs tests/agents-lint.test.mjs` '
-              + 'for the full report',
+            // ARC-09-C185a: the lint's own tests are in the engineering checkout; an install corrects what it read.
+            remedy: isEngineeringCheckout(ctx.root)
+              ? 'run `node --test tests/skills-lint.test.mjs tests/agents-lint.test.mjs` for the full report'
+              : 'correct what the findings name: each begins with its rule id and its file',
             data,
           });
       },

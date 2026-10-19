@@ -186,7 +186,7 @@ export function runDocs(argv, { spell = spellings() } = {}) {
       console.log(JSON.stringify(s, null, 2));
       return (0);
     }
-    const { text, code } = formatStatus(s, spell);
+    const { text, code } = formatStatus(s, spell, { engineering: isEngineeringCheckout(root) });
     (code === 0 ? console.log : console.error)(text);
     return (code);
   }

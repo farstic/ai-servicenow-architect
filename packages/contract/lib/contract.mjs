@@ -21,17 +21,22 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The tree-shape predicate: two existsSync calls, so the loader still needs nothing but the stdlib.
+import { isEngineeringCheckout } from '../../../tools/snowarch/lib/engineering-checkout.mjs';
 
 const selfRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 export const CONTRACT_PATH = 'packages/snowarch/dist/contract.json';
 export const PIN_PATH = 'packages/contract/required-tools.json';
 
-/** The pin and the contract disagree. Carries both shas, because "mismatch" alone is not actionable. */
+/**
+ * The pin and the contract disagree. Carries both shas, because "mismatch" alone is not actionable. The maintainer's
+ * tool is named only in the engineering checkout (ARC-09-C185a): in an install both files are shipped, E-32's to put back.
+ */
 export class ContractPinMismatch extends Error {
-  constructor(pinned, actual) {
-    super(`contract sha mismatch: pinned ${pinned.slice(0, 12)}… committed ${actual.slice(0, 12)}… `
-      + '— run node packages/contract/pin.mjs and review the proposal');
+  constructor(pinned, actual, { engineering = true } = {}) {
+    super(`contract sha mismatch: pinned ${pinned.slice(0, 12)}… committed ${actual.slice(0, 12)}…`
+      + (engineering ? ' — run node packages/contract/pin.mjs and review the proposal' : ''));
     this.name = 'ContractPinMismatch';
     this.pinned = pinned;
     this.actual = actual;
@@ -51,7 +56,9 @@ export function loadContract({ root = selfRoot, verifyPin = true } = {}) {
   if (verifyPin) {
     const pin = JSON.parse(readFileSync(join(root, PIN_PATH), 'utf8'));
     const actual = createHash('sha256').update(text).digest('hex');
-    if (actual !== pin.contractSha256) throw new ContractPinMismatch(pin.contractSha256, actual);
+    if (actual !== pin.contractSha256) {
+      throw new ContractPinMismatch(pin.contractSha256, actual, { engineering: isEngineeringCheckout(root) });
+    }
   }
   return contract;
 }
