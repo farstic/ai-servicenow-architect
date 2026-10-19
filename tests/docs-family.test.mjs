@@ -12,6 +12,7 @@ import {
 } from '../tools/snowarch/lib/docs/family.mjs';
 import { AREAS, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { isEngineeringCheckout } from '../tools/snowarch/lib/engineering-checkout.mjs';
 import { tempDir, trackTempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { licensedEnv } from '../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 
@@ -196,6 +197,10 @@ function withEngine(ws) {
     return d;
   })();
   cpSync(ENGINE_SRC, ws, { recursive: true });
+  // `docs family` is a maintainers' command and refuses outside the engineering checkout's shape, tests/ and .github/
+  // both present (ARC-09-C185a). tests/ arrives with tests/lib; .github/ is made here.
+  mkdirSync(join(ws, '.github'), { recursive: true });
+  assert.ok(isEngineeringCheckout(ws), 'the workspace has the engineering checkout\'s shape');
 
   // THE PRECONDITION THE COPY EXISTS FOR. `lib/config.mjs` resolves the root from its OWN location,
   // deliberately — "cwd is used for exactly one thing: telling them when it differs". So a CLI
