@@ -14,7 +14,8 @@ first ITSM tools are proven on an instance.** When the instance refuses a write 
 business rule, the error now has its own code, `INSTANCE_REFUSED`. Its remedy is to correct the record, so the
 Architect no longer advises a change of roles against the instance's own words. Before the first write, every create
 reads the data policies of its table. A field one requires that the call would not send is refused there, naming the
-policy, so the Architect asks for the value instead of stopping halfway through a build. Resolving an incident or a
+policy, so the Architect asks for the value instead of stopping halfway through a build. A policy that applies only
+under a condition is named as possibly required, and the write goes ahead. Resolving an incident or a
 problem now stores the resolution time, not midnight. A read that asks for fields names any the instance did not
 return, and the upgrade names the version it starts from as the doctor does. The first ITSM run against a real instance
 verified adding, modifying and querying incidents: 5 of the server's 399 tools are now verified live, and the run found
