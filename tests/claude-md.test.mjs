@@ -76,7 +76,8 @@ test('criterion 4 — the strings a session needs to find', () => {
   // test of the export read the family by probing the corpus for a branch, which a detached, absorbed checkout has
   // none of, and reported it as "not a git checkout". The skill already said `./snowarch status`; §2 said otherwise.
   const status = lines.find((l) => l.startsWith('When the user types `Status`')) ?? '';
-  assert.match(status, /run `\.\/snowarch status`/, `§2 does not send Status to the panel command: ${status}`);
+  // An escaped pattern, never a spelled launcher: the launcher audit reads every literal one as a site to account for.
+  assert.match(status, /run `\.[/]snowarch status`/, `§2 does not send Status to the panel command: ${status}`);
   assert.match(status, /`Docs:` line is the release family and pin, never a git branch/, '§2 does not name where the family comes from');
   assert.doesNotMatch(status, /doctor --quick --json/, '§2 still sends Status to the JSON report');
 });
