@@ -111,6 +111,21 @@ test('criterion 4 — pin ≠ gitlink: the docs-bump remedy, not the sync one', 
   assert.match(f.text, new RegExp(`maintainer: node scripts/docs-bump\\.mjs --to ${upstream.pin}`));
 });
 
+test('criterion 4, in an install: pin ≠ gitlink names E-32\'s restore, never the maintainer\'s bump (ARC-09-C185a)', () => {
+  const w = workspace();
+  syncCorpus({ ...w, log: () => {} });
+  const other = git(['rev-parse', 'HEAD~1'], join(w.root, CORPUS_DIR)).trim();
+  writeFileSync(join(w.root, 'engine.config.json'), JSON.stringify({
+    docs: { family: 'australia', pin: other, areasFile: 'vendor/docs-areas.txt', upstream: upstreamUrl },
+  }, null, 2));
+  const s = docsStatus({ root: w.root });
+  assert.equal(s.pinMatchesGitlink, false);
+  const f = formatStatus(s, spellings());
+  assert.equal(f.code, 1);
+  assert.doesNotMatch(f.text, /docs-bump/, 'an install was sent to a maintainer\'s script');
+  assert.match(f.text, /Put the signed files back with .+ doctor --fix; .+ doctor --json lists every one\./);
+});
+
 test('branch ≠ family is reported even while HEAD matches the pin', () => {
   // The state the fixture has to be built to produce: recipe C leaves a DETACHED head at the pin,
   // so `familyMatches` cannot be inferred from HEAD and has to come from the tracked branch.
