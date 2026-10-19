@@ -258,8 +258,11 @@ test('the cmd wrappers are exactly the story\'s, and they call powershell not pw
   assert.match(cmd, /endlocal & exit \/b %RC%/);
 
   assert.match(sn, /where node >nul 2>nul \|\|/);
-  assert.match(sn, /node "%~dp0tools\\snowarch\\bin\\snowarch\.mjs" %\*/);
-  assert.match(sn, /exit \/b %ERRORLEVEL%/);
+  // ARC-09-C194 — node and the exit on ONE line: cmd has read the `exit /b` before node runs, so an upgrade that
+  // replaces this file cannot leave cmd reading a second line from the new file at the old offset. `exit /b` with no
+  // code keeps node's ERRORLEVEL; `%ERRORLEVEL%` on the same line would expand before node ran.
+  assert.match(sn, /^node "%~dp0tools\\snowarch\\bin\\snowarch\.mjs" %\* & exit \/b\r?$/m);
+  assert.equal(/^exit \/b %ERRORLEVEL%/m.test(sn), false, 'the exit is on a line of its own again');
 
   // A missing Node is exit 3, and this asserts the CODE PATH rather than the sentence.
   //

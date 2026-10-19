@@ -9,9 +9,13 @@ rem through to `node`, which is not there, and the step ended with cmd's 9009 in
 rem check that would have caught it was dead code: the CI step invoked this file without `call`, so
 rem cmd transferred control and the assertions on the following lines never ran (ARC-08-S11's
 rem finding, ARC-09-S04's fix).
+rem
+rem ONE LINE for node and the exit (ARC-09-C194). cmd reads a batch file a line at a time, by byte offset, and goes
+rem back to the file after each command; an `upgrade` replaces this file while node runs, so a second line would be
+rem read from the NEW file at the OLD offset. `exit /b` with no code keeps node's ERRORLEVEL, which `%ERRORLEVEL%`
+rem on this line could not: it expands when the line is read, before node runs.
 where node >nul 2>nul || goto :no_node
-node "%~dp0tools\snowarch\bin\snowarch.mjs" %*
-exit /b %ERRORLEVEL%
+node "%~dp0tools\snowarch\bin\snowarch.mjs" %* & exit /b
 
 :no_node
 echo snowarch: Node.js 20+ is required for this command. Design-only works without it: .\bootstrap.cmd --mode design
