@@ -43,6 +43,7 @@ function plantedTree(t) {
     'export async function go(root) {',
     "  spawnSync(process.execPath, [join(root, 'scripts/unlisted-spawn.mjs')]);",
     "  readFileSync(join(root, 'docs/unlisted-data.json'), 'utf8');",
+    "  readFileSync(join(root, 'docs', 'unlisted', 'joined.json'), 'utf8');",
     '  // a comment naming ' + BT + 'docs/only-in-a-comment.md' + BT + ' is not a reference',
     "  if (isEngineeringCheckout(root)) await import('../../../scripts/lib/gated.mjs');",
     '  return b;',
@@ -53,6 +54,7 @@ function plantedTree(t) {
   put(root, 'scripts/lib/gated.mjs', 'export const g = 1;\n');
   put(root, 'scripts/unlisted-spawn.mjs', '\n');
   put(root, 'docs/unlisted-data.json', '{}\n');
+  put(root, 'docs/unlisted/joined.json', '{}\n');
   put(root, '.claude/skills/x/SKILL.md', 'Read ' + BT + 'docs/unlisted-doc.md' + BT + ' first, then ' + BT
     + '.claude/skills/x/SKILL.md' + BT + '.\n');
   put(root, 'docs/unlisted-doc.md', '# x\n');
@@ -82,12 +84,13 @@ test('E-21 skips outside the engineering checkout, with the reason, and runs no 
   assert.match(r.detail ?? r.message ?? '', /verified by the signed manifest \(E-32\).*maintainers' tools, run in the engineering checkout/);
 });
 
-test('the guard finds an import, a spawn, a read and a doc reference the list leaves out; a gated import is excused', (t) => {
+test('the guard finds an import, a spawn, a read (whole or in join segments) and a doc reference the list leaves out; a gated import is excused', (t) => {
   const root = plantedTree(t);
   const refs = unlistedReferences(root, { coverage: COV, entries: ['tools/snowarch/bin/snowarch.mjs'],
     surfaces: ['.claude/skills/'], exceptions: GATED });
   const paths = refs.map((r) => r.path).sort();
-  assert.deepEqual(paths, ['docs/unlisted-data.json', 'docs/unlisted-doc.md', 'scripts/lib/unlisted.mjs', 'scripts/unlisted-spawn.mjs']);
+  assert.deepEqual(paths, ['docs/unlisted-data.json', 'docs/unlisted-doc.md', 'docs/unlisted/joined.json',
+    'scripts/lib/unlisted.mjs', 'scripts/unlisted-spawn.mjs']);
   assert.ok(refs.every((r) => r.from && r.line > 0), 'each finding names the file and line that reaches it');
 });
 
