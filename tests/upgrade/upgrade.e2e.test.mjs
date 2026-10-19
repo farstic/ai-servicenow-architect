@@ -304,9 +304,10 @@ test('ARC-09-C185c — a release install moved to a new origin keeps its tag, th
   const w = await buildWorld(t);
   bootstrapUser(w.user);
   const distribution = join(w.scratch, 'distribution.git');
-  execFileSync('git', ['clone', '-q', '--bare', '--no-hardlinks', w.origin, distribution], { stdio: 'pipe' });
-  execFileSync('git', ['-C', distribution, 'tag', '-d', 'v9.0.0'], { stdio: 'pipe' });
-  assert.equal(execFileSync('git', ['-C', distribution, 'tag', '--list', 'v9.0.0'], { encoding: 'utf8' }).trim(), '');
+  // Through the harness's git(), as every git call here is: core.longpaths on Windows (C27b).
+  git(w.scratch, ['clone', '-q', '--bare', '--no-hardlinks', w.origin, distribution]);
+  git(distribution, ['tag', '-d', 'v9.0.0']);
+  assert.equal(git(distribution, ['tag', '--list', 'v9.0.0']), '');
   git(w.user, ['remote', 'set-url', 'origin', pathToFileURL(distribution).href]);
   assert.equal(git(w.user, ['remote', 'get-url', 'origin']), pathToFileURL(distribution).href);
 
@@ -327,7 +328,7 @@ test('ARC-09-C185c — a release install moved to a new origin keeps its tag, th
   assert.equal(readFileSync(engagement, 'utf8'), '# acme\n');
   const moved = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.equal(moved.status, 0, moved.text);
-  const target = execFileSync('git', ['-C', distribution, 'rev-parse', 'v9.1.0^{commit}'], { encoding: 'utf8' }).trim();
+  const target = git(distribution, ['rev-parse', 'v9.1.0^{commit}']);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), target, 'the tree is not at the new origin\'s v9.1.0');
   // The version of record, as the product reads it (ARC-09-C137: a banner test does not open the file itself).
   const version = snowarch(w.user, ['version'], { bin: w.bin }).stdout;
