@@ -45,6 +45,9 @@ moves once, from its folder: `git remote set-url origin https://github.com/farst
 - `./snowarch doctor --no-network` makes no network call. The release-currency check (E-28) read the flag where the
   doctor never put it and still asked `origin` for its tags, so every report taken with `--no-network` before 2.2.1,
   the release evidence included, made that one call (ARC-09-C187).
+- `Status` reads the release family and pin from the `Docs:` line of the `./snowarch status` panel. The session
+  looked for a git branch in the corpus checkout, which has none, and reported the corpus as not a git checkout
+  (ARC-09-C188).
 
 ### Changed
 
