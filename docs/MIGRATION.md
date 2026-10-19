@@ -19,16 +19,16 @@ upgrade: v2.2.1 has no verified signed manifest (… files in the published mani
 upgrade: v2.2.1 has no verified signed manifest (the published manifest names …, and v2.2.1 here is …) — nothing was changed
 ```
 
-Such an install is replaced once, by a fresh install of 2.2.1 in the same folder, so Claude Code keeps its memory and
-approvals for it, which follow the folder's path; the commands carry over what is yours. Run them from the folder that
-contains it, with its real name in place of `snowarch`. A file the old install does not have is not copied, and the
-copy says so.
+Such an install is replaced once, by a fresh install of the current release in the same folder, so Claude Code keeps
+its memory and approvals for it, which follow the folder's path; the commands carry over what is yours. Run them from
+the folder that contains it, with its real name in place of `snowarch`. A file the old install does not have is not
+copied, and the copy says so.
 
 macOS / Linux:
 
 ```sh
 mv snowarch snowarch-2.2.0
-git -c advice.detachedHead=false clone --branch v2.2.1 https://github.com/farstic/snowarch.git snowarch
+git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/snowarch.git snowarch
 cd snowarch
 mkdir -p .local .claude
 cp -p ../snowarch-2.2.0/.local/licence.json ../snowarch-2.2.0/.local/instances.json .local/
@@ -43,7 +43,7 @@ Windows PowerShell:
 
 ```powershell
 Rename-Item snowarch snowarch-2.2.0
-git -c advice.detachedHead=false clone --branch v2.2.1 https://github.com/farstic/snowarch.git snowarch
+git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/snowarch.git snowarch
 cd snowarch
 New-Item -ItemType Directory -Force .local, .claude | Out-Null
 Copy-Item ..\snowarch-2.2.0\.local\licence.json, ..\snowarch-2.2.0\.local\instances.json .local\
@@ -59,7 +59,7 @@ rotates into) carry over, and the new install continues the trail. The carried `
 permissions, environment and other hooks; its SessionStart hook is the bootstrap's, and it follows the new folder. An
 install that ran design-only (no instance) leaves out `--mode live`. With the carried store, `--mode live` keeps its
 default instance and does not run the wizard. Other folders of your own that git ignores
-(`deliverables/`, `memory/`, `reports/`, `.env`) are copied the same way if you have them; everything else under
+(`deliverables/`, `memory/`, `reports/`) are copied the same way if you have them; everything else under
 `.local/` is a cache the bootstrap rebuilds. Once the new install's `./snowarch status` reads as the old one did,
 delete `snowarch-2.2.0`.
 
