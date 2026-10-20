@@ -20,6 +20,7 @@ import { get as claudeGet, resolveClaude } from '../../registration-claude.mjs';
 import { loadStateOrReason } from '../../state.mjs';
 import { remedyFor } from '../../../../../packages/contract/lib/contract.mjs';
 import { NO_PROMPT_ENV } from '../../spawn-env.mjs';
+import { TIMED_OUT } from '../../probe-net.mjs';
 import { defineCheck } from '../registry.mjs';
 
 import { fail, ok, skip, warn } from './result.mjs';
@@ -406,10 +407,28 @@ export function hostChecks() {
         const remote = 'origin';
         // ARC-09-C190 — with prompts off, as `upgrade`'s fetch: an origin that wants a credential no helper holds
         // answers at once, and never with a prompt the doctor's reader cannot see.
-        const listed = (ctx.exec ?? execFileSync)('git',
-          ['ls-remote', '--tags', '--refs', remote, 'v*'],
-          { cwd: ctx.root, encoding: 'utf8', stdio: 'pipe', timeout: 15_000,
-            env: { ...(ctx.env ?? process.env), ...NO_PROMPT_ENV } });
+        const budget = 15_000;
+        let listed;
+        try {
+          listed = (ctx.exec ?? execFileSync)('git',
+            ['ls-remote', '--tags', '--refs', remote, 'v*'],
+            { cwd: ctx.root, encoding: 'utf8', stdio: 'pipe', timeout: budget,
+              env: { ...(ctx.env ?? process.env), ...NO_PROMPT_ENV } });
+        } catch (e) {
+          // ARC-09-C207 — A REMOTE THAT WILL NOT ANSWER IS A FACT ABOUT THE REMOTE, NOT A CRASH OF THIS CHECK. Uncaught,
+          // a 401, a 404, a name that does not resolve or a blocking proxy reached the runner as "check crashed" at
+          // status fail, from a check whose severity is warn, and the doctor exited 1. The reason is the upgrade's
+          // sentence without its framing, then git's own last line, which is what the reason was read from. Nothing is
+          // written to the cache: nothing was measured, the rule the upgrade keeps for a failed fetch (AC 4).
+          const { gitFetchReason } = await import('../../commands/upgrade.mjs');
+          const stderr = String(e?.stderr ?? '');
+          const reason = e?.code === TIMED_OUT
+            ? `${remote} did not answer within ${budget / 1000} s`
+            : gitFetchReason(stderr, { remote }).reason ?? `could not list ${remote}'s release tags`;
+          const lines = stderr.split('\n').map((l) => l.trim()).filter(Boolean);
+          const said = lines.filter((l) => l.startsWith('fatal:')).pop() ?? lines.pop();
+          return warn(said ? `${reason}\n${said}` : reason, { data: { remote, refreshed: false } });
+        }
         const { sortTags } = await import('../../commands/upgrade.mjs');
         const names = String(listed ?? '').split('\n')
           .map((l) => l.split('/').pop()?.trim()).filter(Boolean);

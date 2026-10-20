@@ -246,22 +246,26 @@ export function originLine(url, repo, cli) {
  * replaced it would be deciding what the user is allowed to see. What this adds is the sentence a
  * reader can act on — and only when the shape is recognised, because a confident wrong remedy
  * costs more than none (R-3, and `03`'s proxy findings).
+ *
+ * ARC-09-C207 — the sentence is `reason`, and each caller frames it: the upgrade's `line` below heads it with
+ * `upgrade: `, and the doctor's E-28 shows it as it is, because a doctor line headed "upgrade:" claims a command that
+ * never ran. `reason` is `null` for a shape this does not recognise.
  */
-export function classifyGitFetchError(stderr = '', { remote = 'origin' } = {}) {
+export function gitFetchReason(stderr = '', { remote = 'origin' } = {}) {
   const text = String(stderr);
   const host = /could not resolve host:?\s*(\S+)/i.exec(text)?.[1] ?? remote;
   if (/could not resolve host/i.test(text)) {
-    return { kind: 'dns', line: `upgrade: DNS failure for ${host} — check the network; if you are `
+    return { kind: 'dns', reason: `DNS failure for ${host} — check the network; if you are `
       + 'behind a corporate proxy, git reads HTTPS_PROXY / http.proxy '
       + '(docs/TROUBLESHOOTING.md#proxy_unreachable)' };
   }
   if (/SSL certificate problem|unable to get local issuer|self[- ]signed certificate/i.test(text)) {
-    return { kind: 'tls', line: 'upgrade: TLS certificate not trusted — a TLS-intercepting proxy '
+    return { kind: 'tls', reason: 'TLS certificate not trusted — a TLS-intercepting proxy '
       + 'needs its CA in git (http.sslCAInfo) and in Node (NODE_EXTRA_CA_CERTS); see '
       + 'docs/TROUBLESHOOTING.md#tls_ca_untrusted' };
   }
   if (/\b407\b|proxy authentication required/i.test(text)) {
-    return { kind: 'proxy-auth', line: 'upgrade: the proxy demanded authentication (407) — put the '
+    return { kind: 'proxy-auth', reason: 'the proxy demanded authentication (407) — put the '
       + 'credentials in HTTPS_PROXY, or ask for an exception for this host '
       + '(docs/TROUBLESHOOTING.md#proxy_auth_required)' };
   }
@@ -271,16 +275,24 @@ export function classifyGitFetchError(stderr = '', { remote = 'origin' } = {}) {
   // "repository '<url>' not found": the URL sits between the words GitHub's own line keeps together.
   if (/could not read Username|Authentication failed|Repository not found|repository '[^']*' not found|terminal prompts disabled/i
     .test(text)) {
-    return { kind: 'auth', line: `upgrade: ${remote} asked for credentials, or was not found — it may be private or `
-      + `moved; check it with git remote get-url ${remote}; nothing was changed` };
+    return { kind: 'auth', reason: `${remote} asked for credentials, or was not found — it may be private or `
+      + `moved; check it with git remote get-url ${remote}` };
   }
   // A refused connection is the shape a dead proxy makes, and it is the one AC 4 exercises.
   if (/connection refused|failed to connect|couldn't connect to server|unable to access/i.test(text)) {
-    return { kind: 'proxy', line: 'upgrade: could not reach the remote — if you are behind a '
+    return { kind: 'proxy', reason: 'could not reach the remote — if you are behind a '
       + 'corporate proxy, git reads HTTPS_PROXY / http.proxy '
       + '(docs/TROUBLESHOOTING.md#proxy_unreachable)' };
   }
-  return { kind: 'unknown', line: null };
+  return { kind: 'unknown', reason: null };
+}
+
+/** The upgrade's line for git's failure: `gitFetchReason`'s sentence, framed as the upgrade's own, or `null`. */
+export function classifyGitFetchError(stderr = '', { remote = 'origin' } = {}) {
+  const { kind, reason } = gitFetchReason(stderr, { remote });
+  if (reason === null) return { kind, line: null };
+  // Only the credential line ends by saying nothing was changed, as ARC-09-C190 wrote it; the others never did.
+  return { kind, line: `upgrade: ${reason}${kind === 'auth' ? '; nothing was changed' : ''}` };
 }
 
 // ARC-09-S12 — `parseSemver` and `sortTags` moved to `lib/semver.mjs` and are re-exported here so
