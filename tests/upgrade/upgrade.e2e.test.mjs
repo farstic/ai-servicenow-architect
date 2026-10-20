@@ -661,3 +661,26 @@ test('ARC-09-C196 — at the tag, a manifest cache that does not hold this relea
   const third = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.match(third.text, /up to date \(v9\.1\.0\)/, third.text);
 }, 3 * MINUTES);
+
+test('ARC-09-C196 — a step that warned before a move that changed its inputs still runs at the tag', async (t) => {
+  // At the tag a recorded warn is judged by its hash, like ok: finished unless its inputs changed. v9.1.0 changes
+  // B02's input, so a pre-move state with B02 warned must still continue, and the next run must be up to date.
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const planted = state(w.user);
+  planted.steps.B02.status = 'warn';
+  writeFileSync(join(w.user, STATE), `${JSON.stringify(planted, null, 2)}\n`);
+  assert.equal(state(w.user).steps.B02.status, 'warn', 'the warn was not planted');
+  const before = readFileSync(join(w.user, STATE), 'utf8');
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  writeFileSync(join(w.user, STATE), before);
+  assert.equal(readFileSync(join(w.user, STATE), 'utf8'), before, 'the pre-move state was not put back');
+
+  const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(again.status, 0, again.text);
+  assert.match(again.text,
+    /already at v9\.1\.0, with steps still to run \([^)]*B02: inputs changed[^)]*\) — continuing from there/, again.text);
+  const third = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.match(third.text, /up to date \(v9\.1\.0\)/, third.text);
+}, 3 * MINUTES);

@@ -777,3 +777,26 @@ test('ARC-09-C196 — at the tag itself, a plan that cannot check the tag out li
   assert.equal(worktrees.length, 1, 'planSteps never tried the worktree, so the fallback was not what answered');
   assert.deepEqual(plan, { steps: [], estimate: true });
 });
+
+test('ARC-09-C196 — every status a step entry can carry has its verdict, on U4\'s path and at the tag', async () => {
+  // The statuses written, as measured: the runner's ok, warn and fail (steps/index.mjs:202, the catch at :189),
+  // `skipped` when runsWhen declined (:125), and interrupt()'s `failed` with reason `interrupted` (:260). A status
+  // `interrupted` is read for older states; nothing in this tree writes it. null = judged by its hash and outputs.
+  const { statusVerdict } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const table = [
+    [undefined, 'never recorded', 'never recorded'],
+    [{ status: 'ok' }, null, null],
+    [{ status: 'warn' }, 'last run warned', null],
+    [{ status: 'fail' }, 'last run did not finish', 'last run did not finish'],
+    [{ status: 'failed', reason: 'interrupted' }, 'last run interrupted', 'last run interrupted'],
+    [{ status: 'failed' }, 'last run did not finish', 'last run did not finish'],
+    [{ status: 'interrupted' }, 'last run interrupted', 'last run interrupted'],
+    [{ status: 'skipped' }, 'last run skipped it', 'last run skipped it'],
+    // A status this table does not name is unfinished, the runner's own rule for anything not ok.
+    [{ status: 'something-new' }, 'last run did not finish', 'last run did not finish'],
+  ];
+  for (const [recorded, atU4, atTag] of table) {
+    assert.equal(statusVerdict(recorded, { warnIsDone: false }), atU4, `U4: ${JSON.stringify(recorded)}`);
+    assert.equal(statusVerdict(recorded, { warnIsDone: true }), atTag, `at the tag: ${JSON.stringify(recorded)}`);
+  }
+});
