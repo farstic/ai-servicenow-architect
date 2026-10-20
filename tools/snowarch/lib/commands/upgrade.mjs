@@ -638,10 +638,13 @@ export function renderPlan({ from, to, commits, date, tagInfo, floor, steps, sto
  * `fail` and `interrupted` both mean "this checkout is part-way through an install", which is the
  * state a resume exists for. A step that was SKIPPED is not one of them: `runsWhen` declining is a
  * decision, not an interruption.
+ *
+ * ARC-09-C196 — and `failed`, which is what `interrupt()` (steps/index.mjs) records for a Ctrl-C, with its reason
+ * `interrupted` beside it. This tested `fail` and `interrupted` only, so an interrupted bootstrap read "up to date".
  */
 export function failedStep(state) {
   for (const [id, entry] of Object.entries(state?.steps ?? {})) {
-    if (entry?.status === 'fail' || entry?.status === 'interrupted') return id;
+    if (entry?.status === 'fail' || entry?.status === 'failed' || entry?.status === 'interrupted') return id;
   }
   return null;
 }
@@ -798,12 +801,24 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   // that answered `up to date` to that would be telling a user to type a command that does
   // nothing. So an unfinished bootstrap continues from U6 instead.
   const unfinished = here === target ? failedStep(state) : null;
-  if (here === target && !unfinished) {
+  // ARC-09-C196 — AT THE TAG, "UP TO DATE" ONLY WHEN NOTHING IS LEFT TO RUN. A move whose bootstrap recorded nothing
+  // (it died before its first entry, was killed, or the run stopped between U5 and U6) leaves every step recorded ok
+  // against the OLD inputs, and this answered "up to date" with U6 and U7 never run. The plan U4 prints asks the
+  // tag's own runner; here it is asked with `manifestWritten: false`, because the at-target path writes no manifest:
+  // a cache without this release's is a step to run, and B01 refreshes it. Without a worktree the plan falls back to
+  // the file diff, which is empty here, and the answer stays "up to date".
+  const leftToRun = here === target && !unfinished
+    ? planSteps(root, target, { ctx: { root, config }, state, opts, run, manifestWritten: false }).steps
+    : [];
+  if (here === target && !unfinished && leftToRun.length === 0) {
     log.step(`up to date (${target})`);
     return EXIT_OK;
   }
-  if (unfinished) {
-    log.step(`already at ${target}; the last run stopped at ${unfinished} — continuing from there`);
+  if (unfinished || leftToRun.length > 0) {
+    log.step(unfinished
+      ? `already at ${target}; the last run stopped at ${unfinished} — continuing from there`
+      : `already at ${target}, with steps still to run (${leftToRun.map((st) => `${st.step}: ${st.why}`).join('; ')}) `
+        + '— continuing from there');
     return finish({ root, env, log, run, target, latest, remote, now, state,
       skipClaudeCheck: Boolean(flags['force-floor']) });
   }
@@ -1033,9 +1048,10 @@ export async function finish({ root, env, log, run, target, latest, remote, now,
     'bootstrap', '--mode', mode, '--yes', ...(skipClaudeCheck ? ['--skip-claude-check'] : [])],
   { cwd: root, stdio: 'inherit', env: childEnv(root, env) });
   if (bootstrap.status !== 0) {
+    // ARC-09-C196 — not "the state file records the step": a bootstrap that died before its first entry, or was
+    // killed, recorded none. The re-run is right either way, because the at-target path asks the plan.
     log.fail(`upgrade: the bootstrap stopped (exit ${bootstrap.status ?? 'abnormally'}) — the tree `
-      + `is at ${target} and the state file records the step; re-run ${spell.cli} upgrade or `
-      + `${spell.bootstrap}`);
+      + `is at ${target}; re-run ${spell.cli} upgrade or ${spell.bootstrap}`);
     return EXIT_FAIL;
   }
 
