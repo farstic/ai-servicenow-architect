@@ -12,16 +12,23 @@ All notable changes to this project are documented in this file. Everything hand
 **A patch release: an upgrade says where releases are published when the install's origin is elsewhere, and never
 waits on a credential prompt.** An install whose origin is another GitHub repository is told, where its upgrade stops,
 the command that points it at `https://github.com/farstic/snowarch.git`. An origin that wants a credential no stored
-helper holds now fails at once, in the upgrade and in the doctor's release check, with a line that says so.
+helper holds now fails at once, in the upgrade and in the doctor's release check, with a line that says so. A remote
+the doctor cannot reach is a warning, no longer a crash.
 
 ### Fixed
 
 - `./snowarch upgrade` and the doctor's release-currency check (E-28) ask git with its prompts off. An origin that
   wanted a credential no stored helper held, or that answered as a private or missing repository, could wait on a
   prompt nobody saw: up to 120 seconds in the upgrade, 15 in the doctor. It now stops at once: the upgrade with
-  `upgrade: origin asked for credentials, or was not found`, the doctor's E-28 with
-  `check crashed: Command failed: git ls-remote --tags --refs origin v*` and git's own `fatal:` line; a credential a
-  helper stores still applies (ARC-09-C190).
+  `upgrade: origin asked for credentials, or was not found`, the doctor's E-28 with a warning,
+  `origin asked for credentials, or was not found`, and git's own `fatal:` line under it; a credential a helper stores
+  still applies (ARC-09-C190).
+- The doctor's release-currency check (E-28) reported an origin it could not ask for its tags as `check crashed`, at
+  status FAIL, so the doctor exited 1: an origin that wanted a credential, was not found, did not resolve, or sat
+  behind a proxy. It now warns with the reason the upgrade gives and git's own line under it, and records no check that
+  did not happen. A server's plain 404, git's `repository '…' not found`, is now named as not found in the upgrade and
+  in E-28. And the proxy remedy printed `h***.p***` for `http.proxy`, in the upgrade too; it now reads `http.proxy`
+  (ARC-09-C207).
 
 ### Changed
 

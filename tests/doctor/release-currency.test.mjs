@@ -26,11 +26,11 @@ import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
 import { runChecks } from '../../tools/snowarch/lib/doctor/runner.mjs';
 import { writeUpgradeCheck } from '../../tools/snowarch/lib/upgrade-check.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runDoctor } from '../../tools/snowarch/lib/doctor/index.mjs';
+import { doctorCommand, runDoctor } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { createRegistry } from '../../tools/snowarch/lib/doctor/registry.mjs';
 
 const REAL_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -511,4 +511,116 @@ test('E-28 under the doctor\'s own --no-network spawns nothing: the flag reaches
   const r = report.checks.find((c) => c.id === 'E-28');
   assert.equal(r.status, 'skip', `E-28 under --no-network: ${r.status} — ${r.detail}`);
   assert.match(r.detail, /^--no-network, and nothing has been checked yet$/);
+});
+
+// ── ARC-09-C207 — a remote that will not list its tags is a warning about the remote, never a crash ─────────────────
+
+/** The reason the upgrade gives, without its `upgrade: ` framing: a credential wanted, or no such repository. */
+const REFUSED_AUTH = 'origin asked for credentials, or was not found — it may be private or moved; check it with '
+  + 'git remote get-url origin';
+
+/** A child process that answers every request with `status`, and its port. E-28's git runs synchronously, so a
+ * server in this process could not answer it. */
+async function answering(t, status) {
+  const head = status === 401 ? "{ 'WWW-Authenticate': 'Basic realm=\"fixture\"' }" : '{}';
+  const server = spawn(process.execPath, ['-e', [
+    `const s = require('node:http').createServer((q, r) => { r.writeHead(${status}, ${head}); r.end(); });`,
+    "s.listen(0, '127.0.0.1', () => process.stdout.write(s.address().port + '\\n'));",
+  ].join('\n')], { stdio: ['ignore', 'pipe', 'inherit'] });
+  t.after(() => server.kill());
+  return new Promise((resolve, reject) => {
+    server.stdout.once('data', (d) => resolve(Number(String(d).trim())));
+    server.once('error', reject);
+  });
+}
+
+/** A checkout whose origin is `url`, and an environment in which no prompt, stored helper, global configuration or
+ * proxy answers in the remote's place. The askpass program leaves a mark if git ever asks. */
+function refusedBy(t, url) {
+  const root = tempDir('snowarch-c207-', t);
+  execFileSync('git', ['init', '-q', '-b', 'main', root]);
+  execFileSync('git', ['-C', root, 'remote', 'add', 'origin', url]);
+  assert.equal(execFileSync('git', ['-C', root, 'remote', 'get-url', 'origin'], { encoding: 'utf8' }).trim(), url,
+    'the origin was not set');
+  const aside = tempDir('snowarch-c207-aside-', t);
+  const marker = join(aside, 'asked');
+  const askpass = join(aside, 'askpass.sh');
+  writeFileSync(askpass, `#!/bin/sh\necho asked >> '${marker}'\necho\n`);
+  chmodSync(askpass, 0o755);
+  const empty = join(aside, 'gitconfig');
+  writeFileSync(empty, '');
+  const env = { ...process.env, GIT_ASKPASS: askpass, GIT_CONFIG_GLOBAL: empty, GIT_CONFIG_NOSYSTEM: '1' };
+  for (const k of ['GIT_TERMINAL_PROMPT', 'SSH_ASKPASS', 'GCM_INTERACTIVE',
+    'HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'https_proxy', 'http_proxy', 'all_proxy']) delete env[k];
+  return { root, env, marker };
+}
+
+test('ARC-09-C207 — a remote that wants a credential, has no such repository, or does not resolve is a warning with its reason, never a crash', async (t) => {
+  const cases = [
+    { name: '401', url: `http://127.0.0.1:${await answering(t, 401)}/fixture.git`, reason: REFUSED_AUTH,
+      fatal: /^fatal: could not read Username for 'http:\/\/127\.0\.0\.1:\d+': terminal prompts disabled$/ },
+    { name: '404', url: `http://127.0.0.1:${await answering(t, 404)}/fixture.git`, reason: REFUSED_AUTH,
+      fatal: /^fatal: repository 'http:\/\/127\.0\.0\.1:\d+\/fixture\.git\/' not found$/ },
+    // `.invalid` never resolves (RFC 6761), so this is a DNS failure on any machine, answered by its own resolver.
+    { name: 'DNS', url: 'http://snowarch-e28.invalid/fixture.git',
+      reason: 'DNS failure for snowarch-e28.invalid — check the network; if you are behind a corporate proxy, git reads '
+        + 'HTTPS_PROXY / http.proxy (docs/TROUBLESHOOTING.md#proxy_unreachable)',
+      fatal: /^fatal: unable to access 'http:\/\/snowarch-e28\.invalid\/fixture\.git\/': Could not resolve host: snowarch-e28\.invalid$/ },
+  ];
+  const details = [];
+  for (const c of cases) {
+    const { root, env, marker } = refusedBy(t, c.url);
+    const { results } = await runChecks([E28], { root, flags: { noNetwork: false }, now: realClock, env });
+    const r = results.find((x) => x.id === 'E-28');
+    details.push(String(r.detail));
+    assert.equal(r.status, 'warn', `${c.name}: ${r.status} — ${r.detail}`);
+    // The reason first, then git's own last line, which is the truth the reason was read from.
+    const [reason, fatal, ...rest] = String(r.detail).split('\n');
+    assert.equal(reason, c.reason, `${c.name}: ${r.detail}`);
+    assert.match(fatal ?? '', c.fatal, `${c.name}: ${r.detail}`);
+    assert.deepEqual(rest, [], `${c.name}: more than the reason and git's line: ${r.detail}`);
+    assert.equal(existsSync(marker), false, `${c.name}: git ran the askpass program, so a terminal would have prompted`);
+    // Nothing was measured, so nothing is recorded: the banner must not report a check that never happened (AC 4).
+    assert.equal(existsSync(join(root, '.local', 'upgrade-check.json')), false, `${c.name}: the cache was written`);
+  }
+  // No E-28 detail is headed as if the upgrade had run, or reads as a crash of this code.
+  for (const d of details) {
+    assert.doesNotMatch(d, /^upgrade:/m, d);
+    assert.equal(d.includes('check crashed'), false, d);
+  }
+});
+
+test('ARC-09-C207 — the doctor exits 0 when E-28 is its only check that is not ok', async (t) => {
+  // The doctor gives its checks the process environment (`childEnv`), so this case uses the one failure that no helper,
+  // prompt or proxy changes into another: a name that never resolves. Whatever the failure, the exit is the claim.
+  const { root } = refusedBy(t, 'http://snowarch-e28.invalid/fixture.git');
+  writeFileSync(join(root, 'engine.config.json'), readFileSync(join(REAL_ROOT, 'engine.config.json')));
+  writeFileSync(join(root, 'package.json'), readFileSync(join(REAL_ROOT, 'package.json')));
+  const chunks = [];
+  const code = await doctorCommand({ flags: { json: true }, out: { write: (s) => chunks.push(s) },
+    err: { write: () => {} }, cwd: root, registry: createRegistry([E28]), input: { isTTY: false } });
+  const report = JSON.parse(chunks.join(''));
+  const r = report.checks.find((c) => c.id === 'E-28');
+  assert.equal(r.status, 'warn', `${r.status} — ${r.detail}`);
+  assert.equal(report.summary.fail, 0, JSON.stringify(report.summary));
+  assert.equal(code, 0, `the doctor exited ${code} on a warning`);
+});
+
+test('ARC-09-C207 — a remote that does not answer in E-28\'s budget, or fails in a way nothing names, is a warning too', async (t) => {
+  // Node's own shape for a sync child killed at its timeout, measured: code ETIMEDOUT, signal SIGTERM, no status. The
+  // code is read from `os.constants`, as probe-net reads it, because the contract owns the spelled name.
+  const { TIMED_OUT } = await import('../../tools/snowarch/lib/probe-net.mjs');
+  const throwing = (error) => (_cmd, args) => {
+    if (args.includes('ls-remote')) throw Object.assign(new Error('git failed'), error);
+    return '';
+  };
+  const slow = await E28.run({ root: tempDir('snowarch-c207-slow-', t), flags: { noNetwork: false }, now: realClock,
+    exec: throwing({ code: TIMED_OUT, signal: 'SIGTERM', status: null, stderr: '' }) });
+  assert.equal(slow.status, 'warn', slow.detail);
+  assert.equal(slow.detail, 'origin did not answer within 15 s');
+  const odd = await E28.run({ root: tempDir('snowarch-c207-odd-', t), flags: { noNetwork: false }, now: realClock,
+    exec: throwing({ status: 128, stderr: 'warning: something first\nerror: something nothing names\n' }) });
+  assert.equal(odd.status, 'warn', odd.detail);
+  // No `fatal:` line, so git's last line is the one shown.
+  assert.equal(odd.detail, "could not list origin's release tags\nerror: something nothing names");
 });

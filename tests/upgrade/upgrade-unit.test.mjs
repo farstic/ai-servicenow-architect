@@ -143,6 +143,13 @@ test('ARC-09-C190 — the classifier names an origin that wants a credential, or
   assert.equal(classifyGitFetchError('fatal: unable to access \'https://x/\': Failed to connect to 127.0.0.1 port 9: Connection refused').kind, 'proxy');
 });
 
+test('ARC-09-C207 — a plain 404, git\'s "repository \'<url>\' not found" with no remote line, is the auth kind', () => {
+  // Measured: a server answering 404 with no `remote:` line, as a moved URL on a self-hosted server does. Git names the
+  // URL between the words, so the GitHub pattern above does not see it.
+  const stderr = "fatal: repository 'http://127.0.0.1:55344/fixture.git/' not found";
+  assert.deepEqual(classifyGitFetchError(stderr, { remote: 'origin' }), { kind: 'auth', line: AUTH_LINE }, stderr);
+});
+
 test('ARC-09-C190 — an origin that wants a credential is answered at once: no askpass, no prompt, the auth line', async (t) => {
   // A remote that asks for a credential, with no network: a child process answers every request with 401. It is a
   // separate process because the upgrade's git runs synchronously, and a server in this one could not answer it.

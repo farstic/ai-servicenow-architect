@@ -27,6 +27,8 @@ export const isSecretKey = (name) => SECRET_KEY.test(String(name));
 const NOT_A_NAME = new Set([
   'mjs', 'js', 'ts', 'cjs', 'json', 'md', 'sh', 'ps1', 'cmd', 'yml', 'yaml', 'txt', 'log', 'lock',
   'com', 'org', 'net', 'io', 'dev', 'local', 'invalid', 'test', 'example', 'gov', 'edu', 'uk', 'de',
+  // ARC-09-C207 — git's `http.proxy`, which the upgrade's and the doctor's proxy remedies name: printed as `h***.p***`.
+  'proxy',
 ]);
 
 /** Values a caller has told us are secret — S07 registers what it reads from the instance store. */
