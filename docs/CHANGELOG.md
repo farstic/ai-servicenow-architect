@@ -32,8 +32,9 @@ the doctor cannot reach is a warning, no longer a crash.
 - A key named in a printed line is no longer shown as a masked name. The redactor reads a bare `word.word` as a
   person's first.last, so the doctor's configuration check (E-06) printed `d***.p*** is missing` for `docs.pin`, and
   the revocation-list line, the roster count, SK-04 and the docs family plan did the same with their keys. Those lines
-  now name the key in backticks, which the redactor leaves alone; `cmd.exe` and `drawio.drawio` are no longer masked
-  (ARC-09-C208).
+  now name the key in backticks, which the redactor leaves alone. `cmd.exe` is no longer masked, and neither is the
+  package id an install command names, so the Windows git remedy reads `winget install Git.Git` again instead of
+  `winget install G***.G***` (ARC-09-C208).
 
 ### Changed
 
