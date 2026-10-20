@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.2.1 — 2026-10-20
+
+### Notes
+
 **A patch release: a refused write says why, a missing mandatory field is caught before anything is written, and the
 first ITSM tools are proven on an instance.** When the instance refuses a write because of its own data policy or
 business rule, the error now has its own code, `INSTANCE_REFUSED`. Its remedy is to correct the record, so the
@@ -29,9 +33,11 @@ The server's contract keeps its 399 tools and gains one error code, 75 in all. T
 under its cap of 80. The licence format is unchanged. The signed manifest now covers every file a release ships, 455
 of them: governance, templates, the scripts the Architect runs and the user documentation joined it, so the doctor
 restores any of them as it restores the engine. From this release the Architect is installed and upgraded from
-`https://github.com/farstic/snowarch`, where the Release and its evidence are published. An install made before 2.2.1
-moves once, from its folder: `git remote set-url origin https://github.com/farstic/snowarch.git`, then
-`./snowarch upgrade` (see MIGRATION.md).
+`https://github.com/farstic/snowarch`, where the Release and its evidence are published. An install of 2.2.0 or earlier
+checks a release by its own older rule and refuses this one, changing nothing, so it is replaced once by a fresh install
+that carries over the licence, the instance store and the engagement folders. An install of a 2.2.1 release candidate
+moves with `git remote set-url origin https://github.com/farstic/snowarch.git`, then `./snowarch upgrade` (MIGRATION.md
+has both).
 
 ### Fixed
 
@@ -45,6 +51,23 @@ moves once, from its folder: `git remote set-url origin https://github.com/farst
 - `./snowarch doctor --no-network` makes no network call. The release-currency check (E-28) read the flag where the
   doctor never put it and still asked `origin` for its tags, so every report taken with `--no-network` before 2.2.1,
   the release evidence included, made that one call (ARC-09-C187).
+- A release is checked against the coverage its own signed manifest carries, as the manifest's format says, not against
+  the coverage of the code doing the checking. Before this, an upgrade refused a release that covers more files than the
+  install, and a release push checked the same way (ARC-09-C192). The release gate also refuses a manifest signed with
+  another coverage than the release's own; an install of 2.2.0 or earlier keeps its own rule and is replaced once (see
+  the Notes).
+- From this release, an upgrade checks every floor its target states (Claude Code, git and Node) with the bootstrap's
+  own rules before it moves anything, so a release that needs a newer git or Node is refused with nothing changed, not
+  after the move. `--force-floor` now completes the upgrade it allows: the bootstrap is told to skip its Claude Code
+  check (ARC-09-C194).
+- On Windows, `snowarch.cmd` runs the command and returns its exit code on one line, so an upgrade that replaces the
+  launcher while it runs no longer leaves it reading the new file at the old place, which printed `|| was unexpected at
+  this time.` or ran the command again, thousands of times when the file grew (ARC-09-C194).
+- From this release, after a move from a release, the command an upgrade names to return to it is `./snowarch upgrade
+  --to` that release, which checks and records it again; `git checkout` would have left the record naming the newer one
+  (ARC-09-C194).
+- From this release, an install on a branch moves to the release tag the upgrade verified, never past it to an
+  unreleased commit, or is refused with nothing changed (ARC-09-C194).
 - `Status` reads the release family and pin from the `Docs:` line of the `./snowarch status` panel. The session
   looked for a git branch in the corpus checkout, which has none, and reported the corpus as not a git checkout
   (ARC-09-C188).
@@ -87,6 +110,179 @@ moves once, from its folder: `git remote set-url origin https://github.com/farst
   farstic/snowarch whose tag is that tag staged and whose manifest is signed from it. `release.yml` installs, judges and
   measures the staged tree on three OSes and compares the distribution tag's tree. An rc keeps the gate it had
   (ARC-09-C185b).
+
+### Added
+
+- release: ARC-09-C185b, a final from 2.2.1 is pushed with --distribution <clone> (76a666a)
+- release: ARC-09-C185a, staged commits and tags carry the owner's identity from NOTICE (ebe22e4)
+- server: ARC-09-C185a, packages/contract/retired-names.json ships (d5573e4)
+- release: ARC-09-C185a, `stage <clone> <ref>` makes the distribution commit, reproducibly (84b6fdd)
+- server: ARC-09-C185a, COVERAGE grows to what a user receives; the manifest covers it all (08a89d6)
+- release: ARC-09-C185a, what ships from one list, its export, and the guard (080f520)
+- engine: ARC-09-C185a, E-21 and `docs family` run only in the engineering checkout (ca7ddfa)
+
+### Fixed
+
+- engine: ARC-09-C194, snowarch.cmd exits with `call exit /b %%ERRORLEVEL%%`, measured (e78b5fd)
+- engine: ARC-09-C194, a branch moves to the verified tag; returning after a move re-verifies (bf783c7)
+- engine: ARC-09-C194, snowarch.cmd runs node and exits on one line (0c4d47c)
+- engine: ARC-09-C194, U4 judges every tag floor; --force-floor completes the move (3c86d50)
+- engine: ARC-09-C192, a manifest is compared on its own coverage, the gate on its own (fee203a)
+- contract: ARC-09-C189, the no-literals probe is written in a temp tree, never the repository (79eb96a)
+- release: ARC-09-C185c, the server package and its publish target name farstic/snowarch (bdd480b)
+- release: ARC-09-C185c, the release body's overflow link resolves on farstic/snowarch (271a5eb)
+- release: ARC-09-C185c, stage refuses a message that names the engineering repository (e89adfa)
+- release: ARC-09-C185a, export copies HEAD's blobs as stage does, on every machine (bf359c4)
+- release: ARC-09-C185a, a link written in inline code is an example, not a reference (c8278d0)
+- release: ARC-09-C185a, the guard resolves a shipped page's relative Markdown links (a3c2874)
+- release: ARC-09-C185a, the guard names maintainers' remedies and marks lint path lists (8ecff0a)
+- doctor: ARC-09-C185a, an install's remedies name no maintainer's file (80b56f3)
+- server: ARC-09-C185a, COVERAGE excludes packages/contract/lint/tests/ (c40d35e)
+- release: ARC-09-C185a, the guard excuses by name what the rulings say is not a reference (153b70a)
+- release: ARC-09-C185a, the guard reads a repo path anywhere in a line of code (3e52437)
+- server: ARC-09-C185a, COVERAGE names the two Windows launchers by their stems (ecc4ddb)
+- release: ARC-09-C185a, the distribution CLI writes synchronously and sets an exit code (5649008)
+- release: ARC-09-C185a, the guard reads a repo path built from join() or resolve() segments (f11261d)
+- doctor: ARC-09-C185a, E-28 reads --no-network where the doctor passes it, ctx.flags (e7c6f03)
+- server: ARC-09-C184, the resolve tools stamp resolved_at as yyyy-MM-dd HH:mm:ss in UTC (96d0927)
+- server: ARC-09-C183, a create reads the data policies and refuses a missing mandatory field (ea3f87e)
+- engine: ARC-09-C170, the upgrade names its from-version as the doctor does, never an import tag (93195bf)
+- server: ARC-09-C178, a read with `fields` names the requested fields the instance left out (a40339f)
+- server: ARC-09-C182, a 403 from a data policy or a business rule is INSTANCE_REFUSED (499ed32)
+- server: ARC-09-C172, the query guard passes …AgoStart/End/Local; a refusal says what to send (b7ce11f)
+
+### Changed
+
+- engine: ARC-09-C185a, E-32's restore remedy has one definition, restoreRemedy(cli) (57951d9)
+- engine: ARC-09-C185a, the skills lint and its data move under tools/snowarch/lib (8338e68)
+- contract: ARC-09-C185a, L05's citation extraction moves to lint/lib/cited-paths.mjs (2ff154f)
+- engine: ARC-09-C185a, the frontmatter parser moves from tests/lib to packages/contract/lib (ba828a9)
+- engine: ARC-09-C185a, roster.mjs and release/tag.mjs move under tools/snowarch/lib (7a64139)
+
+### Internal
+
+- changelog: ARC-09-C194, the Windows launcher's bullet says what was measured (68b4745)
+- engine: ARC-09-C194, a temporary Windows probe of six launcher forms under cmd /c (c1ccb0a)
+- changelog: ARC-09-C194, neutral note lines for two subjects; one bullet reworded (5cc05e4)
+- changelog: ARC-09-C194, the upgrade guards 2.2.1 ships, as its own upgrade does (5c4cb44)
+- engine: ARC-09-C194, the branch case reads back the clone's checkout before using it (1da6c4a)
+- plan: ARC-09-C194, the upgrade guards in the first distribution release (9aedda6)
+- engine: ARC-09-C194, the calls an older release's upgrade makes into this tree (08f131a)
+- engine: ARC-09-C194, red — returning after a move, and a branch install's U5 (de7a668)
+- engine: ARC-09-C194, red on Windows — snowarch.cmd re-reads a replaced launcher (c05be3b)
+- engine: ARC-09-C194, red — U4 judges only the Claude floor; --force-floor half-moves (bbe24e8)
+- ARC-09-C192, MIGRATION says not to copy the rest of .local into the fresh install (8d27c5e)
+- ARC-09-C192, MIGRATION's fresh install pins the current release; .env is not carried (260a4a6)
+- engine: ARC-09-C192, the carried-settings case derives the hook from hookEntry (f218a06)
+- ARC-09-C192, a 2.2.0 install is replaced once; an rc install moves; rows C191–C193 (2a4e288)
+- engine: ARC-09-C192, the upgrade never force-fetches a tag, pinned by the refusal (678b81f)
+- engine: ARC-09-C192, the full move runs on a staged distribution, its own history (e2e2d0a)
+- engine: ARC-09-C192, a carried settings.local.json keeps one SessionStart hook (a164bfd)
+- engine: ARC-09-C192, red — a manifest is read with the running coverage, not its own (732690b)
+- ARC-09-C185b, the release order through farstic/snowarch, its notes and its row (7406006)
+- release: ARC-09-C185b, verify installs the staged tree and checks the distribution tag (4ba362f)
+- release: ARC-09-C185b, red — a final from 2.2.1 leaves only beside its distribution (7b85aae)
+- plan: ARC-09-C188, acceptance passed on the staged export of 012ebbb0 (512afab)
+- changelog: ARC-09-C188, Status reads the family and pin from the panel's Docs line (7dcf52a)
+- engine: ARC-09-C188, the Status pin finds the panel command by an escaped pattern (012ebbb)
+- plan: ARC-09-C188 fixed on its branch; acceptance is a Status sitting on the export (721d8b8)
+- ARC-09-C188, Status runs the panel command and reads the family from its Docs line (9bf3e60)
+- engine: ARC-09-C188, red — Status reads the family from a branch, not the Docs line (ab2c030)
+- engine: ARC-09-C185c, the full-move case calls git through the harness wrapper (cd3e20b)
+- engine: ARC-09-C185c, REFROZEN assembles the predecessor's name, as AC 4 does (2243f6d)
+- engine: ARC-09-C185c, the frozen history is re-frozen once, its substitution as data (c6014b7)
+- engine: ARC-09-C185c, the full-move case reads the version as the product does (f0b1121)
+- plan: ARC-09-C189, the no-literals probe in a temp tree, fixed on its branch (537e5a4)
+- contract: ARC-09-C189, red — the no-literals probe is planted in the real tools/snowarch/lib (ec15ba2)
+- plan: ARC-09-C185c fixed on its branch, its 2.2.2 follow-up; C185b records the owner's assets (681a02d)
+- ARC-09-C185c, MIGRATION moves an install to farstic/snowarch; 2.2.1 Notes say so (dce2526)
+- engine: ARC-09-C185c, the move to a new origin, measured end to end: the tag stays (f309560)
+- engine: ARC-09-C185a, the four-homes case reads the exclusion's meaning, not its word order (3484c06)
+- engine: ARC-09-C185c, the package and config metadata name farstic/snowarch (8f3a6ef)
+- ARC-09-C185c, install pages clone farstic/snowarch and name no engineering repository (fb56fad)
+- release: ARC-09-C185c, red — 40 lines in what ships name the engineering repository (5499a20)
+- ARC-09-C185a, CLAUDE.md keeps room for the version an rc cut writes, 19,986 bytes (3064ca2)
+- release: ARC-09-C185a, red — export follows the machine's autocrlf; stage does not (82cbf3c)
+- engine: ARC-09-C185a, red — CLAUDE.md is 20,002 bytes once a cut writes an rc version (32be295)
+- engine: ARC-09-C185a, upgrade AC 3 edits a tracked page the release leaves out, derived (c7c19fb)
+- release: ARC-09-C185a, the export fixture pins core.autocrlf, so Windows reads as macOS (5e144c4)
+- ARC-09-C185a, the contract gate's generated step runs the distribution guard (c89de4c)
+- contract: ARC-09-C185a, red — the gate's generated step does not run the distribution guard (493080d)
+- ARC-09-C185a, contribution and validation pointers name nothing an install lacks (88f8980)
+- release: ARC-09-C185a, red — this tree has 4 unshipped references, all in the held previews (9725da2)
+- ci: ARC-09-C185a, the distribution job's test finds its installs by pattern, not spelled (a9f37da)
+- plan: ARC-09-C185a, C185b, C185c, C186, C187 and C188 rows (2cf89c8)
+- release: ARC-09-C185a, the integrity e2e: the larger set, an older manifest, R5 and R4 (28dfd33)
+- ARC-09-C185a, a distribution job installs the staged tree on three OSes and judges it (cf79b47)
+- ARC-09-C185a, INSTALL and README stop pointing users at CONTRIBUTING (8a553b0)
+- ARC-09-C185a, TROUBLESHOOTING names the server's error registry without its source path (94cb43c)
+- ARC-09-C185a, user pages name decisions, spikes and tests without engineering paths (628cd13)
+- release: ARC-09-C185a, the inline-code case can fail: its example lands outside the coverage (1ab6dba)
+- release: ARC-09-C185a, red — a link written in inline code is read as a link (28e98a1)
+- release: ARC-09-C185a, red — the guard misses a relative link to an unshipped page (e0884c4)
+- ARC-09-C185a, PLATFORM-NOTES names its records and the server's files instead of citing them (264e6a8)
+- ARC-09-C185a, the live-coverage page names its sitting records instead of citing their paths (14a2a8c)
+- ARC-09-C185a, CLAUDE.md §11 and §12 say which pointers live in the engineering checkout (a46d8cd)
+- contract: ARC-09-C185a, red — a pin mismatch in an install names pin.mjs, which is not shipped (59e8f34)
+- engine: ARC-09-C185a, red — `docs status` in an install names the maintainer's docs-bump (ad30f99)
+- doctor: ARC-09-C185a, red — in an install, the doctor's remedies name maintainers' files (a736313)
+- release: ARC-09-C185a, red — 32 lint fixture files ship under packages/contract/lint/ (0adbe8b)
+- release: ARC-09-C185a, red — the guard reports what the rulings excuse, by name (df0438a)
+- release: ARC-09-C185a, red — the guard misses a repo path mid-sentence in a string (91c16d5)
+- ARC-09-C185a, MODES-AND-PRESETS points at its own plan and MIGRATION step 3, not a snippet (94810ed)
+- changelog: ARC-09-C187 under 2.2.1's Fixed: --no-network makes no network call (8cf68cf)
+- doctor: ARC-09-C187, the runDoctor case names its branch at git init (606792b)
+- engine: ARC-09-C185a, the integrity fixtures follow the grown coverage (0031e97)
+- release: ARC-09-C185a, red — the guard misses a path read through join() segments (c597763)
+- engine: ARC-09-C185a, red — E-28 reaches the network under the doctor's own --no-network (0eb4621)
+- engine: ARC-09-C185a, the docs-family workspace takes the engineering checkout's shape (732aba4)
+- engine: ARC-09-C185a, red — one shipped list and a guard for what the runtime reaches (ee0c0ed)
+- changelog: the 2.2.1 Notes say a conditional data policy is named and the write goes ahead (a8dbc43)
+- changelog: the 2.2.1 Notes and groups, a patch release with no breaking change (7723cb5)
+- plan: ARC-09-C184 names its draft, #478 (14e2d4f)
+- the 2026-10-19 ITSM sweep record gains its install timeline, as the record shape asks (a8a2d1c)
+- plan: ARC-09-C167b group 1 ran in part; ARC-09-C184 fixed on its branch (2ae3f49)
+- PN-21 confirmed on the instance; PN-22 and PN-23 from the 2026-10-19 ITSM sweep (2c2c4f1)
+- the live-coverage ledger takes the ITSM sweep: three tools verified live, resolve named (a07624d)
+- the 2026-10-19 ITSM sweep recorded, steps 0–4 of C167b group 1, one defect (C184) (7ebf472)
+- server: ARC-09-C184, red — a stamped date-time is the instance's format in UTC (8e57cb3)
+- plan: ARC-09-C183 names its draft, #477 (b01eb63)
+- plan: ARC-09-C183 fixed on its branch (e9f9561)
+- contract: ARC-09-C183, the protocol's read-back step names the data-policy check (3d604d7)
+- PN-21, a mandatory field over the REST Table API is a data policy's, not the dictionary's (528e47c)
+- server: ARC-09-C183, red — a data policy's mandatory field is checked before the first write (344a395)
+- plan: ARC-09-C170 names its draft, #476 (3cd36ef)
+- engine: ARC-09-C170, the orphan checkout in the from-label case asserts that it took (87a1a62)
+- plan: ARC-09-C170 fixed on its branch (50cb9d1)
+- engine: ARC-09-C170, red — the upgrade's from-label is a release tag or the commit (58a3ffe)
+- plan: ARC-09-C178 names its draft, #475 (932f11b)
+- plan: ARC-09-C178 fixed on its branch (33dffc2)
+- ARC-09-C178, PN-20's engine consequence names fields_not_returned (12d03eb)
+- server: ARC-09-C178, red — a read names the requested fields the instance did not return (7a8ea4b)
+- server: the error registry's showInRule note keeps no count, so it cannot go stale (c6e5d01)
+- plan: ARC-09-C182 names its draft, #474 (d1ad6a1)
+- plan: ARC-09-C182 fixed on its branch, with the cap at 80 (76bb04a)
+- contract: the rule file's cap is 80, by the owner's ruling of 2026-10-17 (7df65b0)
+- server: ARC-09-C182, red — a 403 from the instance's own rule is INSTANCE_REFUSED (3434d63)
+- the live-coverage ledger counts snow_core_record_read as named-only, with PN-20 as its record (cd3b0c9)
+- PN-20 names snow_core_record_read, so the live-coverage page counts 27 tools named in a record (799fc4a)
+- PN-20, a Protected Script Include's script does not come back over the Table API (3404ea7)
+- ARC-09-C180, an unnamed tool link is refused by a data policy, not "Check duplicate name" (57f68b9)
+- plan: ARC-09-C181 and C182 open; C182 carries the owner's cap-80 ruling for the rule file (8a7bc60)
+- plan: ARC-09-C164 to C180, eleven rows shipped in 2.2.0, tag v2.2.0 at release commit 02ee6ab (6b9e7f6)
+- changelog: the server package's 2.2.0 block is dated, and 2.2.1-dev keeps the open C119 gap (2d6fe67)
+- ARC-09-C172, PN-19 names the two user-access roles Studio copied into the approved roles (367c0b5)
+- ARC-09-C172, PN-17 says only what was reported of the setup routes; the prefix is not recorded (ca2c585)
+- ARC-09-C172, PN-17/18/19 cite the continued run as the Architect's summary, not committed (cb70a46)
+- plan: ARC-09-C172 names its draft, #469 (ba5626a)
+- plan: ARC-09-C172 built on its branch; ARC-09-C173 opens (an AI agent modify tool) (ac0b989)
+- licensing-specialist: ARC-09-C172, a net-new AI agent built in AI Agent Studio needs Prime (4b1795c)
+- now-assist-specialist: ARC-09-C172, remove admin from the pre-filled roles; expect two records (56685cc)
+- ARC-09-C172, PN-17 routes and defaults, PN-18 a new login, PN-19 Studio's access-rules step (233bd59)
+- contract: ARC-09-C172, the Studio step is a write; activation is a record modify (c01f8fc)
+- server: ARC-09-C172, red — the query guard passes every documented GlideSystem …Ago function (bf022c0)
+
+Tag v2.2.1 · contract 2eb5b9945857 · docs-pin aa447ce
 
 ## 2.2.0 — 2026-10-17
 

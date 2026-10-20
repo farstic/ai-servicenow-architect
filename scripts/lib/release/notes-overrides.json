@@ -14,5 +14,13 @@
   "0e5d1af916f965046d563f262bb377ee38205fb7": {
     "line": "snowarch: two comments in the licence code are reworded (ARC-11-C6)",
     "why": "its subject named what the owner's ruling of 2026-10-13 forbids a page to say; the line is what the commit did"
+  },
+  "bf783c745f4b303eb30affc353e00f66561fefd4": {
+    "line": "engine: ARC-09-C194, a branch moves to the verified tag; returning after a move re-verifies",
+    "why": "its subject named what the owner's ruling of 2026-10-13 forbids a page to say; the line is what the commit did"
+  },
+  "de7a668b1a62e14df98d0aa8711268ed5d509fba": {
+    "line": "engine: ARC-09-C194, red — returning after a move, and a branch install's U5",
+    "why": "its subject named what the owner's ruling of 2026-10-13 forbids a page to say; the line is what the commit did"
   }
 }

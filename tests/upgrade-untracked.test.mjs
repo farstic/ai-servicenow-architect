@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { gitReason, namePaths, pullFailureLine, splitZ, UNTRACKED_REASON, untrackedBlockers }
+import { fastForwardFailureLine, gitReason, namePaths, splitZ, UNTRACKED_REASON, untrackedBlockers }
   from '../tools/snowarch/lib/commands/upgrade.mjs';
 
 test('ARC-09-C120 — the blockers are the untracked paths the target tracks, and no others', () => {
@@ -58,13 +58,14 @@ test('ARC-09-C120 — git\'s reason is its first line, and the next one when the
   assert.equal(gitReason(undefined), null);
 });
 
-test('ARC-09-C120 — a pull is called diverged only when git refused the fast-forward', () => {
-  const at = { branch: 'main', remote: 'origin', target: 'v9.2.0' };
-  assert.match(pullFailureLine("hint: Diverging branches can't be fast-forwarded, you need to either:\n"
-    + 'fatal: Not possible to fast-forward, aborting.', at),
-  /^upgrade: main has diverged from origin\/main — resolve with git, or use --to v9\.2\.0 to check out the release tag$/);
-  const locked = pullFailureLine("fatal: Unable to create '/x/.git/index.lock': File exists.", at);
-  assert.equal(locked,
-    "upgrade: git pull --ff-only failed — fatal: Unable to create '/x/.git/index.lock': File exists.; nothing else was changed");
+test('ARC-09-C120 — a failed move is git\'s own reason, quoted, never a guessed divergence', () => {
+  // ARC-09-C194: whether the branch can fast-forward to the tag is asked first, with `merge-base --is-ancestor`, and
+  // refused with its own line; what reaches this one is everything else git can say.
+  const at = { branch: 'main', target: 'v9.2.0' };
+  const locked = fastForwardFailureLine("fatal: Unable to create '/x/.git/index.lock': File exists.", at);
+  assert.equal(locked, "upgrade: git could not fast-forward main to v9.2.0 — fatal: Unable to create "
+    + "'/x/.git/index.lock': File exists.; nothing else was changed");
   assert.doesNotMatch(locked, /diverged/);
+  assert.equal(fastForwardFailureLine('', at), 'upgrade: git could not fast-forward main to v9.2.0 — git gave no reason; '
+    + 'nothing else was changed');
 });

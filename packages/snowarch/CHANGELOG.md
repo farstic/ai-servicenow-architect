@@ -3,11 +3,34 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
-## Unreleased (2.2.1-dev)
+## Unreleased (2.2.2-dev)
 
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
+
+## 2.2.1 — 2026-10-20
+
+**A refusal by the instance's own rules has its own code, `INSTANCE_REFUSED` (ARC-09-C182).** A 403 that a data policy
+or a business rule returns says so, and its remedy is to correct the record rather than to change roles.
+
+**A create reads its table's data policies before it writes (ARC-09-C183).** A field a policy requires that the call
+would not send is refused there, naming the policy; a policy with a condition names the field as possibly required,
+and the write goes ahead.
+
+**The resolve tools store `resolved_at` in the instance's format, in UTC (ARC-09-C184).** They sent an ISO string,
+which the instance stored as the date alone, at midnight.
+
+**A read with `fields` names the requested fields the instance left out (ARC-09-C178).**
+
+**The query guard accepts every documented GlideSystem `…Ago` function, the `…Start`, `…End` and `…Local` forms
+included (ARC-09-C172).** Any other `javascript:` expression is still refused, and the refusal says to compute the
+value and send it literally.
+
+**The signed manifest covers what a release ships, 455 files (ARC-09-C185a).** COVERAGE grows to the governance,
+templates, the scripts the Architect runs and the user documentation; `packages/contract/lint/tests/` is excluded.
+
+Still 399 tools, 163 of them mutating; 75 error codes (one added).
 
 ## 2.2.0 — 2026-10-17
 
