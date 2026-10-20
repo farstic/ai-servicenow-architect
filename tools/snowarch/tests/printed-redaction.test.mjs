@@ -33,11 +33,12 @@ test('ARC-09-C208 — the reader sees a key in a quoted string, in a template\'s
     'template.mjs': 'log.step(`checked ${n} files; see docs.pin for the commit`);',
     'code.mjs': 'log.step(`the pin is ${config.docs.pin} today`);',
     'backticked.mjs': "log.fail('`docs.pin` is not a 40-character sha');",
-    'remedies.json': '{ "git": { "win32": "winget install Git.Git", "darwin": "xcode-select --install" } }',
+    // A JSON value is read by its key path; an install command's package id is left alone by the redactor itself.
+    'remedies.json': '{ "e06": { "default": "set docs.pin to a sha", "win32": "winget install Git.Git" } }',
   } });
   assert.deepEqual(masked.map((m) => m.split(/[: ]/)[0]), ['plain.mjs', 'template.mjs', 'remedies.json'],
     masked.join('\n'));
-  assert.match(masked[2], /^remedies\.json git\.win32 /, masked[2]);
+  assert.match(masked[2], /^remedies\.json e06\.default /, masked[2]);
 });
 
 test('ARC-09-C208 — a real first.last in a printed line is still masked', () => {
