@@ -340,9 +340,11 @@ test('ARC-09-C158 — Windows runs the upgrade set as two shards, and one requir
   const rows = [...shards.matchAll(/^ {10}- \{ shard: (\d), files: '([^']+)' \}$/gm)];
   assert.deepEqual(rows.map((r) => r[1]), ['1', '2'], 'not exactly shards 1 and 2');
   assert.match(shards, /node --test --test-concurrency=2 \$\{\{ matrix\.files \}\}/);
-  // By subject: the general cases in shard 1, the licence and manifest cases leading shard 2.
+  // By subject: the move itself in shard 1; the licence and manifest cases, then the run after a move
+  // (ARC-09-C215), leading shard 2.
   assert.equal(rows[0][2], 'tests/upgrade/upgrade.e2e.test.mjs');
-  assert.match(rows[1][2], /^tests\/upgrade\/upgrade-licence\.e2e\.test\.mjs /);
+  assert.match(rows[1][2],
+    /^tests\/upgrade\/upgrade-licence\.e2e\.test\.mjs tests\/upgrade\/upgrade-after-move\.e2e\.test\.mjs /);
   // The two lists together are the Linux and macOS list, file for file and once each: a file in one
   // and not the other would run on two operating systems and be believed to run on three.
   const windowsFiles = rows.flatMap((r) => r[2].split(/\s+/));
@@ -363,6 +365,9 @@ test('ARC-09-C158 — Windows runs the upgrade set as two shards, and one requir
   // The licence file states the rule that put its cases there, so the next case is placed by it.
   assert.match(readFileSync(join(root, 'tests/upgrade/upgrade-licence.e2e.test.mjs'), 'utf8').slice(0, 2000),
     /THE RULE, by subject and never by seconds: a case belongs here when what it measures is the licence\n \* gate or the signed manifest/);
+  // ARC-09-C215 — and so does the file of the run after a move.
+  assert.match(readFileSync(join(root, 'tests/upgrade/upgrade-after-move.e2e.test.mjs'), 'utf8').slice(0, 2000),
+    /THE RULE, by subject and never by seconds: a case belongs here when what it measures is the run after a\n \* move/);
 });
 
 test('release-dryrun runs the real release on three OSes, every commit (ARC-09-S03)', () => {

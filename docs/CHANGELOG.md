@@ -9,11 +9,25 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A patch release: an upgrade says where releases are published when the install's origin is elsewhere, and never
-waits on a credential prompt.** An install whose origin is another GitHub repository is told, where its upgrade stops,
-the command that points it at `https://github.com/farstic/snowarch.git`. An origin that wants a credential no stored
-helper holds now fails at once, in the upgrade and in the doctor's release check, with a line that says so. A remote
-the doctor cannot reach is a warning, no longer a crash.
+**A patch release: an upgrade that stopped finishes on the next run, and the doctor reports what it finds instead of
+crashing on it.** An upgrade interrupted after it moved the tree, by a Ctrl-C during its bootstrap or a bootstrap that
+ended early, no longer says "up to date" on the next run: `./snowarch upgrade` names the steps still to run and finishes
+them. Right after an upgrade from a tree with no release tag in its history, the doctor no longer reports the release
+just installed as available. The upgrade and the doctor's release check ask git with its prompts off, so an origin that
+wants a credential no stored helper holds fails at once with a line that says so, instead of waiting on a prompt nobody
+sees. An install whose origin is another GitHub repository is told, where its upgrade stops, the command that points it
+at `https://github.com/farstic/snowarch.git`.
+
+The doctor no longer crashes when `engine.config.json` lacks a key it requires: its configuration check names the key
+and how to restore the file, and any command that meets an error it did not expect prints one line, with the details
+under `--verbose`. A remote the doctor cannot reach is a warning with git's own reason, where it was a failed check that
+made the doctor exit 1. Settings and package names in printed lines read as written again: `docs.pin`, `http.proxy` and
+the Windows remedy `winget install Git.Git` had been masked as if they were people's names. The next bootstrap no longer
+runs a step again because that step changed one of its own inputs, as the instance step does when it migrates the store.
+
+The server is unchanged: its contract keeps its 399 tools and 75 error codes, the always-loaded rule file is 73 lines,
+and the licence format is unchanged. The signed manifest covers the same 455 files. A 2.2.1 install upgrades with
+`./snowarch upgrade`.
 
 ### Fixed
 
@@ -65,6 +79,11 @@ the doctor cannot reach is a warning, no longer a crash.
 - The line U5 prints after a move to a release before 2.2.1 names a fresh install (`docs/MIGRATION.md`) instead of an
   `upgrade` that release's own code refuses. Only a checkout whose origin carries those tags can make that move
   (ARC-09-C203).
+- C207's credential case no longer fails when a Windows runner stalls the start of git's HTTP helper past E-28's
+  budget. It starts the helper once before the measured call, and accepts the timeout only when git's trace proves the
+  start stalled (ARC-09-C214).
+- The Windows upgrade check runs the run-after-a-move cases in their own file, in its second shard: the first shard had
+  reached its 45-minute limit with every case passing (ARC-09-C215).
 
 ## 2.2.1 — 2026-10-20
 
