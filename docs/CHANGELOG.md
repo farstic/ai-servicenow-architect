@@ -47,6 +47,12 @@ the doctor cannot reach is a warning, no longer a crash.
   command that points it at `https://github.com/farstic/snowarch.git`. An origin on another host is left alone, and a
   credential in the URL is never printed (ARC-09-C185c).
 
+### Internal
+
+- The release writes the server package's section in `packages/snowarch/CHANGELOG.md` at a final, as it does for this
+  file, and carries the open "Known gap" paragraphs forward. A final whose server package changed with nothing written
+  there is refused before anything is written; the 2.2.1 cut was such a final (ARC-09-C206).
+
 ## 2.2.1 — 2026-10-20
 
 ### Notes
