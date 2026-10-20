@@ -267,7 +267,10 @@ export function classifyGitFetchError(stderr = '', { remote = 'origin' } = {}) {
   }
   // ARC-09-C190 — the remote wanted a credential it was not given, or says it has no such repository, which is how a
   // private one answers a stranger. The fetch runs with prompts off, so this is git's answer at once, not a wait.
-  if (/could not read Username|Authentication failed|Repository not found|terminal prompts disabled/i.test(text)) {
+  // ARC-09-C207 — a plain 404 with no `remote:` line, a moved URL on a self-hosted server, is git's
+  // "repository '<url>' not found": the URL sits between the words GitHub's own line keeps together.
+  if (/could not read Username|Authentication failed|Repository not found|repository '[^']*' not found|terminal prompts disabled/i
+    .test(text)) {
     return { kind: 'auth', line: `upgrade: ${remote} asked for credentials, or was not found — it may be private or `
       + `moved; check it with git remote get-url ${remote}; nothing was changed` };
   }
