@@ -62,6 +62,9 @@ the doctor cannot reach is a warning, no longer a crash.
 - The release writes the server package's section in `packages/snowarch/CHANGELOG.md` at a final, as it does for this
   file, and carries the open "Known gap" paragraphs forward. A final whose server package changed with nothing written
   there is refused before anything is written; the 2.2.1 cut was such a final (ARC-09-C206).
+- The line U5 prints after a move to a release before 2.2.1 names a fresh install (`docs/MIGRATION.md`) instead of an
+  `upgrade` that release's own code refuses. Only a checkout whose origin carries those tags can make that move
+  (ARC-09-C203).
 
 ## 2.2.1 — 2026-10-20
 

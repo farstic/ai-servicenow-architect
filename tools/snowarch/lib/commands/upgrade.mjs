@@ -45,7 +45,8 @@ import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
 import { manifestSays, refreshManifest, refreshWithUpgrade } from '../licence/fetch.mjs';
-import { MANIFESTS_FROM, archiveDiffers, checkTree, signedRelease, writeManifestCache } from '../licence/manifest.mjs';
+import { DISTRIBUTION_FROM, MANIFESTS_FROM, archiveDiffers, checkTree, signedRelease, writeManifestCache }
+  from '../licence/manifest.mjs';
 import { hashFor, INPUTS, STEP_IDS } from '../inputs.mjs';
 
 /**
@@ -1016,11 +1017,8 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   if (byBranch) {
     log.step(`${branch.branch} is at ${target}`);
   } else {
-    // ARC-09-C194 — once the target's manifest is cached, `git checkout` back leaves the cache naming the target, so
-    // integrity reads 'other' and every command is refused. From a release, the way back is the upgrade, which
-    // fetches, verifies and caches that release's own; a tree that was not on one has no manifest to disagree with.
-    const back = manifest && here ? `${cli} upgrade --to ${here}` : `git checkout ${returnTo}`;
-    log.step(`HEAD is detached at ${target} — return with: ${back}`);
+    // ARC-09-C194 and C203: which return the line names, and why, is returnLine's.
+    log.step(returnLine({ cli, here, target, manifest, returnTo }));
   }
   log.step('your instance store lives in .local/, which git ignores, so no checkout touches it');
 
@@ -1045,6 +1043,28 @@ export function returnRef(branch, described) {
   if (branch.branch) return branch.branch;
   if (described?.exact && described.name) return described.name;
   return branch.short;
+}
+
+/**
+ * What U5 says on the detached path, to return to where this tree was.
+ *
+ * ARC-09-C194 — once the target's manifest is cached, `git checkout` back leaves the cache naming the target, so
+ * integrity reads 'other' and every command is refused. From a release, the way back is the upgrade, which fetches,
+ * verifies and caches that release's own; a tree that was not on one has no manifest to disagree with.
+ *
+ * ARC-09-C203 — UNLESS THE TARGET'S OWN CODE CANNOT RUN THAT UPGRADE. The printed upgrade runs under the target, and a
+ * target below `distributionFrom` predates ARC-09-C192: it refuses a newer release's manifest. The D3 drill: from
+ * v2.2.1-rc.2, `--to v2.2.0`, then the printed `upgrade --to v2.2.1-rc.2` was refused. Such a target is left by a fresh
+ * install, which always works. A 2.2.1 release candidate compares below 2.2.1 and is counted with it.
+ */
+export function returnLine({ cli, here, target, manifest, returnTo, distributionFrom = DISTRIBUTION_FROM }) {
+  if (!manifest || !here) return `HEAD is detached at ${target} — return with: git checkout ${returnTo}`;
+  let below = false;
+  try { below = compareSemver(target, distributionFrom) < 0; } catch { below = false; }
+  return below
+    ? `HEAD is detached at ${target} — ${target} checks releases by its own older rule: return to ${here} by a fresh `
+      + 'install (docs/MIGRATION.md)'
+    : `HEAD is detached at ${target} — return with: ${cli} upgrade --to ${here}`;
 }
 
 /**
