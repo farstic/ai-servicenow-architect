@@ -35,6 +35,10 @@ the doctor cannot reach is a warning, no longer a crash.
   now name the key in backticks, which the redactor leaves alone. `cmd.exe` is no longer masked, and neither is the
   package id an install command names, so the Windows git remedy reads `winget install Git.Git` again instead of
   `winget install G***.G***` (ARC-09-C208).
+- The doctor no longer crashes when `engine.config.json` is missing a key it requires (`docs.pin`, `docs.family`,
+  `mcp.serverKey` or `floors.node`). It ended in a Node stack trace; E-06 now reports the key as missing, with its
+  remedy, `git checkout -- engine.config.json`. Any other command that meets an error it did not handle prints one line
+  saying what happened, and the stack only with `--verbose` (ARC-09-C209).
 
 ### Changed
 
