@@ -2407,7 +2407,7 @@ upstream is the docs suite's own local bare repository.
 
 ---
 
-**Where this is tested.** `tests/upgrade/upgrade.e2e.test.mjs` against the two-release fixture harness, `tools/snowarch/tests/input-hash.test.mjs` for the input-hash table that decides which bootstrap steps go stale, and the `upgrade-e2e` CI job on three OSes.
+**Where this is tested.** `tests/upgrade/upgrade.e2e.test.mjs` (the move), `upgrade-after-move.e2e.test.mjs` (the run after it, re-running after a failure included) and `upgrade-licence.e2e.test.mjs` (the licence and the signed manifest) against the two-release fixture harness, `tools/snowarch/tests/input-hash.test.mjs` for the input-hash table that decides which bootstrap steps go stale, and the `upgrade-e2e` CI job on three OSes.
 
 ## Store migrations
 
