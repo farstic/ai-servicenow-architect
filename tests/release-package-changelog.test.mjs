@@ -31,8 +31,8 @@ const { packageChangelogRefusal, writePackageChangelog } = await import('../scri
 const HEAD = '# Changelog\n\nAll notable changes to this project are documented here.\n\n';
 const GAP = '**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and\n'
   + 'then failed still reads the dictionary to confirm the cut.';
-const ENTRY = '**A refusal by the instance\'s own rules has its own code, `INSTANCE_REFUSED` (ARC-09-C182).** A 403 that a\n'
-  + 'data policy returns says so.';
+const ENTRY = '**A refusal by the instance\'s own rules has its own code, `INSTANCE_REFUSED` (ARC-09-C182).** A 403\n'
+  + 'that a data policy returns says so.';
 const PREVIOUS = '## 2.2.0 — 2026-10-17\n\n**An earlier entry.**\n';
 
 /** The package changelog as it stood before the 2.2.1 cut, with something written under Unreleased. */
@@ -72,8 +72,8 @@ test('ARC-09-C206 — the cut refuses a final whose package source changed while
 
 test('ARC-09-C206 — applyWrites renames the package Unreleased at a final, and leaves it alone for a release candidate', () => {
   // Every other write is the real one, over this checkout's own files in memory; nothing runs and nothing is written.
-  const files = new Map(['CLAUDE.md', 'docs/README-head.md', 'docs/INSTALL.md', 'docs/MIGRATION.md', 'docs/CHANGELOG.md']
-    .map((p) => [p, readFileSync(join(REAL_ROOT, p), 'utf8')]));
+  const files = new Map(['CLAUDE.md', 'docs/README-head.md', 'docs/INSTALL.md', 'docs/MIGRATION.md',
+    'docs/CHANGELOG.md'].map((p) => [p, readFileSync(join(REAL_ROOT, p), 'utf8')]));
   const cut = (version) => {
     const fs = new Map(files);
     fs.set('packages/snowarch/CHANGELOG.md', written);
@@ -84,9 +84,11 @@ test('ARC-09-C206 — applyWrites renames the package Unreleased at a final, and
   };
   const final = cut('9.9.9');
   assert.match(final.text, /^## 9\.9\.9 — 2026-10-20$/m, final.text);
-  assert.ok(final.r.touched.includes('packages/snowarch/CHANGELOG.md'), 'the package changelog is not in what a rollback restores');
+  assert.ok(final.r.touched.includes('packages/snowarch/CHANGELOG.md'),
+    'the package changelog is not in what a rollback restores');
   const rc = cut('9.9.9-rc.1');
-  assert.equal(rc.text, written, 'a release candidate renamed the package Unreleased, so the final would find it empty');
+  assert.equal(rc.text, written,
+    'a release candidate renamed the package Unreleased, so the final would find it empty');
 });
 
 test('ARC-09-C206 — preflight asks the package changelog at a final, with the source diff since the previous final', () => {

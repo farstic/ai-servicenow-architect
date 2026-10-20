@@ -12,11 +12,12 @@
  * not a log format: `release: working tree not clean:` followed by the porcelain lines is the thing
  * a maintainer pastes into a chat when asking why.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { compareSemver } from '../../../tools/snowarch/lib/semver.mjs';
 import { spellings } from '../../../tools/snowarch/lib/launcher-spelling.mjs';
+import { PACKAGE_CHANGELOG, packageChangelogRefusal } from './package-changelog.mjs';
 
 export const EXIT_PREFLIGHT = 2;
 
@@ -114,6 +115,16 @@ export function preflight({ version, root, git, config, flags = {}, platform = p
   if (porcelain !== '') {
     return { ok: false,
       message: `release: working tree not clean:\n${porcelain}\nCommit or stash first — nothing was written` };
+  }
+
+  // 5b. ARC-09-C206 — at a final, the server package says what changed in it. The 2.2.1 cut changed
+  // `packages/snowarch/src` and left its changelog with no section; the bump wrote one afterwards.
+  if (latestFinal && !version.includes('-')) {
+    const srcChanged = git(['log', '--format=%H', `${latestFinal}..HEAD`, '--', 'packages/snowarch/src']).trim() !== '';
+    const file = join(root, PACKAGE_CHANGELOG);
+    const refusal = packageChangelogRefusal({ text: existsSync(file) ? readFileSync(file, 'utf8') : '', version,
+      since: latestFinal, srcChanged });
+    if (refusal) return { ok: false, message: refusal };
   }
 
   // 6. Up to date with the remote, unless the maintainer says the network is not available.
