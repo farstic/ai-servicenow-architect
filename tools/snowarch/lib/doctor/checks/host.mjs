@@ -419,7 +419,7 @@ export function hostChecks() {
           // a 401, a 404, a name that does not resolve or a blocking proxy reached the runner as "check crashed" at
           // status fail, from a check whose severity is warn, and the doctor exited 1. The reason is the upgrade's
           // sentence without its framing, then git's own last line, which is what the reason was read from. Nothing is
-          // written to the cache: nothing was measured, the rule the upgrade keeps for a failed fetch (AC 4).
+          // written to the cache: nothing was measured, the rule AC 4 holds the upgrade to when its fetch fails.
           const { gitFetchReason } = await import('../../commands/upgrade.mjs');
           const stderr = String(e?.stderr ?? '');
           const reason = e?.code === TIMED_OUT
