@@ -46,6 +46,9 @@ the doctor cannot reach is a warning, no longer a crash.
   bootstrap, a bootstrap that ended before it recorded a step, and a missing release manifest each left the next run
   saying the install was current; it now names the steps still to run and finishes them. A step that finished with a
   warning no longer reads "last run did not finish" in the plan (ARC-09-C196).
+- A bootstrap step that changes one of its own inputs, as the instance step does when it migrates the store, is no
+  longer run again by the next bootstrap when nothing else has changed. The step recorded its inputs as they were before
+  it ran; it now records them as it left them (ARC-09-C213).
 
 ### Changed
 
