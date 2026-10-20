@@ -9,9 +9,19 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A patch release: an upgrade says where releases are published when the install's origin is elsewhere.** An install
-whose origin is another GitHub repository is told, where its upgrade stops, the command that points it at
-`https://github.com/farstic/snowarch.git`.
+**A patch release: an upgrade says where releases are published when the install's origin is elsewhere, and never
+waits on a credential prompt.** An install whose origin is another GitHub repository is told, where its upgrade stops,
+the command that points it at `https://github.com/farstic/snowarch.git`. An origin that wants a credential no stored
+helper holds now fails at once, in the upgrade and in the doctor's release check, with a line that says so.
+
+### Fixed
+
+- `./snowarch upgrade` and the doctor's release-currency check (E-28) ask git with its prompts off. An origin that
+  wanted a credential no stored helper held, or that answered as a private or missing repository, could wait on a
+  prompt nobody saw: up to 120 seconds in the upgrade, 15 in the doctor. It now stops at once: the upgrade with
+  `upgrade: origin asked for credentials, or was not found`, the doctor's E-28 with
+  `check crashed: Command failed: git ls-remote --tags --refs origin v*` and git's own `fatal:` line; a credential a
+  helper stores still applies (ARC-09-C190).
 
 ### Changed
 
