@@ -245,7 +245,9 @@ export function refusalFor(name, licence, integrity, cli) {
 }
 
 export async function main(argv, { out = process.stdout, err = process.stderr, home = '',
-  platform = process.platform, env = process.env } = {}) {
+  platform = process.platform, env = process.env,
+  // A test seam, as the doctor's `registry` is: a test plants a command under a name the licence gate allows.
+  commands = COMMANDS } = {}) {
   // ARC-07-C31 — ONE `where`, built once and threaded, so the help, the usage and the
   // unknown-command line cannot render three different shells in one run. Defaulted to the
   // process: this is a terminal, and the reader's own shell is the right answer here.
@@ -256,7 +258,7 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
     out.write(`${helpText(where)}\n`);
     return EXIT_OK;
   }
-  const command = COMMANDS[name];
+  const command = commands[name];
   if (!command) {
     err.write(`snowarch: unknown command "${name}" — run ${spellings(where).cli} help\n`);
     return EXIT_USAGE;

@@ -20,7 +20,7 @@ import { spellings } from '../lib/text.mjs';
  */
 const FRAME_CLI = spellings().cli;
 const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-import { EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
+import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
 import { contractSha, cwdNote, loadConfig, version } from '../lib/config.mjs';
 import { licensedEnv } from './helpers/licence-hook/index.mjs';
 import { stateRootInUse, useStateRoot } from './helpers/state-root.mjs';
@@ -477,4 +477,46 @@ test('ARC-07-C33 — the command table says which runs write, and `mode` decides
   for (const name of ['doctor', 'bootstrap', 'instance', 'store', 'upgrade']) {
     assert.equal(readOnly(name), false, `${name} stopped logging`);
   }
+});
+
+// ── ARC-09-C209 — a command that throws is one line, not a stack trace ──────────────────────────────────────────────
+
+test('ARC-09-C209 — a command that throws prints one redacted line and exits 1; the stack only under --verbose', async () => {
+  // `doctor` is a name the licence gate allows, so the planted command runs on any checkout, licensed or not.
+  const boom = { readOnly: true, run: () => {
+    throw new Error('engine.config.json is missing: `docs.pin` (as reported to john.smith)\nsecond line');
+  } };
+  const run = async (argv) => {
+    const captured = [];
+    const sink = { write: (t) => { captured.push(String(t)); return true; } };
+    const code = await main(argv, { out: sink, err: sink, env: {}, commands: { ...COMMANDS, doctor: boom } });
+    return { code, text: captured.join('') };
+  };
+  const plain = await run(['doctor']);
+  assert.equal(plain.code, EXIT_FAIL, plain.text);
+  const lines = plain.text.split('\n').filter((l) => l.trim() !== '' && !/^note: /.test(l));
+  assert.equal(lines.length, 1, `more than one line:\n${plain.text}`);
+  assert.match(lines[0], /engine\.config\.json is missing: `docs\.pin`/, lines[0]);
+  assert.match(lines[0], /run again with --verbose for the details/, lines[0]);
+  // Through the redacting logger: a name in a message is masked like any other printed line.
+  assert.match(lines[0], /j\*\*\*\.s\*\*\*/, lines[0]);
+  assert.doesNotMatch(plain.text, /john\.smith|^\s+at /m, plain.text);
+
+  const verbose = await run(['doctor', '--verbose']);
+  assert.equal(verbose.code, EXIT_FAIL, verbose.text);
+  assert.match(verbose.text, /^\s+at /m, `no stack under --verbose:\n${verbose.text}`);
+  assert.doesNotMatch(verbose.text, /john\.smith/, `the stack was printed past the redactor:\n${verbose.text}`);
+});
+
+test('ARC-09-C209 — loadConfig names the keys it misses in backticks, so a printed refusal is never masked', (t) => {
+  const dir = tempDir('snowarch-c209-config-', t);
+  const config = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..',
+    'engine.config.json'), 'utf8'));
+  delete config.docs.pin;
+  delete config.floors.node;
+  writeFileSync(join(dir, 'engine.config.json'), JSON.stringify(config));
+  assert.throws(() => loadConfig(dir), (e) => {
+    assert.equal(e.message, 'engine.config.json is missing: `docs.pin`, `floors.node`');
+    return true;
+  });
 });
