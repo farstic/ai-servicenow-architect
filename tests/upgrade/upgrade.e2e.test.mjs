@@ -588,7 +588,8 @@ test('ARC-09-C210 — from a tree with no reachable tag, U7 says nothing is avai
   const w = await buildWorld(t);
   bootstrapUser(w.user);
   git(w.user, ['checkout', '-q', '--orphan', 'export']);
-  assert.equal(git(w.user, ['rev-parse', '--abbrev-ref', 'HEAD']), 'export', 'the orphan branch was not checked out');
+  // `symbolic-ref`, not `rev-parse`: an orphan branch has no commit yet, and HEAD names it without resolving.
+  assert.equal(git(w.user, ['symbolic-ref', '--short', 'HEAD']), 'export', 'the orphan branch was not checked out');
   git(w.user, ['commit', '-q', '-m', 'an export with no release tag behind it']);
   assert.equal(git(w.user, ['describe', '--tags'], { allowFail: true }), null, 'a release tag is still reachable');
 
