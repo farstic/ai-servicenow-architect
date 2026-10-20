@@ -17,6 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { manifestFromArchive, signManifest, writeManifestCache } from '../../tools/snowarch/lib/licence/manifest.mjs';
 import { licenceFixture } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
@@ -261,6 +262,64 @@ test('ARC-09-C140 — 2.1 to 2.1: the plan and the run agree on B01, after an in
   assert.match(again.text, /\[B01\/09\][^\n]*ok \(cached\)/, again.text);
   assert.equal(ran(again.text).includes('B01'), false, again.text);
 }, 3 * MINUTES);
+
+// ── ARC-09-C185c — an install whose origin is another GitHub repository than the one releases are published at ─────────
+
+test('ARC-09-C185c — a GitHub origin that is not the releases\' gets the set-url line at U4 and at U2; others stay silent', async (t) => {
+  // The final's manifest is signed over another commit than the tag the old origin carries, as a 2.2.1 final's is over
+  // its distribution commit (ARC-09-C185b).
+  const w = await buildWorld(t, { foreign: ['v9.2.0'] });
+  bootstrapUser(w.user);
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const home = 'https://github.com/farstic/snowarch.git';
+  const old = 'https://github.com/farstic/old-home.git';
+  const said = `upgrade: origin is ${old}, and releases are published at ${home} — git remote set-url origin ${home}`;
+  // A GitHub-shaped origin and no network: `insteadOf` sends git to the world's own origin, while the URL the install
+  // has configured, the one the product reads, stays the GitHub one.
+  const key = (to) => `url.${pathToFileURL(to).href}.insteadOf`;
+  const via = (url, to) => {
+    git(w.user, ['config', key(to), url]);
+    assert.equal(git(w.user, ['config', '--get', key(to)]), url, 'the insteadOf did not take');
+  };
+  const unvia = (to) => {
+    git(w.user, ['config', '--unset', key(to)]);
+    assert.equal(git(w.user, ['config', '--get', key(to)], { allowFail: true }), null, 'the insteadOf is still set');
+  };
+  const origin = (url) => {
+    git(w.user, ['remote', 'set-url', 'origin', url]);
+    assert.equal(git(w.user, ['config', '--get', 'remote.origin.url']), url, 'the origin did not move');
+  };
+  origin(old);
+  via(old, w.origin);
+
+  // U4: the published manifest names another commit than the tag here.
+  const u4 = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(u4.status, 1, u4.text);
+  assert.match(u4.text, /upgrade: v9\.2\.0 has no verified signed manifest \(the published manifest names ddddddd, and v9\.2\.0 here is [0-9a-f]{7}\) — nothing was changed/);
+  assert.ok(u4.text.includes(said), u4.text);
+
+  // U2: the old origin no longer answers, as a private repository does not, and the same line follows git's own error.
+  unvia(w.origin);
+  via(old, join(w.scratch, 'gone.git'));
+  const u2 = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.equal(u2.status, 1, u2.text);
+  assert.ok(u2.text.includes(said), u2.text);
+  unvia(join(w.scratch, 'gone.git'));
+
+  // Controls, refused at U4 the same way: the releases' own repository, and an origin that is not on GitHub.
+  origin(home);
+  via(home, w.origin);
+  const own = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  unvia(w.origin);
+  origin(pathToFileURL(w.origin).href);
+  const mirror = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  for (const r of [own, mirror]) {
+    assert.equal(r.status, 1, r.text);
+    assert.match(r.text, /upgrade: v9\.2\.0 has no verified signed manifest \(the published manifest names ddddddd/, r.text);
+    assert.equal(r.text.includes('releases are published at'), false, r.text);
+  }
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
+}, 2 * MINUTES);
 
 // ── ARC-09-C194 — the way back named after a move is the one that re-verifies ────────────────────────────────────────
 

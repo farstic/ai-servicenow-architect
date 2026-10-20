@@ -221,6 +221,25 @@ export function fastForwardFailureLine(stderr, { branch, target }) {
 }
 
 /**
+ * ARC-09-C185c — the line for an install whose origin is a GitHub repository other than the one releases are published
+ * at (`repo`, the config's `owner/name`), or `null`. From 2.2.1 a final is published there, signed over that repository's
+ * commit, so an origin elsewhere stops at U4 on another commit, or at U2 once it no longer answers; this says where to
+ * point it. Only a GitHub URL is judged: an origin on another host is a mirror or a path, and is the reader's own
+ * arrangement. A credential in the URL is never printed.
+ */
+export function originLine(url, repo, cli) {
+  const at = /^(?:(?:https?|ssh|git):\/\/(?:[^@/]+@)?|[^@/\s]+@)github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i
+    .exec(String(url ?? '').trim());
+  if (!at || typeof repo !== 'string' || repo === '') return null;
+  if (`${at[1]}/${at[2]}`.toLowerCase() === repo.toLowerCase()) return null;
+  // An http(s) URL may carry a token as its user, with or without a password; an ssh user is a login name, kept.
+  const shown = String(url).trim().replace(/^(https?:\/\/)[^@/]+@/i, '$1');
+  const home = `https://github.com/${repo}.git`;
+  return `upgrade: origin is ${shown}, and releases are published at ${home} — git remote set-url origin ${home}, `
+    + `then run ${cli} upgrade again`;
+}
+
+/**
  * What git's failure was, in the words of a remedy.
  *
  * Git's own stderr is printed too, always and first: it is the truth, and a classifier that
@@ -695,6 +714,9 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     if (stderr) for (const line of stderr.split('\n')) log.step(line);
     const { line } = classifyGitFetchError(stderr, { remote });
     log.fail(line ?? 'upgrade: git could not fetch the release tags; nothing was changed');
+    const moved = originLine(git(root, ['config', '--get', `remote.${remote}.url`], { ...opts, allowFail: true }),
+      config.repo, spellings({ platform, env }).cli);
+    if (moved) log.step(moved);
     return EXIT_FAIL;
   }
 
@@ -788,6 +810,13 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     const why = fetched.outcome === 'fetched' ? archiveDiffers(root, target, fetched.entry.doc.manifest) : manifestSays(fetched);
     if (why) {
       log.fail(`upgrade: ${target} has no verified signed manifest (${why}) — nothing was changed`);
+      // ARC-09-C185c — signed over another commit than the tag here: the tag came from somewhere else than the release.
+      const local = git(root, ['rev-parse', `${target}^{commit}`], { ...opts, allowFail: true });
+      if (fetched.outcome === 'fetched' && fetched.entry.doc.manifest.commit !== local) {
+        const moved = originLine(git(root, ['config', '--get', `remote.${remote}.url`], { ...opts, allowFail: true }),
+          config.repo, spellings({ platform, env }).cli);
+        if (moved) log.step(moved);
+      }
       return EXIT_FAIL;
     }
     log.step(manifestSays(fetched));

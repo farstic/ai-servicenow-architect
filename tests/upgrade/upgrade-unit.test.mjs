@@ -33,6 +33,40 @@ import {
 const isWindows = process.platform === 'win32';
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+test('ARC-09-C185c — originLine: a GitHub origin that is not the releases\' repository, and only that', async () => {
+  const { originLine } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const home = 'https://github.com/farstic/snowarch.git';
+  // The launcher is the caller's to spell (a neutral token here: the launcher audit counts a spelled one).
+  const line = (url) => originLine(url, 'farstic/snowarch', 'CLI');
+  assert.equal(line('https://github.com/farstic/old-home.git'), 'upgrade: origin is https://github.com/farstic/old-home.git, '
+    + `and releases are published at ${home} — git remote set-url origin ${home}, then run CLI upgrade again`);
+  // The other spellings of a GitHub origin: ssh, scp-like, no `.git`, http, a trailing slash.
+  for (const url of ['git@github.com:farstic/old-home.git', 'ssh://git@github.com/farstic/old-home', 'http://github.com/farstic/old-home/',
+    'https://github.com/someone/fork.git']) {
+    assert.match(line(url) ?? '', /^upgrade: origin is .+, and releases are published at /, url);
+  }
+  // The releases' own repository, however it is spelled, is silent.
+  for (const url of [home, 'https://github.com/Farstic/SnowArch', 'git@github.com:farstic/snowarch.git',
+    'ssh://git@github.com/farstic/snowarch.git', 'https://github.com/farstic/snowarch/']) {
+    assert.equal(line(url), null, url);
+  }
+  // An origin that is not on GitHub is a mirror or a path, and is silent; so is no origin at all.
+  for (const url of ['https://gitlab.example.com/mirrors/snowarch.git', 'file:///srv/git/snowarch.git', '/srv/git/snowarch.git',
+    'git@github.example.com:farstic/old-home.git', '', null, undefined]) {
+    assert.equal(line(url), null, String(url));
+  }
+  // A credential in the URL is never printed.
+  const masked = line('https://someone:ghp_secret@github.com/farstic/old-home.git') ?? '';
+  assert.match(masked, /origin is https:\/\/github\.com\/farstic\/old-home\.git,/, masked);
+  assert.equal(/ghp_secret|someone/.test(masked), false, masked);
+  const token = line('https://ghp_alone@github.com/farstic/old-home.git') ?? '';
+  assert.equal(token.includes('ghp_alone'), false, token);
+  // An ssh login name is not a credential, and the origin is printed as the reader configured it.
+  assert.match(line('git@github.com:farstic/old-home.git') ?? '', /origin is git@github\.com:farstic\/old-home\.git,/);
+  // No configured repository, no line: the product cannot say where releases are.
+  assert.equal(originLine('https://github.com/farstic/old-home.git', undefined, 'CLI'), null);
+});
+
 // ── ARC-09-C194 — every floor the tag states is judged at U4, before anything moves ──────────────────────────────
 
 /** A probe that answers `--version` for the tools it is given, and finds nothing else. */
