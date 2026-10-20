@@ -605,3 +605,22 @@ test('ARC-09-C207 — the doctor exits 0 when E-28 is its only check that is not
   assert.equal(report.summary.fail, 0, JSON.stringify(report.summary));
   assert.equal(code, 0, `the doctor exited ${code} on a warning`);
 });
+
+test('ARC-09-C207 — a remote that does not answer in E-28\'s budget, or fails in a way nothing names, is a warning too', async (t) => {
+  // Node's own shape for a sync child killed at its timeout, measured: code ETIMEDOUT, signal SIGTERM, no status. The
+  // code is read from `os.constants`, as probe-net reads it, because the contract owns the spelled name.
+  const { TIMED_OUT } = await import('../../tools/snowarch/lib/probe-net.mjs');
+  const throwing = (error) => (_cmd, args) => {
+    if (args.includes('ls-remote')) throw Object.assign(new Error('git failed'), error);
+    return '';
+  };
+  const slow = await E28.run({ root: tempDir('snowarch-c207-slow-', t), flags: { noNetwork: false }, now: realClock,
+    exec: throwing({ code: TIMED_OUT, signal: 'SIGTERM', status: null, stderr: '' }) });
+  assert.equal(slow.status, 'warn', slow.detail);
+  assert.equal(slow.detail, 'origin did not answer within 15 s');
+  const odd = await E28.run({ root: tempDir('snowarch-c207-odd-', t), flags: { noNetwork: false }, now: realClock,
+    exec: throwing({ status: 128, stderr: 'warning: something first\nerror: something nothing names\n' }) });
+  assert.equal(odd.status, 'warn', odd.detail);
+  // No `fatal:` line, so git's last line is the one shown.
+  assert.equal(odd.detail, "could not list origin's release tags\nerror: something nothing names");
+});
