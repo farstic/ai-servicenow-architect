@@ -6,12 +6,13 @@
  *
  * THE RULE, by subject and never by seconds: a case belongs here when what it measures is the licence
  * gate or the signed manifest — what U4 refuses, the manifest B01 fetches or holds, and E-31 or E-32 as
- * U7 reads them after the move. Every other upgrade case stays in `upgrade.e2e.test.mjs`, however long
- * it runs. A new case goes to the file its subject names; the two Windows shards' times follow from that,
- * and are measured rather than balanced (the architect's ruling, 2026-10-15).
+ * U7 reads them after the move. The run after a move is in `upgrade-after-move.e2e.test.mjs` (ARC-09-C215),
+ * and every other upgrade case stays in `upgrade.e2e.test.mjs`, however long it runs. A new case goes to the
+ * file its subject names; the two Windows shards' times follow from that, and are measured rather than
+ * balanced (the architect's ruling, 2026-10-15).
  *
  * Every case runs the command the way a user runs it, in a clone with a real origin, and builds its own
- * world, so no case here depends on one in the other file.
+ * world, so no case here depends on one in another file.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
