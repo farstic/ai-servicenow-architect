@@ -520,3 +520,26 @@ test('ARC-09-C209 — loadConfig names the keys it misses in backticks, so a pri
     return true;
   });
 });
+
+test('ARC-09-C209 — the seam is neutral: without it, main() dispatches the real command table', async () => {
+  const where = { platform: 'linux', env: {} };
+  const helpOf = async (name, extra = {}) => {
+    const captured = [];
+    const sink = { write: (t) => { captured.push(String(t)); return true; } };
+    const code = await main([name, '--help'], { out: sink, err: sink, ...where, ...extra });
+    return { code, text: captured.join('') };
+  };
+  // `--help` is answered before the licence gate, so every command can be asked; a raw command parses its own
+  // arguments, and is left out.
+  const asked = Object.entries(COMMANDS).filter(([, c]) => !c.raw);
+  assert.ok(asked.length >= 8, `only ${asked.length} command(s) asked`);
+  for (const [name, command] of asked) {
+    const usage = typeof command.usage === 'function' ? command.usage(where) : command.usage;
+    const { code, text } = await helpOf(name);
+    assert.equal(code, EXIT_OK, name);
+    assert.equal(text, `${usage}\n`, `${name}: main() did not answer from the real table`);
+  }
+  // The control: a planted table is what main() reads when it is given one, so the comparison above can fail.
+  const planted = await helpOf('doctor', { commands: { doctor: { usage: 'a planted usage', run: () => EXIT_OK } } });
+  assert.equal(planted.text, 'a planted usage\n');
+});
