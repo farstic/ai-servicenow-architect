@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
-## Unreleased (2.2.2-dev)
+## Unreleased
 
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
