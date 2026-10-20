@@ -576,31 +576,56 @@ function refusedBy(t, url) {
   return { root, env, marker, aside };
 }
 
+/** What each C207 case must answer: E-28's reason, and git's own last line after it. */
+const C207_CASES = {
+  401: { name: '401', reason: REFUSED_AUTH,
+    fatal: /^fatal: could not read Username for 'http:\/\/127\.0\.0\.1:\d+': terminal prompts disabled$/ },
+  404: { name: '404', reason: REFUSED_AUTH,
+    fatal: /^fatal: repository 'http:\/\/127\.0\.0\.1:\d+\/fixture\.git\/' not found$/ },
+  // `.invalid` never resolves (RFC 6761), so this is a DNS failure on any machine, answered by its own resolver.
+  DNS: { name: 'DNS',
+    reason: 'DNS failure for snowarch-e28.invalid — check the network; if you are behind a corporate proxy, git reads '
+      + 'HTTPS_PROXY / http.proxy (docs/TROUBLESHOOTING.md#proxy_unreachable)',
+    fatal: /^fatal: unable to access 'http:\/\/snowarch-e28\.invalid\/fixture\.git\/': Could not resolve host: snowarch-e28\.invalid$/ },
+};
+
+/**
+ * How one C207 case is judged from what was measured: E-28's result, how long it took, how many requests the case's
+ * server received during it, and git's trace of it. Throws the assertion that failed.
+ */
+function judged(c, { status, detail, elapsed, received, trace }, why = () => '') {
+  assert.equal(status, 'warn', why());
+  // The reason first, then git's own last line, which is the truth the reason was read from.
+  const [reason, fatal, ...rest] = String(detail).split('\n');
+  assert.equal(reason, c.reason, why());
+  assert.match(fatal ?? '', c.fatal, why());
+  assert.deepEqual(rest, [], `${c.name}: more than the reason and git's line: ${detail}`);
+  return 'answered';
+}
+
+/** A trace file's whole text, or '' when git wrote none. */
+const traceOf = (file) => { try { return readFileSync(file, 'utf8'); } catch { return ''; } };
+
 test('ARC-09-C207 — a remote that wants a credential, has no such repository, or does not resolve is a warning with its reason, never a crash', async (t) => {
   const s401 = await answering(t, 401);
   const s404 = await answering(t, 404);
   const cases = [
-    { name: '401', url: `http://127.0.0.1:${s401.port}/fixture.git`, server: s401, reason: REFUSED_AUTH,
-      fatal: /^fatal: could not read Username for 'http:\/\/127\.0\.0\.1:\d+': terminal prompts disabled$/ },
-    { name: '404', url: `http://127.0.0.1:${s404.port}/fixture.git`, server: s404, reason: REFUSED_AUTH,
-      fatal: /^fatal: repository 'http:\/\/127\.0\.0\.1:\d+\/fixture\.git\/' not found$/ },
-    // `.invalid` never resolves (RFC 6761), so this is a DNS failure on any machine, answered by its own resolver.
-    { name: 'DNS', url: 'http://snowarch-e28.invalid/fixture.git',
-      reason: 'DNS failure for snowarch-e28.invalid — check the network; if you are behind a corporate proxy, git reads '
-        + 'HTTPS_PROXY / http.proxy (docs/TROUBLESHOOTING.md#proxy_unreachable)',
-      fatal: /^fatal: unable to access 'http:\/\/snowarch-e28\.invalid\/fixture\.git\/': Could not resolve host: snowarch-e28\.invalid$/ },
+    { ...C207_CASES[401], url: `http://127.0.0.1:${s401.port}/fixture.git`, server: s401 },
+    { ...C207_CASES[404], url: `http://127.0.0.1:${s404.port}/fixture.git`, server: s404 },
+    { ...C207_CASES.DNS, url: 'http://snowarch-e28.invalid/fixture.git' },
   ];
   const details = [];
   for (const c of cases) {
     const { root, env, marker, aside } = refusedBy(t, c.url);
     // git's own account of the call, written to files so it never mixes into the stderr E-28 classifies.
     const traces = { GIT_TRACE: join(aside, 'trace.txt'), GIT_TRACE_CURL: join(aside, 'trace-curl.txt') };
+    const before = c.server?.log.length ?? 0;
     const started = Date.now();
     const { results } = await runChecks([E28], { root, flags: { noNetwork: false }, now: realClock,
       env: { ...env, ...traces } });
     const elapsed = Date.now() - started;
     // The server's lines arrive only now: E-28's git ran synchronously, so this process read no pipe meanwhile.
-    for (let waited = 0; c.server && c.server.log.length === 0 && waited < 500; waited += 25) {
+    for (let waited = 0; c.server && c.server.log.length === before && waited < 500; waited += 25) {
       await new Promise((resolve) => { setTimeout(resolve, 25); });
     }
     const r = results.find((x) => x.id === 'E-28');
@@ -610,12 +635,8 @@ test('ARC-09-C207 — a remote that wants a credential, has no such repository, 
       ...(c.server?.log ?? []).map((l) => { const [, got, sent, ...what] = l.split(' ');
         return `server: received +${Number(got) - started} ms, sent +${Number(sent) - started} ms, ${what.join(' ')}`; }),
       ...Object.entries(traces).map(([k, f]) => `${k}:\n${traceTail(f)}`)].join('\n');
-    assert.equal(r.status, 'warn', why());
-    // The reason first, then git's own last line, which is the truth the reason was read from.
-    const [reason, fatal, ...rest] = String(r.detail).split('\n');
-    assert.equal(reason, c.reason, why());
-    assert.match(fatal ?? '', c.fatal, why());
-    assert.deepEqual(rest, [], `${c.name}: more than the reason and git's line: ${r.detail}`);
+    judged(c, { status: r.status, detail: r.detail, elapsed, received: (c.server?.log.length ?? 0) - before,
+      trace: traceOf(traces.GIT_TRACE) }, why);
     assert.equal(existsSync(marker), false, `${c.name}: git ran the askpass program, so a terminal would have prompted`);
     // Nothing was measured, so nothing is recorded: the banner must not report a check that never happened (AC 4).
     assert.equal(existsSync(join(root, '.local', 'upgrade-check.json')), false, `${c.name}: the cache was written`);
@@ -660,6 +681,57 @@ test('ARC-09-C207 — a remote that does not answer in E-28\'s budget, or fails 
   assert.equal(odd.status, 'warn', odd.detail);
   // No `fatal:` line, so git's last line is the one shown.
   assert.equal(odd.detail, "could not list origin's release tags\nerror: something nothing names");
+});
+
+// ── ARC-09-C214 — a helper whose start the OS stalled is told from a remote that did not answer, by the evidence ─────
+
+/** E-28's sentence when its git runs out of its budget. */
+const TIMED_OUT_SENTENCE = 'origin did not answer within 15 s';
+
+/**
+ * git's trace of E-28's call in the one Windows failure that captured it: test (windows-latest, node 24), run
+ * 39458581800, job 118752530729. git started git-remote-http at 29.789 and the helper never wrote its own first line,
+ * "resolved executable dir", which every git process writes when it starts. The server received nothing, and E-28
+ * answered at its budget with its timeout sentence.
+ */
+const STALLED_ON_WINDOWS = `${[
+  '16:44:29.018939 exec-cmd.c:266          trace: resolved executable dir: C:/Program Files/Git/ucrt64/bin',
+  "16:44:29.034783 git.c:506               trace: built-in: git ls-remote --tags --refs origin 'v*'",
+  '16:44:29.034783 run-command.c:673       trace: run_command: GIT_DIR=.git git remote-http origin '
+    + 'http://127.0.0.1:53110/fixture.git',
+  '16:44:29.034783 run-command.c:945       trace: start_command: git remote-http origin http://127.0.0.1:53110/fixture.git',
+  '16:44:29.042595 exec-cmd.c:266          trace: resolved executable dir: C:/Program Files/Git/ucrt64/libexec/git-core',
+  '16:44:29.046631 git.c:816               trace: exec: git-remote-http origin http://127.0.0.1:53110/fixture.git',
+  '16:44:29.046631 run-command.c:673       trace: run_command: git-remote-http origin http://127.0.0.1:53110/fixture.git',
+  '16:44:29.789532 run-command.c:945       trace: start_command: git-remote-http origin http://127.0.0.1:53110/fixture.git',
+].join('\n')}\n`;
+
+/** What that run measured, as the C207 case passes it to `judged`. */
+const STALLED_RUN = { status: 'warn', detail: TIMED_OUT_SENTENCE, elapsed: 15011, received: 0, trace: STALLED_ON_WINDOWS };
+
+test('ARC-09-C214 — the recorded Windows stall is accepted on its evidence: the server was asked nothing, and git\'s trace ends at the helper\'s start', () => {
+  assert.equal(judged(C207_CASES[401], STALLED_RUN), 'stalled');
+});
+
+test('ARC-09-C214 — a timeout is refused whenever the evidence does not prove the helper\'s start stalled', () => {
+  const lines = STALLED_ON_WINDOWS.trimEnd().split('\n');
+  const refused = [
+    // A hang in this code before git was spawned leaves no trace at all: the outcome alone is not the evidence.
+    ['no trace', { trace: '' }],
+    ['the trace ends before git started the helper', { trace: `${lines.slice(0, -1).join('\n')}\n` }],
+    ['the helper wrote its first line', { trace: `${STALLED_ON_WINDOWS}16:44:29.790001 exec-cmd.c:266          trace: `
+      + 'resolved executable dir: C:/Program Files/Git/ucrt64/libexec/git-core\n' }],
+    ['the server received a request', { received: 1 }],
+    ['E-28 answered long after its budget', { elapsed: 20_001 }],
+    ['git said something after the sentence', { detail: `${TIMED_OUT_SENTENCE}\nfatal: early EOF` }],
+    ['another sentence', { detail: REFUSED_AUTH }],
+  ];
+  for (const [name, change] of refused) {
+    assert.throws(() => judged(C207_CASES[401], { ...STALLED_RUN, ...change }), assert.AssertionError, name);
+  }
+  // The answer C207 asserts is still judged as an answer, whatever the trace holds.
+  assert.equal(judged(C207_CASES[401], { ...STALLED_RUN, received: 1, elapsed: 40, detail: `${REFUSED_AUTH}\n`
+    + "fatal: could not read Username for 'http://127.0.0.1:53110': terminal prompts disabled" }), 'answered');
 });
 
 // ── ARC-09-C210 — a record no newer than this tree's release is up to date, whichever tree wrote it ─────────────────
