@@ -1645,6 +1645,10 @@ The checklist, verbatim — paste it into the release pull request's description
 >    refuses that and the release rolls back — which is what happened to the first 2.0.7 cut, after an
 >    rc.1 that had passed for the only reason it could: at that moment the newest tag was still the
 >    previous release. **The rehearsal cannot catch this**, so the block being there is the rule.
+> 5b. **Write the server package's changes under `packages/snowarch/CHANGELOG.md`'s `## Unreleased` before a final —
+>    ARC-09-C206.** The cut renames that block to the version, holding what was written, and opens the next
+>    Unreleased with its open "Known gap" paragraphs carried. A final whose `packages/snowarch/src` changed since the
+>    previous final, with nothing written there, is refused before anything is written.
 > 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
 > 7. Update the install page's metrics link if the numbers moved; announce.
 > 8. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
