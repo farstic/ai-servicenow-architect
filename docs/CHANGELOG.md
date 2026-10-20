@@ -68,6 +68,8 @@ the doctor cannot reach is a warning, no longer a crash.
 - C207's credential case no longer fails when a Windows runner stalls the start of git's HTTP helper past E-28's
   budget. It starts the helper once before the measured call, and accepts the timeout only when git's trace proves the
   start stalled (ARC-09-C214).
+- The Windows upgrade check runs the run-after-a-move cases in their own file, in its second shard: the first shard had
+  reached its 45-minute limit with every case passing (ARC-09-C215).
 
 ## 2.2.1 — 2026-10-20
 
