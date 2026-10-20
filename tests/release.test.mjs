@@ -30,7 +30,7 @@ import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { STAGED } from '../scripts/lib/release/writers.mjs';
 import { writeGitattributes } from './helpers/gitattributes.mjs';
 import { gatePlan, makeGateRunner } from '../scripts/lib/release/gates.mjs';
-import { manifestFromArchive, signManifest } from '../tools/snowarch/lib/licence/manifest.mjs';
+import { COVERAGE, manifestFromArchive, signManifest } from '../tools/snowarch/lib/licence/manifest.mjs';
 import { keyPair, listRepo, productKeys } from '../tools/snowarch/tests/helpers/licence.mjs';
 import { stage } from '../scripts/lib/distribution.mjs';
 
@@ -1390,4 +1390,31 @@ test('ARC-09-C185b — --distribution is refused for an rc, and outside --tag-on
   assert.equal(bare.code, 2);
   assert.match(bare.err, /release: --distribution needs the path of your clone of farstic\/snowarch/);
   assert.deepEqual([...pushed(rc.calls), ...pushed(unpushed.calls), ...pushed(bare.calls)], []);
+});
+
+// ── ARC-09-C192 — the signer and the gate are one release: a manifest of another coverage is the wrong manifest ──────
+
+test('ARC-09-C192 — the release gate refuses a manifest signed with another coverage, on the rc path and beside a clone', async (t) => {
+  // A coverage narrower than this release's, which the fixture's files satisfy: a manifest signed with it is the record
+  // of its own files, so only a coverage check can refuse it.
+  const NARROW = { covers: ['CLAUDE.md', 'engine.config.json', 'package.json'], excludes: [], ignores: [...COVERAGE.ignores] };
+  const narrow = (dir, tag) => `${JSON.stringify(signManifest(manifestFromArchive(dir, tag, { coverage: NARROW }),
+    manifestKey.privateKey), null, 2)}\n`;
+  const said = /has no verified signed manifest \(it was signed with another coverage than this release's, covers first differing at [^)\s]+\) — nothing was pushed/;
+
+  const repo = licences(t);
+  const root = await releaseCommit(t, repo.url);
+  repo.publish({ [`releases/v${RC}.json`]: narrow(root, `v${RC}`) });
+  const rc = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease'], { keys: MANIFEST_KEYS });
+  assert.equal(rc.code, 2, rc.out);
+  assert.match(rc.err, said);
+
+  const distRepo = licences(t);
+  const final = await releaseCommit(t, distRepo.url, FINAL);
+  const clone = distribution(t, final);
+  distRepo.publish({ [`releases/v${FINAL}.json`]: narrow(clone, `v${FINAL}`) });
+  const dist = await run(final, [FINAL, '--tag-only', '--push', '--offline', '--distribution', clone], { keys: MANIFEST_KEYS });
+  assert.equal(dist.code, 2, dist.out);
+  assert.match(dist.err, said);
+  assert.deepEqual([...pushed(rc.calls), ...pushed(dist.calls)], []);
 });

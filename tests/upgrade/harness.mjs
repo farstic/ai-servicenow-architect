@@ -407,9 +407,10 @@ function licencesRepo(scratch) {
  * licensed child trusts — and pushed to the world's licences repository as `releases/<tag>.json`, in one commit.
  *
  * `unsigned` tags get none, and `altered` ones a manifest with one hash changed and signed all the same: a record that
- * verifies and is not the tag's (ARC-11-C7's two refusals at U4).
+ * verifies and is not the tag's (ARC-11-C7's two refusals at U4). `foreign` ones are signed over another commit, as a
+ * final's is over its distribution commit when the install's origin carries the engineering tag (ARC-09-C185c).
  */
-function publishManifests(work, licences, tags, { unsigned = [], altered = [] } = {}) {
+function publishManifests(work, licences, tags, { unsigned = [], altered = [], foreign = [] } = {}) {
   const clone = join(dirname(licences.bare), 'licences-work');
   gitRaw(['init', '--quiet', '--initial-branch=main', clone]);
   mkdirSync(join(clone, 'releases'), { recursive: true });
@@ -417,6 +418,7 @@ function publishManifests(work, licences, tags, { unsigned = [], altered = [] } 
   for (const tag of tags.filter((x) => !unsigned.includes(x))) {
     const manifest = manifestFromArchive(work, tag);
     if (altered.includes(tag)) manifest.files['CLAUDE.md'] = '0'.repeat(64);
+    if (foreign.includes(tag)) manifest.commit = 'd'.repeat(40);
     const doc = signManifest(manifest, primary.privateKey);
     writeFileSync(join(clone, 'releases', `${tag}.json`), `${JSON.stringify(doc, null, 2)}\n`);
   }
@@ -425,8 +427,26 @@ function publishManifests(work, licences, tags, { unsigned = [], altered = [] } 
   git(clone, ['push', '--quiet', licences.bare, 'main']);
 }
 
+/**
+ * ARC-09-C192 — `tags`' manifests signed again from `dir`, over ITS commits: a distribution clone's, as a final from
+ * 2.2.1 is signed from the staged clone (ARC-09-C185b). One commit on the world's licences repository, over what is
+ * there, so the upgrade and the doctor read these from now on.
+ */
+export function republishManifests(licences, dir, tags) {
+  const work = join(dirname(licences.bare), `licences-${tags.join('-')}`);
+  gitRaw(['clone', '--quiet', licences.url, work]);
+  const { primary } = licenceFixture();
+  for (const tag of tags) {
+    const doc = signManifest(manifestFromArchive(dir, tag), primary.privateKey);
+    writeFileSync(join(work, 'releases', `${tag}.json`), `${JSON.stringify(doc, null, 2)}\n`);
+  }
+  git(work, ['add', '-A']);
+  git(work, ['commit', '--quiet', '-m', 'the distribution manifests']);
+  git(work, ['push', '--quiet', licences.bare, 'main']);
+}
+
 export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null,
-  unsigned = [], altered = [] } = {}) {
+  unsigned = [], altered = [], foreign = [] } = {}) {
   const marks = [];
   const worldStart = process.hrtime.bigint();
   const scratch = tempDir('snowarch-upgrade-', t);
@@ -541,7 +561,7 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   const tB = process.hrtime.bigint();
   await tagRelease(work, '9.2.0', { claudeFloor });
   marks.push(`tag-B=${Math.round(Number(process.hrtime.bigint() - tB) / 1e6)}ms`);
-  phase('manifests', marks, () => publishManifests(work, licences, ['v9.0.0', 'v9.1.0', 'v9.2.0'], { unsigned, altered }));
+  phase('manifests', marks, () => publishManifests(work, licences, ['v9.0.0', 'v9.1.0', 'v9.2.0'], { unsigned, altered, foreign }));
 
   // ── the bare origin, and the user's clone at v9.0.0 ───────────────────────────────────────
   const origin = join(scratch, 'origin.git');

@@ -34,6 +34,72 @@ import {
 const isWindows = process.platform === 'win32';
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+test('ARC-09-C185c — originLine: a GitHub origin that is not the releases\' repository, and only that', async () => {
+  const { originLine } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const home = 'https://github.com/farstic/snowarch.git';
+  // The launcher is the caller's to spell (a neutral token here: the launcher audit counts a spelled one).
+  const line = (url) => originLine(url, 'farstic/snowarch', 'CLI');
+  assert.equal(line('https://github.com/farstic/old-home.git'), 'upgrade: origin is https://github.com/farstic/old-home.git, '
+    + `and releases are published at ${home} — git remote set-url origin ${home}, then run CLI upgrade again`);
+  // The other spellings of a GitHub origin: ssh, scp-like, no `.git`, http, a trailing slash.
+  for (const url of ['git@github.com:farstic/old-home.git', 'ssh://git@github.com/farstic/old-home', 'http://github.com/farstic/old-home/',
+    'https://github.com/someone/fork.git']) {
+    assert.match(line(url) ?? '', /^upgrade: origin is .+, and releases are published at /, url);
+  }
+  // The releases' own repository, however it is spelled, is silent.
+  for (const url of [home, 'https://github.com/Farstic/SnowArch', 'git@github.com:farstic/snowarch.git',
+    'ssh://git@github.com/farstic/snowarch.git', 'https://github.com/farstic/snowarch/']) {
+    assert.equal(line(url), null, url);
+  }
+  // An origin that is not on GitHub is a mirror or a path, and is silent; so is no origin at all.
+  for (const url of ['https://gitlab.example.com/mirrors/snowarch.git', 'file:///srv/git/snowarch.git', '/srv/git/snowarch.git',
+    'git@github.example.com:farstic/old-home.git', '', null, undefined]) {
+    assert.equal(line(url), null, String(url));
+  }
+  // A credential in the URL is never printed.
+  const masked = line('https://someone:ghp_secret@github.com/farstic/old-home.git') ?? '';
+  assert.match(masked, /origin is https:\/\/github\.com\/farstic\/old-home\.git,/, masked);
+  assert.equal(/ghp_secret|someone/.test(masked), false, masked);
+  const token = line('https://ghp_alone@github.com/farstic/old-home.git') ?? '';
+  assert.equal(token.includes('ghp_alone'), false, token);
+  // An ssh login name is not a credential, and the origin is printed as the reader configured it.
+  assert.match(line('git@github.com:farstic/old-home.git') ?? '', /origin is git@github\.com:farstic\/old-home\.git,/);
+  // No configured repository, no line: the product cannot say where releases are.
+  assert.equal(originLine('https://github.com/farstic/old-home.git', undefined, 'CLI'), null);
+});
+
+// ── ARC-09-C194 — every floor the tag states is judged at U4, before anything moves ──────────────────────────────
+
+/** A probe that answers `--version` for the tools it is given, and finds nothing else. */
+const versions = (map) => (cmd) => (map[cmd] === undefined
+  ? { found: false, ok: false, stdout: '' }
+  : { found: true, ok: true, stdout: map[cmd] });
+const TAG = { floors: { claudeCode: '2.1.214', node: '20.0.0', git: '2.34.1' } };
+const NPM = () => '/usr/bin/npm';
+
+test('ARC-09-C194 — U4 judges the git and Node floors with B00\'s own predicates', async () => {
+  const { toolFloorRefusal } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const judge = (map, mode = 'design') => toolFloorRefusal(TAG, { exec: versions(map), mode, platform: 'linux', locate: NPM });
+  assert.equal(judge({ git: 'git version 2.43.0', node: 'v22.11.0' }), null);
+  // git, in every mode: below, unreadable, absent. B00 refuses each, so U4 does.
+  assert.match(judge({ git: 'git version 2.30.0', node: 'v22.11.0' }) ?? '', /git 2\.30\.0 found, ≥ 2\.34\.1 required/);
+  assert.match(judge({ git: 'git, a build of some kind', node: 'v22.11.0' }) ?? '', /git version not understood/);
+  assert.match(judge({ node: 'v22.11.0' }) ?? '', /git not found/);
+  // Node: B00 refuses it only for live mode, so U4 does the same; design-only notes it and goes on.
+  assert.match(judge({ git: 'git version 2.43.0', node: 'v18.20.0' }, 'live') ?? '', /live mode needs Node\.js 20\+/);
+  assert.equal(judge({ git: 'git version 2.43.0', node: 'v18.20.0' }, 'design'), null);
+  assert.match(judge({ git: 'git version 2.43.0', node: 'node, unreadable' }, 'live') ?? '', /live mode needs Node\.js 20\+/);
+});
+
+test('ARC-09-C194 — a Claude Code that cannot be read is below the floor, not past it', async () => {
+  const { floorCheck } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  // B00 refuses an absent or unreadable Claude Code unless its check is skipped, so U4 may not wave either through.
+  assert.equal(floorCheck(TAG, { exec: versions({}) }).below, true, 'absent');
+  assert.equal(floorCheck(TAG, { exec: versions({ claude: 'some build' }) }).below, true, 'unreadable');
+  assert.equal(floorCheck(TAG, { exec: versions({ claude: '2.1.100 (Claude Code)' }) }).below, true, 'below');
+  assert.equal(floorCheck(TAG, { exec: versions({ claude: '2.1.300 (Claude Code)' }) }).below, false, 'at or above');
+});
+
 test('the classifier names a remedy only for a shape it recognises', () => {
   // Git's own words are printed by the CALLER, always. What this decides is whether a second,
   // actionable line is added — and a confident wrong remedy costs more than none.
