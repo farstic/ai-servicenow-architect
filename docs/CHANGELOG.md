@@ -39,6 +39,9 @@ the doctor cannot reach is a warning, no longer a crash.
   `mcp.serverKey` or `floors.node`). It ended in a Node stack trace; E-06 now reports the key as missing, with its
   remedy, `git checkout -- engine.config.json`. Any other command that meets an error it did not handle prints one line
   saying what happened, and the stack only with `--verbose` (ARC-09-C209).
+- Right after an upgrade from a tree with no release tag in its history, as a hand-made export is, the doctor's
+  release-currency check (E-28) said the release just installed was available. It now reads its record against the
+  release the tree is on, and says the tree is up to date (ARC-09-C210).
 
 ### Changed
 

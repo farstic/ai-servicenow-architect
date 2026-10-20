@@ -342,6 +342,9 @@ export function hostChecks() {
         // ARC-09-C47 — IS THIS RECORD EVIDENCE ABOUT CURRENCY? Three ways it is not, and each
         // catches a different sighting from the owner's sitting. Only the third works on a record
         // written by a build that predates this check.
+        // This tree's exact release tag, asked once: rule 2 below and ARC-09-C210's rule read it. Never under
+        // `--no-network`, whose contract is that the check spawns nothing.
+        const here = cached && !noNetwork ? describeExact(ctx.root, ctx.exec) : null;
         const notCurrency = (() => {
           if (!cached) return null;
           // 1. An upgrade wrote it. It knows which tag it moved to and never asked what exists.
@@ -356,7 +359,6 @@ export function hostChecks() {
           //    `tests/doctor/release-currency.test.mjs` asserts it — and `git describe` is a
           //    spawn even though it is local. Offline keeps checks 1 and 3, which are pure reads
           //    of the record, and says nothing about a disagreement it did not look for.
-          const here = noNetwork ? null : describeExact(ctx.root, ctx.exec);
           if (cached.localTag && here && cached.localTag !== here) {
             return `stale record from an interrupted upgrade (it describes ${cached.localTag}, `
               + `this tree is ${here})`;
@@ -395,10 +397,16 @@ export function hostChecks() {
             return skip(`${cached.remote ?? remote} advertised no release tags · last checked `
               + `${cached.checkedAt}`, { data: { ...cached, refreshed: false } });
           }
-          return cached.behind
+          // ARC-09-C210 — A RECORD NO NEWER THAN THIS TREE'S RELEASE IS UP TO DATE, WHICHEVER TREE WROTE IT. U2 of a
+          // move from a tree with no reachable tag records { localTag: null, behind: true }; rule 2 needs a localTag, so
+          // U7 answered from it, right after the move, that the release just installed was available.
+          const { compareSemver } = await import('../../semver.mjs');
+          let current = false;
+          try { current = Boolean(here) && compareSemver(cached.latestTag, here) <= 0; } catch { current = false; }
+          return cached.behind && !current
             ? warn(`${cached.latestTag} available — run ${cliOf(ctx)} upgrade`,
               { command: `${cliOf(ctx)} upgrade`, data: { ...cached, refreshed: false } })
-            : ok(`up to date (${cached.localTag ?? cached.latestTag}) · last checked `
+            : ok(`up to date (${current ? here : (cached.localTag ?? cached.latestTag)}) · last checked `
               + `${cached.checkedAt}`, { ...cached, refreshed: false });
         }
 
