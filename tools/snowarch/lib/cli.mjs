@@ -6,7 +6,7 @@
 // and this CLI will grow sub-commands written months apart by different people. Everything a user
 // can get wrong — an unknown command, an unknown flag, a missing value — ends in EXIT_USAGE with
 // the usage block for what they were actually trying to do, never a stack trace.
-import { EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from './exit.mjs';
+import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from './exit.mjs';
 import { spellings } from './text.mjs';
 import { cwdNote, loadConfig, root } from './config.mjs';
 import { renderVersion, versionInfo } from './version-info.mjs';
@@ -322,7 +322,19 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
   // `home` comes from the ENTRY POINT: nothing under `lib/` reads the home directory itself
   // (the repo-wide rule), and the doctor needs it only to shorten a path to `~` in a report.
   // `env` since ARC-11-C1: the licence command reports enforcement from the environment `main` was given.
-  const code = await command.run({ flags, positional, argv: rest, log, root, out, err, home, env });
+  let code;
+  try {
+    code = await command.run({ flags, positional, argv: rest, log, root, out, err, home, env });
+  } catch (e) {
+    // ARC-09-C209 — THE NET UNDER EVERY COMMAND. An error a command did not handle ended the process in Node's own
+    // stack trace: unredacted, many lines, and naming our code rather than the problem. It is one line now, through
+    // the redacting logger like every other, with the exit an uncaught error already had (EXIT_FAIL), so nothing
+    // keyed on it changes. The stack is for whoever asks: under the existing --verbose, still redacted.
+    const said = String(e?.message ?? e).split('\n')[0];
+    log.fail(`${name}: ${said}${flags.verbose ? '' : ' — run again with --verbose for the details'}`);
+    if (e?.stack) log.debug(String(e.stack));
+    code = EXIT_FAIL;
+  }
   log.commit();          // a deferred logger that was never committed still gets its lines on disk
   return code;
 }
