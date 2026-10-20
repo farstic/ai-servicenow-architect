@@ -809,8 +809,9 @@ test('ARC-09-C203 — after a move below the first distributed release, the line
   // runs under v2.2.0's code, which predates ARC-09-C192. No harness world can hold such a target: its tags all carry
   // today's code. So the line is checked here, with the boundary named, and the C194 e2e covers the call site.
   const { returnLine } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  // The launcher is a neutral placeholder, as originLine's cases pass one: the line's logic is under test, not a spelling.
   const manifest = { entry: {} };
-  const at = (here, target, over = {}) => returnLine({ cli: './snowarch', here, target, manifest, returnTo: 'main',
+  const at = (here, target, over = {}) => returnLine({ cli: 'CLI', here, target, manifest, returnTo: 'main',
     distributionFrom: '2.2.1', ...over });
   const fresh = (target, here) => `HEAD is detached at ${target} — ${target} checks releases by its own older rule: `
     + `return to ${here} by a fresh install (docs/MIGRATION.md)`;
@@ -818,12 +819,12 @@ test('ARC-09-C203 — after a move below the first distributed release, the line
   // A 2.2.1 release candidate compares below 2.2.1 and is counted with it: rc.1 predates C192.
   assert.equal(at('v2.2.1', 'v2.2.1-rc.1'), fresh('v2.2.1-rc.1', 'v2.2.1'));
   // Exactly at the boundary is not below.
-  assert.equal(at('v2.2.2', 'v2.2.1'), 'HEAD is detached at v2.2.1 — return with: ./snowarch upgrade --to v2.2.2');
-  assert.equal(at('v9.0.0', 'v9.1.0'), 'HEAD is detached at v9.1.0 — return with: ./snowarch upgrade --to v9.0.0');
+  assert.equal(at('v2.2.2', 'v2.2.1'), 'HEAD is detached at v2.2.1 — return with: CLI upgrade --to v2.2.2');
+  assert.equal(at('v9.0.0', 'v9.1.0'), 'HEAD is detached at v9.1.0 — return with: CLI upgrade --to v9.0.0');
   // No manifest, or a tree that was on no release: git takes it back, as before.
   assert.equal(at('v2.2.1-rc.2', 'v2.2.0', { manifest: null }), 'HEAD is detached at v2.2.0 — return with: git checkout main');
   assert.equal(at(null, 'v9.1.0'), 'HEAD is detached at v9.1.0 — return with: git checkout main');
   // Without the argument, the boundary is DISTRIBUTION_FROM.
-  assert.equal(returnLine({ cli: './snowarch', here: 'v2.2.1-rc.2', target: 'v2.2.0', manifest, returnTo: 'main' }),
+  assert.equal(returnLine({ cli: 'CLI', here: 'v2.2.1-rc.2', target: 'v2.2.0', manifest, returnTo: 'main' }),
     fresh('v2.2.0', 'v2.2.1-rc.2'));
 });
