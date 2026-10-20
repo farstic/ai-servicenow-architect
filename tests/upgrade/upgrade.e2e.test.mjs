@@ -339,9 +339,9 @@ test('ARC-09-C185c — an install moved to a staged distribution, unrelated in h
   assert.equal(git(w.user, ['tag', '--list', 'v9.0.0']), 'v9.0.0', 'the fetch dropped the install\'s own tag');
   // No common ancestor: the release the install moves to shares no history with the one it is on.
   assert.equal(git(w.user, ['merge-base', 'HEAD', 'v9.1.0'], { allowFail: true }), null, 'the histories are related');
-  // An install on a BRANCH pulls, and a fast-forward across unrelated histories is refused at U5 with the tag checkout
-  // as the remedy. Nothing moves: HEAD, the branch and the working tree are as they were (measured: of `.local/`, only
-  // the currency cache every fetch writes changed).
+  // An install on a BRANCH fast-forwards to the verified tag (ARC-09-C194), and across unrelated histories it cannot:
+  // refused at U5 with the tag checkout as the remedy. Nothing moves: HEAD, the branch and the working tree are as they
+  // were (measured: of `.local/`, only the currency cache every fetch writes changed).
   const head = git(w.user, ['rev-parse', 'HEAD']);
   git(w.user, ['checkout', '-q', '-B', 'main', 'v9.0.0']);
   assert.equal(git(w.user, ['branch', '--show-current']), 'main');
@@ -350,7 +350,7 @@ test('ARC-09-C185c — an install moved to a staged distribution, unrelated in h
   assert.equal(git(w.user, ['rev-parse', '--abbrev-ref', 'main@{upstream}']), 'origin/main');
   const pulled = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
   assert.equal(pulled.status, 1, pulled.text);
-  assert.match(pulled.text, /upgrade: main has diverged from origin\/main — resolve with git, or use --to v9\.2\.0 to check out the release tag/);
+  assert.match(pulled.text, /upgrade: main cannot fast-forward to v9\.2\.0 — resolve with git, or use --to v9\.2\.0 to check out the release tag; nothing was changed/);
   assert.deepEqual([git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['status', '--porcelain'])], [head, ''], 'the refusal moved the tree');
   git(w.user, ['checkout', '-q', '--detach', 'v9.0.0']);
   assert.equal(git(w.user, ['branch', '--show-current']), '', 'the install is not back on its tag');
@@ -387,6 +387,53 @@ test('ARC-09-C185c — an install moved to a staged distribution, unrelated in h
   const after = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
   assert.match(after.text, /v9\.2\.0 available \(you are on v9\.1\.0\)/, after.text);
 }, MINUTES);
+
+// ARC-09-C194 — A BRANCH INSTALL MOVES TO THE VERIFIED TAG. U5 used to `pull --ff-only origin <branch>`: the branch
+// went wherever the remote branch was, never checked against the manifest U4 had just verified, and finish() then
+// reported a move to the tag. A main that leads or lags its newest tag (INSTALL.md makes branch installs from main)
+// put a branch install on a commit nobody signed.
+test('ARC-09-C194 — a branch install fast-forwards to the verified tag, never past it, or is refused unmoved', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  // origin's main one commit PAST its newest tag.
+  const ahead = join(w.scratch, 'ahead');
+  git(w.scratch, ['clone', '-q', '--no-hardlinks', pathToFileURL(w.origin).href, ahead]);
+  git(ahead, ['checkout', '-q', '-B', 'main', 'v9.2.0']);
+  assert.equal(git(ahead, ['rev-parse', 'HEAD']), git(ahead, ['rev-parse', 'v9.2.0^{commit}']), 'the clone is not at the tag');
+  writeFileSync(join(ahead, 'NEXT.md'), 'a commit after the release\n');
+  git(ahead, ['add', 'NEXT.md']);
+  git(ahead, ['commit', '-q', '-m', 'after v9.2.0']);
+  git(ahead, ['push', '-q', '--force', 'origin', 'main']);
+  const past = git(ahead, ['rev-parse', 'HEAD']);
+  assert.notEqual(past, git(ahead, ['rev-parse', 'v9.2.0^{commit}']), 'origin main is not past the tag');
+  // The install, on a branch at v9.0.0 that tracks origin's main.
+  git(w.user, ['fetch', '-q', 'origin', '+refs/heads/main:refs/remotes/origin/main']);
+  git(w.user, ['checkout', '-q', '-B', 'main', 'v9.0.0']);
+  git(w.user, ['branch', '--set-upstream-to', 'origin/main', 'main']);
+  assert.equal(git(w.user, ['rev-parse', '--abbrev-ref', 'main@{upstream}']), 'origin/main');
+
+  // A branch with a commit of its own cannot fast-forward to the tag: refused, and nothing moves.
+  writeFileSync(join(w.user, 'MINE.md'), 'a local commit\n');
+  git(w.user, ['add', 'MINE.md']);
+  git(w.user, ['commit', '-q', '-m', 'mine']);
+  const mine = git(w.user, ['rev-parse', 'HEAD']);
+  const refused = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
+  assert.equal(refused.status, 1, refused.text);
+  assert.match(refused.text, /upgrade: main cannot fast-forward to v9\.2\.0 — resolve with git, or use --to v9\.2\.0 to check out the release tag; nothing was changed/);
+  assert.deepEqual([git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['status', '--porcelain'])], [mine, ''], 'the refusal moved the tree');
+
+  // Without it, the branch moves to the verified tag's commit exactly, not to origin's main past it.
+  git(w.user, ['reset', '-q', '--hard', 'v9.0.0']);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['rev-parse', 'v9.0.0^{commit}']));
+  const moved = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
+  assert.equal(moved.status, 0, moved.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['rev-parse', 'v9.2.0^{commit}']), 'the branch is not at the verified tag');
+  assert.notEqual(git(w.user, ['rev-parse', 'HEAD']), past, 'the branch went past the tag to origin\'s main');
+  assert.equal(git(w.user, ['branch', '--show-current']), 'main', 'the install left its branch');
+  const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
+  const e32 = (report.checks ?? []).find((c) => c.id === 'E-32');
+  assert.match(e32?.detail ?? '', /^Integrity: verified · v9\.2\.0 · \d+ files$/, JSON.stringify(e32));
+}, 2 * MINUTES);
 
 // ARC-09-C109 — what counts as an acceptance at `Proceed? [Y/n]`.
 //
@@ -428,7 +475,7 @@ test('ARC-09-C109 control — Enter at the prompt is still yes: the default has 
   assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0');
 }, MINUTES);
 
-test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --force-floor does not',
+test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --force-floor completes it',
   async (t) => {
     const w = await buildWorld(t, { claudeFloor: '9.9.9' });
     bootstrapUser(w.user);
@@ -444,17 +491,16 @@ test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --for
     assert.match(r.text, /nothing was changed/);
     assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
 
-    // `--force-floor` gets past THIS command's refusal — and then the bootstrap's own preflight
-    // refuses, because `engine.config.json`'s floor is a separate promise the release does not
-    // get to waive. That is the right layering and worth asserting rather than working around:
-    // the flag overrides the TAG's request, not the engine's requirement.
+    // ARC-09-C194 — `--force-floor` DOES WHAT ITS HELP SAYS: "upgrade even though the release wants a newer Claude
+    // Code". It used to get past this command's refusal and then meet the target's B00, which refused the same Claude
+    // Code after U5 had moved the tree: a half state, asserted here as layering. The flag now also tells the target's
+    // bootstrap to skip that check, the one B00 can skip, so the upgrade it waves through is one that completes.
     const forced = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes', '--force-floor'], { env });
     assert.match(forced.text, /BELOW the floor/, 'the line is still printed when the flag is used');
-    assert.match(forced.text, /\[U5\/7\] move the checkout/, '--force-floor did not get past the plan');
-    assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0',
-      'the tree did not move');
-    assert.notEqual(forced.status, 0, 'the bootstrap preflight must still enforce the engine floor');
-    assert.match(forced.text, /Claude Code 2\.1\.100 found, ≥ 2\.1\.214 required/);
+    assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0', 'the tree did not move');
+    assert.match(forced.text, /Claude Code check skipped \(--skip-claude-check\)/, 'the bootstrap was not told to skip it');
+    assert.doesNotMatch(forced.text, /the bootstrap stopped/, 'the forced move ended in a half state');
+    assert.match(forced.text, /\[U7\/7\] doctor/, 'the forced move did not reach the doctor');
   }, MINUTES);
 
 test('a target that is not a release tag of this product is refused by name', async (t) => {
