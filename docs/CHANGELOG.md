@@ -9,6 +9,17 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A patch release: an upgrade says where releases are published when the install's origin is elsewhere.** An install
+whose origin is another GitHub repository is told, where its upgrade stops, the command that points it at
+`https://github.com/farstic/snowarch.git`.
+
+### Changed
+
+- From this release, an upgrade whose origin is a GitHub repository other than the one releases are published at says
+  so where it stops, at the fetch or at a signed manifest that names another commit, and gives the `git remote set-url`
+  command that points it at `https://github.com/farstic/snowarch.git`. An origin on another host is left alone, and a
+  credential in the URL is never printed (ARC-09-C185c).
+
 ## 2.2.1 — 2026-10-20
 
 ### Notes
