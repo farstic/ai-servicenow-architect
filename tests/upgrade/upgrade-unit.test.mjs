@@ -184,6 +184,26 @@ test('ARC-09-C190 — an origin that wants a credential is answered at once: no 
   assert.equal(existsSync(marker), false, `git ran the askpass program, so a terminal would have prompted:\n${text}`);
   assert.ok(text.includes(`FAIL ${AUTH_LINE}`), text);
   assert.notEqual(code, 0, text);
+  assert.equal(text.includes('releases are published at'), false, `an origin off GitHub got the set-url line:\n${text}`);
+
+  // An install cloned from another GitHub repository, now private: `insteadOf` sends git to the same 401, while the URL
+  // the install has configured, the one the product reads, stays the GitHub one. The auth line, then the set-url line.
+  const old = 'https://github.com/farstic/old-home.git';
+  harnessGit(root, ['remote', 'set-url', 'origin', old]);
+  assert.equal(harnessGit(root, ['config', '--get', 'remote.origin.url']), old, 'the origin did not move');
+  harnessGit(root, ['config', `url.http://127.0.0.1:${port}/fixture.git.insteadOf`, old]);
+  assert.equal(harnessGit(root, ['config', '--get', `url.http://127.0.0.1:${port}/fixture.git.insteadOf`]), old,
+    'the insteadOf did not take');
+  lines.length = 0;
+  const again = await upgradeCommand({ flags: { check: true }, log, root, env, cwd: root });
+  const both = lines.join('\n');
+  const home = 'https://github.com/farstic/snowarch.git';
+  const said = `upgrade: origin is ${old}, and releases are published at ${home} — git remote set-url origin ${home}`;
+  assert.equal(existsSync(marker), false, `git ran the askpass program on the GitHub origin:\n${both}`);
+  assert.ok(both.includes(`FAIL ${AUTH_LINE}`), both);
+  assert.ok(both.includes(said), both);
+  assert.ok(both.indexOf(`FAIL ${AUTH_LINE}`) < both.indexOf(said), `the set-url line came before the auth line:\n${both}`);
+  assert.notEqual(again, 0, both);
 });
 
 test('a prerelease sorts BELOW the release it precedes, and a non-tag is not a tag', () => {
