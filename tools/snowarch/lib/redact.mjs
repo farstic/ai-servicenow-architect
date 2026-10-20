@@ -29,6 +29,9 @@ const NOT_A_NAME = new Set([
   'com', 'org', 'net', 'io', 'dev', 'local', 'invalid', 'test', 'example', 'gov', 'edu', 'uk', 'de',
   // ARC-09-C207 — git's `http.proxy`, which the upgrade's and the doctor's proxy remedies name: printed as `h***.p***`.
   'proxy',
+  // ARC-09-C208 — `cmd.exe` in a launcher error, and `winget install drawio.drawio` in a remedy a user pastes into
+  // PowerShell, where a backtick is the escape character, so the id cannot be quoted as code.
+  'exe', 'drawio',
 ]);
 
 /** Values a caller has told us are secret — S07 registers what it reads from the instance store. */

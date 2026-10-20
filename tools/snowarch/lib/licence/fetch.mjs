@@ -141,7 +141,7 @@ const SAYS = {
   refused: (r) => `revocation list: the published list does not verify (${r.reason}) — ignored`,
   unreachable: (r) => `revocation list: could not be reached (${r.detail}) — `
     + `${r.version ? `kept version ${r.version}` : 'none held'}`,
-  unconfigured: () => 'revocation list: none configured (engine.config.json → licence.revocations)',
+  unconfigured: () => 'revocation list: none configured (engine.config.json → `licence.revocations`)',
 };
 export const refreshSays = (r) => SAYS[r.outcome](r);
 

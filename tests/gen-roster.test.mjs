@@ -148,7 +148,7 @@ test('criterion 2 — a new skill makes --check exit 1 with the row and the coun
     const r = run(dir, ['--check']);
     assert.equal(r.code, 1);
     assert.match(r.out, /^\+\| `zz-dummy` \| on demand \| — \| 0\.0\.1 \|$/m);
-    assert.match(r.out, /gen-roster: roster\.skills 3 ≠ 4 found/);
+    assert.match(r.out, /gen-roster: `roster\.skills` 3 ≠ 4 found/);
     assert.match(r.out, /run `node scripts\/gen-roster\.mjs` and commit the result/);
   } finally { cleanup(dir); }
 });
