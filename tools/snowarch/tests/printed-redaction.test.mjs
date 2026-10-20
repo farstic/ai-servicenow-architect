@@ -21,7 +21,8 @@ const ENGINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 test('ARC-09-C208 — no string in the engine is printed with a key masked as a first.last name', async () => {
   const { masked, files, parts } = await scanPrintedText({
     roots: ['lib', 'bin', 'hooks'].map((d) => join(ENGINE, d)) });
-  // The floor the reader must clear, so a walk that read nothing cannot pass: measured at 102 files, 7,988 parts.
+  // The floor the reader must clear, so a walk that read nothing cannot pass: measured at 109 files (7 of them JSON)
+  // and 8,466 parts.
   assert.ok(files >= 100 && parts >= 7000, `the scan read ${files} file(s), ${parts} literal part(s)`);
   assert.deepEqual(masked, [], `${masked.length} literal(s) the redactor would change:\n  ${masked.join('\n  ')}`);
 });
@@ -32,8 +33,11 @@ test('ARC-09-C208 — the reader sees a key in a quoted string, in a template\'s
     'template.mjs': 'log.step(`checked ${n} files; see docs.pin for the commit`);',
     'code.mjs': 'log.step(`the pin is ${config.docs.pin} today`);',
     'backticked.mjs': "log.fail('`docs.pin` is not a 40-character sha');",
+    'remedies.json': '{ "git": { "win32": "winget install Git.Git", "darwin": "xcode-select --install" } }',
   } });
-  assert.deepEqual(masked.map((m) => m.split(':')[0]), ['plain.mjs', 'template.mjs'], masked.join('\n'));
+  assert.deepEqual(masked.map((m) => m.split(/[: ]/)[0]), ['plain.mjs', 'template.mjs', 'remedies.json'],
+    masked.join('\n'));
+  assert.match(masked[2], /^remedies\.json git\.win32 /, masked[2]);
 });
 
 test('ARC-09-C208 — a real first.last in a printed line is still masked', () => {

@@ -18,6 +18,10 @@
  * `'docs.pin'` is spliced into a sentence elsewhere, which this reader cannot see. The doctor's case for that is
  * `tests/doctor/printed-keys.test.mjs`, which runs the checks and reads what they print.
  *
+ * A JSON FILE BESIDE THE CODE IS READ TOO, its string values by their key path: `remedies.json` holds the remedies
+ * B00 prints, and its Windows git line, `winget install Git.Git`, printed as `G***.G***` on Windows only, where the
+ * doctor test saw it and this reader, reading `.mjs` alone, did not.
+ *
  * Exported as one function so the planted controls and the repository are read by the same code.
  */
 import { readFileSync, readdirSync } from 'node:fs';
@@ -35,7 +39,7 @@ export async function scanPrintedText({ roots = [], read = readFileSync, sources
       if (e.name === 'node_modules' || e.name === 'tests' || e.name === 'fixtures') continue;
       const p = join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.mjs$/.test(e.name)) files.push(p);
+      else if (/\.(mjs|json)$/.test(e.name)) files.push(p);
     }
   };
   for (const root of roots) walk(root);
@@ -44,21 +48,28 @@ export async function scanPrintedText({ roots = [], read = readFileSync, sources
   const inputs = sources ? Object.entries(sources) : files.map((f) => [f, String(read(f, 'utf8'))]);
   const masked = [];
   let parts = 0;
+  const check = (t, where) => {
+    parts += 1;
+    if (!/\s/.test(t)) return;
+    const printed = redact(t);
+    if (printed !== t) masked.push(`${where}  ${JSON.stringify(t)}  →  ${JSON.stringify(printed)}`);
+  };
   for (const [name, text] of inputs) {
+    if (name.endsWith('.json')) {
+      const walkJson = (v, path) => {
+        if (typeof v === 'string') check(v, `${name} ${path}`);
+        else if (Array.isArray(v)) v.forEach((x, i) => walkJson(x, `${path}[${i}]`));
+        else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walkJson(x, path ? `${path}.${k}` : k);
+      };
+      walkJson(JSON.parse(text), '');
+      continue;
+    }
     const src = ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true);
     const visit = (node) => {
       const texts = ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ? [node.text]
         : ts.isTemplateExpression(node) ? [node.head.text, ...node.templateSpans.map((s) => s.literal.text)]
           : [];
-      for (const t of texts) {
-        parts += 1;
-        if (!/\s/.test(t)) continue;
-        const printed = redact(t);
-        if (printed !== t) {
-          const line = src.getLineAndCharacterOfPosition(node.getStart(src)).line + 1;
-          masked.push(`${name}:${line}  ${JSON.stringify(t)}  →  ${JSON.stringify(printed)}`);
-        }
-      }
+      for (const t of texts) check(t, `${name}:${src.getLineAndCharacterOfPosition(node.getStart(src)).line + 1}`);
       ts.forEachChild(node, visit);
     };
     visit(src);
