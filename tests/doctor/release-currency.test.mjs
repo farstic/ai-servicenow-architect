@@ -27,6 +27,7 @@ import { runChecks } from '../../tools/snowarch/lib/doctor/runner.mjs';
 import { writeUpgradeCheck } from '../../tools/snowarch/lib/upgrade-check.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { NO_PROMPT_ENV } from '../../tools/snowarch/lib/spawn-env.mjs';
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -589,12 +590,37 @@ const C207_CASES = {
     fatal: /^fatal: unable to access 'http:\/\/snowarch-e28\.invalid\/fixture\.git\/': Could not resolve host: snowarch-e28\.invalid$/ },
 };
 
+/** E-28's sentence when its git runs out of its budget. */
+const TIMED_OUT_SENTENCE = 'origin did not answer within 15 s';
+
+/** E-28's budget, which its timeout sentence spells, and what its kill and the runner around it may add. */
+const E28_BUDGET_MS = 15_000;
+const KILL_SLACK_MS = 5_000;
+
+/**
+ * ARC-09-C214 — whether git's trace proves the OS stalled the start of git-remote-http: its last line is git's own
+ * `start_command: git-remote-http …`, and nothing follows it, so the helper never wrote its first line ("resolved
+ * executable dir"), which every git process writes when it starts. A git that does not trace `start_command` (Apple's
+ * 2.39 does not) never proves it.
+ */
+const helperStartStalled = (trace) => /\btrace: start_command: git-remote-https? /
+  .test(String(trace).split('\n').filter((l) => l.trim()).at(-1) ?? '');
+
 /**
  * How one C207 case is judged from what was measured: E-28's result, how long it took, how many requests the case's
  * server received during it, and git's trace of it. Throws the assertion that failed.
+ *
+ * ARC-09-C214 — one exception, bound to the evidence, never to the outcome: when the server received nothing and the
+ * trace proves the helper's start stalled, E-28's exact timeout sentence is asserted instead, within its budget, and
+ * the case reports `'stalled'`. A hang in this code before git was spawned leaves no such trace, and is refused.
  */
 function judged(c, { status, detail, elapsed, received, trace }, why = () => '') {
   assert.equal(status, 'warn', why());
+  if (received === 0 && helperStartStalled(trace)) {
+    assert.equal(detail, TIMED_OUT_SENTENCE, why());
+    assert.ok(elapsed < E28_BUDGET_MS + KILL_SLACK_MS, `E-28 answered after its budget: ${elapsed} ms\n${why()}`);
+    return 'stalled';
+  }
   // The reason first, then git's own last line, which is the truth the reason was read from.
   const [reason, fatal, ...rest] = String(detail).split('\n');
   assert.equal(reason, c.reason, why());
@@ -605,6 +631,32 @@ function judged(c, { status, detail, elapsed, received, trace }, why = () => '')
 
 /** A trace file's whole text, or '' when git wrote none. */
 const traceOf = (file) => { try { return readFileSync(file, 'utf8'); } catch { return ''; } };
+
+/** The line a CI log is counted by, after each stall the evidence proved. */
+const STALLED = 'helper start stalled — ARC-09-C214';
+const WARM_UP_MS = 60_000;
+
+/**
+ * ARC-09-C214 (a) — git-remote-http is started once against the case's server before E-28's measured call, with a
+ * budget of its own and with prompts off as E-28 has them, and the server must have received its request: a cold start
+ * the OS stalls is paid here, and a stall past this budget fails the case by name.
+ */
+async function warmedUp(c, root, env) {
+  const before = c.server.log.length;
+  const started = Date.now();
+  // No pipes: a helper still starting when its git is killed holds none open, so the case never waits on it.
+  await new Promise((resolve) => {
+    const git = spawn('git', ['ls-remote', '--tags', '--refs', 'origin', 'v*'],
+      { cwd: root, env: { ...env, ...NO_PROMPT_ENV }, timeout: WARM_UP_MS, stdio: 'ignore' });
+    git.once('close', resolve);
+    git.once('error', resolve);
+  });
+  for (let waited = 0; c.server.log.length === before && waited < 500; waited += 25) {
+    await new Promise((resolve) => { setTimeout(resolve, 25); });
+  }
+  assert.notEqual(c.server.log.length, before, `${c.name}: the warm-up's git asked the server nothing in `
+    + `${Date.now() - started} ms, its budget ${WARM_UP_MS} ms — ARC-09-C214`);
+}
 
 test('ARC-09-C207 — a remote that wants a credential, has no such repository, or does not resolve is a warning with its reason, never a crash', async (t) => {
   const s401 = await answering(t, 401);
@@ -619,6 +671,8 @@ test('ARC-09-C207 — a remote that wants a credential, has no such repository, 
     const { root, env, marker, aside } = refusedBy(t, c.url);
     // git's own account of the call, written to files so it never mixes into the stderr E-28 classifies.
     const traces = { GIT_TRACE: join(aside, 'trace.txt'), GIT_TRACE_CURL: join(aside, 'trace-curl.txt') };
+    // The DNS case has no server to prove a warm-up by; the two before it started the same helper.
+    if (c.server) await warmedUp(c, root, env);
     const before = c.server?.log.length ?? 0;
     const started = Date.now();
     const { results } = await runChecks([E28], { root, flags: { noNetwork: false }, now: realClock,
@@ -632,11 +686,14 @@ test('ARC-09-C207 — a remote that wants a credential, has no such repository, 
     details.push(String(r.detail));
     // On a failure, everything that tells a slow server from a slow git, measured in this run.
     const why = () => [`${c.name}: E-28 answered in ${elapsed} ms: ${r.status} — ${r.detail}`,
-      ...(c.server?.log ?? []).map((l) => { const [, got, sent, ...what] = l.split(' ');
-        return `server: received +${Number(got) - started} ms, sent +${Number(sent) - started} ms, ${what.join(' ')}`; }),
+      ...(c.server?.log ?? []).map((l, i) => { const [, got, sent, ...what] = l.split(' ');
+        const at = (ms) => `${ms - started < 0 ? '' : '+'}${ms - started} ms`;
+        return `${i < before ? 'warm-up' : 'server'}: received ${at(Number(got))}, sent ${at(Number(sent))}, `
+          + `${what.join(' ')}`; }),
       ...Object.entries(traces).map(([k, f]) => `${k}:\n${traceTail(f)}`)].join('\n');
-    judged(c, { status: r.status, detail: r.detail, elapsed, received: (c.server?.log.length ?? 0) - before,
-      trace: traceOf(traces.GIT_TRACE) }, why);
+    const verdict = judged(c, { status: r.status, detail: r.detail, elapsed,
+      received: (c.server?.log.length ?? 0) - before, trace: traceOf(traces.GIT_TRACE) }, why);
+    if (verdict === 'stalled') t.diagnostic(`${STALLED} (${c.name}, E-28 answered in ${elapsed} ms)`);
     assert.equal(existsSync(marker), false, `${c.name}: git ran the askpass program, so a terminal would have prompted`);
     // Nothing was measured, so nothing is recorded: the banner must not report a check that never happened (AC 4).
     assert.equal(existsSync(join(root, '.local', 'upgrade-check.json')), false, `${c.name}: the cache was written`);
@@ -684,9 +741,6 @@ test('ARC-09-C207 — a remote that does not answer in E-28\'s budget, or fails 
 });
 
 // ── ARC-09-C214 — a helper whose start the OS stalled is told from a remote that did not answer, by the evidence ─────
-
-/** E-28's sentence when its git runs out of its budget. */
-const TIMED_OUT_SENTENCE = 'origin did not answer within 15 s';
 
 /**
  * git's trace of E-28's call in the one Windows failure that captured it: test (windows-latest, node 24), run
