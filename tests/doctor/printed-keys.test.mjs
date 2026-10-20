@@ -16,6 +16,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
+import { redactResult } from '../../tools/snowarch/lib/doctor/redact.mjs';
+import { redact } from '../../tools/snowarch/lib/redact.mjs';
+import { CHECK_IDS, TABLE, remedyFor } from '../../tools/snowarch/lib/remedies.mjs';
 import { greenTree, readJson, writeJson } from './helpers/tree.mjs';
 
 /** A masked dotted token as `redact` prints one. Not `\b…\b`: after `***` there is no word boundary to match. */
@@ -55,6 +58,27 @@ test('ARC-09-C208 — with E-06\'s keys absent or invalid, the doctor names each
     const masked = out.split('\n').filter((l) => MASKED.test(l));
     assert.deepEqual(masked, [], `the ${form} report prints a masked key:\n  ${masked.join('\n  ')}`);
   }
+});
+
+test('ARC-09-C208 — every remedy, rendered for win32, darwin and linux, prints with no masked key', () => {
+  // The case above sees only this machine's remedies: the doctor's checks measure the machine, so a macOS run renders
+  // `brew install git` and never `winget install Git.Git`, which every Windows cell printed as `G***.G***` (run
+  // 39418593899). Each row is rendered here for all three platforms, through the runner's redaction and the logger's.
+  const rendered = [];
+  for (const id of CHECK_IDS) {
+    for (const platform of ['win32', 'darwin', 'linux']) {
+      const sentence = TABLE[id][platform] ?? TABLE[id].default;
+      const values = Object.fromEntries([...sentence.matchAll(/\{(\w+)\}/g)].map(([, key]) => [key, 'x']));
+      const remedy = remedyFor(id, { platform, values });
+      rendered.push(remedy);
+      for (const printed of [redactResult({ remedy }).remedy, redact(remedy)]) {
+        assert.doesNotMatch(printed, MASKED, `${id} on ${platform}: "${remedy}" prints as "${printed}"`);
+      }
+    }
+  }
+  // The floor: every row, three times, so a table that read empty cannot pass.
+  assert.equal(rendered.length, CHECK_IDS.length * 3);
+  assert.ok(CHECK_IDS.length >= 6, `only ${CHECK_IDS.length} remedy row(s) read`);
 });
 
 test('ARC-09-C208 — the masked-token pattern finds what redact prints, and not a key in backticks', () => {
