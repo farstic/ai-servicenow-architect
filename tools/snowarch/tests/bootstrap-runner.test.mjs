@@ -401,3 +401,25 @@ test('the state is written after every step, not only at the end', async () => {
   assert.ok(existsSync(join(root, '.local', 'bootstrap-state.json')));
   assert.ok(readFileSync(join(root, '.local', 'bootstrap-state.json'), 'utf8').includes('"B01"'));
 });
+
+test('ARC-09-C213 — a step that rewrites its own declared input is cached on the next run', async () => {
+  // B06 migrates the store, one of its own inputs, and recorded the hash it computed BEFORE the migration: the next
+  // bootstrap saw "inputs changed" and ran it again, and C196's at-tag plan said a finished move had steps to run.
+  // The recorded hash describes the inputs as the step left them; the cache test still compares the hash before a run.
+  const root = makeCheckout();
+  writeFileSync(join(root, 'package-lock.json'), 'v1\n');
+  let ran = 0;
+  const steps = [stub('B01', { inputs: () => [FILE('package-lock.json')],
+    onRun: () => { ran += 1; writeFileSync(join(root, 'package-lock.json'), 'v2, migrated\n'); return { status: 'ok' }; } })];
+  const s = state();
+  const lines = [];
+  await run({ root, ctx: base(root), state: s, steps, onLine: (l) => lines.push(l) });
+  assert.equal(ran, 1);
+  await run({ root, ctx: base(root), state: s, steps, onLine: (l) => lines.push(l) });
+  assert.equal(ran, 1, `the step ran again though its inputs are as it left them:\n${lines.join('\n')}`);
+  assert.equal(lines[1], '[B01/01] b01 … ok (cached)');
+  // A change made after it, by anyone else, still runs it.
+  writeFileSync(join(root, 'package-lock.json'), 'edited by hand\n');
+  await run({ root, ctx: base(root), state: s, steps, onLine: (l) => lines.push(l) });
+  assert.equal(ran, 2, 'an input changed after the step must re-run it');
+});

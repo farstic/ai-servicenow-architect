@@ -565,7 +565,9 @@ test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t
   // The promise the story makes about a failure: the tree is AT the new tag and the state file
   // records which step stopped, so a re-run finishes rather than starting over.
   assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0');
-  assert.match(broken.text, /the tree is at v9\.1\.0 and the state file records the step/);
+  // ARC-09-C196 — the line no longer claims the state file records the step: a bootstrap that died before its first
+  // entry recorded none. Here B02 did record its failure, which the next assertions read.
+  assert.match(broken.text, /the tree is at v9\.1\.0; re-run /);
   const stopped = state(w.user);
   assert.equal(stopped.steps.B02.status, 'fail');
   assert.equal(stopped.steps.B01.status, 'ok', 'a step before the failure was lost');
@@ -578,6 +580,111 @@ test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t
   assert.match(again.text, /\[B02\/09\] docs … (ok|warn)/, 'the resume did not complete B02');
   assert.notEqual(state(w.user).steps.B02.status, 'fail');
 }, MINUTES);
+
+// ── ARC-09-C196 — a move that did not finish is never "up to date" ───────────────────────────────────────────────────
+
+const STATE = '.local/bootstrap-state.json';
+
+test('ARC-09-C196 — a bootstrap interrupted after the move continues on the next run', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+
+  // interrupt()'s OWN record, written by calling it as a Ctrl-C during B02 would: status 'failed', reason
+  // 'interrupted'. failedStep tested 'fail' and 'interrupted', so the next run read "up to date".
+  const { interrupt } = await import('../../tools/snowarch/lib/steps/index.mjs');
+  const recorded = state(w.user);
+  interrupt({ root: w.user, state: recorded, live: { step: 'B02' }, onLine: () => {} });
+  assert.deepEqual([state(w.user).steps.B02.status, state(w.user).steps.B02.reason], ['failed', 'interrupted']);
+
+  const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(again.status, 0, again.text);
+  assert.match(again.text, /already at v9\.1\.0; the last run stopped at B02 — continuing from there/, again.text);
+  // B02 ran to its end: ok, or warn in this world, whose fixture corpus warns.
+  assert.ok(['ok', 'warn'].includes(state(w.user).steps.B02.status), again.text);
+  // And it does not loop: the next run is up to date.
+  const third = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.match(third.text, /up to date \(v9\.1\.0\)/, third.text);
+}, 2 * MINUTES);
+
+test('ARC-09-C196 — a move whose bootstrap recorded nothing continues on the next run, then is up to date', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  // The state as it stood before the move is the state a U6 that saved nothing leaves: the bootstrap died before
+  // its first entry, or was killed, or the run stopped between U5 and U6.
+  const before = readFileSync(join(w.user, STATE), 'utf8');
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  writeFileSync(join(w.user, STATE), before);
+  assert.equal(readFileSync(join(w.user, STATE), 'utf8'), before, 'the pre-move state was not put back');
+
+  // v9.1.0 changes vendor/docs-areas.txt, B02's input: the plan the tag's own runner asks names it.
+  const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(again.status, 0, again.text);
+  assert.match(again.text,
+    /already at v9\.1\.0, with steps still to run \([^)]*B02: inputs changed[^)]*\) — continuing from there/, again.text);
+  assert.doesNotMatch(again.text, /\[B02\/09\][^\n]*ok \(cached\)/, `B02 did not re-run:\n${again.text}`);
+  // No loop: the hashes the real bootstrap just recorded are the plan's, so the next run is up to date.
+  const third = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(third.status, 0, third.text);
+  assert.match(third.text, /up to date \(v9\.1\.0\)/, third.text);
+}, 3 * MINUTES);
+
+test('ARC-09-C196 — the control: a finished move is up to date on the next run', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(again.status, 0, again.text);
+  assert.match(again.text, /up to date \(v9\.1\.0\)/, again.text);
+  assert.doesNotMatch(again.text, /continuing from there/, again.text);
+}, 2 * MINUTES);
+
+test('ARC-09-C196 — at the tag, a manifest cache that does not hold this release is a step to run, not "up to date"', async (t) => {
+  // U5 writes the verified manifest before U6; the at-target path writes none. So a stopped move that left the cache
+  // without this release's manifest is a real reason to continue, and B01 refreshes it: the resume heals itself.
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  const cache = join(w.user, '.local', 'release-manifest.json');
+  rmSync(cache);
+  assert.equal(existsSync(cache), false, 'the manifest cache was not removed');
+
+  const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(again.status, 0, again.text);
+  assert.match(again.text,
+    /already at v9\.1\.0, with steps still to run \([^)]*B01: the release manifest is not held[^)]*\) — continuing from there/,
+    again.text);
+  assert.ok(existsSync(cache), `B01 did not put the release manifest back:\n${again.text}`);
+  const third = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.match(third.text, /up to date \(v9\.1\.0\)/, third.text);
+}, 3 * MINUTES);
+
+test('ARC-09-C196 — a step that warned before a move that changed its inputs still runs at the tag', async (t) => {
+  // At the tag a recorded warn is judged by its hash, like ok: finished unless its inputs changed. v9.1.0 changes
+  // B02's input, so a pre-move state with B02 warned must still continue, and the next run must be up to date.
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const planted = state(w.user);
+  planted.steps.B02.status = 'warn';
+  writeFileSync(join(w.user, STATE), `${JSON.stringify(planted, null, 2)}\n`);
+  assert.equal(state(w.user).steps.B02.status, 'warn', 'the warn was not planted');
+  const before = readFileSync(join(w.user, STATE), 'utf8');
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  writeFileSync(join(w.user, STATE), before);
+  assert.equal(readFileSync(join(w.user, STATE), 'utf8'), before, 'the pre-move state was not put back');
+
+  const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(again.status, 0, again.text);
+  assert.match(again.text,
+    /already at v9\.1\.0, with steps still to run \([^)]*B02: inputs changed[^)]*\) — continuing from there/, again.text);
+  const third = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.match(third.text, /up to date \(v9\.1\.0\)/, third.text);
+}, 3 * MINUTES);
 
 // ── ARC-09-C210 — right after a move, U7's E-28 does not call the release just installed "available" ───────────────
 
@@ -607,3 +714,39 @@ test('ARC-09-C210 — the control: from a release, U7 says nothing is available 
   assert.equal(up.status, 0, up.text);
   assert.doesNotMatch(up.text, /E-28 +WARN/, up.text);
 }, 2 * MINUTES);
+
+// ── ARC-09-C213 — after a successful bootstrap or move, a second bootstrap re-runs no cacheable step ────────────────
+
+/** The cacheable steps (B01–B08) a bootstrap RAN rather than cached or skipped, read from its step lines. */
+const ranAgain = (out) => [...out.matchAll(/^\[(B0[1-8])\/09\] [^\n]*… (ok|warn|fail)(?: \(([^)]*)\))?/gm)]
+  .filter((m) => m[3] !== 'cached').map((m) => m[1]);
+
+test('ARC-09-C213 — after a fresh install, a plain move and a store-migrating move, a second bootstrap re-runs no cacheable step whose last run was ok', async (t) => {
+  // The class: the recorded hash describes the inputs as each step LEFT them, so a bootstrap right after a successful
+  // one re-runs nothing that finished ok. B06 recorded its hash before migrating the store, and C196's at-tag plan then
+  // told a finished move to v9.2.0 that it had steps to run. A step recorded warn re-runs by the runner's own rule
+  // (it caches only ok), so those are left out by name, and the set is pinned: a new warn in these worlds is said here.
+  const w = await buildWorld(t);
+  const warned = () => Object.entries(state(w.user).steps)
+    .filter(([id, entry]) => /^B0[1-8]$/.test(id) && entry.status === 'warn').map(([id]) => id).sort();
+  const point = () => {
+    const excused = warned();
+    return { excused, ranAgain: ranAgain(bootstrapUser(w.user, { store: false })).filter((id) => !excused.includes(id)) };
+  };
+  bootstrapUser(w.user);
+  // The fixture writes the store after its bootstrap, a change made by someone else; one bootstrap takes that in.
+  bootstrapUser(w.user, { store: false });
+  const fresh = point();
+
+  const plain = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(plain.status, 0, plain.text);
+  const afterPlain = point();
+
+  const migrating = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(migrating.status, 0, migrating.text);
+  const afterMigrating = point();
+
+  const expected = { excused: ['B02'], ranAgain: [] };
+  assert.deepEqual({ fresh, afterPlain, afterMigrating }, { fresh: expected, afterPlain: expected, afterMigrating: expected },
+    'a bootstrap right after a successful one re-ran a step that had finished ok, or the warned set changed');
+}, 4 * MINUTES);

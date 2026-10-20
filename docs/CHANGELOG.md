@@ -42,6 +42,13 @@ the doctor cannot reach is a warning, no longer a crash.
 - Right after an upgrade from a tree with no release tag in its history, as a hand-made export is, the doctor's
   release-currency check (E-28) said the release just installed was available. It now reads its record against the
   release the tree is on, and says the tree is up to date (ARC-09-C210).
+- An upgrade that stopped after moving the tree no longer reports "up to date" on the next run. A Ctrl-C during its
+  bootstrap, a bootstrap that ended before it recorded a step, and a missing release manifest each left the next run
+  saying the install was current; it now names the steps still to run and finishes them. A step that finished with a
+  warning no longer reads "last run did not finish" in the plan (ARC-09-C196).
+- A bootstrap step that changes one of its own inputs, as the instance step does when it migrates the store, is no
+  longer run again by the next bootstrap when nothing else has changed. The step recorded its inputs as they were before
+  it ran; it now records them as it left them (ARC-09-C213).
 
 ### Changed
 
