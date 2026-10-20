@@ -661,3 +661,23 @@ test('ARC-09-C207 — a remote that does not answer in E-28\'s budget, or fails 
   // No `fatal:` line, so git's last line is the one shown.
   assert.equal(odd.detail, "could not list origin's release tags\nerror: something nothing names");
 });
+
+// ── ARC-09-C210 — a record no newer than this tree's release is up to date, whichever tree wrote it ─────────────────
+
+/** What U2 writes before moving a tree that has no reachable release tag: the from-tree's own measurement. */
+const TAGLESS_RECORD = { localTag: null, latestTag: 'v9.2.0', behind: true, source: 'upgrade-check' };
+
+test('ARC-09-C210 — a fresh record naming this tree\'s own release is "up to date", though a tagless tree wrote it', async (t) => {
+  // The owner's first upgrade against farstic/snowarch, from an export with no reachable tag: U2 wrote this record,
+  // the tree moved to v9.2.0, and U7's E-28 answered from the cache "v9.2.0 available". E-28's rule for a record that
+  // describes another tree needs a localTag, and this one has none.
+  const r = await e28With(t, { cache: TAGLESS_RECORD, describe: 'v9.2.0', tags: ['v9.2.0'] });
+  assert.equal(r.status, 'ok', r.detail);
+  assert.match(r.detail, /^up to date \(v9\.2\.0\)/, r.detail);
+});
+
+test('ARC-09-C210 — the same record on a tree below its latest release still says that release is available', async (t) => {
+  const r = await e28With(t, { cache: TAGLESS_RECORD, describe: 'v9.1.0', tags: ['v9.2.0'] });
+  assert.equal(r.status, 'warn', r.detail);
+  assert.match(r.detail, /^v9\.2\.0 available/, r.detail);
+});

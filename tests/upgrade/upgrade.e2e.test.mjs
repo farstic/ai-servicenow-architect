@@ -685,3 +685,32 @@ test('ARC-09-C196 — a step that warned before a move that changed its inputs s
   const third = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.match(third.text, /up to date \(v9\.1\.0\)/, third.text);
 }, 3 * MINUTES);
+
+// ── ARC-09-C210 — right after a move, U7's E-28 does not call the release just installed "available" ───────────────
+
+test('ARC-09-C210 — from a tree with no reachable tag, U7 says nothing is available after the move to the latest', async (t) => {
+  // The owner's first upgrade against farstic/snowarch, from an export whose history has no release tag: U2 wrote
+  // the from-tree's record (localTag null, behind) and U7 printed "E-28 WARN release currency: v2.2.1 available"
+  // right after the move to v2.2.1. Here the export is an orphan commit holding v9.0.0's files.
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  git(w.user, ['checkout', '-q', '--orphan', 'export']);
+  // `symbolic-ref`, not `rev-parse`: an orphan branch has no commit yet, and HEAD names it without resolving.
+  assert.equal(git(w.user, ['symbolic-ref', '--short', 'HEAD']), 'export', 'the orphan branch was not checked out');
+  git(w.user, ['commit', '-q', '-m', 'an export with no release tag behind it']);
+  assert.equal(git(w.user, ['describe', '--tags'], { allowFail: true }), null, 'a release tag is still reachable');
+
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  assert.match(up.text, /Upgrade plan: a development tree at [0-9a-f]{7} → v9\.2\.0/, up.text);
+  assert.doesNotMatch(up.text, /E-28 +WARN/, `U7 called the release it had just installed available:\n${up.text}`);
+}, 2 * MINUTES);
+
+test('ARC-09-C210 — the control: from a release, U7 says nothing is available after the move to the latest', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.0.0');
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  assert.doesNotMatch(up.text, /E-28 +WARN/, up.text);
+}, 2 * MINUTES);
