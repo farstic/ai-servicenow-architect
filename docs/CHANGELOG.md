@@ -65,6 +65,9 @@ the doctor cannot reach is a warning, no longer a crash.
 - The line U5 prints after a move to a release before 2.2.1 names a fresh install (`docs/MIGRATION.md`) instead of an
   `upgrade` that release's own code refuses. Only a checkout whose origin carries those tags can make that move
   (ARC-09-C203).
+- C207's credential case no longer fails when a Windows runner stalls the start of git's HTTP helper past E-28's
+  budget. It starts the helper once before the measured call, and accepts the timeout only when git's trace proves the
+  start stalled (ARC-09-C214).
 
 ## 2.2.1 — 2026-10-20
 
