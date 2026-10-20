@@ -1,0 +1,64 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
+/**
+ * ARC-09-C208 — no doctor line prints a configuration key as a masked first.last name.
+ *
+ * The static guard (`tools/snowarch/tests/printed-redaction.test.mjs`) reads the engine's sentences, but a key spliced
+ * into one at run time is not in any of them: E-06 builds `${name} is missing` from a table of keys, so with
+ * `docs.pin` absent the doctor printed "d***.p*** is missing". This case runs the doctor itself, its real checks and
+ * the runner's redaction, over a configuration with the keys of that table absent, and reads what a user would see.
+ *
+ * Not every key: `loadConfig` requires docs.pin, docs.family, mcp.serverKey and floors.node, and with one of them
+ * absent the doctor stops before E-06 runs (ARC-09-C209). So those four stay, docs.pin present but not a sha, and the
+ * other eight are absent.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
+import { greenTree, readJson, writeJson } from './helpers/tree.mjs';
+
+/** A masked dotted token as `redact` prints one. Not `\b…\b`: after `***` there is no word boundary to match. */
+const MASKED = /\b[A-Za-z]\*{3}\.[A-Za-z]\*{3}(?![\w*])/;
+
+/** E-06's table (`configProblems` in doctor/checks/engine-repo.mjs), less the four `loadConfig` requires. */
+const ABSENT = ['product', 'cli', 'mcp.package', 'mcp.packageDir', 'floors.git', 'floors.claudeCode', 'roster.skills',
+  'roster.agents'];
+
+async function doctorAt(root, flags) {
+  const chunks = [];
+  const code = await doctorCommand({ flags: { 'no-network': true, ...flags }, cwd: root,
+    out: { write: (s) => chunks.push(String(s)) }, err: { write: () => {} }, input: { isTTY: false } });
+  return { code, text: chunks.join('') };
+}
+
+test('ARC-09-C208 — with E-06\'s keys absent or invalid, the doctor names each key and masks none', async (t) => {
+  const root = greenTree(t);
+  const config = readJson(root, 'engine.config.json');
+  for (const key of ABSENT) {
+    const path = key.split('.');
+    const parent = path.slice(0, -1).reduce((o, k) => o?.[k], config);
+    delete parent[path.at(-1)];
+  }
+  config.docs.pin = 'ba513f2';
+  writeJson(root, 'engine.config.json', config);
+  const written = readJson(root, 'engine.config.json');
+  assert.deepEqual([written.mcp?.package, written.docs?.pin], [undefined, 'ba513f2'], 'the fixture was not written');
+
+  const text = await doctorAt(root, {});
+  const json = await doctorAt(root, { json: true });
+  const e06 = JSON.parse(json.text).checks.find((c) => c.id === 'E-06');
+  assert.equal(e06?.status, 'fail', `E-06 did not report the configuration: ${JSON.stringify(e06)}`);
+  assert.match(e06.detail, /`mcp\.package` is missing/, e06.detail);
+  assert.match(e06.detail, /`docs\.pin` is not a 40-character sha/, e06.detail);
+  for (const [form, out] of [['text', text.text], ['json', json.text]]) {
+    const masked = out.split('\n').filter((l) => MASKED.test(l));
+    assert.deepEqual(masked, [], `the ${form} report prints a masked key:\n  ${masked.join('\n  ')}`);
+  }
+});
+
+test('ARC-09-C208 — the masked-token pattern finds what redact prints, and not a key in backticks', () => {
+  assert.equal(MASKED.test('E-06 FAIL engine.config.json: d***.p*** is missing'), true);
+  assert.equal(MASKED.test('E-06 FAIL engine.config.json: `docs.pin` is missing'), false);
+  assert.equal(MASKED.test('signed in as j***.s***'), true);
+});
