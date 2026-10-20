@@ -601,7 +601,8 @@ test('ARC-09-C196 — a bootstrap interrupted after the move continues on the ne
   const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.equal(again.status, 0, again.text);
   assert.match(again.text, /already at v9\.1\.0; the last run stopped at B02 — continuing from there/, again.text);
-  assert.equal(state(w.user).steps.B02.status, 'ok', again.text);
+  // B02 ran to its end: ok, or warn in this world, whose fixture corpus warns.
+  assert.ok(['ok', 'warn'].includes(state(w.user).steps.B02.status), again.text);
   // And it does not loop: the next run is up to date.
   const third = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.match(third.text, /up to date \(v9\.1\.0\)/, third.text);
