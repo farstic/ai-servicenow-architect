@@ -133,7 +133,7 @@ test('AC 1 — the dry run prints both config edits, every gateway, a REVIEW lis
   assert.match(text, /^docs family: australia → zurich$/m);
   assert.match(text, /^upstream branch zurich: found \(tip [0-9a-f]{7}\)$/m);
   assert.match(text, /^EDIT \.gitmodules: branch = australia → branch = zurich$/m);
-  assert.match(text, /^EDIT engine\.config\.json: docs\.family "australia" → "zurich"$/m);
+  assert.match(text, /^EDIT engine\.config\.json: `docs\.family` "australia" → "zurich"$/m);
   for (const g of GATEWAYS) {
     assert.ok(plan.edits.some((e) => e.file.includes(`${g}-specialist`)), `no EDIT line for ${g}`);
   }
@@ -243,7 +243,7 @@ test('AC 2 — `docs family zurich` with no flag prints the plan, exits 2, and c
   // The PLAN is still printed — the refusal is not a silent no. A maintainer who asked for a
   // switch gets the thing they would have applied, which is what makes the exit code readable.
   assert.match(r.stdout, /^docs family: australia → zurich$/m);
-  assert.match(r.stdout, /^EDIT engine\.config\.json: docs\.family "australia" → "zurich"$/m);
+  assert.match(r.stdout, /^EDIT engine\.config\.json: `docs\.family` "australia" → "zurich"$/m);
   assert.equal(git(['status', '--porcelain'], w.root).trim(), before, 'the refusal touched the tree');
 });
 
@@ -322,7 +322,7 @@ test('a family outside the schema enum adds one enum line, applied first', () =>
 
   const plan = planFamilySwitch({ ...w, to: 'behind' });
   assert.ok(plan.schemaEdit, 'no schema edit was planned');
-  assert.match(formatPlan(plan, { spell: SPELL }).text, /^EDIT engine\.config\.schema\.json: docs\.family enum \+ "behind"$/m);
+  assert.match(formatPlan(plan, { spell: SPELL }).text, /^EDIT engine\.config\.schema\.json: `docs\.family` enum \+ "behind"$/m);
 
   applyFamilySwitch(plan, { ...w, log: silent, spell: SPELL });
   const after = JSON.parse(read(w.root, 'engine.config.schema.json'))

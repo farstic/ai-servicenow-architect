@@ -192,7 +192,7 @@ Two mechanical notes worth knowing:
   Those are product files: they are in every checkout, and one of them is in every other engagement.
   A client-specific skill (`docs/CLIENT-ONBOARDING.md` §7) has no home under `.claude/skills/` either,
   committed or not: the doctor's E-17 and `tests/engine-config.test.mjs` count that directory against
-  `engine.config.json`'s roster, so an extra one is `roster.skills 28 ≠ 29 found` — a FAIL. Keep it
+  `engine.config.json`'s roster, so an extra one is `` `roster.skills` 28 ≠ 29 found `` — a FAIL. Keep it
   under `clients/<name>/` and ask Claude to read it when the engagement is loaded.
 
 **Two things about auto memory that this rule depends on**, both from Claude Code's own documentation
@@ -1174,7 +1174,7 @@ node scripts/gen-roster.mjs
 ```
 
 `npm run lint` runs `--check`, which exits 1 with a unified diff and, when the counts disagree
-with `engine.config.json.roster`, a line like `roster.skills 28 ≠ 29 found`. An edit made by hand
+with `engine.config.json.roster`, a line like `` `roster.skills` 28 ≠ 29 found ``. An edit made by hand
 inside the markers survives exactly until the next person runs the generator, and fails CI before
 that.
 

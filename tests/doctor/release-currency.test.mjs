@@ -519,20 +519,41 @@ test('E-28 under the doctor\'s own --no-network spawns nothing: the flag reaches
 const REFUSED_AUTH = 'origin asked for credentials, or was not found — it may be private or moved; check it with '
   + 'git remote get-url origin';
 
-/** A child process that answers every request with `status`, and its port. E-28's git runs synchronously, so a
- * server in this process could not answer it. */
+/**
+ * A child process that answers every request with `status`: its port, and a log of when it RECEIVED each request and
+ * when it SENT the answer, in epoch milliseconds. E-28's git runs synchronously, so a server in this process could not
+ * answer it. The log is what tells "the server answered late" from "git sat on the answer" if the case ever runs out
+ * of E-28's budget again: it did once, on a Windows cell (ARC-09-C207's follow-up, run 39418593899).
+ */
 async function answering(t, status) {
   const head = status === 401 ? "{ 'WWW-Authenticate': 'Basic realm=\"fixture\"' }" : '{}';
   const server = spawn(process.execPath, ['-e', [
-    `const s = require('node:http').createServer((q, r) => { r.writeHead(${status}, ${head}); r.end(); });`,
-    "s.listen(0, '127.0.0.1', () => process.stdout.write(s.address().port + '\\n'));",
+    `const s = require('node:http').createServer((q, r) => { const got = Date.now(); r.writeHead(${status}, ${head});`,
+    "  r.end(() => process.stdout.write(`REQ ${got} ${Date.now()} ${q.method} ${q.url}\\n`)); });",
+    "s.listen(0, '127.0.0.1', () => process.stdout.write(`PORT ${s.address().port}\\n`));",
   ].join('\n')], { stdio: ['ignore', 'pipe', 'inherit'] });
   t.after(() => server.kill());
+  const log = [];
+  let buffered = '';
   return new Promise((resolve, reject) => {
-    server.stdout.once('data', (d) => resolve(Number(String(d).trim())));
+    server.stdout.on('data', (d) => {
+      buffered += String(d);
+      const lines = buffered.split('\n');
+      buffered = lines.pop();
+      for (const line of lines) {
+        const port = /^PORT (\d+)$/.exec(line);
+        if (port) resolve({ port: Number(port[1]), log });
+        else if (line.startsWith('REQ ')) log.push(line);
+      }
+    });
     server.once('error', reject);
   });
 }
+
+/** The last `max` characters of a trace file, or why there is none. */
+const traceTail = (file, max = 4000) => {
+  try { const text = readFileSync(file, 'utf8'); return text.length > max ? `…${text.slice(-max)}` : text; } catch (e) { return `(none: ${e.code ?? e.message})`; }
+};
 
 /** A checkout whose origin is `url`, and an environment in which no prompt, stored helper, global configuration or
  * proxy answers in the remote's place. The askpass program leaves a mark if git ever asks. */
@@ -552,14 +573,16 @@ function refusedBy(t, url) {
   const env = { ...process.env, GIT_ASKPASS: askpass, GIT_CONFIG_GLOBAL: empty, GIT_CONFIG_NOSYSTEM: '1' };
   for (const k of ['GIT_TERMINAL_PROMPT', 'SSH_ASKPASS', 'GCM_INTERACTIVE',
     'HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY', 'https_proxy', 'http_proxy', 'all_proxy']) delete env[k];
-  return { root, env, marker };
+  return { root, env, marker, aside };
 }
 
 test('ARC-09-C207 — a remote that wants a credential, has no such repository, or does not resolve is a warning with its reason, never a crash', async (t) => {
+  const s401 = await answering(t, 401);
+  const s404 = await answering(t, 404);
   const cases = [
-    { name: '401', url: `http://127.0.0.1:${await answering(t, 401)}/fixture.git`, reason: REFUSED_AUTH,
+    { name: '401', url: `http://127.0.0.1:${s401.port}/fixture.git`, server: s401, reason: REFUSED_AUTH,
       fatal: /^fatal: could not read Username for 'http:\/\/127\.0\.0\.1:\d+': terminal prompts disabled$/ },
-    { name: '404', url: `http://127.0.0.1:${await answering(t, 404)}/fixture.git`, reason: REFUSED_AUTH,
+    { name: '404', url: `http://127.0.0.1:${s404.port}/fixture.git`, server: s404, reason: REFUSED_AUTH,
       fatal: /^fatal: repository 'http:\/\/127\.0\.0\.1:\d+\/fixture\.git\/' not found$/ },
     // `.invalid` never resolves (RFC 6761), so this is a DNS failure on any machine, answered by its own resolver.
     { name: 'DNS', url: 'http://snowarch-e28.invalid/fixture.git',
@@ -569,15 +592,29 @@ test('ARC-09-C207 — a remote that wants a credential, has no such repository, 
   ];
   const details = [];
   for (const c of cases) {
-    const { root, env, marker } = refusedBy(t, c.url);
-    const { results } = await runChecks([E28], { root, flags: { noNetwork: false }, now: realClock, env });
+    const { root, env, marker, aside } = refusedBy(t, c.url);
+    // git's own account of the call, written to files so it never mixes into the stderr E-28 classifies.
+    const traces = { GIT_TRACE: join(aside, 'trace.txt'), GIT_TRACE_CURL: join(aside, 'trace-curl.txt') };
+    const started = Date.now();
+    const { results } = await runChecks([E28], { root, flags: { noNetwork: false }, now: realClock,
+      env: { ...env, ...traces } });
+    const elapsed = Date.now() - started;
+    // The server's lines arrive only now: E-28's git ran synchronously, so this process read no pipe meanwhile.
+    for (let waited = 0; c.server && c.server.log.length === 0 && waited < 500; waited += 25) {
+      await new Promise((resolve) => { setTimeout(resolve, 25); });
+    }
     const r = results.find((x) => x.id === 'E-28');
     details.push(String(r.detail));
-    assert.equal(r.status, 'warn', `${c.name}: ${r.status} — ${r.detail}`);
+    // On a failure, everything that tells a slow server from a slow git, measured in this run.
+    const why = () => [`${c.name}: E-28 answered in ${elapsed} ms: ${r.status} — ${r.detail}`,
+      ...(c.server?.log ?? []).map((l) => { const [, got, sent, ...what] = l.split(' ');
+        return `server: received +${Number(got) - started} ms, sent +${Number(sent) - started} ms, ${what.join(' ')}`; }),
+      ...Object.entries(traces).map(([k, f]) => `${k}:\n${traceTail(f)}`)].join('\n');
+    assert.equal(r.status, 'warn', why());
     // The reason first, then git's own last line, which is the truth the reason was read from.
     const [reason, fatal, ...rest] = String(r.detail).split('\n');
-    assert.equal(reason, c.reason, `${c.name}: ${r.detail}`);
-    assert.match(fatal ?? '', c.fatal, `${c.name}: ${r.detail}`);
+    assert.equal(reason, c.reason, why());
+    assert.match(fatal ?? '', c.fatal, why());
     assert.deepEqual(rest, [], `${c.name}: more than the reason and git's line: ${r.detail}`);
     assert.equal(existsSync(marker), false, `${c.name}: git ran the askpass program, so a terminal would have prompted`);
     // Nothing was measured, so nothing is recorded: the banner must not report a check that never happened (AC 4).

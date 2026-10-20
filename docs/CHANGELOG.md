@@ -29,6 +29,12 @@ the doctor cannot reach is a warning, no longer a crash.
   did not happen. A server's plain 404, git's `repository '…' not found`, is now named as not found in the upgrade and
   in E-28. And the proxy remedy printed `h***.p***` for `http.proxy`, in the upgrade too; it now reads `http.proxy`
   (ARC-09-C207).
+- A key named in a printed line is no longer shown as a masked name. The redactor reads a bare `word.word` as a
+  person's first.last, so the doctor's configuration check (E-06) printed `d***.p*** is missing` for `docs.pin`, and
+  the revocation-list line, the roster count, SK-04 and the docs family plan did the same with their keys. Those lines
+  now name the key in backticks, which the redactor leaves alone. `cmd.exe` is no longer masked, and neither is the
+  package id an install command names, so the Windows git remedy reads `winget install Git.Git` again instead of
+  `winget install G***.G***` (ARC-09-C208).
 
 ### Changed
 

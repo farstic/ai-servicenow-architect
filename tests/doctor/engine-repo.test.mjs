@@ -58,9 +58,9 @@ test('E-06 names every structural problem in engine.config.json', async (t) => {
   writeJson(root, 'engine.config.json', config);
   const r = await run('E-06', root, { config });
   assert.equal(r.status, 'fail');
-  assert.match(r.detail, /serverKey contains whitespace/);
-  assert.match(r.detail, /docs\.pin is not a 40-character sha/);
-  assert.match(r.detail, /floors\.git is missing/);
+  assert.match(r.detail, /`mcp\.serverKey` contains whitespace/);
+  assert.match(r.detail, /`docs\.pin` is not a 40-character sha/);
+  assert.match(r.detail, /`floors\.git` is missing/);
   assert.equal(r.command, 'git checkout -- engine.config.json');
 });
 
