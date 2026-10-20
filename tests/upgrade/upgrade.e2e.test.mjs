@@ -714,3 +714,39 @@ test('ARC-09-C210 — the control: from a release, U7 says nothing is available 
   assert.equal(up.status, 0, up.text);
   assert.doesNotMatch(up.text, /E-28 +WARN/, up.text);
 }, 2 * MINUTES);
+
+// ── ARC-09-C213 — after a successful bootstrap or move, a second bootstrap re-runs no cacheable step ────────────────
+
+/** The cacheable steps (B01–B08) a bootstrap RAN rather than cached or skipped, read from its step lines. */
+const ranAgain = (out) => [...out.matchAll(/^\[(B0[1-8])\/09\] [^\n]*… (ok|warn|fail)(?: \(([^)]*)\))?/gm)]
+  .filter((m) => m[3] !== 'cached').map((m) => m[1]);
+
+test('ARC-09-C213 — after a fresh install, a plain move and a store-migrating move, a second bootstrap re-runs no cacheable step whose last run was ok', async (t) => {
+  // The class: the recorded hash describes the inputs as each step LEFT them, so a bootstrap right after a successful
+  // one re-runs nothing that finished ok. B06 recorded its hash before migrating the store, and C196's at-tag plan then
+  // told a finished move to v9.2.0 that it had steps to run. A step recorded warn re-runs by the runner's own rule
+  // (it caches only ok), so those are left out by name, and the set is pinned: a new warn in these worlds is said here.
+  const w = await buildWorld(t);
+  const warned = () => Object.entries(state(w.user).steps)
+    .filter(([id, entry]) => /^B0[1-8]$/.test(id) && entry.status === 'warn').map(([id]) => id).sort();
+  const point = () => {
+    const excused = warned();
+    return { excused, ranAgain: ranAgain(bootstrapUser(w.user, { store: false })).filter((id) => !excused.includes(id)) };
+  };
+  bootstrapUser(w.user);
+  // The fixture writes the store after its bootstrap, a change made by someone else; one bootstrap takes that in.
+  bootstrapUser(w.user, { store: false });
+  const fresh = point();
+
+  const plain = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(plain.status, 0, plain.text);
+  const afterPlain = point();
+
+  const migrating = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(migrating.status, 0, migrating.text);
+  const afterMigrating = point();
+
+  const expected = { excused: ['B02'], ranAgain: [] };
+  assert.deepEqual({ fresh, afterPlain, afterMigrating }, { fresh: expected, afterPlain: expected, afterMigrating: expected },
+    'a bootstrap right after a successful one re-ran a step that had finished ok, or the warned set changed');
+}, 4 * MINUTES);
