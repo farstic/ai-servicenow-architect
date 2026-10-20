@@ -99,3 +99,42 @@ test('ARC-09-C206 — preflight asks the package changelog at a final, with the 
   assert.match(source, /`\$\{latestFinal\}\.\.HEAD`, '--', 'packages\/snowarch\/src'/,
     'preflight does not measure the package source since the previous final');
 });
+
+test('ARC-09-C206 — preflight, driven through its git stub, refuses only a final whose package said nothing', async (t) => {
+  const { preflight } = await import('../scripts/lib/release/preflight.mjs');
+  const { tempDir } = await import('../tools/snowarch/tests/helpers/temp.mjs');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const REFUSED = /^release: packages\/snowarch\/src changed since v9\.9\.8/;
+  // The checks before 5b need four answers: the tag is free, v9.9.8 is the newest, the branch is main, the tree is
+  // clean. 5b's own question is the log; anything after it is answered empty, so a later check stops the run.
+  const drive = (version, text, log, flags = {}) => {
+    const root = tempDir('snowarch-c206-preflight-', t);
+    mkdirSync(join(root, 'packages', 'snowarch'), { recursive: true });
+    writeFileSync(join(root, 'packages/snowarch/CHANGELOG.md'), text);
+    const seen = [];
+    const git = (args) => {
+      seen.push(args);
+      if (args[0] === 'tag') return args[2] === 'v*' ? 'v9.9.8\n' : '';
+      if (args[0] === 'rev-parse' && args[1] === '--abbrev-ref') return 'main\n';
+      if (args[0] === 'log') return log;
+      return '';
+    };
+    const r = preflight({ version, root, git, config: {}, flags: { offline: true, ...flags } });
+    return { r, logs: seen.filter((a) => a[0] === 'log') };
+  };
+  const cutText = writePackageChangelog(written, '9.9.9', '2026-10-20').text;
+
+  const refused = drive('9.9.9', gapOnly, 'abc123\n');
+  assert.equal(refused.r.ok, false);
+  assert.match(refused.r.message, REFUSED, refused.r.message);
+  assert.deepEqual(refused.logs, [['log', '--format=%H', 'v9.9.8..HEAD', '--', 'packages/snowarch/src']]);
+
+  const sectioned = drive('9.9.9', cutText, 'abc123\n');
+  assert.doesNotMatch(sectioned.r.message ?? '', REFUSED, 'a final whose section is already cut was refused');
+  const unchanged = drive('9.9.9', gapOnly, '');
+  assert.doesNotMatch(unchanged.r.message ?? '', REFUSED, 'a final whose package did not change was refused');
+
+  const candidate = drive('9.9.9-rc.1', gapOnly, 'abc123\n', { 'allow-prerelease': true });
+  assert.deepEqual(candidate.logs, [], 'a release candidate asked the package source');
+  assert.doesNotMatch(candidate.r.message ?? '', REFUSED);
+});
