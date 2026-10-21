@@ -157,6 +157,41 @@ test('ARC-09-C192 — a settings.local.json carried from an older install ends w
     [carried.permissions, carried.env, carried.hooks.PreToolUse], 'a key of the user\'s was not kept');
 });
 
+// ARC-09-C193 — the SessionStart key holds the user's hooks too. `Object.assign(hooks, hookEntry())` replaced the
+// whole key, so a user's own SessionStart hook was lost at every bootstrap and upgrade, and with Node absent the
+// writer deleted every SessionStart hook, not only ours. Ours is any hook that runs session-start.mjs: the doctor's
+// E-08 reads it the same way, and C192's carried stale copy under another folder is ours too.
+const USER_HOOK = Object.freeze({ type: 'command', command: 'node /home/someone/my-own-banner.js', timeout: 5 });
+
+test('ARC-09-C193 — a user\'s own SessionStart hook beside ours is kept, and ours is there exactly once', () => {
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const mine = { matcher: 'startup', hooks: [USER_HOOK] };
+  const current = { hooks: { SessionStart: [mine, ...hookEntry().SessionStart] } };
+  assert.deepEqual(computeSettings(current, { ...opts, nodePresent: true }).hooks.SessionStart,
+    [mine, ...hookEntry().SessionStart], 'the user\'s hook was not kept, or ours is not there once');
+  // Node gone: ours leaves, the user's stays.
+  assert.deepEqual(computeSettings(current, { ...opts, nodePresent: false }).hooks.SessionStart, [mine],
+    'with Node absent the writer removed a hook that is not ours');
+  // One group holding both: the user's hook stays in its group, and ours is written once on its own.
+  const shared = { hooks: { SessionStart: [{ matcher: 'startup|resume',
+    hooks: [USER_HOOK, hookEntry().SessionStart[0].hooks[0]] }] } };
+  assert.deepEqual(computeSettings(shared, { ...opts, nodePresent: true }).hooks.SessionStart,
+    [{ matcher: 'startup|resume', hooks: [USER_HOOK] }, ...hookEntry().SessionStart]);
+});
+
+test('ARC-09-C193 — through B07, twice: the user\'s SessionStart hook survives every bootstrap', async () => {
+  const root = makeCheckout();
+  writeFileSync(join(root, SETTINGS_LOCAL),
+    `${JSON.stringify({ hooks: { SessionStart: [{ matcher: 'startup', hooks: [USER_HOOK] }] } }, null, 2)}\n`);
+  for (const run of [1, 2]) {
+    const r = await runB07(ctxFor(root));
+    assert.equal(r.status, 'ok', `run ${run}: ${r.detail}`);
+  }
+  const hooks = readJson(root, SETTINGS_LOCAL).hooks.SessionStart.flatMap((e) => e.hooks);
+  assert.deepEqual(hooks.filter((h) => h.command === USER_HOOK.command), [USER_HOOK], 'the user\'s hook was lost');
+  assert.equal(hooks.filter((h) => /session-start\.mjs/.test(h.command)).length, 1, 'ours is not there exactly once');
+});
+
 test('AC 3 — invalid JSON is the one failure mode, and the bytes are untouched', async () => {
   const root = makeCheckout();
   const broken = '{ not json';
