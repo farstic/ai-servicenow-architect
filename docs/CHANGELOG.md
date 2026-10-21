@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.2.2 — 2026-10-21
+
+### Notes
+
 **A patch release: an upgrade that stopped finishes on the next run, and the doctor reports what it finds instead of
 crashing on it.** An upgrade interrupted after it moved the tree, by a Ctrl-C during its bootstrap or a bootstrap that
 ended early, no longer says "up to date" on the next run: `./snowarch upgrade` names the steps still to run and finishes
@@ -84,6 +88,100 @@ and the licence format is unchanged. The signed manifest covers the same 455 fil
   start stalled (ARC-09-C214).
 - The Windows upgrade check runs the run-after-a-move cases in their own file, in its second shard: the first shard had
   reached its 45-minute limit with every case passing (ARC-09-C215).
+
+### Added
+
+- engine: ARC-09-C185c, an origin elsewhere on GitHub is told where releases are (9f97a46)
+
+### Fixed
+
+- engine: ARC-09-C203, a return the target's own code would refuse is not printed (ef8d993)
+- engine: ARC-09-C213, the recorded hash describes the inputs as the step left them (7379856)
+- engine: ARC-09-C196, a warned step is finished at the tag; the plan says it warned (247bba0)
+- engine: ARC-09-C196, an unfinished move continues; the at-tag plan decides (816df84)
+- doctor: ARC-09-C210, a record no newer than this tree's release is up to date (1597fce)
+- release: ARC-09-C206, a final writes the server package's section or is refused (5e3485b)
+- engine: ARC-09-C209, no crash on a missing config key; a command error is one line (6870c0b)
+- engine: ARC-09-C208, the package id an install command names is never masked (fad082b)
+- engine: ARC-09-C208, printed keys are backticked; exe and drawio are not names (d6361a0)
+- doctor: ARC-09-C207, E-28 warns with the reason when ls-remote fails (36553d3)
+- engine: ARC-09-C207, the proxy remedy keeps http.proxy instead of h***.p*** (d54548d)
+- engine: ARC-09-C207, git's plain-404 sentence is the auth kind (4179bb4)
+- engine: ARC-09-C190, the fetch and E-28 run with prompts off and name an auth failure (651069a)
+
+### Changed
+
+- doctor: ARC-09-C207, E-28's comment stays out of AC 2's loose network scan (a2658e0)
+
+### Internal
+
+- changelog: the 2.2.2 notes, as the owner approved them (644e5e4)
+- plan: ARC-09-C214 and C215, the rows name #500 and the shard times after the split (a39aa86)
+- ARC-09-C215, the guide spells both e2e paths in full (5f79a35)
+- ARC-09-C215, the contributing guide names the three upgrade e2e files (0d813b1)
+- plan: ARC-09-C215, the row: the run after a move is its own file in shard 2 (04a1e68)
+- changelog: ARC-09-C215, the run-after-a-move cases in their own Windows shard file (d4e6585)
+- plan: ARC-09-C214, the row: the C207 case judges a timeout by its trace (5da1719)
+- changelog: ARC-09-C214, the C207 case and a helper whose start the runner stalled (dbf8bb6)
+- ci: ARC-09-C215, the run after a move is its own e2e file, in Windows shard 2 (594a718)
+- ci: ARC-09-C215, the shard rule names the run after a move, leading shard 2 (b9193a8)
+- engine: ARC-09-C214, the C207 case warms the helper and judges a timeout by trace (a6c2ce2)
+- engine: ARC-09-C214, the recorded Windows stall replayed through the C207 judgement (e895d57)
+- plan: ARC-09-C203 built on #499 (f1d1418)
+- engine: ARC-09-C203, the return-line cases pass a neutral launcher (ad123f6)
+- changelog: ARC-09-C203, the line after a move names a return the target can run (eb876f8)
+- engine: ARC-09-C203, the return line after a move names what the target can run (f69417e)
+- plan: ARC-09-C196 and C213 built on #498 (36b7592)
+- changelog: ARC-09-C213, a step that changes its own input is not run again for it (e6345f0)
+- engine: ARC-09-C213, a step that rewrites its own input is cached on the next run (5b081b4)
+- plan: ARC-09-C213 opened, a step that writes its own input records a stale hash (3d733d3)
+- changelog: ARC-09-C196, an upgrade that stopped after the move is not up to date (00d8e8d)
+- engine: ARC-09-C196, an interrupted B02 that reruns ends ok or warn, not only ok (1656bf4)
+- engine: ARC-09-C196, a warned step is finished at the tag; each status has a verdict (a489b8b)
+- engine: ARC-09-C196, a move that did not finish is never up to date (b2bf558)
+- plan: ARC-09-C210 built on #497 (ea62ae7)
+- changelog: ARC-09-C210, no false 'available' right after a move from a tagless tree (aa163d0)
+- engine: ARC-09-C210, the orphan branch is read back with symbolic-ref (1ba66c5)
+- doctor: ARC-09-C210, U7's E-28 after a move from a tree with no reachable tag (000c35d)
+- plan: ARC-09-C206 built on #496 (7ab39fe)
+- ARC-09-C206, the release checklist says to write the server package's changes (9a29f59)
+- changelog: ARC-09-C206, the release writes the server package's section at a final (687643f)
+- changelog: ARC-09-C206, the server package's Unreleased heading is bare (74d5cd0)
+- release: ARC-09-C206, preflight is driven through its git stub (e6e0cc8)
+- release: ARC-09-C206, the cut writes the server package's section, or refuses (f9f19bc)
+- plan: ARC-09-C209 built on #495 (1248e41)
+- plan: ARC-09-C210, C211 and C212 opened (b9ad787)
+- changelog: ARC-09-C209, the doctor no longer crashes on a missing config key (9602326)
+- engine: ARC-09-C209, without the seam main() dispatches the real command table (94f3d19)
+- engine: ARC-09-C209, a missing config key is E-06's, a command error one line (97feb18)
+- plan: ARC-09-C208, install-command ids and the Windows-only miss (de631eb)
+- changelog: ARC-09-C208, the Windows git remedy reads winget install Git.Git again (c4bf040)
+- doctor: ARC-09-C207 follow-up, the case records timing, server times and git traces (4e9be82)
+- doctor: ARC-09-C208, every remedy is rendered for win32, darwin and linux (c65df6b)
+- engine: ARC-09-C208, the static guard reads JSON too, red on winget install Git.Git (2ee2ef4)
+- plan: ARC-09-C208 built on #494, and C209 opened (c8f9c61)
+- ARC-09-C208, the roster line is quoted as the doctor now prints it (f1e508b)
+- changelog: ARC-09-C208, a key in a printed line is no longer shown as a masked name (db0a29c)
+- engine: ARC-09-C208, no printed sentence or doctor line masks a key (19940f6)
+- plan: ARC-09-C195 to C206 opened, C193 for 2.2.2, C194 names the shipped launcher (d5f2758)
+- plan: ARC-09-C207 built on #492, C208 opened, and the repository stays public (81a64a6)
+- changelog: ARC-09-C207, E-28 warns instead of crashing; the proxy remedy reads right (ce65355)
+- doctor: ARC-09-C207, E-28's timeout and an unrecognised failure warn too (6c09f75)
+- doctor: ARC-09-C207, E-28 on a 401, a 404 or a DNS failure warns, never crashes (490d167)
+- plan: ARC-09-C190, the row is built on #488 (ce62980)
+- changelog: ARC-09-C190, an upgrade never waits on a credential prompt (c115ee9)
+- ARC-09-C190, MIGRATION names the credential stop in both replacement paths (5187c50)
+- engine: ARC-09-C190, a GitHub origin gets the auth line at U2, then the set-url line (0027f56)
+- changelog: ARC-09-C185c, the 2.2.2 Notes open and the origin line is Changed (d37d1e1)
+- plan: ARC-09-C185c, the 2.2.2 follow-up is built on #487 (b751181)
+- plan: ARC-09-C170 to C194, fourteen rows shipped in 2.2.1, release commit 30565b8 (3ebda56)
+- changelog: the server package's 2.2.1 section, which the cut did not write (7b46587)
+- engine: ARC-09-C185c, the origin case asserts that each config change took (dd753f6)
+- ARC-09-C185c, MIGRATION quotes the refusal an unmoved install meets (4af6d8a)
+- engine: ARC-09-C185c, red — a GitHub origin elsewhere gets the set-url line (8c5f142)
+- engine: ARC-09-C190, red — the fetch and E-28 may prompt on a credentialed origin (8f63a3e)
+
+Tag v2.2.2 · contract dc5e203ed519 · docs-pin aa447ce
 
 ## 2.2.1 — 2026-10-20
 
