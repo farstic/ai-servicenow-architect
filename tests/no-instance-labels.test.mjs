@@ -92,7 +92,7 @@ test('ARC-09-C216 — the scan can fail: a planted label is found in any case, i
   // Its git reads no global or system configuration, so a developer's own excludes cannot hide a planted file.
   const dir = tempDir('c216-', t);
   const env = { ...process.env, HOME: dir, USERPROFILE: dir, XDG_CONFIG_HOME: dir, GIT_CONFIG_NOSYSTEM: '1' };
-  execFileSync('git', ['init', '-q'], { cwd: dir, env });
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir, env });
   const plain = `zq${randomBytes(6).toString('hex')}`;
   const hyphened = `zq-${randomBytes(4).toString('hex')}`;
   const denied = new Set([sha256(plain), sha256(hyphened)]);
