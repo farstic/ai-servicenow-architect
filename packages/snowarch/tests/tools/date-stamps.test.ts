@@ -3,7 +3,7 @@
 /**
  * ARC-09-C184 — a date-time the server stamps is sent in the instance's internal format, in UTC.
  *
- * The owner's ITSM sweep on `pditestdoit` (Brazil patch 0, 2026-10-19): `snow_inc_incident_resolve` at about 06:31 UTC
+ * The owner's ITSM sweep on a Brazil-family PDI (patch 0, 2026-10-19): `snow_inc_incident_resolve` at about 06:31 UTC
  * stored `resolved_at` as `2026-10-19 00:00:00`. The tool sent `new Date().toISOString()`, and the instance kept only
  * the date: `calendar_stc` came out negative. The Table API takes an actual value in GMT unless the call asks for
  * display values (`c_TableAPI.md`, sysparm_input_display_value), and the internal format is `yyyy-MM-dd HH:mm:ss`

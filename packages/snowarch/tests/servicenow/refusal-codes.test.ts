@@ -3,7 +3,7 @@
 /**
  * ARC-09-C182 — a 403 the instance's own rule gave is INSTANCE_REFUSED, not INSUFFICIENT_PRIVILEGES.
  *
- * The owner's v2.2.0-rc.3 check on `tgdev` (2026-10-17): an unnamed tool link was refused with "Operation Failed:
+ * The owner's v2.2.0-rc.3 check on a PDI (2026-10-17): an unnamed tool link was refused with "Operation Failed:
  * Data Policy Exception: The following fields are mandatory: Name (Code: INSUFFICIENT_PRIVILEGES)", and the Architect
  * then printed that code's remedy — the account lacks a role — against the instance's own words. Every 403 was that
  * code. Now the detail decides: the ACL wording stays INSUFFICIENT_PRIVILEGES; a data policy or a business rule is

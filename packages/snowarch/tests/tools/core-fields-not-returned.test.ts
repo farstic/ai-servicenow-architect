@@ -3,7 +3,7 @@
 /**
  * ARC-09-C178 — a read names the fields it asked for and did not get.
  *
- * On `tgdev` (2026-10-17) two `sn_aia` Script Includes came back without a `script` field, with nothing saying so:
+ * On a PDI (2026-10-17) two `sn_aia` Script Includes came back without a `script` field, with nothing saying so:
  * the platform withholds a Protected script (PN-20). The tools pass on what the instance answers, which is right, but
  * a missing field read as an empty one. When `fields` is passed, the result now carries `fields_not_returned` with the
  * requested fields the answer lacks; the record or records are as returned, and nothing is invented.
