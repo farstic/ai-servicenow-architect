@@ -14,12 +14,14 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { chmodSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { redactResult } from '../../tools/snowarch/lib/doctor/redact.mjs';
 import { redact } from '../../tools/snowarch/lib/redact.mjs';
 import { CHECK_IDS, TABLE, remedyFor } from '../../tools/snowarch/lib/remedies.mjs';
-import { greenTree, readJson, writeJson } from './helpers/tree.mjs';
+import { greenTree, linkInstall, readJson, writeJson } from './helpers/tree.mjs';
 
 /** A masked dotted token as `redact` prints one. Not `\b…\b`: after `***` there is no word boundary to match. */
 const MASKED = /\b[A-Za-z]\*{3}\.[A-Za-z]\*{3}(?![\w*])/;
@@ -85,4 +87,31 @@ test('ARC-09-C208 — the masked-token pattern finds what redact prints, and not
   assert.equal(MASKED.test('E-06 FAIL engine.config.json: d***.p*** is missing'), true);
   assert.equal(MASKED.test('E-06 FAIL engine.config.json: `docs.pin` is missing'), false);
   assert.equal(MASKED.test('signed in as j***.s***'), true);
+});
+
+test('ARC-09-C211 — a store with an unknown key: SV-02 names the key path in backticks, and masks none', async (t) => {
+  // The server joins zod's path with dots and the runner's redaction read it as a first.last name: C210's probe
+  // printed SV-02 as "i***.p*** Unrecognized key(s) in object: 'notes'". A live checkout whose server can load the
+  // store, as json-boundary.test.mjs builds one, with an unknown key under the instance `pdi`.
+  const root = linkInstall(greenTree(t, { mode: 'live' }));
+  writeJson(root, '.local/instances.json', {
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: { pdi: {
+      url: 'https://dev12345.service-now.com', environment: 'pdi',
+      auth: { method: 'basic', username: 'admin', password: 'fixture-only' },
+      preset: 'read-only', flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false,
+      notes: 'an unknown key',
+    } },
+  });
+  chmodSync(join(root, '.local/instances.json'), 0o600);
+  const run = async (flags) => (await doctorAt(root, { 'no-cache': true, ...flags })).text;
+  const json = await run({ json: true });
+  const text = await run({});
+  const sv02 = JSON.parse(json).checks.find((c) => c.id === 'SV-02');
+  assert.match(sv02?.detail ?? '', /`instances\.pdi` Unrecognized key\(s\) in object: 'notes'/, JSON.stringify(sv02));
+  for (const [form, out] of [['text', text], ['json', json]]) {
+    const masked = out.split('\n').filter((l) => MASKED.test(l));
+    assert.deepEqual(masked, [], `the ${form} report prints a masked key:\n  ${masked.join('\n  ')}`);
+  }
 });
