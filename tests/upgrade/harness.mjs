@@ -27,7 +27,7 @@ import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 import {
   chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { licenceFixture, licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
@@ -679,6 +679,25 @@ async function buildTwoReleaseWorld(t, { from, to, label, modules = 'link', mani
   return { scratch, work, origin, user, bin, licences };
 }
 
+/**
+ * ARC-09-C212 — the home every product start here gives its child, and everything that child spawns: HOME and
+ * USERPROFILE (what `homedir()` reads on POSIX and on Windows) and CLAUDE_CONFIG_DIR, in the world beside the user's
+ * clone. Applied after the caller's `env`, so no case hands a child the developer's own home.
+ *
+ * The product reads the home once, in `bin/snowarch.mjs`, and the doctor opens `~/.claude.json` there (E-23, E-30).
+ * Given the developer's home, a harness run read the developer's file: C210's probe printed the counts of its
+ * credential-shaped keys into a test log. And E-27's `claude mcp get` rewrites that file while it answers when the
+ * `claude` it finds on PATH is a real one (`tools/snowarch/lib/doctor/checks/host.mjs:187`); with this home, a real
+ * CLI a future case reaches answers against the fixture's. `harness-shape.test.mjs` holds the class, and
+ * `upgrade.e2e.test.mjs` the runtime.
+ */
+export function fixtureHome(user) {
+  const home = join(dirname(user), `${basename(user)}-home`);
+  const config = join(home, '.claude');
+  mkdirSync(config, { recursive: true });
+  return { HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: config };
+}
+
 /** The user's clone, bootstrapped design-only, with a v1 store beside it. */
 export function bootstrapUser(user, { store = true, licence = {} } = {}) {
   // `spawnSync` and an explicit throw, not `execFileSync`: its error message names the COMMAND and
@@ -687,7 +706,8 @@ export function bootstrapUser(user, { store = true, licence = {} } = {}) {
   const r = spawnSync(process.execPath,
     [join(user, 'tools/snowarch/bin/snowarch.mjs'), 'bootstrap',
       '--mode', 'design', '--yes', '--skip-claude-check', '--docs', 'sparse'],
-    { cwd: user, encoding: 'utf8', env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user }, { licence }) });
+    { cwd: user, encoding: 'utf8',
+      env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user, ...fixtureHome(user) }, { licence }) });
   if (r.status !== 0) {
     throw new Error(`the fixture bootstrap exited ${r.status ?? r.signal ?? 'abnormally'}:\n`
       + `${r.stdout ?? ''}${r.stderr ?? ''}`);
@@ -738,7 +758,7 @@ export function snowarch(user, args, { env = {}, input = '', bin = null, licence
       cwd: user, encoding: 'utf8', input,
       // `licence: false` (ARC-11-C6 step 6): the fixture's keys are trusted and no licence is written, so the state is
       // `missing`, the path a user without a licence takes.
-      env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user, ...path, ...env }, { licence }),
+      env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user, ...path, ...env, ...fixtureHome(user) }, { licence }),
     });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '',
     text: `${r.stdout ?? ''}${r.stderr ?? ''}` };
