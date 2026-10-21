@@ -40,7 +40,7 @@ Trigger conditions — any of these in a user request fires this skill:
 - Request is purely about the CSM base layer with no FSO object (plain customer case, entitlement, account hierarchy) → `csm-specialist` alone.
 - Request is about ITSM, HRSD, ITOM, CMDB/CSDM → the respective gateway. (Note: FSO policies are Sold Products under `cmdb_model` / `cmdb_service_product_model` — if the request is about the product model itself, `cmdb-csdm-specialist` co-fires.)
 - Request is about FSO **banking** packs (deposits, loans, cards, payments, treasury, disputes, Agentic Contact Center for Banking, Visa / Mastercard / Verifi / JHA spokes) → outside this gateway's depth; see the Banking catalogue section — flag as out of scope for an insurer and route only if the engagement genuinely has banking products.
-- Request asks for code → after gateway, Technical Designer then Developer.
+- Request asks for code → after gateway, the Developer on a Verdict A; on a Verdict B, Technical Designer then Developer.
 - Request asks for a playbook / flow build → after gateway, Flow Designer Specialist (playbooks are Process Automation Designer; flows are Workflow Studio).
 - Request asks for an integration design → after gateway, Integration Specialist with the FSO integration guide constraints from this envelope.
 
@@ -416,7 +416,7 @@ Return rejection when:
 | Base CSM layer touched (account/contact/consumer, case states, workspace, portals, entitlements) | **CSM Specialist** co-fires in this turn; both Envelopes written and reconciled |
 | Product model / Sold Product / `cmdb_model` questions | **CMDB & CSDM Specialist** co-fires |
 | Verdict A, configuration only | Instruct on baseline configuration; **Flow Designer Specialist** for playbook (PAD) / flow (Workflow Studio) edits |
-| Verdict A or B, needs design | **Technical Designer** with this envelope as constraints |
+| Verdict B, needs design | **Technical Designer** with this envelope as constraints |
 | Core policy/claims system data, Guidewire/FRISS/Socure, remote tables, Table API intake | **Integration Specialist** with the integration-approach decision from Part 4 |
 | Now Assist for FSO beyond activation, AI agents | **Now Assist Specialist** |
 | PII/PHI on claims, KYC/sanctions data, column-level encryption, GDPR | **Security & GRC Specialist** routing-time consult |

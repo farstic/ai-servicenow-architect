@@ -35,7 +35,7 @@ Trigger conditions — any of these in a user request fires this skill:
 - Request is about ITSM (incident, problem, change, RITM, MIM) → `itsm-specialist`.
 - Request is about HRSD (HR case, Lifecycle Event, Employee Center) → `hrsd-specialist`.
 - Request is about CMDB, Discovery, MID Server, Service Mapping → `itom-discovery-specialist`.
-- Request asks for code → after gateway, Technical Designer then Developer.
+- Request asks for code → after gateway, the Developer on a Verdict A; on a Verdict B, Technical Designer then Developer.
 - Request asks for ACL matrix or table model → after gateway, Technical Designer.
 
 ## Ground Truth — `ServiceNowDocs/` Citation Discipline
@@ -346,7 +346,7 @@ Return rejection when:
 | When | Hand-off |
 |---|---|
 | Verdict A, configuration only | **Developer** for minor scripts, or instruct user on baseline configuration |
-| Verdict A or B, needs design | **Technical Designer** with this envelope as constraints |
+| Verdict B, needs design | **Technical Designer** with this envelope as constraints |
 | Spec references flows | Technical Designer → **Flow Designer Specialist** |
 | Spec references integrations | Technical Designer → **Integration Specialist** |
 | Request touches CMDB or service mapping | **ITOM/Discovery Specialist** routing-time consult |

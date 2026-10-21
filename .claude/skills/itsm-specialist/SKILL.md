@@ -39,10 +39,10 @@ Trigger conditions — any of these in a user request fires this skill:
 - Request is about ServiceNow CSM (case, account, contact, contract) → `csm-specialist`.
 - Request is about HRSD (HR case, Lifecycle Event, Employee Center) → `hrsd-specialist`.
 - Request is about ITOM Discovery, MID Server, CMDB Discovery, Service Mapping, Event Management → `itom-discovery-specialist`.
-- Request asks for code → after gateway, Technical Designer then Developer.
+- Request asks for code → after gateway, the Developer on a Verdict A; on a Verdict B, Technical Designer then Developer.
 - Request asks for table model or ACL matrix → after gateway, Technical Designer.
-- Request asks for a flow → after gateway, Technical Designer then Flow Designer Specialist.
-- Request asks for an integration → after gateway, Technical Designer then Integration Specialist.
+- Request asks for a flow → after gateway, the Flow Designer Specialist on a Verdict A; on a Verdict B, Technical Designer then Flow Designer Specialist.
+- Request asks for an integration → after gateway, the Integration Specialist on a Verdict A; on a Verdict B, Technical Designer then Integration Specialist.
 
 The gateway always fires first, even when downstream specialists are obviously needed. The gateway produces the constraints; the builders work within them.
 
@@ -399,7 +399,7 @@ You stop and return a rejection when:
 | When | Hand-off |
 |---|---|
 | Verdict A, configuration only | **Developer** (for any minor scripts), or instruct user on baseline configuration |
-| Verdict A or B, needs design | **Technical Designer** with this envelope as constraints |
+| Verdict B, needs design | **Technical Designer** with this envelope as constraints |
 | Spec references flows | Technical Designer hands off to **Flow Designer Specialist** downstream |
 | Spec references integrations | Technical Designer hands off to **Integration Specialist** downstream |
 | Request touches CMDB | Add **CMDB & CSDM Specialist** as routing-time consult |
