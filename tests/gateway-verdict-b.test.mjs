@@ -157,3 +157,30 @@ test('ARC-09-C204 — every gateway\'s Part 4 routes each letter, and Verdict A 
   assert.deepEqual(failures, [], failures.join('\n'));
   assert.ok(read >= 6, `${read} gateways' Part 4 read`);
 });
+
+test('ARC-09-C204 — outside Part 4, no gateway routes a Verdict A through the Technical Designer', () => {
+  // Found by the class check after the AFTER sitting: three routing tables sent "Verdict A or B, needs design" to the
+  // Technical Designer, and five "When NOT to use this skill" lines sent a request for code, a flow or an integration
+  // through it whatever the letter. A design deliverable the user asks for by name, a table model or an ACL matrix, goes
+  // to the Technical Designer whatever the letter, and stays.
+  const failures = [];
+  let read = 0;
+  for (const dir of gatewayDirs(ROOT)) {
+    read += 1;
+    skill(dir).split('\n').forEach((line, i) => {
+      const where = `${dir}/SKILL.md:${i + 1}`;
+      if (line.startsWith('|')) {
+        const [first, ...rest] = line.split('|').slice(1).map((c) => c.trim());
+        if (/\bVerdict A\b/.test(first ?? '') && /Technical Designer/.test(rest.join(' '))) {
+          failures.push(`${where}: a routing row sends Verdict A to the Technical Designer`);
+        }
+      }
+      if (/→ after gateway/.test(line) && /Technical Designer/.test(line)
+        && !/\bVerdict B\b/.test(line) && !/table model|ACL matrix/i.test(line)) {
+        failures.push(`${where}: an after-gateway line sends the request through the Technical Designer whatever the letter`);
+      }
+    });
+  }
+  assert.deepEqual(failures, [], failures.join('\n'));
+  assert.ok(read >= 6, `${read} gateways read`);
+});
