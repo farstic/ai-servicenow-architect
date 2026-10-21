@@ -192,6 +192,24 @@ test('ARC-09-C193 — through B07, twice: the user\'s SessionStart hook survives
   assert.equal(hooks.filter((h) => /session-start\.mjs/.test(h.command)).length, 1, 'ours is not there exactly once');
 });
 
+test('ARC-09-C193 — a user\'s own script called session-start.mjs is the user\'s: only our layout is ours', () => {
+  // Ours is a script at tools/snowarch/hooks/session-start.mjs, any folder before it, either separator: C192's copy
+  // from another install's folder is ours to replace, and a user's ~/scripts/session-start.mjs is theirs to keep.
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const theirs = [
+    { type: 'command', command: 'node /home/someone/scripts/session-start.mjs' },
+    { type: 'command', command: 'node /home/someone/mytools/snowarch/hooks/session-start.mjs' },
+  ];
+  const windowsCopyOfOurs = { type: 'command',
+    command: 'node C:\\Users\\someone\\snowarch-2.2.0\\tools\\snowarch\\hooks\\session-start.mjs' };
+  const current = { hooks: { SessionStart: [{ matcher: 'startup', hooks: [...theirs, windowsCopyOfOurs] }] } };
+  for (const nodePresent of [true, false]) {
+    const kept = computeSettings(current, { ...opts, nodePresent }).hooks.SessionStart.flatMap((g) => g.hooks);
+    assert.deepEqual(kept.filter((h) => theirs.includes(h)), theirs, `nodePresent ${nodePresent}: a user's script was removed`);
+    assert.equal(kept.includes(windowsCopyOfOurs), false, `nodePresent ${nodePresent}: a copy of ours, in Windows form, was kept`);
+  }
+});
+
 test('AC 3 — invalid JSON is the one failure mode, and the bytes are untouched', async () => {
   const root = makeCheckout();
   const broken = '{ not json';
