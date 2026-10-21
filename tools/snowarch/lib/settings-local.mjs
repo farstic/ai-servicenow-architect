@@ -36,12 +36,14 @@ export const hookEntry = () => ({
 });
 
 /**
- * ARC-09-C193 — which SessionStart hook is ours: one that runs `session-start.mjs`, wherever its path points. ONE
- * definition with two readers: this writer, and the doctor's E-08 (`sessionStartProblems`). A copy carried from
- * another install's folder (ARC-09-C192) is ours to replace, and E-08 reports it as a hook at a wrong path; a hook
- * that runs anything else is the user's, and stays.
+ * ARC-09-C193 — which SessionStart hook is ours: one whose script is a `session-start.mjs` inside a `tools/snowarch/`
+ * folder, any folder before it, either separator. ONE definition with two readers: this writer, and the doctor's
+ * E-08 (`sessionStartProblems`). A copy carried from another install's folder (ARC-09-C192), or a script elsewhere
+ * in our tree (ARC-11-C10), is ours to replace, and E-08 reports it as a hook at a wrong path; any other hook is the
+ * user's and stays, a script of theirs that is also called `session-start.mjs` included.
  */
-export const isOurSessionStartHook = (hook) => /session-start\.mjs/.test(String(hook?.command ?? ''));
+const OUR_SESSION_START = /(?:^|[\s"'/\\])tools[/\\]snowarch[/\\](?:[^\s"']*[/\\])?session-start\.mjs(?:$|[\s"'])/;
+export const isOurSessionStartHook = (hook) => OUR_SESSION_START.test(String(hook?.command ?? ''));
 
 /** The SessionStart groups with our hook taken out of each; a group that held only ours is dropped. */
 function withoutOurSessionStart(groups) {
