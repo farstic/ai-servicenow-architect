@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 
@@ -346,9 +346,12 @@ test('ARC-09-C212 — the two product starts in tests/upgrade/ both give their c
     base: REAL_ROOT });
   assert.ok(files >= 8, `the reader read ${files} files`);
   assert.deepEqual(unresolved, []);
+  // The reader names a file the platform's way (`relative()`): on Windows `tests\upgrade\harness.mjs`. POSIX here, so
+  // the expected names are one spelling on every cell.
+  const posix = (p) => p.split(sep).join('/');
   // bootstrapUser and snowarch(): U6's bootstrap and U7's doctor are THEIR children, and inherit what they are given.
-  assert.deepEqual(starts.map((s) => s.file), ['tests/upgrade/harness.mjs', 'tests/upgrade/harness.mjs'],
-    `the product starts moved: ${starts.map((s) => `${s.file}:${s.line}`).join(', ')}`);
-  const bare = starts.filter((s) => !/\bfixtureHome\(/.test(s.args)).map((s) => `${s.file}:${s.line}`);
+  assert.deepEqual(starts.map((s) => posix(s.file)), ['tests/upgrade/harness.mjs', 'tests/upgrade/harness.mjs'],
+    `the product starts moved: ${starts.map((s) => `${posix(s.file)}:${s.line}`).join(', ')}`);
+  const bare = starts.filter((s) => !/\bfixtureHome\(/.test(s.args)).map((s) => `${posix(s.file)}:${s.line}`);
   assert.deepEqual(bare, [], 'a product start that does not give its child the fixture home');
 });
