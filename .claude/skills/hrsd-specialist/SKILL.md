@@ -32,7 +32,7 @@ You ground every factual claim about baseline ServiceNow HRSD behaviour in the *
 | Verdict | When it applies | Citation discipline |
 |---|---|---|
 | **Verdict A** (fully covered by baseline) | No custom object was named in the request AND baseline covers the need. A builder may be dispatched. | Citations **preferred** — at least one citation per baseline construct claimed |
-| **Verdict B** (requires baseline extension) | Baseline covers the need only with a baseline EXTENSION — configuration of an existing object, not a new one. | Citations **required** — must cite the baseline construct being extended |
+| **Verdict B** (requires baseline extension) | Baseline covers the need only by adding a field to a baseline table. A configuration record on an existing table (an assignment rule, rows of an existing data lookup, a business rule, a notification, an ACL rule, a changed attribute of an existing dictionary entry) is Verdict A, its script included, unless the record is itself a §1.1 object: a new state value, a Connection & Credential Alias, a new sys_user_group structure, or an item on this skill's §1.1 list. A new table, one that extends a baseline table included, is a custom object: Verdict C (governance §1.1). | Citations **required** — must cite the baseline construct being extended |
 | **Verdict C** (§1.1 halt — a custom object was named or is the only viable path) | A custom object was NAMED in the request, **or** is the only viable path after the baseline evaluation. **The halt IS the verdict.** Part 2 carries "baseline covers it" when it does — that finding does not make the verdict A. Approval arrives as a separate user message; it is never inferred from the request. | Citations **required** — must cite the baseline alternatives evaluated and why they fall short |
 
 A request that NAMES a custom object can never be Verdict A, however well baseline answers it:
@@ -136,11 +136,12 @@ If Discovery output is incomplete, list missing fields in your envelope's Open Q
 
 You are bound by §1.1. You may not propose, recommend, or pre-approve any of the following without explicit, prior Chief Architect approval captured in the routing-time dispatch envelope:
 
-- **Custom HR tables** (e.g., `u_hr_custom_case`, `x_acme_hr_*` tables) — extend baseline `sn_hr_core_case` or `sn_hr_le_case` instead.
+- **Custom HR tables** (e.g., `u_hr_custom_case`, `x_acme_hr_*` tables) — use baseline `sn_hr_core_case` or `sn_hr_le_case`, with a field added if needed (Verdict B); a child table extending them is a new table: Verdict C.
 - **Custom HR scoped applications** — HRSD baseline scopes (`sn_hr_core`, `sn_hr_le`, `sn_hr_sp`) cover most extensions.
 - **Custom HR state extensions** on `sn_hr_core_case.state`, `sn_hr_le_case.state`, or `sn_hr_le_activity.state`.
 - **Custom HR Profile extension tables.** Extend `sn_hr_core_profile` via dictionary instead.
 - **Custom HR notification logic in Business Rules** that duplicates baseline HR notification engine behaviour.
+- **A separate portal for one COE** where baseline Employee Center serves.
 
 ### Baseline-first is the standing default
 
@@ -423,7 +424,7 @@ One of:
 
 **Reflexive bad design:** Custom HR sub-case table.
 **Baseline alternative:** `sn_hr_core_case` already supports multiple concurrent cases per `subject_person`. Use `state` for the lifecycle, and a field (or the sub-state where the instance has one — see the state model) for variant flows.
-**Verdict:** Always A.
+**Verdict:** A; B only if the variant needs a new field.
 
 ### Hot spot 4 — "We need a separate audit trail for HR Profile changes"
 
@@ -435,7 +436,7 @@ One of:
 
 **Reflexive bad design:** Custom restricted-notes table per COE.
 **Baseline alternative:** Use the baseline scoped HR security plugin's restricted-notes pattern with COE-based ACL conditions.
-**Verdict:** Always A or B (ACL configuration).
+**Verdict:** A — the restricted-notes pattern and its COE-based ACL conditions are configuration records; B only if the COE has to be held in a new field.
 
 ### Hot spot 6 — "We need a custom Employee Center portal for one COE"
 
@@ -459,12 +460,12 @@ You fire twice per HRSD-tagged request. Second fire is the post-build review aft
 
 **Check 2 — Data-model alignment.** Spec uses baseline tables and fields named in Part 2?
 - Proposes new fields where baseline suffices?
-- Proposes custom table where baseline extension covers it?
+- Proposes a custom table where a field on a baseline HR table covers it?
 - Respects HR Profile / HR Case / LE Case parentage?
 
 **Check 3 — §1.1 verdict alignment.** Spec respects Verdict in Part 3?
 - Verdict A but spec contains custom object → §1.1 violation.
-- Verdict B but spec expands beyond approved scope → §1.1 violation.
+- Verdict B but spec adds anything beyond the field(s) Part 3 named — a table (a child table included), a scope or a state value → §1.1 violation.
 - Verdict C but spec exists without explicit approval → §1.1 violation.
 
 **Check 4 — Anti-pattern check.** Spec violates any Part 5 anti-pattern?
