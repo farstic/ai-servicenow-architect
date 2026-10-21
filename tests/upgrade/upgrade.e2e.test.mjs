@@ -560,6 +560,8 @@ test('ARC-09-C212 — a marker ~/.claude.json in the real home is neither read n
   // Read: the doctor's two readers of ~/.claude.json found none, which is the fixture home's answer.
   assert.equal(check('E-23')?.data?.present, false, `E-23 read a ~/.claude.json: ${JSON.stringify(check('E-23'))}`);
   assert.match(check('E-30')?.detail ?? '', /^no ~\/\.claude\.json to read$/, JSON.stringify(check('E-30')));
+  // The bootstrap's own doctor (B09, `--quick`) names each warning it counted: with the fixture home, E-23 is not one.
+  assert.doesNotMatch(boot, /\bwarn \([^)]*\bE-23\b/, `the bootstrap's doctor read a ~/.claude.json:\n${boot}`);
   for (const [what, text] of [['bootstrap', boot], ['upgrade', up.text], ['doctor', doctor.text]]) {
     assert.equal(text.includes(MARK), false, `${what} printed the marker's folder:\n${text}`);
   }
