@@ -116,3 +116,44 @@ test('ARC-09-C204 — no §1.1 hot spot gives two letters', () => {
   }
   assert.ok(read >= 6, `${read} gateways' hot spots read`);
 });
+
+/** `## Part 4 …` to the next `## ` heading. */
+function part4(text) {
+  const lines = text.split('\n');
+  const from = lines.findIndex((l) => l.startsWith('## Part 4'));
+  if (from < 0) return null;
+  const to = lines.findIndex((l, i) => i > from && l.startsWith('## '));
+  return lines.slice(from, to < 0 ? lines.length : to).join('\n');
+}
+
+/** Each letter's recommendation, which a Part 4 states on the line that names the letter. */
+const PART4 = [
+  ['A', 'PROCEED — baseline configuration only', 'No Technical Designer needed'],
+  ['B', 'PROCEED — dispatch to Technical Designer with constraints', null],
+  ['C', 'HALT — §1.1 custom-object proposal required', null],
+];
+
+test('ARC-09-C204 — every gateway\'s Part 4 routes each letter, and Verdict A to no Technical Designer', () => {
+  // Measured in the AFTER sitting on #503: FSO's and CSM's Part 4 named "baseline configuration only" and "dispatch to
+  // Technical Designer" with no letter, and 3 of the 4 FSO and CSM runs proposed the Technical Designer on a Verdict A,
+  // configuration-only answer. Under v2.2.2 that routing went with B. A configuration record is A now, so Part 4 says
+  // which letter each recommendation answers.
+  const failures = [];
+  let read = 0;
+  for (const dir of gatewayDirs(ROOT)) {
+    const p4 = part4(skill(dir));
+    if (!p4) { failures.push(`${dir}: no Part 4`); continue; }
+    read += 1;
+    const lines = p4.split('\n');
+    for (const [letter, recommendation, also] of PART4) {
+      const named = lines.filter((l) => new RegExp(`\\bVerdict ${letter}\\b`).test(l) && l.includes(recommendation));
+      if (named.length !== 1) failures.push(`${dir}: its Part 4 does not route Verdict ${letter} to "${recommendation}"`);
+      else if (also && !named[0].includes(also)) failures.push(`${dir}: its Part 4 Verdict ${letter} line does not say "${also}"`);
+    }
+    if (lines.some((l) => /\bVerdict A\b/.test(l) && /dispatch to Technical Designer/.test(l))) {
+      failures.push(`${dir}: its Part 4 sends Verdict A to the Technical Designer`);
+    }
+  }
+  assert.deepEqual(failures, [], failures.join('\n'));
+  assert.ok(read >= 6, `${read} gateways' Part 4 read`);
+});
