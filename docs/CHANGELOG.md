@@ -9,6 +9,14 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A patch release, in progress: before a gateway calls a name undocumented, it is told to search the bundled corpus for
+it.**
+
+### Changed
+
+- Each gateway is now told to search the bundled corpus for a name before it marks the name "not documented in the
+  bundled corpus"; before, a name on a page it had not opened in that turn got the mark (ARC-09-C217).
+
 ## 2.2.3 — 2026-10-21
 
 ### Notes
