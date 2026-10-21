@@ -18,8 +18,7 @@ the gateway verifies the instance has it.
 ### Fixed
 
 - A bootstrap or an upgrade replaced every SessionStart hook in `.claude/settings.local.json` with its own, so a
-  SessionStart hook of yours was lost each time, and without Node it removed them all. It now rewrites only the hook it
-  wrote and keeps yours (ARC-09-C193).
+  SessionStart hook of yours was lost each time. It now rewrites only the hook it wrote and keeps yours (ARC-09-C193).
 - The doctor's store check (SV-02) printed a store key path as a masked name: an unknown key under the instance `pdi`
   read `i***.p*** Unrecognized key(s) in object: 'notes'`. The server now names the path in backticks, which the doctor
   prints as written (ARC-09-C211).
