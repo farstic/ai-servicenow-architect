@@ -14,15 +14,14 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { redactResult } from '../../tools/snowarch/lib/doctor/redact.mjs';
 import { redact } from '../../tools/snowarch/lib/redact.mjs';
 import { CHECK_IDS, TABLE, remedyFor } from '../../tools/snowarch/lib/remedies.mjs';
+import { MASKED } from './helpers/masked.mjs';
 import { greenTree, readJson, writeJson } from './helpers/tree.mjs';
-
-/** A masked dotted token as `redact` prints one. Not `\b…\b`: after `***` there is no word boundary to match. */
-const MASKED = /\b[A-Za-z]\*{3}\.[A-Za-z]\*{3}(?![\w*])/;
 
 /** E-06's table (`configProblems` in doctor/checks/engine-repo.mjs), less the four `loadConfig` requires. */
 const ABSENT = ['product', 'cli', 'mcp.package', 'mcp.packageDir', 'floors.git', 'floors.claudeCode', 'roster.skills',

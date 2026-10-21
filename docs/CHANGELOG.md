@@ -9,6 +9,36 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A patch release, in progress: the gateways judge configuration, a new field and a new table one way.** A configuration
+record on an existing table, its script included, is baseline configuration, unless §1.1 lists it. A new field on a
+baseline table is an extension. Any new table is a custom object and waits for approval. The ITSM gateway also checks
+for the business rule that fills an incident's assignment group from its configuration item; it ships with a plugin, so
+the gateway verifies the instance has it.
+
+### Fixed
+
+- A bootstrap or an upgrade replaced every SessionStart hook in `.claude/settings.local.json` with its own, so a
+  SessionStart hook of yours was lost each time, and without Node it removed them all. It now rewrites only the hook it
+  wrote and keeps yours (ARC-09-C193).
+- The doctor's store check (SV-02) printed a store key path as a masked name: an unknown key under the instance `pdi`
+  read `i***.p*** Unrecognized key(s) in object: 'notes'`. The server now names the path in backticks, which the doctor
+  prints as written (ARC-09-C211).
+
+### Changed
+
+- The six gateways define Verdict B one way: a new field on a baseline table, and nothing else. A configuration record
+  on an existing table, such as an assignment rule, rows of an existing data lookup, a business rule, a notification or
+  an ACL rule, is Verdict A, its script included, unless it is itself a §1.1 object. Any new table, one that extends a
+  baseline table included, is Verdict C and waits for approval, where a gateway could treat a table extension as B and
+  proceed. FSO's service definitions, decision-table rows, document lists and record producers move from B to A. The
+  ITSM gateway grounds assignment in the **Populate Assignment Group based on CI/SO** business rule and in the
+  conditions and Execution Order of assignment rules (ARC-09-C204).
+
+### Internal
+
+- The upgrade test harness gives every product process it starts a home of its own, so a test run neither reads nor rewrites
+  the developer's `~/.claude.json` (ARC-09-C212).
+
 ## 2.2.2 — 2026-10-21
 
 ### Notes
