@@ -15,6 +15,12 @@ baseline table is an extension. Any new table is a custom object and waits for a
 for the business rule that fills an incident's assignment group from its configuration item; it ships with a plugin, so
 the gateway verifies the instance has it.
 
+### Fixed
+
+- A bootstrap or an upgrade replaced every SessionStart hook in `.claude/settings.local.json` with its own, so a
+  SessionStart hook of yours was lost each time, and without Node it removed them all. It now rewrites only the hook it
+  wrote and keeps yours (ARC-09-C193).
+
 ### Changed
 
 - The six gateways define Verdict B one way: a new field on a baseline table, and nothing else. A configuration record
