@@ -32,6 +32,7 @@ the gateway verifies the instance has it.
   proceed. FSO's service definitions, decision-table rows, document lists and record producers move from B to A. The
   ITSM gateway grounds assignment in the **Populate Assignment Group based on CI/SO** business rule and in the
   conditions and Execution Order of assignment rules (ARC-09-C204).
+- The platform notes no longer name the maintainers' own instances (ARC-09-C216).
 
 ### Internal
 
