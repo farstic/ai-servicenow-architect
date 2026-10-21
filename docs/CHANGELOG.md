@@ -9,11 +9,12 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A patch release, in progress: the gateways judge configuration, a new field and a new table one way.** A configuration
-record on an existing table, its script included, is baseline configuration, unless §1.1 lists it. A new field on a
-baseline table is an extension. Any new table is a custom object and waits for approval. The ITSM gateway also checks
-for the business rule that fills an incident's assignment group from its configuration item; it ships with a plugin, so
-the gateway verifies the instance has it.
+**A patch release: the gateways judge configuration, a new field and a new table one way, and a bootstrap or an upgrade
+keeps your own SessionStart hooks.** A configuration record on an existing table, its script included, is baseline
+configuration, unless §1.1 lists it. A new field on a baseline table is an extension. Any new table is a custom object
+and waits for approval. The ITSM gateway also checks for the business rule that fills an incident's assignment group
+from its configuration item; it ships with a plugin, so the gateway verifies the instance has it. Your own SessionStart
+hooks in `.claude/settings.local.json` now survive a bootstrap and an upgrade.
 
 ### Fixed
 
