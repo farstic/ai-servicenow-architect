@@ -9,6 +9,8 @@ All notable changes to this project are documented here. This project adheres to
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
 
+## 2.2.3 — 2026-10-21
+
 **A store error names its key path in backticks (ARC-09-C211).** `STORE_SCHEMA_INVALID` named the path bare,
 `instances.pdi Unrecognized key(s) …`, and the engine's doctor printed it as a masked name. It now names the path in
 backticks, as in `` `instances.pdi` ``, which the doctor prints as written; an issue at the store's root names no
