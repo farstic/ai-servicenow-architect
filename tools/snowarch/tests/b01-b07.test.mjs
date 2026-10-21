@@ -193,12 +193,13 @@ test('ARC-09-C193 — through B07, twice: the user\'s SessionStart hook survives
 });
 
 test('ARC-09-C193 — a user\'s own script called session-start.mjs is the user\'s: only our layout is ours', () => {
-  // Ours is a script at tools/snowarch/hooks/session-start.mjs, any folder before it, either separator: C192's copy
-  // from another install's folder is ours to replace, and a user's ~/scripts/session-start.mjs is theirs to keep.
+  // Ours is a session-start.mjs inside a tools/snowarch/ folder, any folder before it, either separator: C192's copy
+  // from another install's folder is ours to replace, and a user's ~/scripts/session-start.mjs is theirs to keep. A
+  // folder whose name only ends in "tools" is not the tools folder.
   const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
   const theirs = [
     { type: 'command', command: 'node /home/someone/scripts/session-start.mjs' },
-    { type: 'command', command: 'node /home/someone/mytools/snowarch/hooks/session-start.mjs' },
+    { type: 'command', command: 'node /home/someone/mytools/snowarch/session-start.mjs' },
   ];
   const windowsCopyOfOurs = { type: 'command',
     command: 'node C:\\Users\\someone\\snowarch-2.2.0\\tools\\snowarch\\hooks\\session-start.mjs' };
