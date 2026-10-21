@@ -31,6 +31,7 @@ import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { bootstrapUser, buildWorld, fakeClaude, git, republishManifests, snowarch } from './harness.mjs';
 import { stage } from '../../scripts/lib/distribution.mjs';
 import { COVERAGE, isCovered } from '../../tools/snowarch/lib/licence/manifest.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 const isWindows = process.platform === 'win32';
 const MINUTES = 10 * 60 * 1000;
@@ -516,4 +517,53 @@ test('a target that is not a release tag of this product is refused by name', as
   assert.equal(r.status, 1, r.text);
   assert.match(r.text, /v9\.5\.0 is not a release tag of this product/);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
+}, MINUTES);
+
+// ── ARC-09-C212 — the harness gives every product start a fixture home ──────────────────────────────────────────────
+
+/**
+ * The runtime half of ARC-09-C212; the class half is in `harness-shape.test.mjs`. The doctor opens `~/.claude.json`
+ * (E-23, E-30), and E-27's `claude mcp get`, through a real CLI on PATH, rewrites it while it answers
+ * (tools/snowarch/lib/doctor/checks/host.mjs:187). A harness that handed its children the developer's own home let a
+ * test run read, and could let it rewrite, the developer's file: C210's probe printed the counts of its
+ * credential-shaped keys into a test log.
+ */
+test('ARC-09-C212 — a marker ~/.claude.json in the real home is neither read nor rewritten by bootstrap, upgrade or doctor', async (t) => {
+  const w = await buildWorld(t);
+  // A stand-in for the developer's home, never the real one: THIS process is pointed at it, so a child that inherits
+  // the process's home reads this file, and a child given the fixture home cannot.
+  const realHome = tempDir('snowarch-c212-realhome-', t);
+  const MARK = 'c212-marker-folder';
+  const { names: [stale] } = JSON.parse(readFileSync(new URL(
+    '../../tools/snowarch/lib/doctor/checks/stale-registrations.json', import.meta.url), 'utf8'));
+  // A stale-named registration (E-23) under a folder that does not exist (E-30): both report it, if they read it.
+  const marker = join(realHome, '.claude.json');
+  writeFileSync(marker, `${JSON.stringify({ projects: { [join(realHome, MARK)]: { mcpServers: {
+    [stale]: { command: 'node', env: { SN_PASSWORD: 'c212-not-a-secret' } } } } } }, null, 2)}\n`);
+  const before = { bytes: readFileSync(marker), mtimeMs: statSync(marker).mtimeMs };
+
+  const saved = Object.fromEntries(['HOME', 'USERPROFILE', 'CLAUDE_CONFIG_DIR'].map((k) => [k, process.env[k]]));
+  t.after(() => {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  });
+  process.env.HOME = realHome;
+  process.env.USERPROFILE = realHome;
+  delete process.env.CLAUDE_CONFIG_DIR;
+
+  const boot = bootstrapUser(w.user);
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  const doctor = snowarch(w.user, ['doctor', '--json', '--section', 'legacy'], { bin: w.bin });
+  const report = JSON.parse(doctor.stdout);
+  const check = (id) => report.checks.find((c) => c.id === id);
+
+  // Read: the doctor's two readers of ~/.claude.json found none, which is the fixture home's answer.
+  assert.equal(check('E-23')?.data?.present, false, `E-23 read a ~/.claude.json: ${JSON.stringify(check('E-23'))}`);
+  assert.match(check('E-30')?.detail ?? '', /^no ~\/\.claude\.json to read$/, JSON.stringify(check('E-30')));
+  for (const [what, text] of [['bootstrap', boot], ['upgrade', up.text], ['doctor', doctor.text]]) {
+    assert.equal(text.includes(MARK), false, `${what} printed the marker's folder:\n${text}`);
+  }
+  // Rewritten: the bytes and the time are the ones written above.
+  assert.deepEqual(readFileSync(marker), before.bytes, 'the marker ~/.claude.json was rewritten');
+  assert.equal(statSync(marker).mtimeMs, before.mtimeMs, 'the marker ~/.claude.json was touched');
 }, MINUTES);

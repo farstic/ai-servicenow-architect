@@ -23,6 +23,7 @@ import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 import { buildWorld, LONGPATHS, NOT_COPIED, persistLongPaths } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { applyWrites } from '../../scripts/lib/release/writers.mjs';
+import { scanProductStarts } from '../../tools/snowarch/tests/helpers/licence-hook/starts.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -330,4 +331,24 @@ test('C13: ARC-09-S11 AC 3 — the released shape is produced, tagged, and check
     assert.equal(r.status, 0,
       `${file} fails on the RELEASED tree:\n${`${r.stdout}${r.stderr}`.slice(0, 3000)}`);
   }
+});
+
+// ── ARC-09-C212 — every product start in the harness gets a fixture home ────────────────────────────────────────────
+
+/**
+ * The class: every start of the product under tests/upgrade/, read by the same reader as the licence spawn rule. A
+ * start that is not given the harness's fixture home (`fixtureHome(`) hands its child the developer's own HOME, and
+ * the doctor that child runs opens the developer's `~/.claude.json` (E-23, E-30) and lets E-27's `claude mcp get`,
+ * through a real CLI on PATH, rewrite it while it answers (tools/snowarch/lib/doctor/checks/host.mjs:187).
+ */
+test('ARC-09-C212 — the two product starts in tests/upgrade/ both give their child the fixture home', async () => {
+  const { starts, unresolved, files } = await scanProductStarts({ roots: [join(REAL_ROOT, 'tests/upgrade')],
+    base: REAL_ROOT });
+  assert.ok(files >= 8, `the reader read ${files} files`);
+  assert.deepEqual(unresolved, []);
+  // bootstrapUser and snowarch(): U6's bootstrap and U7's doctor are THEIR children, and inherit what they are given.
+  assert.deepEqual(starts.map((s) => s.file), ['tests/upgrade/harness.mjs', 'tests/upgrade/harness.mjs'],
+    `the product starts moved: ${starts.map((s) => `${s.file}:${s.line}`).join(', ')}`);
+  const bare = starts.filter((s) => !/\bfixtureHome\(/.test(s.args)).map((s) => `${s.file}:${s.line}`);
+  assert.deepEqual(bare, [], 'a product start that does not give its child the fixture home');
 });

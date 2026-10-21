@@ -75,8 +75,9 @@ function sources(roots) {
 
 /**
  * `{ starts, unresolved, files }`.
- * - `starts`: every product start, as `{ file, line, entry, licensed }`, where `entry` is what it names
- *   (`cli`, `server`, `launcher`, joined with `+`) or `presumed`.
+ * - `starts`: every product start, as `{ file, line, entry, licensed, declared, args }`, where `entry` is what it
+ *   names (`cli`, `server`, `launcher`, joined with `+`) or `presumed`, and `args` is the start's arguments
+ *   followed the same way, so a class rule other than the licence's can be asserted on them (ARC-09-C212).
  * - `unresolved`: files that reach `child_process` in a way the reader does not follow (a `require`, a
  *   dynamic `import()`), as `path: why`. Reported, never passed.
  * - `files`: how many files were read.
@@ -373,9 +374,10 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
       if (isStart) {
         const entry = classify(file, node, fileNames);
         if (entry) {
-          const licensed = (node.arguments ?? []).some((a) => /\blicensedEnv\(/.test(expand(file, a).text));
+          const args = (node.arguments ?? []).map((a) => expand(file, a).text).join('\n');
+          const licensed = /\blicensedEnv\(/.test(args);
           const line = p.src.getLineAndCharacterOfPosition(node.getStart()).line + 1;
-          starts.push({ file: relative(base, file), line, entry, licensed, declared: declaration(p.src, line) });
+          starts.push({ file: relative(base, file), line, entry, licensed, declared: declaration(p.src, line), args });
         }
       }
       ts.forEachChild(node, visit);
