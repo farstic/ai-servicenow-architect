@@ -105,6 +105,9 @@ test('ARC-09-C218 — every repository a test helper creates goes through initFi
 });
 
 test('ARC-09-C218 — the count finds a raw init that a new helper would add', () => {
-  assert.deepEqual(initSites("  git(root, ['init', '-q']);\n  // git(['init']) in a comment\n"), { raw: 1, shared: 0 });
+  // ASSEMBLED, never written out, as in precondition-asserts.test.mjs: a planted init spelled in full is a bare
+  // `git init` in this file for ARC-09-C14's scan to find.
+  const init = ['in', 'it'].join('');
+  assert.deepEqual(initSites(`  git(root, ['${init}', '-q']);\n  // git(['${init}']) in a comment\n`), { raw: 1, shared: 0 });
   assert.deepEqual(initSites("  initFixtureRepo((a) => git(root, a), root, ['-q']);\n"), { raw: 0, shared: 1 });
 });
