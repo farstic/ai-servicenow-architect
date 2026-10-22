@@ -194,10 +194,10 @@ test('ARC-09-C219 — each exempt file still holds what it is exempt for', () =>
 // runners measured the mechanism. Every `.ts` file of the tree is read, fixtures and helpers included, because the
 // repositories are made in fixture files rather than in the `*.test.ts` files ARC-09-C14 reads.
 
-/** The repositories the server's TypeScript tests create, each through initFixtureRepo; a fixture that adds one raises it. */
+/** The repositories the server's TypeScript tests create through initFixtureRepo; a fixture that adds one raises it. */
 const SERVER_REPOSITORIES = 3;
 
-/** The lines of one file's code that define an initFixtureRepo of their own: a copy, which could drift from the helper. */
+/** The lines of a file's code that define their own initFixtureRepo: a copy, which could drift from the helper. */
 export function definitionsOf(text) {
   const out = [];
   text.split('\n').forEach((line, i) => {

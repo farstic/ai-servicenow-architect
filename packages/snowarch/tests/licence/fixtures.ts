@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canonicalJson, fingerprint, LICENCE_FORMAT, LIST_FORMAT, type ProductKey } from '../../src/licence/core.js';
 import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 import { COVERAGE, MANIFEST_FORMAT } from '../../src/licence/integrity.js';
+import { initFixtureRepo } from '../../../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 /**
  * ARC-11-C1 — keys, licences and lists made by the test that uses them. None is ever committed: the
@@ -76,17 +77,22 @@ export function checkout(prefix = 'snowarch-licence-'): string {
   return root;
 }
 
-/** A bare repository standing in for the list repository; `files` null is a repository with no branch. */
+/**
+ * A bare repository standing in for the list repository; `files` null is a repository with no branch. Both repositories
+ * come from initFixtureRepo, with git's automatic maintenance and gc off: the work repository commits and pushes, and
+ * the bare one receives the push, so either could otherwise still be written to while the suite removes it
+ * (ARC-09-C220).
+ */
 export function listRepo(files: Record<string, string> | null): string {
   const base = fixtureDir('snowarch-licence-repo-');
   const bare = join(base, 'list.git');
   const env = { ...process.env, GIT_AUTHOR_NAME: 'fixture', GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
     GIT_COMMITTER_NAME: 'fixture', GIT_COMMITTER_EMAIL: 'fixture@example.invalid' };
   const git = (args: string[]): void => { execFileSync('git', args, { env, stdio: 'pipe' }); };
-  git(['init', '-q', '--bare', '--initial-branch=main', bare]);
+  initFixtureRepo(git, bare, ['-q', '--bare', '--initial-branch=main']);
   if (files) {
     const work = join(base, 'work');
-    git(['init', '-q', '--initial-branch=main', work]);
+    initFixtureRepo(git, work, ['-q', '--initial-branch=main']);
     for (const [path, content] of Object.entries(files)) writeFileSync(join(work, path), content);
     git(['-C', work, 'add', '-A']);
     git(['-C', work, 'commit', '-q', '--allow-empty', '-m', 'list']);
@@ -98,7 +104,8 @@ export function listRepo(files: Record<string, string> | null): string {
 /**
  * ARC-11-C141 — an engine checkout at a release, tagged, its signed manifest held: what a user has after an install.
  * The manifest hashes the bytes written here, which are the bytes the tag holds (`.gitattributes` is the repository's
- * own), so a fresh checkout verifies. `cache: false` leaves no manifest held; `key` signs it.
+ * own), so a fresh checkout verifies. `cache: false` leaves no manifest held; `key` signs it. The repository comes from
+ * initFixtureRepo, as listRepo's do (ARC-09-C220).
  */
 export function releaseCheckout({ version = '9.1.0', key, cache = true }: { version?: string; key: Pair; cache?: boolean }): string {
   const root = fixtureDir('snowarch-integrity-');
@@ -118,7 +125,7 @@ export function releaseCheckout({ version = '9.1.0', key, cache = true }: { vers
   const git = (args: string[]): string => execFileSync('git', ['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', ...args],
     { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();
   const tag = `v${version}`;
-  git(['init', '-q', '-b', 'main']);
+  initFixtureRepo(git, root, ['-q', '-b', 'main']);
   git(['add', '-A']);
   git(['commit', '-qm', 'the release']);
   git(['tag', '-a', tag, '-m', tag]);
