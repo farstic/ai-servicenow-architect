@@ -553,7 +553,7 @@ choices from `sys_choice`, does not guess, and asks the user, as it did in the s
 ## PN-24 — Under `sysparm_display_value=all` every field is an object: the stored value beside its label
 
 **Applies to:** the REST Table API, `GET /api/now/table/<table>` with `sysparm_display_value=all` · observed on a
-maintainer's PDI, 2026-10-22; the probe did not record the instance's release family (the bundled corpus is Australia)
+maintainer's Brazil-family PDI, 2026-10-22
 **Behaviour:** every field comes back as `{ "display_value": …, "value": … }`. A reference field adds `link`; its
 `value` is the 32-character sys_id and its `display_value` the referenced record's display name. A choice field's
 `value` is the stored code and its `display_value` the label. A plain string field carries the same text in both.
