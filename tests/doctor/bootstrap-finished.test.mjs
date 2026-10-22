@@ -375,3 +375,38 @@ test('ARC-08-C36 — a step that genuinely did not finish is still a FAIL', asyn
   assert.match(r.detail, /B09 failed/, 'the sentence no longer says which step failed, or how');
   assert.ok(r.command, 'a genuinely unfinished install lost its remedy');
 });
+
+// ── ARC-09-C198 — a record carried from another folder ─────────────────────────────────────────────────────────
+//
+// The cross-version sweep copied a 2.2.0 `.local/bootstrap-state.json` into a fresh checkout: the new install had no
+// corpus and no `settings.local.json`, and this check said "all current". The steps had run, in the folder the record
+// came from.
+
+test('ARC-09-C198 — a finished record copied into another folder is not all current there', async (t) => {
+  const from = finished(greenTree(t, { mode: 'live' }));
+  const root = greenTree(t, { mode: 'live' });
+  writeJson(root, '.local/bootstrap-state.json', readJson(from, '.local/bootstrap-state.json'));
+
+  const r = await E29.run(ctxFor(root));
+  assert.equal(r.status, 'fail', 'another folder\'s finished install was reported as this one\'s');
+  assert.equal(r.detail,
+    `bootstrap incomplete since ${engineVersionOf(root)}: the recorded steps were run in another folder`);
+  // E-29's own remedy line, the one every incomplete install gets.
+  assert.equal(r.remedy, SPELLED_BOOTSTRAP);
+  assert.equal(r.command, SPELLED_BOOTSTRAP);
+});
+
+test('ARC-09-C198 — a record written before the binding existed does not say all current either', async (t) => {
+  const root = finished(greenTree(t, { mode: 'live' }));
+  const state = readJson(root, '.local/bootstrap-state.json');
+  // Every record written before this release has no binding, in this folder or any other, and it cannot say which.
+  delete state.checkout;
+  writeJson(root, '.local/bootstrap-state.json', state);
+
+  const r = await E29.run(ctxFor(root));
+  assert.equal(r.status, 'fail', 'a record that does not say where its steps ran was reported as this folder\'s');
+  assert.equal(r.detail, `bootstrap incomplete since ${engineVersionOf(root)}: the record was written before this `
+    + 'release and does not say which folder its steps ran in');
+  assert.equal(r.remedy, SPELLED_BOOTSTRAP);
+  assert.equal(r.command, SPELLED_BOOTSTRAP);
+});
