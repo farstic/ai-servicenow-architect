@@ -21,6 +21,7 @@ import { renderVersion, versionInfo } from '../tools/snowarch/lib/version-info.m
 import { licensedEnv } from '../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 /**
  * ARC-07-C31 — DERIVED, and `esc` with it, because the spelling contains `.` and `\\`.
@@ -50,9 +51,9 @@ function checkout(t, { version = '9.0.0', contract = '{"schema":1,"tools":[]}' }
   write(root, 'packages/snowarch/dist/contract.json', contract);
   write(root, 'packages/contract/required-tools.json', `${JSON.stringify({ contractSha256: sha, tools: [] }, null, 2)}\n`);
   mkdirSync(join(root, 'vendor/ServiceNowDocs'), { recursive: true });
-  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(join(root, 'vendor/ServiceNowDocs'), args), join(root, 'vendor/ServiceNowDocs'), ['-q', '-b', 'main']);
 
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
   assert.equal(git(root, ['config', 'user.name']).trim(), 'fixture', 'the fixture identity did not take');

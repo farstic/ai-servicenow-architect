@@ -19,6 +19,7 @@ import {
 } from '../lib/licence/manifest.mjs';
 import { keyPair, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
+import { initFixtureRepo } from './helpers/fixture-git.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const primary = keyPair();
@@ -58,7 +59,7 @@ function fixture(t, extra = {}) {
   const base = tempDir('snowarch-manifest-', t);
   const repo = join(base, 'repo');
   mkdirSync(repo);
-  git(repo, ['init', '-q', '--initial-branch=main']);
+  initFixtureRepo((args) => git(repo, args), repo, ['-q', '--initial-branch=main']);
   git(repo, ['config', 'core.longpaths', 'true']);
   for (const [path, content] of Object.entries({ ...FILES, ...extra })) {
     mkdirSync(dirname(join(repo, path)), { recursive: true });

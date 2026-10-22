@@ -14,6 +14,7 @@ import {
   credentialLines, CREDENTIAL_EXT, ENVISH, isPlaceholder,
 } from '../tools/snowarch/lib/doctor/checks/credential-shape.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const git = (args, cwd = root) => execFileSync('git', args, { cwd, encoding: 'utf8' });
@@ -82,7 +83,7 @@ test('S02 AC 5 — an engagement note in the working tree is invisible to git', 
   // checkout to prove it would be the test leaving engagement-shaped litter behind.
   const dir = tempDir('snowarch-engagement-');
   try {
-    git(['init', '-q', '-b', 'main', '.'], dir);
+    initFixtureRepo((args) => git(args, dir), dir, ['-q', '-b', 'main']);
     writeFileSync(join(dir, '.gitignore'), readFileSync(join(root, '.gitignore'), 'utf8'));
     mkdirSync(join(dir, 'clients', 'acme'), { recursive: true });
     writeFileSync(join(dir, 'clients/acme/memory.md'), '# notes for this engagement\n');
@@ -116,7 +117,7 @@ test('ARC-10-S03 AC 2 — the four engine-era scratch lines are gone, and their 
   // in a checkout, so the rule was hiding something that never appears here.
   const dir = tempDir('snowarch-scratch-');
   try {
-    git(['init', '-q', '-b', 'main', '.'], dir);
+    initFixtureRepo((args) => git(args, dir), dir, ['-q', '-b', 'main']);
     writeFileSync(join(dir, '.gitignore'), readFileSync(join(root, '.gitignore'), 'utf8'));
     for (const rel of ['node-compile-cache/x', 'scratchpad/x', 'deliverables-note.md']) {
       mkdirSync(dirname(join(dir, rel)), { recursive: true });
@@ -209,7 +210,7 @@ test('one ignore file for the monorepo', () => {
 const withScratchRepo = (fn) => {
   const dir = tempDir('never-commit-');
   try {
-    git(['init', '-q', '-b', 'main', '.'], dir);
+    initFixtureRepo((args) => git(args, dir), dir, ['-q', '-b', 'main']);
     writeFileSync(join(dir, '.gitignore'), readFileSync(join(root, '.gitignore')));
     fn(dir);
   } finally { rmSync(dir, { recursive: true, force: true }); }

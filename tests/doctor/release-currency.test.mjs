@@ -11,6 +11,7 @@
 import { test } from 'node:test';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import assert from 'node:assert/strict';
+import { initFixtureRepo } from '../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 /**
  * The launcher these regexes hold, DERIVED AND ESCAPED — ARC-07-W17.
@@ -501,7 +502,7 @@ test('E-28 under the doctor\'s own --no-network spawns nothing: the flag reaches
   // (doctor/index.mjs), and only a run through runDoctor proves the check reads it where the doctor puts it. A clone
   // with no origin makes a spawned `ls-remote` fail loudly instead of quietly reaching the network.
   const root = tempDir('snowarch-e28-flags-', t);
-  execFileSync('git', ['init', '-q', '-b', 'main', root]);
+  initFixtureRepo((args) => execFileSync('git', args), root, ['-q', '-b', 'main']);
   assert.equal(spawnSync('git', ['-C', root, 'remote', 'get-url', 'origin']).status === 0, false,
     'the fixture has no origin');
   const config = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -560,7 +561,7 @@ const traceTail = (file, max = 4000) => {
  * proxy answers in the remote's place. The askpass program leaves a mark if git ever asks. */
 function refusedBy(t, url) {
   const root = tempDir('snowarch-c207-', t);
-  execFileSync('git', ['init', '-q', '-b', 'main', root]);
+  initFixtureRepo((args) => execFileSync('git', args), root, ['-q', '-b', 'main']);
   execFileSync('git', ['-C', root, 'remote', 'add', 'origin', url]);
   assert.equal(execFileSync('git', ['-C', root, 'remote', 'get-url', 'origin'], { encoding: 'utf8' }).trim(), url,
     'the origin was not set');

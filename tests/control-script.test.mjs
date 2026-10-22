@@ -24,6 +24,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '..', 'scripts', 'ci', 'control.mjs');
@@ -37,7 +38,7 @@ function repo(t, { content = 'export const answer = 42;\n', autocrlf = false } =
   // `-b main` because `init.defaultBranch` is a MACHINE setting (ARC-09-C14): a fixture whose branch
   // name comes from the operator's git config is a fixture that behaves differently per machine, and
   // `precondition-asserts.test.mjs` scans for exactly this. It caught my first version.
-  git('init', '-q', '-b', 'main');
+  initFixtureRepo((args) => git(...args), dir, ['-q', '-b', 'main']);
   git('config', 'user.email', 'test@example.invalid');
   git('config', 'user.name', 'test');
   git('config', 'commit.gpgsign', 'false');

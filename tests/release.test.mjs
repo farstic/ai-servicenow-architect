@@ -33,6 +33,7 @@ import { gatePlan, makeGateRunner } from '../scripts/lib/release/gates.mjs';
 import { COVERAGE, manifestFromArchive, signManifest } from '../tools/snowarch/lib/licence/manifest.mjs';
 import { keyPair, listRepo, productKeys } from '../tools/snowarch/tests/helpers/licence.mjs';
 import { stage } from '../scripts/lib/distribution.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -88,9 +89,9 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
   // working tree has to hold something git can describe, or `git status` in the outer repository
   // fails with "not a git repository" and every question about cleanliness goes unanswered.
   mkdirSync(join(root, 'vendor/ServiceNowDocs'), { recursive: true });
-  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(join(root, 'vendor/ServiceNowDocs'), args), join(root, 'vendor/ServiceNowDocs'), ['-q', '-b', 'main']);
 
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
   git(root, ['add', '.gitattributes', 'package.json', 'package-lock.json', 'packages', 'tools',
@@ -795,7 +796,7 @@ function withRemote(t, state) {
   // any`. It passed locally, where this machine's git resolves it, and failed on all twelve
   // `test` and `release-dryrun` cells — a fixture that depended on the machine it ran on, which is
   // ARC-08-S05's lesson arriving a third time.
-  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare], { stdio: 'pipe' });
+  initFixtureRepo((args) => execFileSync('git', args, { stdio: 'pipe' }), bare, ['-q', '--bare', '-b', 'main']);
   git(root, ['remote', 'add', 'origin', bare]);
   if (state !== 'no-upstream') {
     git(root, ['push', '-q', 'origin', 'main']);
@@ -1181,7 +1182,7 @@ function licences(t) {
   const url = listRepo(t, null);
   const publish = (files) => {
     const work = tempDir('snowarch-licences-work-', t);
-    git(work, ['init', '-q', '-b', 'main']);
+    initFixtureRepo((args) => git(work, args), work, ['-q', '-b', 'main']);
     for (const [rel, text] of Object.entries(files)) write(work, rel, text);
     git(work, ['add', '-A']);
     git(work, ['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'publish']);
@@ -1368,7 +1369,7 @@ test('ARC-09-C185b — a clone whose tag is not this tag staged is refused, thou
   assert.equal(tampered.code, 2, tampered.out);
   assert.match(tampered.err, /release: v9\.1\.0 in .+ is tree [0-9a-f]{7}, and v9\.1\.0 staged from here is [0-9a-f]{7} — nothing was pushed/);
   const empty = join(tempDir('snowarch-distribution-', t), 'snowarch');
-  git(dirname(empty), ['init', '-q', '-b', 'main', empty]);
+  initFixtureRepo((args) => git(dirname(empty), args), empty, ['-q', '-b', 'main']);
   const untagged = await run(root, [FINAL, '--tag-only', '--push', '--offline', '--distribution', empty], { keys: MANIFEST_KEYS });
   assert.equal(untagged.code, 2, untagged.out);
   assert.match(untagged.err, /release: .+ has no v9\.1\.0: stage it there with --tag — nothing was pushed/);

@@ -13,6 +13,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const git = (args, cwd = root) => execFileSync('git', args, { cwd, encoding: 'utf8' });
@@ -350,7 +351,7 @@ test('the S03 leaf-cut paths stay deleted', () => {
 // ---------- mutations, in a throwaway repository ----------
 const withScratchRepo = (fn) => {
   const dir = tempDir('no-legacy-');
-  try { git(['init', '-q', '-b', 'main', '.'], dir); fn(dir); }
+  try { initFixtureRepo((args) => git(args, dir), dir, ['-q', '-b', 'main']); fn(dir); }
   finally { rmSync(dir, { recursive: true, force: true }); }
 };
 

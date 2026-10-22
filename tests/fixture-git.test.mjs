@@ -9,6 +9,11 @@
 // A probe on the runner reproduced the race only under load, at 2 of 3,008 pairs (the C218 row has the counts), so
 // these cases hold the mechanism, deterministically: every repository a test helper creates goes through
 // initFixtureRepo, which turns git's automatic maintenance and automatic gc off in it.
+//
+// ARC-09-C219 — and every repository a test FILE creates. The same detached maintenance makes the test's own removal
+// fail: on node 24 `rmSync` reported success over a folder that was still there, at 402 of 3,008 pairs under load
+// (temp.mjs's `ESURVIVED`), and at 0 with the two settings (the C219 row has every cell). The test files' calls also
+// name their branch, which ARC-09-C14 checked for the raw `git init` they replace.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -65,8 +70,8 @@ test('ARC-09-C218 — greenTree\'s commit starts no automatic maintenance, where
   rmSync(plain, { recursive: true, force: true });
 });
 
-/** Helper files: everything under a `helpers/` directory of the two test trees, and the upgrade harness. */
-function helperFiles() {
+/** Every `.mjs` of the two test trees, as repository-relative POSIX paths. */
+function treeFiles() {
   const out = [];
   const walk = (d) => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
@@ -75,7 +80,17 @@ function helperFiles() {
     }
   };
   for (const r of ['tests', 'tools/snowarch/tests']) walk(join(ROOT, r));
-  return out.filter((f) => f.includes('/helpers/') || f === 'tests/upgrade/harness.mjs').sort();
+  return out.sort();
+}
+
+/** Helper files: everything under a `helpers/` directory of the two test trees, and the upgrade harness. */
+function helperFiles() {
+  return treeFiles().filter((f) => f.includes('/helpers/') || f === 'tests/upgrade/harness.mjs');
+}
+
+/** Test files: every `*.test.mjs` of the two test trees outside a `helpers/` directory. */
+function testFiles() {
+  return treeFiles().filter((f) => f.endsWith('.test.mjs') && !f.includes('/helpers/'));
 }
 
 /** Raw `git init` calls and initFixtureRepo calls in one file's code, comments left out. */
@@ -110,4 +125,63 @@ test('ARC-09-C218 — the count finds a raw init that a new helper would add', (
   const init = ['in', 'it'].join('');
   assert.deepEqual(initSites(`  git(root, ['${init}', '-q']);\n  // git(['${init}']) in a comment\n`), { raw: 1, shared: 0 });
   assert.deepEqual(initSites("  initFixtureRepo((a) => git(root, a), root, ['-q']);\n"), { raw: 0, shared: 1 });
+});
+
+// ── ARC-09-C219 — the test files' own repositories ─────────────────────────────────────────────────────────────
+
+/** The repositories the test files create, each through initFixtureRepo; a test that adds one raises this number. */
+const TEST_REPOSITORIES = 37;
+const SELF = 'tests/fixture-git.test.mjs';
+
+/** Test files that keep a raw `git init`, each with its reason. A file is exempt by name, never by pattern. */
+const EXEMPT = new Map([
+  [SELF, 'this guard plants its own samples, assembled'],
+  ['tests/precondition-asserts.test.mjs', 'ARC-09-C14 plants a bare init and a named one as samples of what it scans for'],
+  ['tests/architecture-history.test.mjs', 'its repository fetches one tag and never commits, and the case branches on '
+    + 'init\'s own status; fetch-only repositories are not measured (ARC-09-C219)'],
+]);
+
+/** The initFixtureRepo calls in one file's code that name no branch, by line: neither `-b` nor `--initial-branch=`. */
+export function unnamedCalls(text) {
+  const out = [];
+  text.split('\n').forEach((line, i) => {
+    if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+    if (!/\binitFixtureRepo\(/.test(line) || /export function initFixtureRepo\(/.test(line)) return;
+    if (!/'-b'|'--initial-branch=/.test(line)) out.push(i + 1);
+  });
+  return out;
+}
+
+test('ARC-09-C219 — every repository a test file creates goes through initFixtureRepo, and names its branch', () => {
+  const files = testFiles();
+  assert.ok(files.length > 50, `${files.length} test files found: the walk read nothing`);
+  const raw = []; const unnamed = []; let shared = 0;
+  for (const f of files) {
+    if (EXEMPT.has(f)) continue;
+    const text = readFileSync(join(ROOT, f), 'utf8');
+    const sites = initSites(text);
+    if (sites.raw > 0) raw.push(`${f}: ${sites.raw}`);
+    shared += sites.shared;
+    for (const n of unnamedCalls(text)) unnamed.push(`${f}:${n}`);
+  }
+  assert.deepEqual(raw, [], 'a test runs git init itself, so its repository keeps automatic maintenance on');
+  assert.deepEqual(unnamed, [], 'an initFixtureRepo call names no branch, so its repository takes init.defaultBranch '
+    + 'from the machine (ARC-09-C14)');
+  assert.equal(shared, TEST_REPOSITORIES,
+    `${shared} initFixtureRepo calls in the test files, not ${TEST_REPOSITORIES}: a test that adds a repository raises the number`);
+});
+
+test('ARC-09-C219 — the branch rule finds a call that names no branch, and takes either spelling', () => {
+  const call = (flags) => `  initFixtureRepo((a) => git(root, a), root, [${flags}]);`;
+  assert.deepEqual(unnamedCalls(`${call("'-q'")}\n`), [1]);
+  assert.deepEqual(unnamedCalls(`${call("'-q', '-b', 'main'")}\n`), []);
+  assert.deepEqual(unnamedCalls(`${call("'-q', '--initial-branch=main'")}\n`), []);
+  assert.deepEqual(unnamedCalls(`  // ${call("'-q'").trim()}\n`), [], 'a comment is not a call');
+});
+
+test('ARC-09-C219 — each exempt file still holds what it is exempt for', () => {
+  // An exemption whose reason has gone is a hole: the file would be skipped with nothing left to excuse.
+  for (const f of [...EXEMPT.keys()].filter((k) => k !== SELF)) {
+    assert.ok(initSites(readFileSync(join(ROOT, f), 'utf8')).raw > 0, `${f} has no raw init left: drop its exemption`);
+  }
 });
