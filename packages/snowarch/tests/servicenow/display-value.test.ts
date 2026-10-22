@@ -179,8 +179,8 @@ describe('ARC-09-C205 — the schema: both tools declare display_value, with the
     const { coreToolManifest } = await import('../../src/tools/core.js');
     const tools = coreToolManifest();
     for (const name of ['snow_core_records_query', 'snow_core_record_read']) {
-      const property = tools.find((t) => t.name === name)?.inputSchema.properties?.display_value;
-      expect(property, name).toEqual({
+      const properties = tools.find((t) => t.name === name)?.inputSchema.properties as Record<string, unknown> | undefined;
+      expect(properties?.display_value, name).toEqual({
         type: 'string',
         enum: ['false', 'all'],
         description: 'For a list a person will read, pass display_value: \'all\' with `fields`: each field then carries '
