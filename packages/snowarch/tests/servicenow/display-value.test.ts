@@ -13,6 +13,9 @@
  * (ARC-09-C121), and every read passes the write-verification wrapper, which must leave a read's answer untouched.
  * The owner's third rule, that nothing working today may change, is asserted byte for byte: the URL as a string and the
  * answer as the JSON text the server sends.
+ *
+ * The fetch mock REPEATS a lone last queued answer rather than consuming it (tests/helpers/fetch-mock.ts), so a case
+ * that makes several calls resets it and queues one answer before each call, or the next call gets the last answer.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { respond, resetFetchMock, snFetchMockModule, type SnFetchState } from '../helpers/fetch-mock.js';
