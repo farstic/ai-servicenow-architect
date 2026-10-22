@@ -6,9 +6,9 @@
 // cpSync met ENOENT under '<tmp>/snowarch-doctor-*/.git/objects', 38 ms into the test, right after greenTree's
 // `git commit`. On the runners' git 2.55 that commit starts `git maintenance run --auto --quiet --detach`, automatic
 // maintenance that goes on after the commit has returned; Apple git 2.39 starts it without --detach and waits for it.
-// A probe on the runner did not reproduce the race (the C218 row has the counts), so these cases hold the mechanism,
-// deterministically: every repository a test helper creates goes through initFixtureRepo, which turns git's automatic
-// maintenance and automatic gc off in it.
+// A probe on the runner reproduced the race only under load, at 2 of 3,008 pairs (the C218 row has the counts), so
+// these cases hold the mechanism, deterministically: every repository a test helper creates goes through
+// initFixtureRepo, which turns git's automatic maintenance and automatic gc off in it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
