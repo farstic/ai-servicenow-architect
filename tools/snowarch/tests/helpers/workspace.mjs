@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { tempDir } from './temp.mjs';
+import { initFixtureRepo } from './fixture-git.mjs';
 
 /**
  * The smallest tree `bootstrap` will act on: a config, an areas file, a lockfile, a package.json.
@@ -79,7 +80,7 @@ export function makeCheckout({ pin = 'a'.repeat(40), family = 'australia' } = {}
   // A real repository, because ARC-06-S04's preflight asks git where the top of the tree is. A
   // fixture that was not one would fail the root check for a reason that has nothing to do with
   // what the test is about.
-  execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
+  initFixtureRepo((args) => execFileSync('git', args, { cwd: root, stdio: 'ignore' }), root, ['-q']);
   execFileSync('git', ['add', '-A'], { cwd: root, stdio: 'ignore' });
   // `example.com` is RFC 2606's reserved name; `.invalid` is the rule of record's counter-example
   // and has no grandfather clause (ARC-09-C2).
