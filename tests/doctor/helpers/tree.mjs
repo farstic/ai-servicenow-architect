@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { hookEntry } from '../../../tools/snowarch/lib/settings-local.mjs';
 import { emptyState } from '../../../tools/snowarch/lib/state.mjs';
 import { tempDir } from '../../../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 export const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -88,7 +89,7 @@ export function greenTree(t, { mode = 'design', extra = {} } = {}) {
 
   for (const [rel, value] of Object.entries(extra)) writeJson(root, rel, value);
 
-  git(root, ['init', '-q']);
+  initFixtureRepo((args) => git(root, args), root, ['-q']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
   git(root, ['add', '-A']);

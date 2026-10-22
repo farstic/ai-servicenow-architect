@@ -36,6 +36,7 @@ import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { writeHead, writeMarker } from '../../scripts/lib/release/writers.mjs';
 import { AREAS, buildUpstream } from '../helpers/docs-fixture.mjs';
 import { LAST_UNENFORCED_RELEASE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
+import { initFixtureRepo } from '../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 export const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -398,7 +399,7 @@ function pointAtFixtureCorpus(work, upstream, { licences = null } = {}) {
  */
 function licencesRepo(scratch) {
   const bare = join(scratch, 'licences.git');
-  gitRaw(['init', '--quiet', '--bare', '--initial-branch=main', bare]);
+  initFixtureRepo(gitRaw, bare, ['--quiet', '--bare', '--initial-branch=main']);
   return { bare, url: pathToFileURL(bare).href };
 }
 
@@ -412,7 +413,7 @@ function licencesRepo(scratch) {
  */
 function publishManifests(work, licences, tags, { unsigned = [], altered = [], foreign = [] } = {}) {
   const clone = join(dirname(licences.bare), 'licences-work');
-  gitRaw(['init', '--quiet', '--initial-branch=main', clone]);
+  initFixtureRepo(gitRaw, clone, ['--quiet', '--initial-branch=main']);
   mkdirSync(join(clone, 'releases'), { recursive: true });
   const { primary } = licenceFixture();
   for (const tag of tags.filter((x) => !unsigned.includes(x))) {
@@ -484,7 +485,7 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // exists — a list here would be the copy that goes stale when somebody adds the next generator.
   phase('gen-all', marks, () => execFileSync(process.execPath,
     [join(work, 'scripts/gen-all.mjs')], { cwd: work, stdio: 'pipe' }));
-  phase('git-init', marks, () => git(work, ['init', '-q', '-b', 'main']));
+  phase('git-init', marks, () => initFixtureRepo((args) => git(work, args), work, ['-q', '-b', 'main']));
   // Written into the fixture repository the moment it exists, so every git that ever runs here —
   // including ones this suite does not spawn — reads it. See `persistLongPaths`.
   persistLongPaths(work);
@@ -643,7 +644,7 @@ async function buildTwoReleaseWorld(t, { from, to, label, modules = 'link', mani
   pointAtFixtureCorpus(work, upstream, { licences: licences?.url ?? null });
   phase(`modules-${modules}`, marks, () => placeModules(work, modules));
   phase('gen-all-old', marks, () => regenerate(work));
-  phase('git-init', marks, () => git(work, ['init', '-q', '-b', 'main']));
+  phase('git-init', marks, () => initFixtureRepo((args) => git(work, args), work, ['-q', '-b', 'main']));
   persistLongPaths(work);
   disableBackgroundGit(work);
   commit(work, from, upstream.pin);

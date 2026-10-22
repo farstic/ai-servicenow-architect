@@ -20,6 +20,7 @@ import { pathToFileURL } from 'node:url';
 import { fingerprint, signLicence, signList } from '../../lib/licence/core.mjs';
 import { COVERAGE, signManifest } from '../../lib/licence/manifest.mjs';
 import { tempDir } from './temp.mjs';
+import { initFixtureRepo } from './fixture-git.mjs';
 
 /** A fresh Ed25519 pair, as PEM, the shape `licence keygen` writes. */
 export function keyPair() {
@@ -68,10 +69,10 @@ export function listRepo(t, files) {
   const env = { ...process.env, GIT_AUTHOR_NAME: 'fixture', GIT_AUTHOR_EMAIL: 'fixture@example.invalid',
     GIT_COMMITTER_NAME: 'fixture', GIT_COMMITTER_EMAIL: 'fixture@example.invalid' };
   const git = (args) => execFileSync('git', args, { env, stdio: 'pipe' });
-  git(['init', '-q', '--bare', '--initial-branch=main', bare]);
+  initFixtureRepo(git, bare, ['-q', '--bare', '--initial-branch=main']);
   if (files) {
     const work = join(base, 'work');
-    git(['init', '-q', '--initial-branch=main', work]);
+    initFixtureRepo(git, work, ['-q', '--initial-branch=main']);
     // A path may name a directory: a release manifest is `releases/<tag>.json` (ARC-11-C7).
     for (const [path, content] of Object.entries(files)) {
       mkdirSync(dirname(join(work, path)), { recursive: true });
