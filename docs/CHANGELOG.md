@@ -9,7 +9,15 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A patch release, in progress: a copied folder no longer passes for an installed one.**
+**A patch release: a live list shows each field's label beside its stored value, a copied folder no longer passes for an
+installed one, and the update banner and `upgrade --to` say only what is true.** Asked for records, the Architect can
+read each field's label and stored value in one call and show them as "In Progress (2)"; every query, filter and write
+still uses the stored value. The bootstrap record is now bound to the folder it was written in, so another install's
+`.local/` copied into a new folder no longer passes for a finished install. One consequence on every existing install:
+the first bootstrap after upgrading to 2.2.4 runs each of its steps once more, the documentation check included and, in
+live mode, the dependency install, and the plan that 2.2.3's own `upgrade` prints does not show that. The session banner
+no longer announces a newer release that the doctor would not, and `upgrade --to` a version that
+github.com/farstic/snowarch does not carry now says so.
 
 ### Fixed
 
