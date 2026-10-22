@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -845,6 +845,10 @@ function missingTagWorld(t, url = null) {
   const config = JSON.parse(readFileSync(join(REPO, 'engine.config.json'), 'utf8'));
   const origin = tempDir('snowarch-c201-origin-', t);
   initFixtureRepo((args) => harnessGit(origin, args), origin, ['-q', '-b', 'main']);
+  // The product's own line endings, before the first commit, as releaseTree and the integrity worlds take them. Without
+  // them the Windows runner's clone, under the system config's core.autocrlf=true, wrote CRLF into both files, and the
+  // upgrade, run here with no system config, read them as modified and stopped at U1: the first CI run's Windows red.
+  copyFileSync(join(REPO, '.gitattributes'), join(origin, '.gitattributes'));
   writeFileSync(join(origin, 'engine.config.json'), `${JSON.stringify(config, null, 2)}\n`);
   writeFileSync(join(origin, 'package.json'), `${JSON.stringify({ name: 'fixture', version: '9.1.0' }, null, 2)}\n`);
   harnessGit(origin, ['add', '-A']);
@@ -902,6 +906,8 @@ test('ARC-09-C201 — the control: a release tag passes the tag check', async (t
   for (const line of [NOT_RELEASE('v9.1.0'), NOT_THERE('v9.1.0', w.config.repo), NOT_IN_ORIGIN('v9.1.0')]) {
     assert.equal(r.text.includes(line), false, `a release tag was refused as a tag:\n${r.text}`);
   }
+  // And the run went on past U3. Without this the case also passed where the run never reached U3 at all.
+  assert.match(r.text, /^\[U[4-7]\/7\] /m, `the run did not get past U3:\n${r.text}`);
 });
 
 test('ARC-09-C201 — on any other origin, an absent tag is not a tag of this checkout\'s origin', async (t) => {
