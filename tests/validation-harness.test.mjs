@@ -10,6 +10,7 @@ import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { DEFAULT_MODEL, SETTING_SOURCES, header, policyFor } from '../scripts/validation/session-policy.mjs';
 import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { formatReport, reportTurn } from '../scripts/validation/turn-report.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 /**
  * ARC-09-C87 — the validation harness runs every case, isolates the session it runs, and reports what a
@@ -131,7 +132,7 @@ function corpus(t) {
   writeFileSync(join(md, 'customer-service-management', 'twin.md'), 'x');
   writeFileSync(join(md, 'it-service-management', 'twin.md'), 'x');
   writeFileSync(join(md, 'customer-service-management', 'only-here.md'), 'x');
-  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir });
+  initFixtureRepo((args) => execFileSync('git', args, { cwd: dir }), dir, ['-q', '-b', 'main']);
   writeFileSync(join(dir, 'CLAUDE.md'), 'x');
   execFileSync('git', ['add', 'CLAUDE.md'], { cwd: dir });
   return dir;

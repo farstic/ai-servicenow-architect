@@ -24,6 +24,7 @@ import { buildWorld, LONGPATHS, NOT_COPIED, persistLongPaths } from './harness.m
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { applyWrites } from '../../scripts/lib/release/writers.mjs';
 import { scanProductStarts } from '../../tools/snowarch/tests/helpers/licence-hook/starts.mjs';
+import { initFixtureRepo } from '../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -200,7 +201,7 @@ test('C27b: a `-c` override does not persist, and a config write does', (t) => {
   // Asserted as git behaviour rather than as a sentence in a comment, because "I thought `-c`
   // persisted" is the belief that cost the cycle, and a belief is what a control is for.
   const dir = tempDir('snowarch-longpaths-', t);
-  rgit(dir, ['init', '-q', '-b', 'main', '.']);
+  initFixtureRepo((args) => rgit(dir, args), dir, ['-q', '-b', 'main']);
   // Deliberately NOT through `rgit`: this case is about what a bare call sees, which is the whole
   // question. Exempt from the scan below by the marker on the line.
   const get = () => run(dir, 'git', ['config', '--local', '--get', 'core.longpaths']); // scan-exempt: the subject

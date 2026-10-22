@@ -31,6 +31,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const allowlist = JSON.parse(readFileSync(join(root, 'tests/eol.allowlist.json'), 'utf8'));
@@ -249,7 +250,7 @@ function fixtureRepo(t, { attributes, files: contents, autocrlf }) {
   const run = (...args) => execFileSync('git', ['-c', 'user.email=f@example.invalid',
     '-c', 'user.name=Fixture', ...args],
   { cwd: dir, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: noConfig, GIT_CONFIG_SYSTEM: noConfig } });
-  run('init', '-q', '-b', 'main');
+  initFixtureRepo((args) => run(...args), dir, ['-q', '-b', 'main']);
   run('config', 'core.autocrlf', String(autocrlf));
   writeFileSync(join(dir, '.gitattributes'), attributes);
   for (const [name, body] of Object.entries(contents)) writeFileSync(join(dir, name), body);

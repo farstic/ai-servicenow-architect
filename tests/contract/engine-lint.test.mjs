@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { symlinkSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { tempDir, trackTempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 /**
  * The engine lint, driven the way anyone runs it: the CLI, against a fixture tree.
@@ -352,7 +353,7 @@ test('criterion 2 — L05 fails on a typo in a cited path and passes on the real
 function gitTree(mutate = () => {}, parent) {
   const dir = minimalTree(mutate, parent);
   const git = (...args) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' });
-  git('init', '-q', '-b', 'main');
+  initFixtureRepo((args) => git(...args), dir, ['-q', '-b', 'main']);
   git('add', '-A');
   return dir;
 }

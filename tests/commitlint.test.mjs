@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { allowedScopes, check, failLine, lint, resolveRange } from '../scripts/ci/commitlint.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCOPES = allowedScopes(REAL_ROOT);
@@ -90,7 +91,7 @@ test('a commit already on the base is not this branch\'s to answer for', (t) => 
   // opposite of what a lint of "your commits" means.
   const root = tempDir('snowarch-range-', t);
   writeFileSync(join(root, 'f.txt'), '1\n');
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
   assert.equal(git(root, ['config', 'user.name']).trim(), 'fixture', 'the fixture identity did not take');
@@ -154,7 +155,7 @@ test('the real script, on a real range, in a real repository', (t) => {
     writeFileSync(join(root, rel), text);
   };
   file('a.txt', 'a\n');
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
   assert.equal(git(root, ['config', 'user.name']).trim(), 'fixture',
@@ -233,7 +234,7 @@ function repoWithFloor(t) {
   const git = (...args) => execFileSync('git',
     ['-c', 'user.email=f@example.invalid', '-c', 'user.name=Fixture', ...args],
     { cwd: dir, encoding: 'utf8' });
-  git('init', '-q', '-b', 'main');
+  initFixtureRepo((args) => git(...args), dir, ['-q', '-b', 'main']);
   const commit = (subject) => {
     writeFileSync(join(dir, 'f.txt'), `${subject}\n`);
     git('add', 'f.txt');

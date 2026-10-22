@@ -26,6 +26,7 @@ import {
 import { manifestFromArchive, signManifest, writeManifestCache } from '../lib/licence/manifest.mjs';
 import { keyPair, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
+import { initFixtureRepo } from './helpers/fixture-git.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const isWindows = process.platform === 'win32';
@@ -56,7 +57,7 @@ function release(t, { signedBy = signer, manifestOver = {}, cache = true } = {})
   };
   for (const [rel, text] of Object.entries(files)) put(root, rel, text);
   cpSync(join(REPO, '.gitattributes'), join(root, '.gitattributes'));
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'f@example.com']);
   git(root, ['config', 'user.name', 'f']);
   git(root, ['add', '-A']);
