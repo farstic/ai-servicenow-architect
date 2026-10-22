@@ -16,6 +16,10 @@ All notable changes to this project are documented in this file. Everything hand
 - A `.local/bootstrap-state.json` copied from another folder no longer marks its steps done here: the record is bound
   to the folder it was written in, and one from another folder, or written before this release, has its steps run
   again (ARC-09-C198).
+- On an install from github.com/farstic/snowarch, `./snowarch upgrade --to` a tag that is not there (a release
+  candidate, or a release before 2.2.1) said it was not a release tag of this product. It now says the tag is not in
+  that repository, which carries final releases from 2.2.1 on; a tag that is there but is no release keeps its
+  sentence (ARC-09-C201).
 
 ## 2.2.3 — 2026-10-21
 
