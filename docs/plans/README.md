@@ -52,6 +52,7 @@ ARCs are numbered `ARC-NN` in dependency order; `ARC-00` is the pre-implementati
 | 09 | `ARC-09-release-upgrade-and-cross-platform/` | Release script and tag, changelog, release workflow, `version` / `upgrade`, store migrations, CI matrix on macOS/Linux/Windows × Node 20/22/24 incl. Windows without Git Bash, optional npm publish. | 11 | 15–25 |
 | 10 | `ARC-10-migration-and-cutover/` | `docs/MIGRATION.md`, legacy scaffolding retired, author's cutover, clean-machine validation runs, deprecation notices, two-week review and archive. | 10 | 10.5–14 (+14 calendar days) |
 | 11 | `ARC-11-licensing-and-access-control/` | Added 2026-10-10, after the cutover: a signed licence and `./snowarch licence`, a signed revocation list, a warn-only start-up check with an enforcement switch, the licence id in the audit trail, the licensing documents; from 2.0.13, enforcement on every build, with no switch (C6). | 12 rows | not sized |
+| 12 | `ARC-12-local-console/` | Added 2026-10-22, as a future plan, research only and not started: `snowarch ui`, a localhost page that runs the end-user commands (status, licence, doctor, update check, upgrade, docs sync) for several installs, each through its own launcher. Starting it is the owner's word, after 2.2.4, and amends D-03. | none until started | MVP estimated at 1.5–2 weeks |
 
 ## Status legend
 
