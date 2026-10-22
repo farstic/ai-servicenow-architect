@@ -20,6 +20,10 @@ All notable changes to this project are documented in this file. Everything hand
   does not take as a check of this checkout: one an upgrade wrote, one that describes a different release than the
   one installed, one naming a prerelease, or one no newer than the installed release. It now reads the record as the
   doctor does, and says nothing for such a record (ARC-09-C199).
+- On an install from github.com/farstic/snowarch, `./snowarch upgrade --to` a tag that is not there (a release
+  candidate, or a release before 2.2.1) said it was not a release tag of this product. It now says the tag is not in
+  that repository, which carries final releases from 2.2.1 on; a tag that is there but is no release keeps its
+  sentence (ARC-09-C201).
 
 ## 2.2.3 — 2026-10-21
 

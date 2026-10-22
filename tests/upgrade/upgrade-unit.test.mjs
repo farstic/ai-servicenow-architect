@@ -11,10 +11,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   classifyGitFetchError, doctorLines, licenceNotice, parseSemver, refusesTarget, renderPlan, returnRef, sortTags,
@@ -828,4 +828,103 @@ test('ARC-09-C203 — after a move below the first distributed release, the line
   // Without the argument, the boundary is DISTRIBUTION_FROM.
   assert.equal(returnLine({ cli: 'CLI', here: 'v2.2.1-rc.2', target: 'v2.2.0', manifest, returnTo: 'main' }),
     fresh('v2.2.0', 'v2.2.1-rc.2'));
+});
+
+// ── ARC-09-C201 — a tag that is not there, told apart from a tag that is no release ─────────────────────────────────
+//
+// U3 said "<x> is not a release tag of this product" both when the tag was absent and when it carried no contract
+// trailer. On an install from github.com/farstic/snowarch, which carries finals only, `--to` an rc or a release before
+// 2.2.1 meets an absent tag and was told the other cause.
+
+/**
+ * A distribution-shaped world: an origin holding one release and one tag that is no release, and an install cloned
+ * from it. The install's origin URL is `url`, github.com/<config.repo> unless given, and `insteadOf` sends git to the
+ * origin on disk while the URL the product reads stays the one an install has.
+ */
+function missingTagWorld(t, url = null) {
+  const config = JSON.parse(readFileSync(join(REPO, 'engine.config.json'), 'utf8'));
+  const origin = tempDir('snowarch-c201-origin-', t);
+  initFixtureRepo((args) => harnessGit(origin, args), origin, ['-q', '-b', 'main']);
+  // The product's own line endings, before the first commit, as releaseTree and the integrity worlds take them. Without
+  // them the Windows runner's clone, under the system config's core.autocrlf=true, wrote CRLF into both files, and the
+  // upgrade, run here with no system config, read them as modified and stopped at U1: the first CI run's Windows red.
+  copyFileSync(join(REPO, '.gitattributes'), join(origin, '.gitattributes'));
+  writeFileSync(join(origin, 'engine.config.json'), `${JSON.stringify(config, null, 2)}\n`);
+  writeFileSync(join(origin, 'package.json'), `${JSON.stringify({ name: 'fixture', version: '9.1.0' }, null, 2)}\n`);
+  harnessGit(origin, ['add', '-A']);
+  harnessGit(origin, ['commit', '-q', '-m', 'the release']);
+  const trailers = [`contract: ${'a'.repeat(64)}`, `docs-pin: ${'b'.repeat(40)}`].join('\n');
+  harnessGit(origin, ['tag', '-a', 'v9.1.0', '-m', `snowarch v9.1.0\n\n${trailers}`]);
+  harnessGit(origin, ['tag', '-a', 'v9.5.0', '-m', 'snowarch v9.5.0\n\na tag, with no contract trailer']);
+  const user = tempDir('snowarch-c201-user-', t);
+  harnessGit(dirname(user), ['clone', '-q', origin, user]);
+  const own = url ?? `https://github.com/${config.repo}.git`;
+  harnessGit(user, ['remote', 'set-url', 'origin', own]);
+  if (own !== origin) harnessGit(user, ['config', `url.${pathToFileURL(origin).href}.insteadOf`, own]);
+  return { user, config, origin };
+}
+
+/** `upgrade --to <target> --yes` in the world, with no global or system git configuration, and what it said. */
+async function upgradeTo(t, w, target) {
+  const empty = join(tempDir('snowarch-c201-home-', t), 'gitconfig');
+  writeFileSync(empty, '');
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: empty, GIT_CONFIG_NOSYSTEM: '1' };
+  const lines = [];
+  const log = { step: (l) => lines.push(l), fail: (l) => lines.push(`FAIL ${l}`),
+    warn: (l) => lines.push(`WARN ${l}`), ok: (l) => lines.push(String(l)) };
+  const head = harnessGit(w.user, ['rev-parse', 'HEAD']);
+  const code = await upgradeCommand({ flags: { to: target, yes: true }, log, root: w.user, env, cwd: w.user });
+  assert.equal(harnessGit(w.user, ['rev-parse', 'HEAD']), head, 'the tree moved');
+  return { code, text: lines.join('\n') };
+}
+
+const NOT_RELEASE = (x) => `FAIL upgrade: ${x} is not a release tag of this product`;
+const NOT_THERE = (x, repo) => `FAIL upgrade: ${x} is not a tag of github.com/${repo}, which carries final releases `
+  + 'from 2.2.1 on';
+const NOT_IN_ORIGIN = (x) => `FAIL upgrade: ${x} is not a tag of this checkout's origin`;
+
+for (const [what, target] of [['a release candidate', 'v9.5.0-rc.1'], ['a release older than the first final', 'v9.0.0']]) {
+  test(`ARC-09-C201 — ${what} that the releases' repository does not hold is named as not there`, async (t) => {
+    const w = missingTagWorld(t);
+    const r = await upgradeTo(t, w, target);
+    assert.equal(r.code, 1, r.text);
+    assert.ok(r.text.includes(NOT_THERE(target, w.config.repo)), r.text);
+    assert.equal(r.text.includes(NOT_RELEASE(target)), false, `told the other cause:\n${r.text}`);
+  });
+}
+
+test('ARC-09-C201 — a tag that is there but carries no contract keeps its sentence', async (t) => {
+  const w = missingTagWorld(t);
+  const r = await upgradeTo(t, w, 'v9.5.0');
+  assert.equal(r.code, 1, r.text);
+  assert.ok(r.text.includes(NOT_RELEASE('v9.5.0')), r.text);
+});
+
+test('ARC-09-C201 — the control: a release tag passes the tag check', async (t) => {
+  const w = missingTagWorld(t);
+  const r = await upgradeTo(t, w, 'v9.1.0');
+  for (const line of [NOT_RELEASE('v9.1.0'), NOT_THERE('v9.1.0', w.config.repo), NOT_IN_ORIGIN('v9.1.0')]) {
+    assert.equal(r.text.includes(line), false, `a release tag was refused as a tag:\n${r.text}`);
+  }
+  // And the run went on past U3. Without this the case also passed where the run never reached U3 at all.
+  assert.match(r.text, /^\[U[4-7]\/7\] /m, `the run did not get past U3:\n${r.text}`);
+});
+
+test('ARC-09-C201 — on any other origin, an absent tag is not a tag of this checkout\'s origin', async (t) => {
+  // An engineering-shaped origin: a path, no GitHub, no insteadOf.
+  const engineering = missingTagWorld(t, null);
+  harnessGit(engineering.user, ['remote', 'set-url', 'origin', engineering.origin]);
+  const r = await upgradeTo(t, engineering, 'v9.5.0-rc.1');
+  assert.equal(r.code, 1, r.text);
+  assert.ok(r.text.includes(NOT_IN_ORIGIN('v9.5.0-rc.1')), r.text);
+});
+
+test('ARC-09-C201 — an origin URL that carries a credential prints neither it nor the host', async (t) => {
+  const w = missingTagWorld(t, 'https://someone:tok3n-c201@git.example.invalid/snowarch.git');
+  const r = await upgradeTo(t, w, 'v9.5.0-rc.1');
+  assert.equal(r.code, 1, r.text);
+  assert.ok(r.text.includes(NOT_IN_ORIGIN('v9.5.0-rc.1')), r.text);
+  for (const leak of ['tok3n-c201', 'someone', 'git.example.invalid']) {
+    assert.equal(r.text.includes(leak), false, `the origin URL reached the output (${leak}):\n${r.text}`);
+  }
 });
