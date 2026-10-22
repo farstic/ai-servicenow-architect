@@ -27,6 +27,7 @@ import { join } from 'node:path';
 
 import { planContext, planSteps, rerunAtTag } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { hashFor } from '../../tools/snowarch/lib/inputs.mjs';
+import { checkoutKey } from '../../tools/snowarch/lib/state.mjs';
 import { STEPS } from '../../tools/snowarch/lib/steps/index.mjs';
 import { git } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -100,6 +101,8 @@ function recordCurrent(root, ctx) {
   const state = { version: 1, product: 'snowarch', mode: ctx.mode, docs: { mode: ctx.docs },
     registration: 'project', hooksDisabledByBootstrap: false, steps: {} };
   const hashCtx = planContext({ root, config: ctx.config, ctx, state });
+  // ARC-09-C198 — recorded HERE: the plan, like the runner, keeps nothing from a record of another folder.
+  state.checkout = checkoutKey(root, hashCtx.platform);
   for (const step of STEPS) {
     if (step.runsWhen(hashCtx) === false || step.cacheable === false) continue;
     state.steps[step.id] = { status: 'ok', inputsHash: hashFor(step.id, hashCtx),

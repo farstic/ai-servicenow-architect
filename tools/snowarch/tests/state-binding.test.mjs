@@ -14,8 +14,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { emptyState, explainStale, loadState, staleSteps } from '../lib/state.mjs';
+import { basename, join } from 'node:path';
+import { assertStorable, checkoutKey, emptyState, explainStale, loadState, notHereReason, staleSteps }
+  from '../lib/state.mjs';
+import { pathKey } from '../lib/path-key.mjs';
+import { register, reset as forgetSecrets } from '../lib/redact.mjs';
+import { samePath } from '../lib/steps/B00.mjs';
 import { runSteps } from '../lib/steps/index.mjs';
 import { STEP_IDS, alwaysRuns, hashFor } from '../lib/inputs.mjs';
 import { loadConfig, root as REPO } from '../lib/config.mjs';
@@ -161,4 +165,37 @@ test('ARC-09-C198 — staleSteps names every step of a carried record, and of on
   assert.deepEqual(reasons(unbound), cacheable.map((id) => `${id} no-folder`));
   assert.deepEqual(explainStale(staleSteps(unbound, ctx, { hashFor, steps: ['B02'], alwaysRuns })),
     ['B02 will run — was recorded without a folder']);
+});
+
+// ── the key: one folder, one key, and never the path ───────────────────────────────────────────────────────────
+
+test('ARC-09-C198 — on Windows, either separator and either drive-letter case are one folder', () => {
+  const key = (p) => checkoutKey(p, 'win32');
+  assert.equal(key('C:/Users/runner/snowarch'), key('c:\\Users\\runner\\snowarch'));
+  assert.equal(key('D:\\A\\repo'), key('d:/a/repo'));
+  assert.notEqual(key('C:\\Users\\runner\\snowarch'), key('C:\\Users\\runner\\other'), 'two folders, one key');
+  // The rule is B00's own, moved, so the key and `samePath` cannot come apart.
+  assert.equal(pathKey('C:/Users/runner/snowarch', 'win32'), pathKey('c:\\Users\\runner\\snowarch', 'win32'));
+  assert.equal(samePath('C:/Users/runner/snowarch', 'c:\\Users\\runner\\snowarch', 'win32'), true);
+});
+
+test('ARC-09-C198 — the key is a sha256, never the path, and the state guard takes it where it refuses the path',
+  (t) => {
+    const root = makeCheckout({}, t);
+    const key = checkoutKey(root);
+    assert.match(key, /^[A-Za-z0-9_-]{43}$/, 'not a base64url sha256');
+    // Why a key and not the path: the bootstrap registers the instance's password with the redactor
+    // (instance-file.mjs), and `assertStorable` refuses any value the redactor would rewrite. A folder path that holds
+    // the password could not be saved at all; the key of that folder can.
+    register(basename(root));
+    try {
+      assert.throws(() => assertStorable({ checkout: root }), /the redactor would rewrite it/,
+        'precondition: the guard does refuse the path itself');
+      assert.doesNotThrow(() => assertStorable({ checkout: key }));
+    } finally { forgetSecrets(); }
+  });
+
+test('ARC-09-C198 — a record says which of the two it is', () => {
+  assert.equal(notHereReason({ checkout: 'a key written in another folder' }), 'other-folder');
+  assert.equal(notHereReason({ steps: {} }), 'no-folder');
 });

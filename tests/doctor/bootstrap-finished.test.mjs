@@ -51,6 +51,7 @@ const SPELLED_BOOTSTRAP = spellings(CTX).bootstrap;
 
 import { engineRepoChecks } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { version as engineVersionOf } from '../../tools/snowarch/lib/config.mjs';
+import { checkoutKey } from '../../tools/snowarch/lib/state.mjs';
 import { greenTree, readJson, writeJson } from './helpers/tree.mjs';
 
 const E29 = engineRepoChecks().find((c) => c.id === 'E-29');
@@ -69,7 +70,7 @@ function finished(root, over = {}) {
       durationMs: 0, engineVersion: current };
   }
   writeJson(root, '.local/bootstrap-state.json',
-    { ...state, mode: 'live', steps, ...over });
+    { ...state, mode: 'live', steps, checkout: checkoutKey(root, 'darwin'), ...over });
   return root;
 }
 
@@ -186,7 +187,7 @@ test('a step the recorded mode never plans is not reported missing', async (t) =
     steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-20T09:00:00.000Z',
       durationMs: 0, engineVersion: current };
   }
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
 
   const r = await E29.run(ctxFor(root));
   assert.equal(r.status, 'ok', r.detail);
@@ -224,7 +225,7 @@ function midStep(root, runningId) {
     steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
       durationMs: 0, engineVersion: current };
   }
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   return { root, platform: 'darwin', env: { [RUNNING_STEP_ENV]: runningId },
     config: readJson(root, 'engine.config.json') };
 }
@@ -252,7 +253,7 @@ test('C32: it excludes the step that is running, not B09 by name', async (t) => 
     steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
       durationMs: 0, engineVersion: current };
   }
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   const r = await E29.run({ root, platform: 'darwin', env: { [RUNNING_STEP_ENV]: 'B07' },
     config: readJson(root, 'engine.config.json') });
   assert.equal(r.status, 'ok', r.detail);
@@ -284,7 +285,7 @@ test('C32: a step recorded as interrupted is a FAIL even while another step is r
   }
   steps.B02 = { status: 'failed', reason: 'interrupted', inputsHash: null,
     finishedAt: '2026-09-24T09:01:00.000Z', durationMs: 0, engineVersion: current };
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   const r = await E29.run({ root, platform: 'darwin', env: { [RUNNING_STEP_ENV]: 'B09' },
     config: readJson(root, 'engine.config.json') });
   assert.equal(r.status, 'fail', `an interrupted step was forgiven: ${r.detail}`);
@@ -325,7 +326,7 @@ function cachedUnderOlder(root, { older = '0.9.0', runningId = null } = {}) {
     steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
       durationMs: 0, engineVersion: id === 'B02' ? current : older };
   }
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   return { root, platform: 'darwin', config: readJson(root, 'engine.config.json'),
     env: runningId ? { [RUNNING_STEP_ENV]: runningId } : {} };
 }
@@ -367,7 +368,7 @@ test('ARC-08-C36 — a step that genuinely did not finish is still a FAIL', asyn
   }
   steps.B09 = { status: 'failed', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
     durationMs: 0, engineVersion: '0.9.0' };
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   const r = await E29.run({ root, platform: 'darwin', env: {},
     config: readJson(root, 'engine.config.json') });
 

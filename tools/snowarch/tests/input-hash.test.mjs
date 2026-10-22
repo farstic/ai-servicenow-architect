@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { humanDuration, withoutDuration } from '../lib/steps/format.mjs';
 import { version as engineVersionOf } from '../lib/config.mjs';
 import { INPUTS, KINDS, STEP_IDS, alwaysRuns, hashFor, storeStamp, storeVersion } from '../lib/inputs.mjs';
-import { staleSteps, explainStale, emptyState } from '../lib/state.mjs';
+import { checkoutKey, staleSteps, explainStale, emptyState } from '../lib/state.mjs';
 import { STEPS, runSteps } from '../lib/steps/index.mjs';
 import { loadConfig } from '../lib/config.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
@@ -58,6 +58,8 @@ const fresh = (root, ctx) => {
   for (const step of STEP_IDS) {
     s.steps[step] = { status: 'ok', inputsHash: hashFor(step, ctx), durationMs: 1 };
   }
+  // ARC-09-C198 — and recorded HERE, as the runner now records every run.
+  s.checkout = checkoutKey(root, ctx.platform);
   return s;
 };
 

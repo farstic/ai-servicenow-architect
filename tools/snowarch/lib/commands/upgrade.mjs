@@ -35,7 +35,7 @@ import { branchState, describe, git, isShallow, versionTag } from '../git.mjs';
 import { askOnce, isYes } from '../ask.mjs';
 import { childEnv, NO_PROMPT_ENV } from '../spawn-env.mjs';
 import { loadConfig, root as defaultRoot, version as readVersion } from '../config.mjs';
-import { loadState } from '../state.mjs';
+import { loadState, notHereReason, recordedHere } from '../state.mjs';
 // ARC-08-C29 — the runner's own step list, so the plan and the run are one computation.
 import { STEPS, outputMissingOf } from '../steps/index.mjs';
 import { checkGit, checkNode, makeExec } from '../steps/B00.mjs';
@@ -493,11 +493,18 @@ export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktre
     // disk. `node` is this machine's, because it is this machine that will run the steps.
     const tagCtx = planContext({ root: at, config, ctx, state });
 
+    // ARC-09-C198 — the runner keeps none of the steps of a record that is not this checkout's, so the plan names
+    // every step that record holds, and says which of the two it is; a step with no record keeps "never recorded".
+    // The CHECKOUT's root, not the worktree's: the state is the checkout's, and so is the folder it names.
+    const notHere = recordedHere(state, root, tagCtx.platform) ? null
+      : (notHereReason(state) === 'other-folder' ? 'recorded in another folder' : 'recorded without a folder');
+
     const out = new Map();
     for (const step of STEPS) {
       if (step.runsWhen(tagCtx) === false) continue;
       if (step.cacheable === false) continue;   // B00 and B09 run every time and say so elsewhere
       const recorded = state?.steps?.[step.id];
+      if (recorded && notHere) { out.set(step.id, notHere); continue; }
       const unfinished = statusVerdict(recorded, { warnIsDone });
       if (unfinished) { out.set(step.id, unfinished); continue; }
       let hash = null;
