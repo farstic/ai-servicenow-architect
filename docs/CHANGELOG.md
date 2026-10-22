@@ -9,6 +9,14 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A patch release, in progress: a copied folder no longer passes for an installed one.**
+
+### Fixed
+
+- A `.local/bootstrap-state.json` copied from another folder no longer marks its steps done here: the record is bound
+  to the folder it was written in, and one from another folder, or written before this release, has its steps run
+  again (ARC-09-C198).
+
 ## 2.2.3 — 2026-10-21
 
 ### Notes

@@ -27,6 +27,7 @@ import { join } from 'node:path';
 
 import { planContext, planSteps, rerunAtTag } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { hashFor } from '../../tools/snowarch/lib/inputs.mjs';
+import { checkoutKey } from '../../tools/snowarch/lib/state.mjs';
 import { STEPS } from '../../tools/snowarch/lib/steps/index.mjs';
 import { git } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -100,6 +101,8 @@ function recordCurrent(root, ctx) {
   const state = { version: 1, product: 'snowarch', mode: ctx.mode, docs: { mode: ctx.docs },
     registration: 'project', hooksDisabledByBootstrap: false, steps: {} };
   const hashCtx = planContext({ root, config: ctx.config, ctx, state });
+  // ARC-09-C198 — recorded HERE: the plan, like the runner, keeps nothing from a record of another folder.
+  state.checkout = checkoutKey(root, hashCtx.platform);
   for (const step of STEPS) {
     if (step.runsWhen(hashCtx) === false || step.cacheable === false) continue;
     state.steps[step.id] = { status: 'ok', inputsHash: hashFor(step.id, hashCtx),
@@ -353,3 +356,43 @@ test('the plan ctx is the shape every step reads', { timeout: 120_000 }, (t) => 
       `${step.id}'s inputs could not be resolved from the ctx the plan builds`);
   }
 });
+
+// ── ARC-09-C198 — the runner keeps nothing from a record that is not this checkout's, so neither does the plan ──
+
+/** The recorded state, rewritten by `change`: what a carried or an older `.local/bootstrap-state.json` holds. */
+function rewriteState(root, change) {
+  const path = join(root, '.local', 'bootstrap-state.json');
+  const state = JSON.parse(readFileSync(path, 'utf8'));
+  change(state);
+  writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`);
+  return state;
+}
+
+test('ARC-09-C198 — a record carried from another folder puts every cacheable step in the plan, and says why',
+  { timeout: 120_000 }, (t) => {
+    const root = clone(t);
+    const ctx = ctxFor(root);
+    checkoutTag(root, 'v9.9.9-target');
+    const recorded = recordCurrent(root, ctx);
+    // What a copy of another folder's `.local/` carries: a binding, and not this folder's.
+    const state = rewriteState(root, (s) => { s.checkout = 'a key written in another folder'; });
+
+    const { steps, estimate } = planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync });
+    assert.equal(estimate, false, 'the worktree comparison did not run');
+    assert.deepEqual(steps.map((s) => `${s.step} ${s.why}`),
+      Object.keys(recorded).sort().map((id) => `${id} recorded in another folder`));
+  });
+
+test('ARC-09-C198 — a record written before the binding existed puts every cacheable step in the plan, and says why',
+  { timeout: 120_000 }, (t) => {
+    const root = clone(t);
+    const ctx = ctxFor(root);
+    checkoutTag(root, 'v9.9.9-target');
+    const recorded = recordCurrent(root, ctx);
+    const state = rewriteState(root, (s) => { delete s.checkout; });
+
+    const { steps, estimate } = planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync });
+    assert.equal(estimate, false, 'the worktree comparison did not run');
+    assert.deepEqual(steps.map((s) => `${s.step} ${s.why}`),
+      Object.keys(recorded).sort().map((id) => `${id} recorded without a folder`));
+  });

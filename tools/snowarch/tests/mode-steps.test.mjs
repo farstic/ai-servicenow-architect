@@ -10,7 +10,7 @@ import { STEPS } from '../lib/steps/index.mjs';
 import { hashInputs } from '../lib/steps/inputs.mjs';
 import { EXIT_OK } from '../lib/exit.mjs';
 import { computeSettings, hookEntry, HOOKS_LEFT_ALONE } from '../lib/settings-local.mjs';
-import { emptyState, loadState, saveState } from '../lib/state.mjs';
+import { checkoutKey, emptyState, loadState, saveState } from '../lib/state.mjs';
 import { instanceKeptNote, restartSentence } from '../lib/text.mjs';
 import { makeCheckout, recorder, stub } from './helpers/workspace.mjs';
 import { spellings } from '../lib/text.mjs';
@@ -78,7 +78,8 @@ test('criterion 1 — a live switch caches B01–B03 and runs B04 onwards', asyn
   const hash = hashInputs(root, []);          // computed, never typed — the runner's own function
   const cached = Object.fromEntries(['B01', 'B02', 'B03'].map((id) => [id,
     { status: 'ok', inputsHash: hash, finishedAt: new Date().toISOString(), durationMs: 1 }]));
-  bootstrapped(root, { steps: cached });
+  // ARC-09-C198 — recorded in THIS folder, as the runner records every run; modeCommand's platform is the default.
+  bootstrapped(root, { steps: cached, checkout: checkoutKey(root) });
   writeFileSync(join(root, '.local', 'instances.json'), STORE);
 
   const log = recorder();
