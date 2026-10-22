@@ -9,6 +9,12 @@ All notable changes to this project are documented here. This project adheres to
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
 
+**`snow_core_records_query` and `snow_core_record_read` take `display_value`, `'false'` (the default) or `'all'`
+(ARC-09-C205).** With `'all'` the request adds `sysparm_display_value=all`, and each field comes back as the instance
+sends it: its stored value beside its label, `{ display_value, value }`, with `link` on a reference. Without it, or with
+`'false'`, the request is unchanged, byte for byte. `'true'` is refused before any request, with its reason, and so is
+any other value.
+
 ## 2.2.3 — 2026-10-21
 
 **A store error names its key path in backticks (ARC-09-C211).** `STORE_SCHEMA_INVALID` named the path bare,
