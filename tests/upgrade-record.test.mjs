@@ -16,9 +16,9 @@ import { MAX_AGE_MS as RECORD_MAX_AGE_MS } from '../tools/snowarch/lib/upgrade-c
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Releases, prereleases in §11.4's own order, a `-dev` version, tags without `v`, and strings that are no version. */
-const TAGS = ['v2.2.3', 'v2.2.4', 'v2.9.0', 'v2.10.0', 'v2.2.4-alpha', 'v2.2.4-alpha.1', 'v2.2.4-alpha.beta',
-  'v2.2.4-beta', 'v2.2.4-beta.2', 'v2.2.4-beta.11', 'v2.2.4-rc.1', 'v2.2.4-rc.2', 'v2.2.4-rc.10', 'v2.2.4-dev',
-  '2.2.4', '2.2.4-rc.1', 'v2.2', 'garbage', ''];
+const TAGS = ['v9.2.3', 'v9.2.4', 'v9.9.0', 'v9.10.0', 'v9.2.4-alpha', 'v9.2.4-alpha.1', 'v9.2.4-alpha.beta',
+  'v9.2.4-beta', 'v9.2.4-beta.2', 'v9.2.4-beta.11', 'v9.2.4-rc.1', 'v9.2.4-rc.2', 'v9.2.4-rc.10', 'v9.2.4-dev',
+  '9.2.4', '9.2.4-rc.1', 'v9.2', 'garbage', ''];
 
 /** The outcome of a call: its value, or that it threw. */
 const outcome = (fn) => { try { return { value: fn() }; } catch { return { threw: true }; } };
@@ -37,10 +37,11 @@ test('ARC-09-C199 — the judge orders every pair of tags as semver.mjs does, an
   }
   assert.equal(pairs, TAGS.length ** 2);
   // The table holds what the comparison is for: equal, lower, a prerelease below its release, numeric order.
-  assert.equal(compareTags('v2.2.3', 'v2.2.3'), 0);
-  assert.equal(compareTags('v2.2.3', 'v2.2.4'), -1);
-  assert.equal(compareTags('v2.2.4-rc.10', 'v2.2.4'), -1);
-  assert.equal(compareTags('v2.2.4-rc.2', 'v2.2.4-rc.10'), -1);
+  assert.equal(compareTags('v9.2.3', 'v9.2.3'), 0);
+  assert.equal(compareTags('v9.2.3', 'v9.2.4'), -1);
+  assert.equal(compareTags('v9.9.0', 'v9.10.0'), -1);
+  assert.equal(compareTags('v9.2.4-rc.10', 'v9.2.4'), -1);
+  assert.equal(compareTags('v9.2.4-rc.2', 'v9.2.4-rc.10'), -1);
 });
 
 test('ARC-09-C199 — the judge\'s freshness window is upgrade-check.mjs\'s', () => {

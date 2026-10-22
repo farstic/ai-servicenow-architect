@@ -18,16 +18,15 @@ import { banner } from '../../tools/snowarch/hooks/session-start.mjs';
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
 import { writeUpgradeCheck } from '../../tools/snowarch/lib/upgrade-check.mjs';
-import { greenTree, linkInstall, readJson, writeJson } from '../doctor/helpers/tree.mjs';
+import { linkInstall, releaseTree } from '../doctor/helpers/tree.mjs';
 
 const E28 = hostChecks().find((c) => c.id === 'E-28');
 const NOW = Date.now();
 const HOUR = 60 * 60 * 1000;
 
-/** The hook tests' own checkout at `version`, with its cache written by the doctor itself. */
+/** A release tree at `version`, the hook tests' own linked install, with its cache written by the doctor itself. */
 async function checkout(t, version) {
-  const root = linkInstall(greenTree(t, { mode: 'design' }));
-  writeJson(root, 'package.json', { ...readJson(root, 'package.json'), version });
+  const root = linkInstall(releaseTree(t, version));
   await doctorCommand({ flags: { quick: true, 'no-network': true, json: true }, out: { write: () => {} }, cwd: root,
     input: { isTTY: false } });
   return root;
