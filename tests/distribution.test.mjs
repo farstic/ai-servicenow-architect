@@ -19,6 +19,7 @@ import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { isEngineeringCheckout } from '../tools/snowarch/lib/engineering-checkout.mjs';
 import { engineeringNames, exportTree, shippedFiles, stage, unlistedReferences } from '../scripts/lib/distribution.mjs';
 import { engineContractChecks } from '../tools/snowarch/lib/doctor/checks/engine-contract.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const REAL_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // A backtick, built here so the fixtures' cited paths are not citations of this file (L05 reads it too).
@@ -70,7 +71,7 @@ function plantedTree(t) {
     // The example's path lands outside the coverage, so a guard that read it as a link would report it.
     + 'Write an image as ' + BT + '![Figure N](../../../docs/figure-N.png)' + BT + ': an example in code, not a link.\n');
   put(root, 'docs/relative-guide.md', '# guide\n');
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   // A Windows runner's condition, on every OS: git converting text to CRLF on its way out. The export's claim is
   // "as HEAD has them", so it must not depend on this, as `stage` does not.
   git(root, ['config', 'core.autocrlf', 'true']);
@@ -170,7 +171,7 @@ function releaseTree(t) {
   put(root, '.gitattributes', '*.ps1 text eol=crlf\n');
   put(root, '.gitmodules', '[submodule "vendor/ServiceNowDocs"]\n\tpath = vendor/ServiceNowDocs\n');
   put(root, 'tests/not-shipped.test.mjs', '\n');
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['add', '-A']);
   git(root, ['update-index', '--add', '--cacheinfo', `160000,${PIN},vendor/ServiceNowDocs`]);
   assert.match(git(root, ['ls-files', '--stage', 'vendor/ServiceNowDocs']), new RegExp(`^160000 ${PIN} 0\t`));
@@ -249,7 +250,7 @@ test('the guard finds a shipped file that names the engineering repository or li
     '',
   ].join('\n'));
   put(root, 'tests/not-shipped.md', `${ENG}\n`);
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'fixture']);
   const hits = engineeringNames(root, { coverage: { covers: ['docs/'], excludes: [], ignores: [] } });

@@ -18,6 +18,7 @@ import { integrityGate, refusalFor } from '../lib/cli.mjs';
 import { manifestFromArchive, signManifest, writeManifestCache } from '../lib/licence/manifest.mjs';
 import { keyPair, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
+import { initFixtureRepo } from './helpers/fixture-git.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const signer = keyPair();
@@ -35,7 +36,7 @@ function release(t, { cache = true } = {}) {
     'tools/snowarch/bin/snowarch.mjs': 'export {};\n', '.claude/skills/s/SKILL.md': 'signed\n',
   })) put(root, rel, text);
   cpSync(join(REPO, '.gitattributes'), join(root, '.gitattributes'));
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['-c', 'user.email=f@example.com', '-c', 'user.name=f', 'add', '-A']);
   git(root, ['-c', 'user.email=f@example.com', '-c', 'user.name=f', 'commit', '-qm', 'r']);
   git(root, ['-c', 'user.email=f@example.com', '-c', 'user.name=f', 'tag', '-a', 'v9.1.0', '-m', 'v9.1.0']);

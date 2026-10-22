@@ -30,6 +30,7 @@ import {
   MAX_AGE_MS, REFRESH_AFTER_MS, cachePath, isFresh, needsRefresh, readUpgradeCheck,
   writeUpgradeCheck,
 } from '../../tools/snowarch/lib/upgrade-check.mjs';
+import { initFixtureRepo } from '../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const isWindows = process.platform === 'win32';
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -165,7 +166,7 @@ test('ARC-09-C190 — an origin that wants a credential is answered at once: no 
   });
 
   const root = tempDir('snowarch-c190-', t);
-  harnessGit(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => harnessGit(root, args), root, ['-q', '-b', 'main']);
   writeFileSync(join(root, 'engine.config.json'), readFileSync(join(REPO, 'engine.config.json')));
   harnessGit(root, ['add', 'engine.config.json']);
   harnessGit(root, ['commit', '-q', '-m', 'fixture']);
@@ -717,7 +718,7 @@ test('ARC-07-C39 — the return ref resolves in a tag-only checkout, and a branc
   // fixture identity, so a runner with no git author still commits.
   const git = (...args) => harnessGit(dir, args);
 
-  git('init', '--quiet', '-b', 'trunk');
+  initFixtureRepo((args) => git(...args), dir, ['--quiet', '-b', 'trunk']);
   writeFileSync(join(dir, 'a.txt'), 'one\n');
   git('add', '.');
   git('commit', '--quiet', '-m', 'one');
@@ -768,7 +769,7 @@ test('ARC-09-C196 — at the tag itself, a plan that cannot check the tag out li
   // degrades to today's "up to date", never to a "continuing" nothing can finish.
   const { planSteps } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
   const root = tempDir('snowarch-c196-plan-', t);
-  harnessGit(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => harnessGit(root, args), root, ['-q', '-b', 'main']);
   writeFileSync(join(root, 'engine.config.json'), readFileSync(join(REPO, 'engine.config.json')));
   harnessGit(root, ['add', 'engine.config.json']);
   harnessGit(root, ['commit', '-q', '-m', 'fixture']);

@@ -22,6 +22,7 @@ import { manifestFromArchive, readManifest, readManifestCache } from '../lib/lic
 import { tempDir } from './helpers/temp.mjs';
 import { fileURLToPath } from 'node:url';
 import { spellings } from '../lib/text.mjs';
+import { initFixtureRepo } from './helpers/fixture-git.mjs';
 
 const REPO = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -419,7 +420,7 @@ function releaseRoot(w, tag) {
     mkdirSync(dirname(join(w.root, rel)), { recursive: true });
     writeFileSync(join(w.root, rel), text);
   }
-  gitIn(w.root, ['init', '-q', '--initial-branch=main']);
+  initFixtureRepo((args) => gitIn(w.root, args), w.root, ['-q', '--initial-branch=main']);
   gitIn(w.root, ['add', '-A']);
   gitIn(w.root, ['commit', '-qm', tag]);
   gitIn(w.root, ['tag', '-a', tag, '-m', tag]);

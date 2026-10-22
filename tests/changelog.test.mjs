@@ -20,6 +20,7 @@ import { shapeProblems } from './lib/changelog-shape.mjs';
 import { buildFile, classify, extractNotes, extractUnreleased, FROZEN_HEADING, readCommits, renderGroups,
   sectionFor, trailerLine, writeChangelog } from '../scripts/lib/release/changelog.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' });
@@ -76,7 +77,7 @@ function fixture(t, { notes = 'A hand-written note.\n\nAnd a second paragraph.' 
   file('docs/CHANGELOG.md', `${HEADER}## Unreleased\n\n### Notes\n\n${notes}\n\n${FROZEN}`);
   file('a.txt', 'a\n');
 
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
   git(root, ['add', '-A']);
