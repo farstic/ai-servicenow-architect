@@ -222,6 +222,17 @@ export function fastForwardFailureLine(stderr, { branch, target }) {
 }
 
 /**
+ * The `owner/name` of a GitHub URL in any of git's spellings (https, ssh, git://, scp-like), or `null` for any other
+ * URL, a path or another host. A credential in the URL is never part of the answer. ARC-09-C201 — taken out of
+ * `originLine`, unchanged, because U3 asks the same question of the same URL.
+ */
+export function githubRepoOf(url) {
+  const at = /^(?:(?:https?|ssh|git):\/\/(?:[^@/]+@)?|[^@/\s]+@)github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i
+    .exec(String(url ?? '').trim());
+  return at ? `${at[1]}/${at[2]}` : null;
+}
+
+/**
  * ARC-09-C185c — the line for an install whose origin is a GitHub repository other than the one releases are published
  * at (`repo`, the config's `owner/name`), or `null`. From 2.2.1 a final is published there, signed over that repository's
  * commit, so an origin elsewhere stops at U4 on another commit, or at U2 once it no longer answers; this says where to
@@ -229,10 +240,9 @@ export function fastForwardFailureLine(stderr, { branch, target }) {
  * arrangement. A credential in the URL is never printed.
  */
 export function originLine(url, repo, cli) {
-  const at = /^(?:(?:https?|ssh|git):\/\/(?:[^@/]+@)?|[^@/\s]+@)github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/i
-    .exec(String(url ?? '').trim());
+  const at = githubRepoOf(url);
   if (!at || typeof repo !== 'string' || repo === '') return null;
-  if (`${at[1]}/${at[2]}`.toLowerCase() === repo.toLowerCase()) return null;
+  if (at.toLowerCase() === repo.toLowerCase()) return null;
   // An http(s) URL may carry a token as its user, with or without a password; an ssh user is a login name, kept.
   const shown = String(url).trim().replace(/^(https?:\/\/)[^@/]+@/i, '$1');
   const home = `https://github.com/${repo}.git`;
@@ -794,6 +804,22 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   }
   const tagInfo = await readTag(root, target, { opts });
   if (!tagInfo?.contract) {
+    // ARC-09-C201 — TWO CAUSES, ONE SENTENCE BEFORE. `readTag` is empty for a tag that is not there and for one that is
+    // no release alike, and the github.com/<config.repo> distribution carries finals only, from 2.2.1 on, so `--to` an
+    // rc or an older release meets the first and was told the second. So git is asked whether the ref exists: U2's
+    // `fetch --tags --prune` prunes no local tag (only --prune-tags would), so a tag absent now is absent from the
+    // origin, and one present only here keeps the sentence below. The origin's URL decides which sentence prints and
+    // is never part of one, so a credential in it cannot reach the line. Nothing has moved yet, and nothing does.
+    const present = git(root, ['rev-parse', '--verify', '--quiet', `refs/tags/${target}`], { ...opts, allowFail: true });
+    if (!present) {
+      const url = git(root, ['config', '--get', `remote.${remote}.url`], { ...opts, allowFail: true });
+      const ours = typeof config.repo === 'string' && config.repo !== ''
+        && githubRepoOf(url)?.toLowerCase() === config.repo.toLowerCase();
+      log.fail(ours
+        ? `upgrade: ${target} is not a tag of github.com/${config.repo}, which carries final releases from 2.2.1 on`
+        : `upgrade: ${target} is not a tag of this checkout's origin`);
+      return EXIT_FAIL;
+    }
     log.fail(`upgrade: ${target} is not a release tag of this product`);
     return EXIT_FAIL;
   }
