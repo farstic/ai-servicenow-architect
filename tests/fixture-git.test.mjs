@@ -185,3 +185,74 @@ test('ARC-09-C219 — each exempt file still holds what it is exempt for', () =>
     assert.ok(initSites(readFileSync(join(ROOT, f), 'utf8')).raw > 0, `${f} has no raw init left: drop its exemption`);
   }
 });
+
+// ── ARC-09-C220 — the server's TypeScript fixtures ──────────────────────────────────────────────────────────────
+//
+// C219's class in the third test tree, which neither walk above reads: `packages/snowarch/tests/licence/fixtures.ts`
+// created three repositories with a raw `git init`, a bare one that receives a push and two that commit, so the same
+// detached maintenance could run while vitest's cleanup removed them. No probe was run for these: C219's A/B on the
+// runners measured the mechanism. Every `.ts` file of the tree is read, fixtures and helpers included, because the
+// repositories are made in fixture files rather than in the `*.test.ts` files ARC-09-C14 reads.
+
+/** The repositories the server's TypeScript tests create, each through initFixtureRepo; a fixture that adds one raises it. */
+const SERVER_REPOSITORIES = 3;
+
+/** The lines of one file's code that define an initFixtureRepo of their own: a copy, which could drift from the helper. */
+export function definitionsOf(text) {
+  const out = [];
+  text.split('\n').forEach((line, i) => {
+    if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+    if (/\bfunction\s+initFixtureRepo\b|\binitFixtureRepo\s*=\s*(\(|function\b)/.test(line)) out.push(i + 1);
+  });
+  return out;
+}
+
+/** Every `.ts` file of the server's test tree, as repository-relative POSIX paths. */
+function serverTestFiles() {
+  const out = [];
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) { if (e.name !== 'node_modules') walk(p); } else if (/\.ts$/.test(e.name)) out.push(posix(relative(ROOT, p)));
+    }
+  };
+  walk(join(ROOT, 'packages/snowarch/tests'));
+  return out.sort();
+}
+
+test('ARC-09-C220 — every repository the server\'s TypeScript tests create goes through initFixtureRepo, and names its branch', () => {
+  const files = serverTestFiles();
+  assert.ok(files.length > 50, `${files.length} server test files found: the walk read nothing`);
+  assert.ok(files.includes('packages/snowarch/tests/licence/fixtures.ts'), 'the walk did not read the licence fixtures');
+  const raw = []; const unnamed = []; const defined = []; let shared = 0;
+  for (const f of files) {
+    const text = readFileSync(join(ROOT, f), 'utf8');
+    const sites = initSites(text);
+    if (sites.raw > 0) raw.push(`${f}: ${sites.raw}`);
+    shared += sites.shared;
+    for (const n of unnamedCalls(text)) unnamed.push(`${f}:${n}`);
+    for (const n of definitionsOf(text)) defined.push(`${f}:${n}`);
+  }
+  assert.deepEqual(defined, [], `a server test defines its own initFixtureRepo: the one helper is ${SHARED}, imported`);
+  assert.deepEqual(raw, [], 'a server test fixture runs git init itself, so its repository keeps automatic maintenance on');
+  assert.deepEqual(unnamed, [], 'an initFixtureRepo call names no branch, so its repository takes init.defaultBranch '
+    + 'from the machine (ARC-09-C14)');
+  assert.equal(shared, SERVER_REPOSITORIES,
+    `${shared} initFixtureRepo calls in the server's tests, not ${SERVER_REPOSITORIES}: a fixture that adds a repository raises the number`);
+});
+
+test('ARC-09-C220 — the scan reads the TypeScript shapes: a typed runner\'s raw init, and a call through the helper', () => {
+  // ASSEMBLED, as above, so this file holds no raw init for ARC-09-C14's scan or for its own.
+  const init = ['in', 'it'].join('');
+  const runner = "  const git = (args: string[]): void => { execFileSync('git', args, { env, stdio: 'pipe' }); };";
+  assert.deepEqual(initSites(`${runner}\n  git(['${init}', '-q', '--bare', '--initial-branch=main', bare]);\n`), { raw: 1, shared: 0 });
+  const call = "  initFixtureRepo(git, bare, ['-q', '--bare', '--initial-branch=main']);";
+  assert.deepEqual(initSites(`${runner}\n${call}\n`), { raw: 0, shared: 1 });
+  assert.deepEqual(unnamedCalls(`${call}\n`), []);
+  assert.deepEqual(unnamedCalls("  initFixtureRepo(git, root, ['-q']);\n"), [1]);
+  // A copy of the helper is found in either form, and the import that replaces it is not a copy.
+  assert.deepEqual(definitionsOf('export function initFixtureRepo(git: Runner, dir: string, initArgs: string[]): string {\n'), [1]);
+  assert.deepEqual(definitionsOf('  const initFixtureRepo = (git: Runner, dir: string, args: string[]): string => {\n'), [1]);
+  assert.deepEqual(definitionsOf("import { initFixtureRepo } from '../../../../tools/snowarch/tests/helpers/fixture-git.mjs';\n"
+    + `${call}\n`), []);
+});
