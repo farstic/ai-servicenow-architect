@@ -25,6 +25,13 @@ All notable changes to this project are documented in this file. Everything hand
   that repository, which carries final releases from 2.2.1 on; a tag that is there but is no release keeps its
   sentence (ARC-09-C201).
 
+### Added
+
+- Live reads can return a field's label beside its stored value in one call: `snow_core_records_query` and
+  `snow_core_record_read` take `display_value: 'all'`, so a list shows "In Progress (2)" instead of a bare code, while
+  every query and write keeps using the stored value. A call without it is unchanged, and `'true'` is refused
+  (ARC-09-C205).
+
 ## 2.2.3 — 2026-10-21
 
 ### Notes
