@@ -59,6 +59,9 @@ export function maskFinding(text, { engagement = '', aliases = [], labels = [], 
   out = out.replace(/\b([a-z][a-z0-9+.-]*):\/\/[^\s:@/]+:[^\s@/]+@/gi, '$1://');
   out = out.replace(/(^|\s)(-u|--user)\s+\S+:\S+/g, '$1$2 <user>:<secret>');
   out = out.replace(/\b(password|passwd|pwd|secret|client_secret|token|api[_-]?key)\b(\s*[:=]\s*)("[^"]*"|'[^']*'|\S+)/gi, '$1$2<secret>');
+  // A credential named in a sentence: the word, then "is", "was" or a space, then a value of 6 or more characters with
+  // a digit or a symbol in it, which "the token is expired" and "password reset" do not have (the architect's case).
+  out = out.replace(/\b(password|passwd|pwd|secret|token|api[ _-]?key|client[ _-]?secret)(\s+(?:is|was)\s+|\s+)(?=[^\s;,]{6,})(?=[^\s;,]*[^A-Za-z\s;,])[^\s;,]+/gi, '$1$2<secret>');
   out = out.replace(/\b(Basic|Bearer)\s+[A-Za-z0-9+/=._-]{8,}/g, '$1 <secret>');
   out = out.replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '<secret>');
   // 2. URLs whole: a path or a query carries sys_ids, view names and encoded queries. The keep-list stays verbatim.
@@ -123,7 +126,11 @@ export const FIXED_REVIEW = Object.freeze([
   'company names and abbreviations that neither the instance store nor aliases.txt holds',
   'ticket keys in other systems, such as Jira or Azure DevOps',
   'record numbers with fewer than 6 digits',
+  'a credential written in plain words that no rule recognises',
 ]);
+
+/** Said in the header and in the review list when the store's usernames and secrets were not read. */
+const CREDENTIALS_NOT_READ = 'credentials NOT read — check usernames and passwords before sending';
 
 /** Product words too common to be a client's name: a name that is one masks every use of the word. */
 const PRODUCT_WORDS = new Set([...ENV_WORDS, 'incident', 'problem', 'change', 'request', 'task', 'case', 'knowledge',
@@ -144,19 +151,24 @@ export function aliasWarnings({ engagement = '', aliases = [] } = {}) {
   return out;
 }
 
-/** The whole output: what ran, the warnings, the masked text, and what the reader must still check. */
-export function renderFinding(text, values = {}, { storeRead = false, notes = [] } = {}) {
+/**
+ * The whole output: what ran, the warnings, the masked text, and what the reader must still check. The two tiers are
+ * reported apart: the store's names can be read where its credentials cannot (a checkout without its dependencies, a
+ * store the loader refuses), and a header that said only "(store read)" then hid unmasked usernames.
+ */
+export function renderFinding(text, values = {}, { storeRead = false, credentialsRead = false } = {}) {
   const masked = maskFinding(text, values);
   const instanceNames = new Set([
     ...(values.labels ?? []).filter((l) => !ENV_WORDS.has(l)),
     ...(values.storeUrls ?? []).flatMap((u) => { try { const h = new URL(u).hostname.toLowerCase(); return [h, stemOf(h)]; } catch { return []; } }),
   ]);
-  const head = storeRead
+  const head = [storeRead
     ? `instance names masked by value: ${instanceNames.size} (store read)`
-    : 'instance store NOT read — check every instance name';
-  const review = reviewList(masked);
-  return [head, ...notes, ...aliasWarnings(values), '', masked.trimEnd(), '', 'Read before sending:',
-    ...review.map((r) => `- ${r}`), ...FIXED_REVIEW.map((r) => `- ${r}`), ''].join('\n');
+    : 'instance store NOT read — check every instance name',
+  credentialsRead ? 'credentials read' : CREDENTIALS_NOT_READ].join(' · ');
+  const review = [...(credentialsRead ? [] : [CREDENTIALS_NOT_READ]), ...reviewList(masked), ...FIXED_REVIEW];
+  return [head, ...aliasWarnings(values), '', masked.trimEnd(), '', 'Read before sending:',
+    ...review.map((r) => `- ${r}`), ''].join('\n');
 }
 
 const refuse = (why) => ({ ok: false,
@@ -207,23 +219,21 @@ function readAliases(path) {
 /**
  * The credential tier, this script's alone: usernames, through the store loader that registers the store's secrets
  * with the redactor as it parses (instance-file.mjs:135), so step 11 masks them by value. mask-values.mjs never reads
- * the credential block (label.ts:133), and nothing here prints a credential: it only feeds the masker.
+ * the credential block (label.ts:133), and nothing here prints a credential: it only feeds the masker. When it cannot
+ * read them, the caller says so in the header and the review list; it never fails quietly.
  */
 async function credentialValues(storePath, root) {
-  try {
-    const { loadContract } = await import('../../../packages/contract/lib/contract.mjs');
-    const { readInstanceFile } = await import('./instance-file.mjs');
-    const contract = loadContract({ root: ENGINE_ROOT, verifyPin: false });
-    const r = await readInstanceFile(storePath, { root, contract });
-    if (!r.ok) return { read: false, usernames: [] };
-    return { read: true, usernames: Object.values(r.store.instances).map((e) => e?.auth?.username).filter(Boolean) };
-  } catch {
-    return { read: false, usernames: [] };
-  }
+  const { loadContract } = await import('../../../packages/contract/lib/contract.mjs');
+  const { readInstanceFile } = await import('./instance-file.mjs');
+  const contract = loadContract({ root: ENGINE_ROOT, verifyPin: false });
+  const r = await readInstanceFile(storePath, { root, contract });
+  if (!r.ok) return { read: false, usernames: [] };
+  return { read: true, usernames: Object.values(r.store.instances).map((e) => e?.auth?.username).filter(Boolean) };
 }
 
 /** `finding.mjs <clients/<engagement>/findings/<name>.md>` or `finding.mjs --next-name <engagement> <slug>`. */
-export async function main(argv, { root = ENGINE_ROOT, env = process.env, out = process.stdout } = {}) {
+export async function main(argv, { root = ENGINE_ROOT, env = process.env, out = process.stdout,
+  credentialReader = credentialValues } = {}) {
   if (argv[0] === '--next-name') {
     try { out.write(`${nextFindingName(root, argv[1], argv[2])}\n`); return 0; } catch (e) { out.write(`finding: ${e.message}\n`); return 2; }
   }
@@ -231,12 +241,13 @@ export async function main(argv, { root = ENGINE_ROOT, env = process.env, out = 
   if (!target.ok) { out.write(`${target.reason}\n`); return 2; }
   const storePath = env.SNOW_STORE || join(root, '.local', 'instances.json');
   const hosts = storeHostValues(storePath);
-  const credentials = await credentialValues(storePath, root);
+  // A store that cannot be read at all has no credentials to read either; a loader that fails is reported, not hidden.
+  let credentials = { read: false, usernames: [] };
+  if (hosts.read) { try { credentials = await credentialReader(storePath, root); } catch { /* reported below, as NOT read */ } }
   const values = { engagement: target.engagement,
     aliases: readAliases(join(root, 'clients', target.engagement, 'findings', 'aliases.txt')),
     labels: hosts.labels, storeUrls: hosts.hosts.map((h) => `https://${h}`), usernames: credentials.usernames };
-  const notes = hosts.read && !credentials.read ? ['the store\'s usernames were not read — check every username'] : [];
-  out.write(renderFinding(readFileSync(target.path, 'utf8'), values, { storeRead: hosts.read, notes }));
+  out.write(renderFinding(readFileSync(target.path, 'utf8'), values, { storeRead: hosts.read, credentialsRead: credentials.read }));
   return 0;
 }
 
