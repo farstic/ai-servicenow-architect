@@ -22,7 +22,8 @@ only the first.**
   Breached becomes true while, by default, the stage stays In Progress (ARC-09-C228).
 - `snow_cat_active_slas_index`, the server's list of active Task SLAs, now selects those in stage In Progress or Paused,
   breached or not. It selected by a stage value no row holds (PN-25), so finished and cancelled SLAs could come back,
-  and it left out breached SLAs still running (ARC-09-C229).
+  and it left out breached SLAs still running. Where `com.snc.sla.compatibility.breach` is set to true, a breached SLA's
+  stage is Breached, and the list still leaves it out (ARC-09-C229).
 
 ### Added
 
