@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-23
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 36 tests, T-01 through T-36, no number reserved. The count is asserted by
+> **How many.** 37 tests, T-01 through T-37, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -2013,6 +2013,65 @@ Turn 2:
 
 ---
 
+## T-37 — `/snowarch finding` writes one note in the engagement's folder and prints only a masked copy to send
+
+**Covers:** ARC-09-C221 (the skill's `finding` section; `tools/snowarch/lib/finding.mjs`) · **Modes:** design-only ✅ · live ✅ (where a store exists, its names are also masked by value)
+
+One session, from a checkout where `clients/` holds only what Setup writes.
+
+### Setup
+
+```sh
+mkdir -p clients/acme-bank
+```
+
+### Prompt
+
+Three turns in one session, each answering what the one before asked.
+
+Turn 1:
+
+```
+/snowarch finding
+```
+
+Turn 2, the engagement and its other names:
+
+```
+acme-bank. Its other names are Acme Bank Holdings and Acme.
+```
+
+Turn 3, the finding:
+
+```
+I asked for the open incidents of Acme Bank. What happened: on https://acmebank.service-now.com the incident INC0012345 for Acme Bank showed the wrong assignment group, and Ivan Petrov said the list for 9d385017c611228701d22104cc95c371 never loaded. What I expected: the assignment group taken from the incident's configuration item.
+```
+
+### Expected behaviour
+
+1. Turn 1: the engagement is asked for, with no default; `_unfiled` is never offered.
+2. The other names are asked for once and written to `clients/acme-bank/findings/aliases.txt`.
+3. `node tools/snowarch/lib/finding.mjs --next-name acme-bank <slug>` runs, and the note is written to the path it printed.
+4. `node tools/snowarch/lib/finding.mjs <that path>` runs, and its output is printed verbatim.
+5. The answer closes with: Send the text above to the person who issued your licence.
+
+### Pass criteria
+
+- The printed copy carries no `acmebank`, no `INC0012345`, no `9d385017`, and no `Acme`. `Ivan Petrov` is named under **Read before sending**.
+- In design-only the copy's first line reads `instance store NOT read — check every instance name`.
+- From the tree, not the model's words: after the session, outside `.local/`, `git status --porcelain --untracked-files=all --ignored` lists exactly two new files, `clients/acme-bank/findings/aliases.txt` and one note beside it, and nothing else changed.
+- The session's tool calls are the `./snowarch status` read, the two `finding.mjs` runs and the two writes, and nothing sends the copy anywhere.
+
+### Fail signals
+
+- A default engagement, or `_unfiled`, offered.
+- The copy summarised, reworded or decorated instead of printed verbatim.
+- A credential asked for, or an offer to send the finding on the user's behalf.
+- Any file written outside `clients/acme-bank/findings/`.
+- A fourth question asked when the three turns already answered everything.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -2091,7 +2150,7 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
 | 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` `T-35` | the launchers, without Git Bash — the path that has cost the most cells |
 | 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |
