@@ -2058,9 +2058,9 @@ I asked for the open incidents of Acme Bank. What happened: on https://acmebank.
 ### Pass criteria
 
 - The printed copy carries no `acmebank`, no `INC0012345`, no `9d385017`, and no `Acme`. `Ivan Petrov` is named under **Read before sending**.
-- In design-only the copy's first line reads `instance store NOT read — check every instance name`.
-- From the tree, not the model's words: after the session, outside `.local/`, `git status --porcelain --untracked-files=all --ignored` lists exactly two new files, `clients/acme-bank/findings/aliases.txt` and one note beside it, and nothing else changed.
-- The session's tool calls are the `./snowarch status` read, the two `finding.mjs` runs and the two writes, and nothing sends the copy anywhere.
+- In design-only the copy's first line reads `instance store NOT read — check every instance name · credentials NOT read — check usernames and passwords before sending`.
+- From the tree, not the model's words: after the session, outside `.local/` and `.claude/settings.local.json`, which the runner's bootstrap writes (B07), `git status --porcelain --untracked-files=all --ignored` lists exactly two new files, `clients/acme-bank/findings/aliases.txt` and one note beside it, and nothing else changed.
+- Bash calls are reads of the findings folder, `./snowarch status`, and the two `finding.mjs` runs; Write calls are exactly the two files; nothing sends the copy anywhere.
 
 ### Fail signals
 
