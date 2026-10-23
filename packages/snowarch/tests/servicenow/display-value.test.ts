@@ -183,11 +183,15 @@ describe('ARC-09-C205 — the schema: both tools declare display_value, with the
       expect(properties?.display_value, name).toEqual({
         type: 'string',
         enum: ['false', 'all'],
+        // ARC-09-C225: the rendering is the owner's rule of 2026-10-23, in the plan row's words.
         description: 'For a list a person will read, pass display_value: \'all\' with `fields`: each field then carries '
-          + 'its stored value and its label. Show a field as \'Label (value)\' when the two differ (choices, references, '
-          + 'dates), and once when they are equal. A date\'s label is in the user\'s format and time zone; its stored '
-          + 'value is UTC. Use only the stored value in any query, filter, encoded query or write, never the label. '
-          + 'Default \'false\' returns stored values only, as before; \'true\' is refused.',
+          + 'its stored value and its label. A code hidden behind a word shows as \'Label (value)\' ("Resolved (6)"); '
+          + 'a label that already carries the value ("3 - Moderate"), or differs from it only by case ("Normal"), '
+          + 'shows once; a reference shows by name, its sys_id only on request; a date shows as its label, with its '
+          + 'difference from UTC noted once, not beside each date. A date\'s label is in the format and time zone of '
+          + 'the ServiceNow user the server signs in as; its stored value is UTC. Use only the stored value in any '
+          + 'query, filter, encoded query or write, never the label. Default \'false\' returns stored values only, as '
+          + 'before; \'true\' is refused.',
       });
     }
   });
