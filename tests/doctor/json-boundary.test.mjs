@@ -291,3 +291,56 @@ test('ARC-09-C227 — control: the cache guard gives the same answer when asked 
 test('ARC-09-C227 — control: the shared INSTANCE_HOST stays non-global', () => {
   assert.equal(INSTANCE_HOST.flags.includes('g'), false, 'INSTANCE_HOST gained the g flag, and its .test() callers now carry lastIndex');
 });
+
+// ── ARC-09-C221 — the store's own hosts, by value (the latent case once called C228) ───────────────────────────────
+//
+// INSTANCE_HOST recognises a ServiceNow-hosted URL with a scheme. An instance on a custom domain, or a host written
+// bare, is not that shape, so maskForJson left it as written. Measured at develop 5b5c0daf: no field of
+// `doctor --json` carried the host, with the network off or on (an `.invalid` host). So the leak was latent, and the
+// boundary now also masks what the store itself names, by value: the non-credential tier, shared with
+// `/snowarch finding` (tools/snowarch/lib/mask-values.mjs). It never reads the credential block.
+
+const STORE_VALUES = { hosts: ['servicedesk.acmebank.com'], stems: ['acmebank'] };
+
+test('ARC-09-C221 — a custom-domain instance is masked by value: its URL, its bare host and its stem', () => {
+  const out = maskForJson({ server: { instances: [] }, v: ['see https://servicedesk.acmebank.com/now/nav',
+    'host servicedesk.acmebank.com, no scheme', 'the acmebank instance and acmebankdev'] }, STORE_VALUES).v;
+  assert.deepEqual(out, [`see ${HOST_MASK}/now/nav`, `host ${HOST_MASK}, no scheme`, `the ${HOST_MASK} instance and ${HOST_MASK}`]);
+});
+
+test('ARC-09-C221 — control: the product\'s own words survive the store\'s values, and no values means no change', () => {
+  const product = ['ServiceNow and snowarch', 'see https://docs.servicenow.com/x', 'github.com/farstic/snowarch'];
+  assert.deepEqual(maskForJson({ server: { instances: [] }, v: product }, STORE_VALUES).v, product);
+  assert.deepEqual(maskForJson({ server: { instances: [] }, v: ['host servicedesk.acmebank.com'] }).v,
+    ['host servicedesk.acmebank.com'], 'with no store values the boundary changed what it masks');
+});
+
+test('ARC-09-C221 — the store\'s values are read SNOW_STORE first, and never a credential', async (t) => {
+  const { storeMaskValues } = await import('../../tools/snowarch/lib/doctor/json-boundary.mjs');
+  const root = linkInstall(greenTree(t, { mode: 'live' }));
+  const store = { version: 1, defaultInstance: 'acme-prod', instances: { 'acme-prod': {
+    url: 'https://servicedesk.acmebank.com', environment: 'prod',
+    auth: { method: 'basic', username: 'svc.integration', password: FIXTURE_SECRET },
+    preset: 'read-only', flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false } } };
+  writeJson(root, '.local/instances.json', store);
+  assert.deepEqual(storeMaskValues(root, {}), { hosts: ['servicedesk.acmebank.com'], stems: ['acmebank'] });
+  writeJson(root, 'elsewhere.json', { ...store, instances: { x: { ...store.instances['acme-prod'], url: 'https://other.example.org' } } });
+  assert.deepEqual(storeMaskValues(root, { SNOW_STORE: join(root, 'elsewhere.json') }), { hosts: ['other.example.org'], stems: ['example'] });
+  const all = JSON.stringify(storeMaskValues(root, {}));
+  assert.ok(!all.includes(FIXTURE_SECRET) && !all.includes('svc.integration'), 'a credential reached the boundary\'s values');
+  assert.deepEqual(storeMaskValues(join(root, 'nowhere'), {}), { hosts: [], stems: [] });
+});
+
+test('ARC-09-C221 — every maskForJson call passes the store\'s values', async () => {
+  const { readFileSync: read } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const lib = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'tools', 'snowarch', 'lib');
+  const calls = [];
+  for (const f of ['doctor/index.mjs', 'commands/status.mjs']) {
+    read(join(lib, f), 'utf8').split('\n').forEach((line, i) => {
+      if (/maskForJson\(/.test(line) && !/^\s*(\/\/|\*)/.test(line)) calls.push(`${f}:${i + 1}: ${/storeMaskValues\(/.test(line) ? 'ok' : 'MISSING'}`);
+    });
+  }
+  assert.equal(calls.length, 3, `expected the 3 known call sites: ${calls.join(' | ')}`);
+  assert.deepEqual(calls.filter((c) => c.endsWith('MISSING')), [], 'a call site masks without the store\'s values');
+});
