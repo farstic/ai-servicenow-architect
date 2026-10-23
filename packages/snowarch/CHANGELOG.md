@@ -9,6 +9,8 @@ All notable changes to this project are documented here. This project adheres to
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
 
+## 2.2.4 — 2026-10-23
+
 **`snow_core_records_query` and `snow_core_record_read` take `display_value`, `'false'` (the default) or `'all'`
 (ARC-09-C205).** With `'all'` the request adds `sysparm_display_value=all`, and each field comes back as the instance
 sends it: its stored value beside its label, `{ display_value, value }`, with `link` on a reference. Without it, or with
