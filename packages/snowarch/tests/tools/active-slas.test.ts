@@ -10,6 +10,8 @@
  *
  * The tool now asks for the two stages an active SLA is in, breached or not. A caller's filter goes in front with `^`,
  * and IN keeps the two stages one condition, so no OR binds across the caller's part.
+ * The description says why a breach is found by `has_breached`, and that with com.snc.sla.compatibility.breach set
+ * to true a breached SLA's stage is Breached, which this list leaves out (`t_ConfigureSLAProperties.md`).
  *
  * Every case runs through the router, as a caller meets the tool. The fetch mock REPEATS a lone last queued answer
  * (tests/helpers/fetch-mock.ts); each case queues one answer after the reset in beforeEach.
@@ -76,7 +78,10 @@ describe('ARC-09-C229 — snow_cat_active_slas_index asks for the Task SLAs stil
   it('the description says which Task SLAs it lists', async () => {
     const { catalogToolManifest } = await import('../../src/tools/catalog.js');
     expect(catalogToolManifest().find((t) => t.name === 'snow_cat_active_slas_index')?.description).toBe(
-      'List active Task SLAs — stage In Progress or Paused, breached or not (each record\'s has_breached says which) — '
-      + 'with an optional encoded-query filter.');
+      'List active Task SLAs: stage In Progress or Paused, breached or not, with an optional encoded-query filter. By '
+      + 'default the 2011 SLA engine keeps a breached SLA In Progress and sets has_breached to true, so find breaches '
+      + 'with has_breached=true: a filter on stage=breached returns nothing from this tool. With '
+      + 'com.snc.sla.compatibility.breach set to true, a breached SLA\'s stage is Breached, and this list leaves it '
+      + 'out.');
   });
 });
