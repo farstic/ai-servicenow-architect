@@ -1667,7 +1667,7 @@
   },
   {
     "name": "snow_cat_active_slas_index",
-    "description": "List active SLA records with optional filters",
+    "description": "List active Task SLAs — stage In Progress or Paused, breached or not (each record's has_breached says which) — with an optional encoded-query filter.",
     "inputSchema": {
       "type": "object",
       "properties": {

@@ -213,7 +213,8 @@ export function catalogToolManifest(): ToolDefinition[] {
     },
     {
       name: 'snow_cat_active_slas_index',
-      description: 'List active SLA records with optional filters',
+      description: 'List active Task SLAs — stage In Progress or Paused, breached or not (each record\'s has_breached '
+        + 'says which) — with an optional encoded-query filter.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -379,7 +380,8 @@ export async function dispatchCatalogAction(
       return { count: resp.count, slas: resp.records };
     }
     case 'snow_cat_active_slas_index': {
-      let query = 'stage!=complete^has_breached=false';
+      // ARC-09-C229: the two stages an active SLA is in, breached or not; the stored values are PN-25's.
+      let query = 'stageINin_progress,paused';
       if (args.query) query = `${args.query}^${query}`;
       const resp = await client.queryRecords({ table: 'task_sla', query, limit: args.limit || 10 });
       return { count: resp.count, slas: resp.records };
