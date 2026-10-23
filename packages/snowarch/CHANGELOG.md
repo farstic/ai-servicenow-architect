@@ -5,6 +5,14 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**The `display_value` description states the owner's rendering rule (ARC-09-C225).** It told the model to show a field
+as 'Label (value)' wherever the two differ, naming choices, references and dates. It now says: "A choice whose label
+hides its code (negative codes too) shows as 'Label (value)' ("Resolved (6)"); a label that already carries the value
+("3 - Moderate"), or differs from it only by case ("Normal"), shows once; a reference shows by name, its sys_id only on
+request; a date shows as its label, with its difference from UTC noted once, not beside each date. A date's label is in
+the format and time zone of the ServiceNow user the server signs in as; its stored value is UTC." The stored value stays
+the only value in any query, filter or write; the request and its answer are unchanged.
+
 **`snow_cat_active_slas_index` asks for the Task SLAs In Progress or Paused (ARC-09-C229).** Its query was
 `stage!=complete^has_breached=false`. No row holds `complete` (PN-25), so the stage half excluded nothing, and the
 breach half left out breached SLAs that are still running. The query is now `stageINin_progress,paused`, breached or

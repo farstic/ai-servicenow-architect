@@ -25,6 +25,14 @@ only the first.**
   and it left out breached SLAs still running. Where `com.snc.sla.compatibility.breach` is set to true, a breached SLA's
   stage is Breached, and the list still leaves it out (ARC-09-C229).
 
+### Changed
+
+- The server gives the model one rule for showing a field in a live list: a choice whose label hides its code, negative
+  codes too, with its label and value, as "Resolved (6)"; a label that already carries its value ("3 - Moderate"), or
+  differs from it only by case ("Normal"), once; a reference by its name, with its sys_id only on request; a date in the
+  format and time zone of the ServiceNow user the server signs in as, with its difference from UTC noted once. Queries,
+  filters and writes still use the stored value (ARC-09-C225).
+
 ### Added
 
 - `/snowarch finding` records something the engine got wrong as a note in the engagement's own folder, which stays on
