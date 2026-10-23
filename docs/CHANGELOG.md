@@ -20,11 +20,11 @@ only the first.**
 
 ### Changed
 
-- The server gives the model one rule for showing a field in a live list: a code behind a word with its label and value,
-  as "Resolved (6)"; a label that already carries its value ("3 - Moderate"), or differs from it only by case
-  ("Normal"), once; a reference by its name, with its sys_id only on request; a date in the format and time zone of the
-  ServiceNow user the server signs in as, with its difference from UTC noted once. Queries, filters and writes still
-  use the stored value (ARC-09-C225).
+- The server gives the model one rule for showing a field in a live list: a choice whose label hides its code, negative
+  codes too, with its label and value, as "Resolved (6)"; a label that already carries its value ("3 - Moderate"), or
+  differs from it only by case ("Normal"), once; a reference by its name, with its sys_id only on request; a date in the
+  format and time zone of the ServiceNow user the server signs in as, with its difference from UTC noted once. Queries,
+  filters and writes still use the stored value (ARC-09-C225).
 
 ### Added
 

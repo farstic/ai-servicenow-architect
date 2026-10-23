@@ -6,12 +6,12 @@ All notable changes to this project are documented here. This project adheres to
 ## Unreleased
 
 **The `display_value` description states the owner's rendering rule (ARC-09-C225).** It told the model to show a field
-as 'Label (value)' wherever the two differ, naming choices, references and dates. It now says: "A code hidden behind a
-word shows as 'Label (value)' ("Resolved (6)"); a label that already carries the value ("3 - Moderate"), or differs
-from it only by case ("Normal"), shows once; a reference shows by name, its sys_id only on request; a date shows as its
-label, with its difference from UTC noted once, not beside each date. A date's label is in the format and time zone of
-the ServiceNow user the server signs in as; its stored value is UTC." The stored value stays the only value in any
-query, filter or write; the request and its answer are unchanged.
+as 'Label (value)' wherever the two differ, naming choices, references and dates. It now says: "A choice whose label
+hides its code (negative codes too) shows as 'Label (value)' ("Resolved (6)"); a label that already carries the value
+("3 - Moderate"), or differs from it only by case ("Normal"), shows once; a reference shows by name, its sys_id only on
+request; a date shows as its label, with its difference from UTC noted once, not beside each date. A date's label is in
+the format and time zone of the ServiceNow user the server signs in as; its stored value is UTC." The stored value stays
+the only value in any query, filter or write; the request and its answer are unchanged.
 
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
