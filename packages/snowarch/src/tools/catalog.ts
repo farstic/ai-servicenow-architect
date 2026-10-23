@@ -213,7 +213,11 @@ export function catalogToolManifest(): ToolDefinition[] {
     },
     {
       name: 'snow_cat_active_slas_index',
-      description: 'List active SLA records with optional filters',
+      description: 'List active Task SLAs: stage In Progress or Paused, breached or not, with an optional '
+        + 'encoded-query filter. By default the 2011 SLA engine keeps a breached SLA In Progress and sets has_breached '
+        + 'to true, so find breaches with has_breached=true: a filter on stage=breached returns nothing from this '
+        + 'tool. With com.snc.sla.compatibility.breach set to true, a breached SLA\'s stage is Breached, and this list '
+        + 'leaves it out.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -379,7 +383,8 @@ export async function dispatchCatalogAction(
       return { count: resp.count, slas: resp.records };
     }
     case 'snow_cat_active_slas_index': {
-      let query = 'stage!=complete^has_breached=false';
+      // ARC-09-C229: the two stages an active SLA is in, breached or not; the stored values are PN-25's.
+      let query = 'stageINin_progress,paused';
       if (args.query) query = `${args.query}^${query}`;
       const resp = await client.queryRecords({ table: 'task_sla', query, limit: args.limit || 10 });
       return { count: resp.count, slas: resp.records };

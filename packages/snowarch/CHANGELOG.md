@@ -13,6 +13,13 @@ request; a date shows as its label, with its difference from UTC noted once, not
 the format and time zone of the ServiceNow user the server signs in as; its stored value is UTC." The stored value stays
 the only value in any query, filter or write; the request and its answer are unchanged.
 
+**`snow_cat_active_slas_index` asks for the Task SLAs In Progress or Paused (ARC-09-C229).** Its query was
+`stage!=complete^has_breached=false`. No row holds `complete` (PN-25), so the stage half excluded nothing, and the
+breach half left out breached SLAs that are still running. The query is now `stageINin_progress,paused`, breached or
+not, with a caller's `query` in front, joined with `^`; each record's `has_breached` says whether it breached. The
+description says to find a breach by `has_breached`, and that where `com.snc.sla.compatibility.breach` is set to true a
+breached SLA's stage is Breached, which the list leaves out.
+
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
