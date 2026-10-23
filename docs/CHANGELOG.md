@@ -9,6 +9,15 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A patch release, in progress: `./snowarch doctor --json` masks every ServiceNow-hosted instance URL in a value, not
+only the first.**
+
+### Fixed
+
+- `./snowarch doctor --json` left a second instance address unmasked: where one value named two instances, or the same
+  instance twice, only the first became `<host>`, and the rest stayed in the text a user pastes into an issue. Every
+  ServiceNow-hosted instance URL in the output is masked now (ARC-09-C227).
+
 ## 2.2.4 — 2026-10-23
 
 ### Notes

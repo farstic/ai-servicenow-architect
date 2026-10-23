@@ -22,5 +22,13 @@
   "de7a668b1a62e14df98d0aa8711268ed5d509fba": {
     "line": "engine: ARC-09-C194, red — returning after a move, and a branch install's U5",
     "why": "its subject named what the owner's ruling of 2026-10-13 forbids a page to say; the line is what the commit did"
+  },
+  "3be9f1d373a11b37335957cee46b83d9a13718d5": {
+    "line": "doctor: doctor --json masks every ServiceNow-hosted instance URL in a value, not only the first (ARC-09-C227)",
+    "why": "its subject said every instance host; the pattern recognises ServiceNow-hosted instance URLs only, as the Fixed bullet says (the architect's correction, 2026-10-23)"
+  },
+  "19930f9a201a0342379a87168f6b25884bdeb777": {
+    "line": "changelog: ARC-09-C227, the Notes line and the Fixed bullet name ServiceNow-hosted instance URLs",
+    "why": "its subject said every instance URL; the change covers ServiceNow-hosted instance URLs only (the architect's correction, 2026-10-23)"
   }
 }
