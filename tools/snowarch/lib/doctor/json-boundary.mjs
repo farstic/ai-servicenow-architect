@@ -26,6 +26,11 @@ import { realpathSync } from 'node:fs';
 
 import { INSTANCE_HOST } from '../doctor-cache.mjs';
 
+// ARC-09-C227 — every host in a string, not only the first. A replace with the shared constant, which has no g
+// flag, masked one address and left a second instance's in the JSON a user pastes into an issue. This copy is
+// global, and the constant is not: the cache guard asks it with .test(), which a /g regex makes stateful.
+const INSTANCE_HOST_ALL = new RegExp(INSTANCE_HOST.source, `${INSTANCE_HOST.flags}g`);
+
 export const LABEL_MASK = '<label>';
 export const HOST_MASK = '<host>';
 export const HOME_MASK = '~';
@@ -147,7 +152,7 @@ export function maskForJson(report, { labels = labelsIn(report), home = '' } = {
   // the generic shapes, which also cover a report quoting a path that is somebody else's home.
   const homes = homeValues(home).map((h) => new RegExp(escapeRe(h), 'g'));
   const maskString = (s) => {
-    let out = s.replace(INSTANCE_HOST, HOST_MASK);
+    let out = s.replace(INSTANCE_HOST_ALL, HOST_MASK);
     for (const re of homes) out = out.replace(re, HOME_MASK);
     out = out.replace(HOME_PATH, HOME_MASK);
     for (const [re, to] of res) out = out.replace(re, to);
