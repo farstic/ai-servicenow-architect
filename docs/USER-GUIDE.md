@@ -100,6 +100,26 @@ client secret, and if anything claiming to be this command does, stop and report
 Nothing is written to the instance by any of this. Setup configures a connection; using it is a
 separate, explicitly approved act.
 
+### Reporting a finding
+
+When the engine gets something wrong (a table name that does not exist, a step that failed, an answer that
+contradicts the documentation), type `/snowarch finding` and describe it. The engine:
+
+1. asks which engagement the finding belongs to; a finding about the product itself can go under a name such as
+   `general`;
+2. the first time, asks for the client's other names (legal name, abbreviations, brands) and keeps them in
+   `clients/<engagement>/findings/aliases.txt`;
+3. writes your note to `clients/<engagement>/findings/`, which stays on your machine, because git ignores
+   `clients/`;
+4. prints a masked copy. Instance names and URLs, sys_ids, record numbers, e-mail addresses, IP addresses and home
+   folders become placeholders such as `<instance-url-1>` and `<record>`, and so do credentials in their usual forms
+   (key: value or key=value, user:password in a URL or after -u, Basic and Bearer tokens, known token prefixes),
+   your instance's stored username and password, and the client names you gave it.
+
+Before you send it, read the **Read before sending** list at its end. No rule knows people's names, places, company
+names or abbreviations you did not give it, ticket keys from other systems, a credential written in plain words, or
+record numbers with fewer than 6 digits. Then send the text to the person who issued your licence.
+
 ---
 
 ## Scenario 1 — Business Analyst: requirements to user stories
