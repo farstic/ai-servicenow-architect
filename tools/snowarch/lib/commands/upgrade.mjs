@@ -178,6 +178,13 @@ export const NOTHING_CHANGED = 'upgrade: nothing changed';
 export const UNTRACKED_REASON =
   'git refuses to overwrite an untracked file the target tracks, even with identical content';
 
+/**
+ * ARC-09-C197 — why a file under a directory the target covers stops an upgrade, said beside U4's refusal (the
+ * architect's words, 2026-10-24).
+ */
+export const EXTRAS_REASON = 'after the upgrade those folders must hold exactly what the release signed, so a file '
+  + 'it does not ship would stop the upgrade after the move; keep your own files outside them';
+
 /** A NUL-separated list from git (`-z`), each path as git wrote it: no quoting, nothing trimmed. */
 export const splitZ = (text) => String(text ?? '').split('\0').filter(Boolean);
 
@@ -198,6 +205,25 @@ export function untrackedBlockers(untracked, tracked, { ignoreCase = false } = {
 export const namePaths = (paths, max = 10) => (paths.length <= max
   ? paths.join(', ')
   : `${paths.slice(0, max).join(', ')} and ${paths.length - max} more`);
+
+/**
+ * ARC-09-C197 — the files U5's tree check would call extra, named at U4 before anything moves: what checkTree calls
+ * extra against the target's manifest now, less what the move deletes. U1 has refused a modified tracked file, so the
+ * move deletes a file HEAD tracks and the target does not, overwrites an ignored one the target tracks, and leaves the
+ * rest of what HEAD does not track where it is (measured on git 2.39.5, for the checkout and the branch's
+ * fast-forward alike). One function decides at U4 and at U5, so the two cannot disagree about a file.
+ */
+export function extrasAfterMove(root, manifest, headTracked, { check = checkTree } = {}) {
+  const tracked = new Set(headTracked);
+  return check(root, manifest).modified.filter((d) => d.why === 'extra' && !tracked.has(d.path)).map((d) => d.path);
+}
+
+/** ARC-09-C197 — U4's refusal for those files, in C120's shape (the architect's words, 2026-10-24). */
+export function extrasRefusal(extras, target) {
+  const one = extras.length === 1;
+  return `upgrade: ${extras.length} file${one ? ' is' : 's are'} in folders ${target} manages but not in its signed `
+    + `file list: ${namePaths(extras)} — move ${one ? 'it' : 'them'} out of those folders; nothing was changed`;
+}
 
 /**
  * git's own reason: its first line, and the next one when the first ends with a colon, because git's refusals put
@@ -912,6 +938,14 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     }
     log.step(manifestSays(fetched));
     manifest = fetched;
+    // ARC-09-C197 — a file U5's check of the moved tree would call extra is named now, before anything moves.
+    const extras = extrasAfterMove(root, manifest.entry.doc.manifest,
+      splitZ(gitRaw(['ls-tree', '-r', '--name-only', '-z', 'HEAD'])));
+    if (extras.length > 0) {
+      log.fail(extrasRefusal(extras, target));
+      log.step(EXTRAS_REASON);
+      return EXIT_USAGE;
+    }
   } else {
     log.step(`${target} is from before ${MANIFESTS_FROM}, when releases began to carry a signed manifest: its files are not checked`);
   }
@@ -1033,8 +1067,9 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     }
   }
   // ARC-11-C7 — the tree is checked after U5 and before U6: what git checked out against what the owner signed, so a
-  // tree that differs (a file the checkout left, a filter, a covered directory with more in it) stops the upgrade
-  // before the bootstrap runs on it. The cache is not written yet, so git alone takes the tree back.
+  // tree that differs (a file the checkout did not write, a filter) stops the upgrade before the bootstrap runs on it.
+  // A covered directory with more in it is U4's to name since ARC-09-C197; this stays for what U4 cannot see. The
+  // cache is not written yet, so git alone takes the tree back.
   if (manifest) {
     const tree = checkTree(root, manifest.entry.doc.manifest);
     if (!tree.ok) {
