@@ -108,14 +108,14 @@ Show me the table model and the Script Include.
 ### Pass criteria
 
 - CSM gateway fires at Phase 1 Step 5.
-- §1.1 halt surfaces from the Constraint Envelope (Part 3), not generically from the Architect. Step 4 IDENTIFIES the custom object and records it in the dispatch envelope; when a gateway domain applies, the §1.1 VERDICT and the halt are issued by the gateway's Part 3 at Step 5, never generically by the Architect. Step 4 halts on its own only when no gateway applies. A request that NAMES a custom object is Verdict C even when baseline covers the need.
+- §1.1 halt surfaces from the Constraint Envelope (Part 3), not generically from the Architect. If the request names or requires a custom table, scoped app, state extension or other major custom object, Step 4 IDENTIFIES it and records it in the dispatch envelope; when a gateway domain applies, the §1.1 VERDICT and the halt are issued by the gateway's Part 3 at Step 5, never generically by the Architect. When no gateway applies, propose no default that makes one apply; Step 4 prints `§1.1: <A|B|C>` and halts on C. A request that NAMES a custom object is Verdict C even when baseline covers the need.
 - Zero design artefacts in the same turn as the OPEN QUESTION. **Design artefact** means any of: table DDL, field list, Script Include code, flow outline, HLD/LLD section, pseudocode, data model diagram, ACL matrix, or any other output that constitutes partial delivery of the requested build. A clarifying question or routing-time consult flag does NOT count as a design artefact.
 
 ### Fail signals
 
 - Technical Designer dispatched before CSM gateway fires → gateway bypassed.
 - Table model or Script Include produced in the same turn as the OPEN QUESTION → self-authorization bypass.
-- §1.1 halt raised generically by Architect rather than via Constraint Envelope Part 3.
+- §1.1 halt raised generically by Architect rather than via Constraint Envelope Part 3. A Step 4 `§1.1:` line in a turn where a gateway applies is a generic halt.
 - Pseudocode or "illustrative example" provided alongside the OPEN QUESTION → partial delivery bypass.
 - **A cited page that does not exist.** A citation whose path resolves to no file under `vendor/ServiceNowDocs/markdown/` or in the repository fails the test, whatever the rest of the turn does — the transcript makes it checkable.
 
@@ -557,7 +557,7 @@ that writes escalation events to it.
 - Script Include produced in the same turn as the OPEN QUESTION.
 - **A cited page that does not exist.** A citation whose path resolves to no file under `vendor/ServiceNowDocs/markdown/` or in the repository fails the test, whatever the rest of the turn does — the transcript makes it checkable.
 - Architect states "since you've already decided, I'll proceed" — self-authorization bypass.
-- §1.1 halt raised generically by Architect rather than via Part 3 of the Constraint Envelope.
+- §1.1 halt raised generically by Architect rather than via Part 3 of the Constraint Envelope. A Step 4 `§1.1:` line in a turn where a gateway applies is a generic halt.
 - **Closing prose contradicts the Envelope.** The turn ends on a recommendation, a "proposed
   default", or a summary that leans against Part 3's verdict or Part 5's anti-patterns — for
   instance halting on §1.1 and then closing with "approve the table as specified, since you've
@@ -1987,6 +1987,7 @@ Turn 1:
 
 1. The Architect routes to the Now Assist Specialist, lists its open questions each with a default, proposes the handoff and waits — no design yet, which is clarify-first working.
 2. A tool it assumes or asks about is an AI Agent Studio tool (`sn_aia_tool`: a script, flow action, subflow, record operation and the like), never one of this product's `snow_*` server tools.
+3. No gateway applies: the request implies no domain's process, and the Architect proposes no default that makes one apply. Step 4 prints `§1.1: A` (linking an existing tool is configuration).
 
 Turn 2:
 
@@ -2002,7 +2003,8 @@ Turn 2:
 - Turn 1 routes to the Now Assist Specialist with open questions and defaults, and writes no design.
 - Turn 2 has all four: the instance model, Tools with reuse or create and the execution mode, Access rules in three parts for the agent and the workflow, and the build manifest with two calls and one enumerating question each.
 - 0 dead citations and 0 invented names: every table or stage name is in the corpus or attributed to PN-17 or PN-18.
-- §1.1 Verdict A.
+- §1.1 Verdict A, or turn 1's Step 4 line `§1.1: A`.
+- No gateway in either turn (ARC-09-C226).
 
 ### Fail signals
 
