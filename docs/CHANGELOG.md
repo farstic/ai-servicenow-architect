@@ -18,6 +18,14 @@ only the first.**
   instance twice, only the first became `<host>`, and the rest stayed in the text a user pastes into an issue. Every
   ServiceNow-hosted instance URL in the output is masked now (ARC-09-C227).
 
+### Added
+
+- `/snowarch finding` records something the engine got wrong as a note in the engagement's own folder, which stays on
+  your machine, and prints a masked copy to send to the person who issued your licence. Instance names and URLs,
+  sys_ids, record numbers, e-mail addresses, IP addresses and home folders become placeholders, and so do credentials in
+  their usual forms, your instance's stored username and password, and the client names you gave it. The copy ends with
+  what no rule can catch, for you to check before sending (ARC-09-C221).
+
 ## 2.2.4 — 2026-10-23
 
 ### Notes
