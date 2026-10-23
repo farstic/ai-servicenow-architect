@@ -1,8 +1,8 @@
 ---
 name: snowarch
-description: Use when the user types Status, or runs /snowarch status, setup-instance or doctor. Produces the doctor's Mode line, an instance added in the user's terminal (credentials never pass through chat), or the health check with its remedies.
-argument-hint: "status | setup-instance [--resume] | doctor"
-allowed-tools: Bash(./snowarch status*), Bash(node tools/snowarch/bin/snowarch.mjs status*), Bash(./snowarch doctor*), Bash(node tools/snowarch/bin/snowarch.mjs doctor*), Bash(cat .local/bootstrap-state.json), Read, mcp__servicenow__snow_core_instances_reload, mcp__servicenow__snow_core_capabilities_read, mcp__servicenow__snow_core_instances_index, mcp__servicenow__snow_core_current_instance_read
+description: Use when the user types Status, or runs /snowarch status, setup-instance, doctor or finding. Produces the doctor's Mode line, an instance added in the user's terminal (credentials never pass through chat), the health check, or a masked finding.
+argument-hint: "status | setup-instance [--resume] | doctor | finding"
+allowed-tools: Bash(./snowarch status*), Bash(node tools/snowarch/bin/snowarch.mjs status*), Bash(./snowarch doctor*), Bash(node tools/snowarch/bin/snowarch.mjs doctor*), Bash(cat .local/bootstrap-state.json), Bash(node tools/snowarch/lib/finding.mjs *), Read, mcp__servicenow__snow_core_instances_reload, mcp__servicenow__snow_core_capabilities_read, mcp__servicenow__snow_core_instances_index, mcp__servicenow__snow_core_current_instance_read
 metadata:
   version: 2.0.0
 ---
@@ -12,16 +12,16 @@ metadata:
 ## Triggers
 
 **Keywords:** snowarch, status, mode, doctor, setup instance, add instance, health check, bootstrap
-state, capability flags, which instance.
+state, capability flags, which instance, finding, report a finding.
 
 **Fires:** On demand, when the user types `/snowarch <sub-command>` — and, model-invoked, when the
 user types the plain word `Status`, which `CLAUDE.md` §2 routes here.
 
-**Not this skill:** it configures and reports; it does not design. A ServiceNow design question goes
-to the roster. It never calls an MCP tool and never asks for a credential.
+**Not this skill:** it configures, reports and records findings; it does not design. A ServiceNow design
+question goes to the roster. It calls MCP tools only in `setup-instance --resume`, and never asks for a credential.
 
-The first word of the arguments selects the sub-command (`status` when none is given): `status`,
-`setup-instance` or `doctor`. `setup-instance` also accepts `--resume`.
+The first word of the arguments selects the sub-command (`status` when none is given):
+`status`, `setup-instance`, `doctor` or `finding`. `setup-instance` also accepts `--resume`.
 
 ## status
 
@@ -221,3 +221,25 @@ configuration file by hand instead.
 
 <!-- ARC-08-S09: the doctor's own check ids, --fix semantics and the self-heal report shape extend
      THIS file in place. Never a second skill. -->
+
+## finding
+
+Records something the engine got wrong as a note in the engagement's own folder, and prints a masked copy for the
+user to send. The note stays on this machine; this skill sends nothing.
+
+1. **Ask which engagement the finding belongs to.** Offer no default. A finding about the product rather than a
+   client goes under a name the user chooses, such as `general`. Never `_unfiled`: it holds design artefacts only.
+2. **The first time for an engagement, ask once for its other names**: its legal name, abbreviations and brands.
+   Keep them in `clients/<engagement>/findings/aliases.txt`, one per line, `#` for a comment. "None" is an answer.
+3. **Compose the note in the user's words**: what was asked, what happened, what was expected, the `Engine:` line
+   of `./snowarch status`, and today's date.
+4. Run `node tools/snowarch/lib/finding.mjs --next-name <engagement> <slug>` for a free path, and **write the note
+   there** with the Write tool. Claude Code's own permission flow governs the write; this skill grants no write and
+   promises no prompt.
+5. Run `node tools/snowarch/lib/finding.mjs <that path>`. **Print its output verbatim**: what ran, the warnings,
+   the masked text and the "Read before sending" list. Nothing goes in place of it.
+6. Close with: Send the text above to the person who issued your licence.
+
+The masker cannot know people's names, places, company names or abbreviations it was not given, ticket keys in
+other systems, or record numbers with fewer than 6 digits; its "Read before sending" list says so every time. Asked
+whether the copy is safe to send, say that it is masked, and that those still need a reader.

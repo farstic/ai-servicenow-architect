@@ -33,6 +33,9 @@ const CLI = POSIX.cli;
 const EXTRA = {
   'T-07': { tools: ['Bash'], allowed: [`Bash(${CLI}:*)`, `Bash(${CLI} doctor:*)`] },
   'T-13': { tools: ['Write'], allowed: ['Write'] },
+  // ARC-09-C221 — the note and aliases.txt are written, the masker and the status read are run. Write is allowed for
+  // any path here, so T-37's pass criteria read the tree diff, not the model's words, for "nothing else was written".
+  'T-37': { tools: ['Bash', 'Write'], allowed: ['Write', 'Bash(node tools/snowarch/lib/finding.mjs *)', `Bash(${CLI} status:*)`] },
 };
 
 /** The tool set and the permissions for one case. */

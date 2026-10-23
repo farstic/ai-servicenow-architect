@@ -26,7 +26,7 @@ import { statePath } from '../local-paths.mjs';
 import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ } from '../exit.mjs';
 import { BANNER } from '../text.mjs';
 import { resolveCheckout, runDoctor } from '../doctor/index.mjs';
-import { maskForJson } from '../doctor/json-boundary.mjs';
+import { maskForJson, storeMaskValues } from '../doctor/json-boundary.mjs';
 import { renderPanel } from '../doctor/panel.mjs';
 
 /**
@@ -148,7 +148,7 @@ export async function statusCommand({ flags = {}, log, out = process.stdout, env
   }
 
   if (flags.json) {
-    write(JSON.stringify(maskForJson(report, { home }), null, 2));
+    write(JSON.stringify(maskForJson(report, { home, ...storeMaskValues(root, env) }), null, 2));
   } else {
     // ARC-07-W17 — the panel is PURE (its import graph is walked and must reach no environment), so
     // the launcher is supplied here, where reading the shell is allowed.
