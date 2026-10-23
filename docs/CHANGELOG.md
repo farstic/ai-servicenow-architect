@@ -17,6 +17,9 @@ only the first.**
 - `./snowarch doctor --json` left a second instance address unmasked: where one value named two instances, or the same
   instance twice, only the first became `<host>`, and the rest stayed in the text a user pastes into an issue. Every
   ServiceNow-hosted instance URL in the output is masked now (ARC-09-C227).
+- The ITSM gateway gave a finished task SLA's stage as `complete` and warned against `completed`, the value an
+  instance's choice list holds (PN-25). It now names `completed`, labelled Completed, and says that on a breach Has
+  Breached becomes true while, by default, the stage stays In Progress (ARC-09-C228).
 - `snow_cat_active_slas_index`, the server's list of active Task SLAs, now selects those in stage In Progress or Paused,
   breached or not. It selected by a stage value no row holds (PN-25), so finished and cancelled SLAs could come back,
   and it left out breached SLAs still running (ARC-09-C229).

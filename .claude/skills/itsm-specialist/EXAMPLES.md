@@ -97,7 +97,7 @@ The following are explicitly blocked in any downstream design:
 - **Do not duplicate the baseline assignment-rule logic in the scheduled job.** The scheduled job reads `assignment_group` from the incident; it does not re-route. *(citation: `markdown/it-service-management/incident-management/t_DefinAnAssignRuleIncidents.md`)*
 - **Do not hardcode the duty-manager rotation sys_id in the scheduled job.** Resolve at runtime via `new OnCallRotation().whoIsOnCall()` or externalise to a system property if a default fallback is needed.
 - **Do not write the work note in a custom audit table** — use `incident.work_notes`. This is a §1.1 hot spot; the work_notes journal is the baseline audit for state changes and operational events. *(citation: `markdown/platform-security/audit-mgmt-console.md`)*
-- **Do not query `task_sla.stage='completed'` if SLA tracking is added** — baseline value is `complete` without the -ed. (Defensive — relevant if Technical Designer adds SLA-aware logic.)
+- **Do not query `task_sla.stage='complete'` if SLA tracking is added** — a finished SLA's stage is stored as `completed` (PN-25), labelled Completed, and appears as Achieved under the 2010-compatibility SLA property; verify against the instance's choice list. (Defensive — relevant if Technical Designer adds SLA-aware logic.)
 
 ## Open Questions
 
