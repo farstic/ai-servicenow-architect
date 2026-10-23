@@ -183,7 +183,7 @@ describe('ARC-09-C205 — the schema: both tools declare display_value, with the
       expect(properties?.display_value, name).toEqual({
         type: 'string',
         enum: ['false', 'all'],
-        // ARC-09-C225: the rendering is the owner's rule of 2026-10-23, in the plan row's words.
+        // ARC-09-C225: the rendering is the owner's rule of 2026-10-23, its wording measured before and after.
         description: 'For a list a person will read, pass display_value: \'all\' with `fields`: each field then carries '
           + 'its stored value and its label. A choice whose label hides its code (negative codes too) shows as '
           + '\'Label (value)\' ("Resolved (6)"); '
