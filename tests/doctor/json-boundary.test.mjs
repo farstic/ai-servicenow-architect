@@ -313,6 +313,11 @@ test('ARC-09-C221 — control: the product\'s own words survive the store\'s val
   assert.deepEqual(maskForJson({ server: { instances: [] }, v: product }, STORE_VALUES).v, product);
   assert.deepEqual(maskForJson({ server: { instances: [] }, v: ['host servicedesk.acmebank.com'] }).v,
     ['host servicedesk.acmebank.com'], 'with no store values the boundary changed what it masks');
+  // A store host whose stem is one of the product's own words (`portal.service.example`, `snow.servicenow.example`)
+  // still masks the host whole, but not the word: the report is full of it.
+  const words = ['ServiceNow and the Service Portal', 'servicenow.com/docs'];
+  assert.deepEqual(maskForJson({ server: { instances: [] }, v: words }, { hosts: [], stems: ['service', 'servicenow'] }).v, words,
+    'a product word was masked as a store stem');
 });
 
 test('ARC-09-C221 — the store\'s values are read SNOW_STORE first, and never a credential', async (t) => {

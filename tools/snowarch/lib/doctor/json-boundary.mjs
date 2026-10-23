@@ -25,11 +25,28 @@
 import { realpathSync } from 'node:fs';
 
 import { INSTANCE_HOST } from '../doctor-cache.mjs';
+import { storePath } from '../local-paths.mjs';
+import { byValueEntries, ENV_WORDS, maskByValue, storeHostValues } from '../mask-values.mjs';
 
 // ARC-09-C227 — every host in a string, not only the first. A replace with the shared constant, which has no g
 // flag, masked one address and left a second instance's in the JSON a user pastes into an issue. This copy is
 // global, and the constant is not: the cache guard asks it with .test(), which a /g regex makes stateful.
 const INSTANCE_HOST_ALL = new RegExp(INSTANCE_HOST.source, `${INSTANCE_HOST.flags}g`);
+
+// ARC-09-C221 — stems the report itself is full of: a store host's stem that is one of these is not masked, or the
+// product's own words would read `<host>`. A host is still masked whole.
+const PRODUCT_STEMS = new Set([...ENV_WORDS, 'servicenow', 'service', 'snowarch', 'github', 'npmjs', 'nodejs',
+  'docs', 'developer', 'support', 'example', 'invalid', 'local', 'localhost']);
+
+/**
+ * ARC-09-C221 — the store's own hosts and stems, for maskForJson: the non-credential tier (mask-values.mjs), read
+ * with the server's precedence, `SNOW_STORE` first. A custom-domain instance, or a host written bare, is not
+ * INSTANCE_HOST's shape; by value, the boundary masks it anyway. No credential is read here.
+ */
+export function storeMaskValues(root, env = process.env) {
+  const { hosts, stems } = storeHostValues(env.SNOW_STORE || storePath(root));
+  return { hosts, stems };
+}
 
 export const LABEL_MASK = '<label>';
 export const HOST_MASK = '<host>';
@@ -146,13 +163,19 @@ export function labelsIn(report) {
  * exceptions are wrong for somebody. The collision is asserted in the test, so it is documented
  * behaviour rather than a discovery.
  */
-export function maskForJson(report, { labels = labelsIn(report), home = '' } = {}) {
+export function maskForJson(report, { labels = labelsIn(report), home = '', hosts = [], stems = [] } = {}) {
   const res = [...labels].sort((a, b) => b.length - a.length).map((l) => [wordRe(l), LABEL_MASK]);
   // This run's own home FIRST — it is the most specific, and it may match no pattern at all — then
   // the generic shapes, which also cover a report quoting a path that is somebody else's home.
   const homes = homeValues(home).map((h) => new RegExp(escapeRe(h), 'g'));
+  // ARC-09-C221 — the store's hosts whole, with or without a scheme, then their stems (`acmebankdev` included).
+  const storeHosts = [...hosts].sort((a, b) => b.length - a.length)
+    .map((h) => new RegExp(`(?:[a-z][a-z0-9+.-]*://)?(?<![A-Za-z0-9.-])${escapeRe(h)}(?![A-Za-z0-9-])`, 'gi'));
+  const stemEntries = byValueEntries({ stems: stems.filter((s) => s.length > 3 && !PRODUCT_STEMS.has(s.toLowerCase())) });
   const maskString = (s) => {
     let out = s.replace(INSTANCE_HOST_ALL, HOST_MASK);
+    for (const re of storeHosts) out = out.replace(re, HOST_MASK);
+    out = maskByValue(out, stemEntries, () => HOST_MASK);
     for (const re of homes) out = out.replace(re, HOME_MASK);
     out = out.replace(HOME_PATH, HOME_MASK);
     for (const [re, to] of res) out = out.replace(re, to);
