@@ -170,6 +170,15 @@ test('ARC-09-C221 — every product control comes through unchanged', async () =
   assert.deepEqual(damaged, [], 'a product string was masked');
 });
 
+test('ARC-09-C221 — a URL that ends a clause keeps its punctuation, and a store host stays an instance URL', async () => {
+  // Found in the first end-to-end run, after the corpus passed: the URL rule took the comma into the URL, so the
+  // store's own host failed to parse and was tagged a plain <url>, and the sentence lost its comma.
+  const { maskFinding } = await finding();
+  reset();
+  assert.equal(maskFinding('saw it on https://servicedesk.acmebank.com, then on https://acmebank.service-now.com/x. Again!', STORE),
+    'saw it on <instance-url-1>, then on <instance-url-2>. Again!');
+});
+
 test('ARC-09-C221 — masking is idempotent over the whole corpus', async () => {
   const { maskFinding } = await finding();
   for (const [id, text, values] of [...LEAKS, ...CONTROLS]) {
