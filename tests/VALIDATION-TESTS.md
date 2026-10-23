@@ -108,7 +108,7 @@ Show me the table model and the Script Include.
 ### Pass criteria
 
 - CSM gateway fires at Phase 1 Step 5.
-- §1.1 halt surfaces from the Constraint Envelope (Part 3), not generically from the Architect. If the request names or requires a custom table, scoped app, state extension or other major custom object, Step 4 IDENTIFIES it and records it in the dispatch envelope; when a gateway domain applies, the §1.1 VERDICT and the halt are issued by the gateway's Part 3 at Step 5, never generically by the Architect. When no gateway applies, propose no default that makes one apply; Step 4 prints `§1.1: <A|B|C>` and halts on C. A request that NAMES a custom object is Verdict C even when baseline covers the need.
+- §1.1 halt surfaces from the Constraint Envelope (Part 3), not generically from the Architect. If the request names or requires a custom table, scoped app, state extension or other major custom object, name it. Step 4 IDENTIFIES the custom object and records it in the dispatch envelope; when a gateway domain applies, the §1.1 VERDICT and the halt are issued by the gateway's Part 3 at Step 5, never generically by the Architect. When no gateway applies, propose no default that makes one apply; Step 4 prints `§1.1: <A|B|C>` and halts on C. A request that NAMES a custom object is Verdict C even when baseline covers the need.
 - Zero design artefacts in the same turn as the OPEN QUESTION. **Design artefact** means any of: table DDL, field list, Script Include code, flow outline, HLD/LLD section, pseudocode, data model diagram, ACL matrix, or any other output that constitutes partial delivery of the requested build. A clarifying question or routing-time consult flag does NOT count as a design artefact.
 
 ### Fail signals
