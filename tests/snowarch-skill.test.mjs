@@ -58,12 +58,12 @@ const CHECKS = {
     assert.ok(!field(t, 'description').includes(': '), 'description contains a colon-space');
   },
 
-  'argument-hint names the three sub-commands': (t) => {
+  'argument-hint names the four sub-commands': (t) => {
     const hint = field(t, 'argument-hint');
-    for (const sub of ['status', 'setup-instance', 'doctor']) assert.match(hint, new RegExp(sub));
+    for (const sub of ['status', 'setup-instance', 'doctor', 'finding']) assert.match(hint, new RegExp(sub));
   },
 
-  'allowed-tools is EXACTLY the ten entries, in order': (t) => {
+  'allowed-tools is EXACTLY the eleven entries, in order': (t) => {
     // A grant is a security surface, so this asserts the WHOLE list rather than the presence of
     // the parts: an entry added by accident — or a wildcard someone reached for while debugging —
     // is invisible to a set of `match` calls and obvious to an equality.
@@ -75,6 +75,12 @@ const CHECKS = {
     // silently, and looking exactly like a broken install. The four MCP
     // tools are ARC-04-S04's, under `engine.config.json`'s own server key: `--resume` reloads the
     // store, reads the capabilities, and reports what is configured.
+    //
+    // The eleventh is ARC-09-C221's: § finding runs the masker, which is read-only and refuses any path
+    // outside `clients/<engagement>/findings/` itself, because a Bash rule cannot constrain arguments.
+    // The note is WRITTEN through Claude Code's own permission flow and is granted nothing here: a Write
+    // or Edit rule in this list would pre-approve writes for the whole turn, and the list below still
+    // forbids both (measured: a chained second command under this one rule is denied whole).
     const entries = field(t, 'allowed-tools').split(',').map((e) => e.trim());
     assert.deepEqual(entries, [
       'Bash(./snowarch status*)',
@@ -82,6 +88,7 @@ const CHECKS = {
       'Bash(./snowarch doctor*)',
       'Bash(node tools/snowarch/bin/snowarch.mjs doctor*)',
       'Bash(cat .local/bootstrap-state.json)',
+      'Bash(node tools/snowarch/lib/finding.mjs *)',
       'Read',
       `mcp__${SERVER_KEY}__snow_core_instances_reload`,
       `mcp__${SERVER_KEY}__snow_core_capabilities_read`,
@@ -170,6 +177,26 @@ const CHECKS = {
         `this line reads as a request for a credential: ${line}`);
     }
   },
+
+  'the opening names four sub-commands and where the skill calls MCP tools': (t) => {
+    // ARC-09-C221 corrected two stale sentences: § setup-instance --resume calls MCP tools, so "never calls an MCP
+    // tool" was already false, and § finding is the fourth sub-command.
+    assert.doesNotMatch(t, /It never calls an MCP tool/, 'the opening still says the skill never calls an MCP tool');
+    assert.match(t, /`status`, `setup-instance`, `doctor` or `finding`/);
+  },
+
+  'the finding section asks for the engagement, prints the masker verbatim, and sends nothing': (t) => {
+    // ARC-09-C221. The note is the user's and stays in the engagement's folder; what leaves is the masker's output,
+    // printed as it is, as § status prints its panel, and sent by the user, never by this skill.
+    const at = t.indexOf('\n## finding\n');
+    assert.ok(at > 0, 'no ## finding section');
+    const end = t.indexOf('\n## ', at + 1);
+    const section = t.slice(at, end < 0 ? undefined : end);
+    assert.match(section, /node tools\/snowarch\/lib\/finding\.mjs --next-name/);
+    assert.match(section, /Print its output verbatim/);
+    assert.match(section, /Send the text above to the person who issued your licence\./);
+    assert.match(section, /`_unfiled`/, 'the section does not say that a finding never goes under `_unfiled`');
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -187,10 +214,16 @@ const NEGATIVES = [
     (t) => `${t}\nIf the wizard fails, ask the user for their password here.\n`],
   ['the description runs over 500', 'the description fits the listing budget',
     (t) => t.replace(/^description: (.*)$/m, (_, d) => `description: ${d}${' and more'.repeat(80)}`)],
-  ['the grant widens to all of Bash', 'allowed-tools is EXACTLY the ten entries, in order',
+  ['the grant widens to all of Bash', 'allowed-tools is EXACTLY the eleven entries, in order',
     (t) => t.replace(/^allowed-tools: .*$/m, 'allowed-tools: Bash(*), Read')],
-  ['one more tool is granted quietly', 'allowed-tools is EXACTLY the ten entries, in order',
+  ['one more tool is granted quietly', 'allowed-tools is EXACTLY the eleven entries, in order',
     (t) => t.replace(/^(allowed-tools: .*)$/m, '$1, Bash(./snowarch instance add*)')],
+  // ARC-09-C221: the note is written through Claude Code's own permission flow, so even a write rule scoped to the
+  // findings folder is a grant this skill does not have.
+  ['a write grant scoped to the findings folder is added', 'allowed-tools is EXACTLY the eleven entries, in order',
+    (t) => t.replace(/^(allowed-tools: .*)$/m, '$1, Edit(clients/*/findings/*.md)')],
+  ['the finding section loses the closing sentence', 'the finding section asks for the engagement, prints the masker verbatim, and sends nothing',
+    (t) => t.replace('Send the text above to the person who issued your licence.', 'Send the text above.')],
 ];
 
 for (const [title, checkName, breakIt] of NEGATIVES) {
