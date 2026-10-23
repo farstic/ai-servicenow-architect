@@ -40,14 +40,14 @@ When the user types `Status` or `/snowarch status`: run `./snowarch status` (the
 
 ## 4. The roster, in one breath
 
-28 specialist personas · 29 skills (the extra one is reference knowledge, not a persona) · 9 sub-agents. The nine with sub-agents: **story-writer, hld-lld-writer, technical-designer, developer, flow-designer-specialist, integration-specialist, now-assist-specialist, atf-author, diagramming-specialist**. Everything else — gateways, reviewers, consults, documentation — is a skill loaded in the main thread.
+28 specialist personas · 29 skills (the extra one is reference knowledge, not a persona) · 9 sub-agents. The nine with sub-agents: **story-writer, hld-lld-writer, technical-designer, developer, flow-designer-specialist, integration-specialist, now-assist-specialist, atf-author, diagramming-specialist**. Everything else (gateways, reviewers, consults, documentation) is a skill loaded in the main thread.
 
 ## 5. Phase 1 — routing
 
 1. **Restate** the task in one sentence.
 2. **Read engagement context** if a client is named: `clients/<name>/<name>-engagement-state.md`, the one file onboarding creates. If none is named, save the design artefacts you produce under `clients/_unfiled/`, in `design-only` and `live` mode alike — never a scratchpad or temp directory — and say in the reply where it went and that naming an engagement moves it. A change to an instance is never filed there: the write gate asks which engagement it is for. A gateway Envelope for a named engagement is saved under `clients/<name>/envelopes/` and listed in the state file's `## Envelopes` section (date · gateway · verdict · path); reading engagement context means the state file and every Envelope it lists, so a later prompt in that engagement starts from them instead of re-reading the corpus. An Envelope under `clients/_unfiled/` is loaded by nothing until an engagement is named.
 3. **Surface assumptions.** Apply engagement defaults silently; raise only genuine uncertainty.
-4. **Identify the custom object.** If the request names or requires a custom table, scoped app, state extension or other major custom object, Step 4 IDENTIFIES it and records it in the dispatch envelope; when a gateway domain applies, the §1.1 VERDICT and the halt are issued by the gateway's Part 3 at Step 5, never generically by the Architect. When no gateway applies, propose no default that makes one apply; Step 4 prints `§1.1: <A|B|C>` and halts on C. The user's original request is never approval — approval arrives as a separate message.
+4. **Identify the custom object.** If the request names or requires a custom table, scoped app, state extension or other major custom object, name it. Step 4 IDENTIFIES the custom object and records it in the dispatch envelope; when a gateway domain applies, the §1.1 VERDICT and the halt are issued by the gateway's Part 3 at Step 5, never generically by the Architect. When no gateway applies, propose no default that makes one apply; Step 4 prints `§1.1: <A|B|C>` and halts on C. The user's original request is never approval — approval arrives as a separate message.
 5. **Apply the Domain Expert gateway.** Before any builder dispatch — **and before finalizing a domain-scoped document** (proposal, scoping document, HLD/LLD/PDD) that makes baseline, data-model or §1.1 claims:
 
 | Domain trigger keywords | Gateway specialist | Skill path |
@@ -122,7 +122,7 @@ When a returned artefact contains a JavaScript code block, propose verbatim: *"C
 
 ## 9. §1.1 and delivery governance
 
-Baseline first: a custom table, scoped app or state extension requires explicit, separate user approval, and self-authorization is prohibited. Every ruling — approval **or** rejection — is recorded as an ADR in `clients/<name>/decisions/`. Every unresolved OPEN QUESTION becomes a RAID item; NFRs go to the consult that owns them; the traceability matrix gains a row per story, design, build, test and deploy.
+Baseline first: a custom table, scoped app or state extension requires explicit, separate user approval, and self-authorization is prohibited. Every ruling (approval **or** rejection) is recorded as an ADR in `clients/<name>/decisions/`. Every unresolved OPEN QUESTION becomes a RAID item; NFRs go to the consult that owns them; the traceability matrix gains a row per story, design, build, test and deploy.
 
 ## 10. Confidentiality
 
@@ -135,7 +135,7 @@ Record it in the same pull request as the fix or the test; no category is exclud
 - **A ServiceNow platform behaviour** → `docs/PLATFORM-NOTES.md`, a `PN-xx` entry. `Grounding:` is a real path under `vendor/ServiceNowDocs/` or the words `observed behaviour` — never an invented path.
 - **This server's own behaviour** → a failing test under `packages/snowarch/tests/`, then the fix; a `packages/snowarch/CHANGELOG.md` row until fixed (in the engineering checkout).
 - **An install or Claude Code behaviour** → `docs/TROUBLESHOOTING.md` when it has an error code, else a rule in `docs/CONTRIBUTING.md` (in the engineering checkout).
-- **Anything instance-specific** — URLs, sys_ids, user names — is never committed: it belongs in `.local/`, `clients/<name>/` or Claude Code's own memory.
+- **Anything instance-specific** (URLs, sys_ids, user names) is never committed: it belongs in `.local/`, `clients/<name>/` or Claude Code's own memory.
 
 ## 12. Maintenance
 
