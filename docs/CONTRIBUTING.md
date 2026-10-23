@@ -2525,6 +2525,46 @@ differently. An entry that changes nothing about how the engine works is a note,
 
 ---
 
+## The platform notes have a size cap
+
+`tests/platform-notes-size.test.mjs` fails once `docs/PLATFORM-NOTES.md` reaches 80,000 bytes,
+counted with LF line ends so a Windows checkout measures what git stores (ARC-09-C222). When the cap
+was set the notes held 24 entries in 49,230 bytes, about 2 KB an entry. They are an evidence
+archive: what an entry teaches belongs in the skill or tool that acts on it, and the entry records
+why. Nothing warns before the cap, because a warning that never fails is one nobody reads. The pull
+request that crosses it carries the split as part of its own work:
+
+1. **Move the entries by area** into `docs/platform-notes/<area>.md`, one file per area of the
+   platform that the entries' `Applies to:` lines name, such as update sets and capture, the REST
+   Table API and data policies, AI Agent Studio, or ITSM records. The Windows notes, which are about
+   this repository, get a file of their own. An entry moves whole: its id, its title and its five
+   fields.
+2. **Keep `docs/PLATFORM-NOTES.md` as the index:** its introduction, then one line per entry with the
+   id, the title and the area file, written as a backticked `docs/platform-notes/<area>.md` path so
+   the distribution guard reads it. A `PN-xx` cited elsewhere (59 files when the cap was set) then
+   still resolves through the same path, and the path that `CLAUDE.md` § 11 and the table above name
+   stays right.
+3. **Point the readers at the index and the area files.** When the cap was set they were:
+   - `tests/no-legacy-surfaces.test.mjs`: five fields per entry and nothing from an instance
+     (ARC-02-S10), and every tool named exists (ARC-02-S12). `PN-07` resolving (ARC-10-S04) holds
+     through the index;
+   - `scripts/live-coverage.mjs`, `scripts/lib/live-coverage.mjs` and `tests/live-coverage.test.mjs`,
+     which read the notes as a record of the tools called live;
+   - `tools/snowarch/lib/docs/citations.mjs`, whose `DEFAULT_ROOTS` put the notes in the citation
+     scan behind `docs verify` and `vendor/docs-areas.txt`;
+   - `tests/docs-links.test.mjs` and `tests/install-page.test.mjs`, which check the notes' links;
+   - `packages/snowarch/src/licence/integrity.ts`, whose `COVERAGE` is what ships (ARC-09-C185a).
+     Name each area file there, not the directory: ARC-09-C197 allows no new directory prefix in
+     `COVERAGE` until its fix is in the installed base. `node scripts/distribution.mjs --check`
+     reports an area file the index cites that `COVERAGE` leaves out;
+   - `tests/platform-notes-size.test.mjs`, which then measures the index and each area file.
+
+   `tests/windows-spellings.test.mjs` reads every tracked page under `docs/`, so it follows the split
+   by itself. The list is as measured when the cap was set: before moving anything,
+   `git grep -n PLATFORM-NOTES -- '*.mjs' '*.ts'` shows the readers as they are then.
+
+---
+
 ## Vocabulary
 
 The v3 rebuild retired four strings. **SK-09** (`.claude/`) and the criterion-2 sweep in
