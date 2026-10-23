@@ -200,7 +200,7 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 - "Do not create a custom on-call structure — use baseline `cmn_rota`, `cmn_schedule_span`, `cmn_rota_member`. *(citation: `markdown/it-service-management/on-call-scheduling/c_OnCallSchedulingConcepts.md`)*"
 - "Do not duplicate baseline notification logic in a custom BR — extend the baseline notification record by adding a condition or modifying the template."
 - "Do not create a custom priority matrix table — edit the rows of the baseline Priority Lookup Rules, already keyed on `impact` and `urgency`, to produce `priority`." *(citation: `markdown/it-service-management/incident-management/def-prio-lookup-rules.md`)*
-- "Do not query `task_sla` with `stage='completed'` — the baseline stage vocabulary uses `stage='complete'` (no -ed suffix). Verify against your instance's `task_sla` choice list before depending on either value.]
+- "Do not query `task_sla` with `stage='complete'` — a finished SLA's stage is stored as `completed` (PN-25), the stage the corpus labels Completed *(citation: `markdown/it-service-management/service-level-management/sla-timer.md`)*, which appears as Achieved when the SLA engine property **Enable compatibility with 2010 'breached' stage for SLAs** is true *(citation: `markdown/it-service-management/service-level-management/c_SLATimeline.md`)*. Verify against your instance's `task_sla` choice list before depending on either value."]
 
 ## Open Questions
 
