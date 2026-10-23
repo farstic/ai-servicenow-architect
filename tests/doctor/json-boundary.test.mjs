@@ -25,6 +25,7 @@ import { dirname, join } from 'node:path';
 
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { maskForJson, labelsIn, LABEL_MASK, HOST_MASK, HOME_MASK, homeValues } from '../../tools/snowarch/lib/doctor/json-boundary.mjs';
+import { cacheSensitiveValue, INSTANCE_HOST } from '../../tools/snowarch/lib/doctor-cache.mjs';
 import { greenTree, linkInstall, writeJson } from './helpers/tree.mjs';
 
 const LABEL = 'acme-prod';
@@ -250,4 +251,43 @@ test('C1 — a label of `dev` also masks the environment token, and that is the 
   assert.match(r.modeLine, /preset=read-only/);
   assert.equal(r.schema, JSON.parse(json).schema);
   assert.ok(Array.isArray(r.checks) && r.checks.length > 0, 'the report lost its checks');
+});
+
+// ── ARC-09-C227 — every instance host in a string, not only the first ──────────────────────────────────
+//
+// maskForJson replaced with INSTANCE_HOST, which has no g flag, so a string naming two instances kept the second
+// address: "https://alpha.service-now.com and https://beta.service-now.com" came out as
+// "<host> and https://beta.service-now.com", and a host named twice kept its second copy. Shipped through 2.2.4.
+// The shared constant stays non-global: cacheSensitiveValue asks it with .test(), and a /g regex carries
+// lastIndex from one call to the next.
+
+const ALPHA = 'https://alpha.service-now.com';
+const BETA = 'https://beta.service-now.com';
+const maskedValue = (value) => maskForJson({ server: { instances: [] }, value }).value;
+
+test('ARC-09-C227 — two instance hosts in one string are both masked', () => {
+  assert.equal(maskedValue(`${ALPHA} and ${BETA}`), `${HOST_MASK} and ${HOST_MASK}`);
+});
+
+test('ARC-09-C227 — the same host twice in one string is masked twice', () => {
+  assert.equal(maskedValue(`${ALPHA} then ${ALPHA} again`), `${HOST_MASK} then ${HOST_MASK} again`);
+});
+
+test('ARC-09-C227 — two hosts in a nested field and in an array element are all masked', () => {
+  const out = maskForJson({ server: { instances: [] }, a: { b: `${ALPHA}/api ${BETA}/x`, list: [`${BETA} ${ALPHA}`] } });
+  assert.deepEqual(out.a, { b: `${HOST_MASK}/api ${HOST_MASK}/x`, list: [`${HOST_MASK} ${HOST_MASK}`] });
+});
+
+test('ARC-09-C227 — control: one host in a string is masked, as before', () => {
+  assert.equal(maskedValue(`see ${ALPHA}/now`), `see ${HOST_MASK}/now`);
+});
+
+test('ARC-09-C227 — control: the cache guard gives the same answer when asked twice', () => {
+  const value = `${ALPHA} is the instance`;
+  assert.equal(cacheSensitiveValue(value), 'it carries an instance address');
+  assert.equal(cacheSensitiveValue(value), 'it carries an instance address');
+});
+
+test('ARC-09-C227 — control: the shared INSTANCE_HOST stays non-global', () => {
+  assert.equal(INSTANCE_HOST.flags.includes('g'), false, 'INSTANCE_HOST gained the g flag, and its .test() callers now carry lastIndex');
 });
