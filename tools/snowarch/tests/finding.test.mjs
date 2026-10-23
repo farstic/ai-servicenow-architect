@@ -18,7 +18,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from './helpers/temp.mjs';
 import { reset } from '../lib/redact.mjs';
@@ -191,19 +191,46 @@ test('ARC-09-C221 — masking is idempotent over the whole corpus', async () => 
 test('ARC-09-C221 — the output says what ran first, and ends with what the reader must still check', async () => {
   const { renderFinding, FIXED_REVIEW } = await finding();
   reset();
-  const read = renderFinding('Ivan Petrov saw INC0010001 on https://acmebank.service-now.com', STORE, { storeRead: true });
+  const read = renderFinding('Ivan Petrov saw INC0010001 on https://acmebank.service-now.com', STORE,
+    { storeRead: true, credentialsRead: true });
   const lines = read.split('\n');
-  assert.match(lines[0], /^instance names masked by value: \d+ \(store read\)$/);
+  assert.match(lines[0], /^instance names masked by value: \d+ \(store read\) · credentials read$/);
   assert.ok(read.includes('<record>') && read.includes('<instance-url-1>'), 'the masked text is not in the output');
   const tail = read.slice(read.lastIndexOf('Read before sending:'));
   assert.ok(read.lastIndexOf('Read before sending:') > 0, 'no "Read before sending:" section');
   assert.ok(tail.includes('Ivan Petrov'), 'the review list does not carry the person the masker kept');
   for (const item of FIXED_REVIEW) assert.ok(tail.includes(item), `the fixed list lost "${item}"`);
-  for (const cls of ['people', 'places', 'company names', 'ticket keys', 'abbreviations', 'fewer than 6 digits']) {
+  for (const cls of ['people', 'places', 'company names', 'ticket keys', 'abbreviations', 'fewer than 6 digits',
+    'a credential written in plain words']) {
     assert.ok(FIXED_REVIEW.join(' ').includes(cls), `the fixed list does not name ${cls}`);
   }
   const unread = renderFinding('text', STORE, { storeRead: false });
-  assert.equal(unread.split('\n')[0], 'instance store NOT read — check every instance name');
+  assert.equal(unread.split('\n')[0],
+    'instance store NOT read — check every instance name · credentials NOT read — check usernames and passwords before sending');
+});
+
+test('ARC-09-C221 — the two tiers are reported apart: credentials not read is said, in the header and in the review list', async () => {
+  // The architect's measurement on 140754a0: in a worktree with no node_modules the credential tier's imports failed,
+  // the failure was swallowed, usernames went unmasked, and the header still said "(store read)".
+  const { renderFinding } = await finding();
+  reset();
+  const out = renderFinding('logged in as svc_snowarch_acme', STORE, { storeRead: true, credentialsRead: false });
+  assert.match(out.split('\n')[0],
+    /^instance names masked by value: \d+ \(store read\) · credentials NOT read — check usernames and passwords before sending$/);
+  const tail = out.slice(out.lastIndexOf('Read before sending:'));
+  assert.ok(tail.includes('credentials NOT read'), 'the review list does not say the credentials were not read');
+});
+
+test('ARC-09-C221 — a credential written in plain words is masked, and the plain words around it are not', async () => {
+  const { maskFinding } = await finding();
+  reset();
+  const [a, b, c] = [['hun', 'ter2'].join(''), ['abc123', 'def456'].join(''), ['hun', 'ter3'].join('')];
+  const out = maskFinding(`my ${PASSWORD_WORD} is ${a} and the token is ${b}; pwd ${c}`, SMALL);
+  assert.deepEqual(survivors(out, [a, b, c]), [], `a plain-word credential survived: ${out}`);
+  for (const plain of ['the token is expired', `the ${PASSWORD_WORD} is required`, `${PASSWORD_WORD} reset`, 'token count 3']) {
+    reset();
+    assert.equal(maskFinding(plain, SMALL), plain, `plain words were masked: ${plain}`);
+  }
 });
 
 test('ARC-09-C221 — a short or product-word engagement name or alias is warned about', async () => {
@@ -304,11 +331,37 @@ test('ARC-09-C221 — the script end to end: the store\'s own username and passw
   const code = await main(['clients/acme-bank/findings/2026-10-23-slow-list.md'],
     { root, env: { SNOW_STORE: storeFile(t) }, out: { write: (s) => { out += s; } } });
   assert.equal(code, 0, out);
-  assert.match(out.split('\n')[0], /^instance names masked by value: \d+ \(store read\)$/);
+  assert.match(out.split('\n')[0], /^instance names masked by value: \d+ \(store read\) · credentials read$/);
   assert.ok(!out.includes(PW), 'the store\'s password was printed');
   assert.ok(!out.includes('svc_snowarch_acme'), 'the store\'s username was printed');
   assert.ok(!/acmebank/i.test(out), 'the store\'s host was printed');
   assert.ok(out.includes('<record>'), 'the record number was not masked');
+});
+
+test('ARC-09-C221 — the script end to end, its credential reader failing: the header and the review list say so', async (t) => {
+  const { main } = await finding();
+  const note = 'Logged in as svc_snowarch_acme on https://servicedesk.acmebank.com.';
+  const run = async (root, extra) => {
+    let out = '';
+    const code = await main(['clients/acme-bank/findings/2026-10-23-slow-list.md'], { root, out: { write: (s) => { out += s; } }, ...extra });
+    assert.equal(code, 0, out);
+    return out;
+  };
+  // A loader that cannot load: what a checkout without its dependencies meets.
+  const failing = await run(checkout(t, note), { env: { SNOW_STORE: storeFile(t) },
+    credentialReader: async () => { throw new Error('Cannot find module'); } });
+  // The store loader refusing: a store inside a checkout git does not ignore (here, no repository at all).
+  const root = checkout(t, note);
+  mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(join(root, '.local', 'instances.json'), readFileSync(storeFile(t), 'utf8'));
+  chmodSync(join(root, '.local', 'instances.json'), 0o600);
+  const refused = await run(root, { env: {} });
+  for (const out of [failing, refused]) {
+    assert.match(out.split('\n')[0], /\(store read\) · credentials NOT read — check usernames and passwords before sending$/);
+    assert.ok(out.slice(out.lastIndexOf('Read before sending:')).includes('credentials NOT read'),
+      'the review list does not say the credentials were not read');
+    assert.ok(!/acmebank/i.test(out), 'the non-credential tier stopped masking the store\'s host');
+  }
 });
 
 test('ARC-09-C221 — the script refuses a path outside the findings folder and prints nothing of it', async (t) => {
