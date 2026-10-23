@@ -5,6 +5,11 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**`snow_cat_active_slas_index` asks for the Task SLAs In Progress or Paused (ARC-09-C229).** Its query was
+`stage!=complete^has_breached=false`. No row holds `complete` (PN-25), so the stage half excluded nothing, and the
+breach half left out breached SLAs that are still running. The query is now `stageINin_progress,paused`, breached or
+not, with a caller's `query` in front, joined with `^`; each record's `has_breached` says whether it breached.
+
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
