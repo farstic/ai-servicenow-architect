@@ -605,7 +605,7 @@ BOM" and produces files `JSON.parse` refuses.
 `tools/snowarch/launcher/docs-recipe.ps1` had none. 5.1 read its em dash as `â€”`, took the last of those
 characters for a double quote and ended a string early, so `bootstrap.cmd --docs full` stopped at B02 with
 "The term 'Invoke-DocsRecipeFull' is not recognized" (ARC-09-C244, fixed in 2.2.5).
-`tests/launcher-parity.test.mjs` checks the BOM of every file `bootstrap.ps1` dot-sources.
+A launcher-parity test checks the BOM of every file `bootstrap.ps1` dot-sources.
 
 **Line endings.** `.gitattributes` gives `*.ps1` and `*.cmd` `text eol=crlf`: the index keeps LF and
 every checkout converts. A lone LF in a `.cmd` is a batch file that stops at the first line.
