@@ -34,6 +34,12 @@ only the first.**
   reports each dead one, with its line, to the Architect, with the instruction to correct it before presenting the file.
   It is a hook the bootstrap writes beside the session banner's, in `.claude/settings.local.json`, when Node is present
   (ARC-09-C231).
+- After `./snowarch upgrade` moved the checkout, the doctor lines it closed with were titled by the release you had
+  installed, not the one you moved to: a check the new release added could print without its title, and one it renamed
+  under its old one. The lines now print exactly the checks the new release's doctor reported in that run, with its
+  titles, and keep the instance names and commands this machine's doctor cache holds for the same run. The upgrade that
+  brings you this release is still run by the one you have installed, so the change shows from your next upgrade on
+  (ARC-09-C200).
 
 ### Changed
 
