@@ -29,7 +29,7 @@ import { planContext, planForMove, planSteps, rerunAtTag } from '../../tools/sno
 import { hashFor } from '../../tools/snowarch/lib/inputs.mjs';
 import { checkoutKey } from '../../tools/snowarch/lib/state.mjs';
 import { STEPS } from '../../tools/snowarch/lib/steps/index.mjs';
-import { git } from './harness.mjs';
+import { LONGPATHS, git } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { REAL_ROOT } from '../doctor/helpers/tree.mjs';
 
@@ -408,18 +408,19 @@ test('ARC-09-C241 — a worktree a failed target left dirty is cleaned before th
     assert.deepEqual(fresh.steps.map((s) => s.step), [], 'the control: a state current for the tag plans nothing');
 
     // The helper runs the TARGET's code in the shared worktree. This one leaves it dirty, then fails: a stray file,
-    // and the lock file B04 hashes, edited. Planned on as it was left, B04 would be "inputs changed".
+    // and the areas file B02 hashes, edited. Planned on as it was left, B02 would be "inputs changed".
     const adds = [];
     let stray = null;
+    // Only git is ever spawned here: the one other command U4 runs is the helper, and the stand-in answers for it.
     const run = (cmd, args, options) => {
-      if (cmd === process.execPath) {
+      if (cmd !== 'git') {
         stray = join(args[1], 'stray-from-the-target.txt');
         writeFileSync(stray, 'left behind\n');
-        writeFileSync(join(args[1], 'package-lock.json'), '{}\n');
+        writeFileSync(join(args[1], 'vendor', 'docs-areas.txt'), 'markdown/edited-by-the-target\n');
         return { status: 1, stdout: '', stderr: 'plan-at-target: the target failed after writing\n' };
       }
-      if (cmd === 'git' && args[0] === 'worktree' && args[1] === 'add') adds.push(args.at(-2));
-      return spawnSync(cmd, args, options);
+      if (args[0] === 'worktree' && args[1] === 'add') adds.push(args.at(-2));
+      return spawnSync('git', [...LONGPATHS, ...args], options);   // scan-exempt: U4's own git calls, passed through
     };
     const plan = planForMove(root, 'v9.9.9-target', { ctx, state, run, signed: true });
     assert.equal(adds.length, 1, `U4 made ${adds.length} worktrees of the tag`);

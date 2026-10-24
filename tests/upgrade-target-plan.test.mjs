@@ -215,12 +215,13 @@ function fixtureCheckout(t) {
   return { repo, git };
 }
 
-/** spawnSync, recorded: every `git worktree add` this process makes. */
+/** git through spawnSync, recorded: every `git worktree add` this process makes. planSteps spawns nothing else. */
 function recordedRun() {
   const adds = [];
   const run = (cmd, args, options) => {
-    if (cmd === 'git' && args[0] === 'worktree' && args[1] === 'add') adds.push(args.at(-2));
-    return spawnSync(cmd, args, options);
+    assert.equal(cmd, 'git', `planSteps spawned ${cmd}`);
+    if (args[0] === 'worktree' && args[1] === 'add') adds.push(args.at(-2));
+    return spawnSync('git', args, options);
   };
   return { run, adds };
 }
@@ -242,19 +243,33 @@ test('ARC-09-C241 — planSteps hands a kept worktree to rerunAtTag, which then 
   assert.ok(existsSync(join(kept, 'package.json')), 'planSteps removed a worktree it did not make');
 });
 
-test('ARC-09-C241 — the helper hands the target\'s planSteps the worktree it runs in', (t) => {
-  // The worktree stands in for the target: its planSteps answers with the options it was handed.
-  const at = tempDir('snowarch-c241-target-', t);
-  mkdirSync(join(at, 'tools', 'snowarch', 'lib', 'commands'), { recursive: true });
-  writeFileSync(join(at, 'engine.config.json'), '{}\n');
-  writeFileSync(join(at, 'tools', 'snowarch', 'lib', 'commands', 'upgrade.mjs'),
+test('ARC-09-C241 — the helper hands the target\'s planSteps the worktree it runs in, when that is the tag\'s', (t) => {
+  // The tag's own code is a planSteps that answers with the options it was handed.
+  const repo = tempDir('snowarch-c241-target-', t);
+  const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: 'pipe', env: IDENTITY });
+  initFixtureRepo(git, repo, ['-q', '-b', 'main']);
+  mkdirSync(join(repo, 'tools', 'snowarch', 'lib', 'commands'), { recursive: true });
+  writeFileSync(join(repo, 'engine.config.json'), '{}\n');
+  writeFileSync(join(repo, 'tools', 'snowarch', 'lib', 'commands', 'upgrade.mjs'),
     'export function planSteps(root, tag, options) {\n'
     + '  const seen = JSON.stringify({ keepWorktree: options.keepWorktree ?? null });\n'
     + '  return { steps: [{ step: "B00", title: seen, why: "probe", files: [] }], estimate: false };\n}\n');
-  const r = spawnSync(process.execPath, [PLAN_HELPER, at, at, 'v9.2.0'], { cwd: at, encoding: 'utf8',
-    input: JSON.stringify({ manifestWritten: true, state: null }), timeout: PLAN_TIMEOUT_MS });
-  assert.equal(r.status, 0, r.stderr);
-  assert.deepEqual(JSON.parse(JSON.parse(r.stdout).steps[0].title), { keepWorktree: at });
+  git(['add', '-A']);
+  git(['commit', '-qm', 'the target']);
+  git(['tag', 'v9.2.0']);
+  const seen = (at) => {
+    const r = spawnSync(process.execPath, [PLAN_HELPER, at, repo, 'v9.2.0'], { cwd: repo, encoding: 'utf8',
+      input: JSON.stringify({ manifestWritten: true, state: null }), timeout: PLAN_TIMEOUT_MS });
+    assert.equal(r.status, 0, r.stderr);
+    return JSON.parse(JSON.parse(r.stdout).steps[0].title).keepWorktree;
+  };
+  const at = join(tempDir('snowarch-c241-at-', t), 'at-tag');
+  git(['worktree', 'add', '--detach', '--quiet', at, 'v9.2.0']);
+  t.after(() => { try { git(['worktree', 'remove', '--force', at]); } catch { /* the repository went first */ } });
+  assert.equal(seen(at), at, 'the helper did not hand over the worktree of the tag it ran in');
+  // The control: a tree that holds the target's code without being the tag's checkout is not planned in.
+  git(['commit', '-q', '--allow-empty', '-m', 'past the tag']);
+  assert.equal(seen(repo), null, 'the helper handed over a tree that is not the tag\'s checkout');
 });
 
 test('ARC-09-C241 — planForMove makes one worktree, asks the target in it, and plans the fallback in it', () => {
