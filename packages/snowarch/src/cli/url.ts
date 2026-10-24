@@ -89,8 +89,8 @@ export function normalizeInstanceUrl(input: string): UrlResult {
     return { ok: true, url: `https://${trimmed.toLowerCase()}.service-now.com`, proposed: true, notes: [] };
   }
 
-  // ARC-09-C240 — an http(s) scheme typed wrong is quoted back as typed, as 2.2.4 did, never checked as
-  // `https://https…`, whose refusal would be about a path the user never typed.
+  // ARC-09-C240 — an http(s) scheme typed wrong is quoted back as typed, as 2.2.4 did, never checked with a second
+  // scheme put in front of it, whose refusal would be about a path the user never typed.
   if (MISTYPED_SCHEME.test(trimmed)) return notAUrl(trimmed);
 
   // ARC-09-C223 — a host typed without a scheme is checked AS `https://<host>`, through every check
