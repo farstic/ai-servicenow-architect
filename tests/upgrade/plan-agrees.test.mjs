@@ -21,11 +21,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { planContext, planSteps, rerunAtTag } from '../../tools/snowarch/lib/commands/upgrade.mjs';
+import { planContext, planForMove, planSteps, rerunAtTag } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { hashFor } from '../../tools/snowarch/lib/inputs.mjs';
 import { checkoutKey } from '../../tools/snowarch/lib/state.mjs';
 import { STEPS } from '../../tools/snowarch/lib/steps/index.mjs';
@@ -395,4 +395,38 @@ test('ARC-09-C198 — a record written before the binding existed puts every cac
     assert.equal(estimate, false, 'the worktree comparison did not run');
     assert.deepEqual(steps.map((s) => `${s.step} ${s.why}`),
       Object.keys(recorded).sort().map((id) => `${id} recorded without a folder`));
+  });
+
+test('ARC-09-C241 — a worktree a failed target left dirty is cleaned before the fallback plans in it',
+  { timeout: 120_000 }, (t) => {
+    const root = clone(t);
+    const ctx = ctxFor(root);
+    checkoutTag(root, 'v9.9.9-target');
+    recordCurrent(root, ctx);
+    const state = JSON.parse(readFileSync(join(root, '.local', 'bootstrap-state.json'), 'utf8'));
+    const fresh = planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync });
+    assert.deepEqual(fresh.steps.map((s) => s.step), [], 'the control: a state current for the tag plans nothing');
+
+    // The helper runs the TARGET's code in the shared worktree. This one leaves it dirty, then fails: a stray file,
+    // and the lock file B04 hashes, edited. Planned on as it was left, B04 would be "inputs changed".
+    const adds = [];
+    let stray = null;
+    const run = (cmd, args, options) => {
+      if (cmd === process.execPath) {
+        stray = join(args[1], 'stray-from-the-target.txt');
+        writeFileSync(stray, 'left behind\n');
+        writeFileSync(join(args[1], 'package-lock.json'), '{}\n');
+        return { status: 1, stdout: '', stderr: 'plan-at-target: the target failed after writing\n' };
+      }
+      if (cmd === 'git' && args[0] === 'worktree' && args[1] === 'add') adds.push(args.at(-2));
+      return spawnSync(cmd, args, options);
+    };
+    const plan = planForMove(root, 'v9.9.9-target', { ctx, state, run, signed: true });
+    assert.equal(adds.length, 1, `U4 made ${adds.length} worktrees of the tag`);
+    assert.deepEqual(plan.steps, fresh.steps, 'the fallback planned on what the failed target left behind');
+    assert.match(plan.installedBecause, /the target failed after writing/);
+    assert.ok(stray, 'the stand-in target never ran');
+    assert.equal(existsSync(stray), false, 'the stray file the target wrote is still there');
+    const listed = git(root, ['worktree', 'list', '--porcelain']).split('\n').filter((l) => l.startsWith('worktree '));
+    assert.equal(listed.length, 1, `a worktree is still registered: ${listed.join(', ')}`);
   });

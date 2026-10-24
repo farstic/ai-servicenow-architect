@@ -14,12 +14,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { PLAN_HELPER, PLAN_TIMEOUT_MS, planForMove, renderPlan, targetPlan }
+import { PLAN_HELPER, PLAN_TIMEOUT_MS, planForMove, planSteps, renderPlan, targetPlan }
   from '../tools/snowarch/lib/commands/upgrade.mjs';
+import { loadConfig } from '../tools/snowarch/lib/config.mjs';
 import { MANIFESTS_FROM } from '../tools/snowarch/lib/licence/manifest.mjs';
 import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
@@ -189,4 +190,83 @@ test('ARC-09-C195 — the helper plans and nothing more: the checkout and .local
   assert.deepEqual(snapshot(repo), before.files, 'the helper changed a file in the checkout or in its .local/');
   assert.equal(git(['worktree', 'list', '--porcelain']), before.worktrees, 'the helper left a worktree registered');
   assert.equal(git(['status', '--porcelain', '--ignored']), before.status);
+});
+
+/** A two-tag fixture checkout at v9.1.0, moving to v9.2.0, whose move changes a step's input (B04's lock file). */
+function fixtureCheckout(t) {
+  const repo = tempDir('snowarch-c241-', t);
+  const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: 'pipe', env: IDENTITY });
+  const put = (path, text) => {
+    mkdirSync(dirname(join(repo, path)), { recursive: true });
+    writeFileSync(join(repo, path), text);
+  };
+  initFixtureRepo(git, repo, ['-q', '-b', 'main']);
+  put('.gitignore', '.local/\n');
+  put('package.json', '{"name":"fixture","version":"9.2.0"}\n');
+  put('package-lock.json', '{"lockfileVersion":3}\n');
+  git(['add', '-A']);
+  git(['commit', '-qm', 'one']);
+  git(['tag', 'v9.1.0']);
+  put('package-lock.json', '{"lockfileVersion":3,"packages":{}}\n');
+  git(['commit', '-qam', 'two']);
+  git(['tag', 'v9.2.0']);
+  git(['checkout', '-q', 'v9.1.0']);
+  assert.equal(git(['rev-parse', 'HEAD']), git(['rev-parse', 'v9.1.0^{commit}']), 'the checkout did not move to v9.1.0');
+  return { repo, git };
+}
+
+/** spawnSync, recorded: every `git worktree add` this process makes. */
+function recordedRun() {
+  const adds = [];
+  const run = (cmd, args, options) => {
+    if (cmd === 'git' && args[0] === 'worktree' && args[1] === 'add') adds.push(args.at(-2));
+    return spawnSync(cmd, args, options);
+  };
+  return { run, adds };
+}
+
+test('ARC-09-C241 — planSteps hands a kept worktree to rerunAtTag, which then adds none', (t) => {
+  const { repo, git } = fixtureCheckout(t);
+  const ctx = { root: repo, config: loadConfig(ROOT) };
+  const fresh = recordedRun();
+  const planned = planSteps(repo, 'v9.2.0', { ctx, state: null, run: fresh.run });
+  assert.equal(fresh.adds.length, 1, 'the control: without a kept worktree, planSteps adds one');
+
+  const kept = join(tempDir('snowarch-c241-kept-', t), 'at-tag');
+  git(['worktree', 'add', '--detach', '--quiet', kept, 'v9.2.0']);
+  t.after(() => { try { git(['worktree', 'remove', '--force', kept]); } catch { /* removed by the case */ } });
+  const reused = recordedRun();
+  const again = planSteps(repo, 'v9.2.0', { ctx, state: null, run: reused.run, keepWorktree: kept });
+  assert.deepEqual(reused.adds, [], 'planSteps added a worktree although it was handed one');
+  assert.deepEqual(again, planned, 'the plan from the kept worktree is not the plan from a fresh one');
+  assert.ok(existsSync(join(kept, 'package.json')), 'planSteps removed a worktree it did not make');
+});
+
+test('ARC-09-C241 — the helper hands the target\'s planSteps the worktree it runs in', (t) => {
+  // The worktree stands in for the target: its planSteps answers with the options it was handed.
+  const at = tempDir('snowarch-c241-target-', t);
+  mkdirSync(join(at, 'tools', 'snowarch', 'lib', 'commands'), { recursive: true });
+  writeFileSync(join(at, 'engine.config.json'), '{}\n');
+  writeFileSync(join(at, 'tools', 'snowarch', 'lib', 'commands', 'upgrade.mjs'),
+    'export function planSteps(root, tag, options) {\n'
+    + '  const seen = JSON.stringify({ keepWorktree: options.keepWorktree ?? null });\n'
+    + '  return { steps: [{ step: "B00", title: seen, why: "probe", files: [] }], estimate: false };\n}\n');
+  const r = spawnSync(process.execPath, [PLAN_HELPER, at, at, 'v9.2.0'], { cwd: at, encoding: 'utf8',
+    input: JSON.stringify({ manifestWritten: true, state: null }), timeout: PLAN_TIMEOUT_MS });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(JSON.parse(r.stdout).steps[0].title), { keepWorktree: at });
+});
+
+test('ARC-09-C241 — planForMove makes one worktree, asks the target in it, and plans the fallback in it', () => {
+  const { run, calls } = fakeRun({ helper: { status: 1, stdout: '', stderr: 'plan-at-target: no planSteps\n' } });
+  let handed;
+  const plan = planForMove('/checkout', 'v9.2.0', { signed: true, run,
+    ownPlan: (root, tag, options) => { handed = options.keepWorktree; return OWN; } });
+  assert.deepEqual(plan, { ...OWN, installedBecause: 'the target\'s own plan could not be read: plan-at-target: no planSteps' });
+  const adds = calls.filter((c) => c.cmd === 'git' && c.args[0] === 'worktree' && c.args[1] === 'add');
+  assert.equal(adds.length, 1, JSON.stringify(adds.map((c) => c.args)));
+  const helper = calls.find((c) => c.cmd === process.execPath);
+  assert.equal(handed, helper.args[1], 'the fallback did not plan in the worktree the target was asked in');
+  assert.ok(calls.some((c) => c.cmd === 'git' && c.args[1] === 'remove' && c.args.at(-1) === helper.args[1]),
+    'the shared worktree was not removed');
 });
