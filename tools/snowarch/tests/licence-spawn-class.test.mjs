@@ -14,7 +14,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { scanProductStarts } from './helpers/licence-hook/starts.mjs';
@@ -41,10 +41,14 @@ test('ARC-11-C6 — every test that starts a CLI, the server or a launcher gives
  * The paths are built with `resolve`, not `join`, because the reader follows a relative import with `resolve`, and on
  * Windows `resolve` puts the drive in front: a planted `\planted\paths.mjs` was never the `D:\planted\paths.mjs` it
  * looked for, so an imported path went unfollowed on the three Windows test cells and the dry run (run 38233593218).
+ *
+ * ARC-09-C202 — `dotted` spells each path through a `.` segment, which TypeScript folds out of a source file's name
+ * as it turns every backslash of a Windows path into a slash. A path that reaches the reader unlike the name
+ * TypeScript gives its source is then the case on every platform, not on Windows alone.
  */
-function plant(sources) {
+function plant(sources, { dotted = false } = {}) {
   const base = resolve('/planted');
-  const at = (rel) => join(base, rel);
+  const at = (rel) => (dotted ? `${base}${sep}.${sep}${rel}` : join(base, rel));
   const map = new Map(Object.entries(sources).map(([rel, text]) => [at(rel), text]));
   return {
     files: [...map.keys()].filter((f) => f.endsWith('.test.mjs')),
@@ -57,7 +61,7 @@ function plant(sources) {
   };
 }
 
-const scan = async (sources) => (await scanProductStarts(plant(sources))).starts
+const scan = async (sources, opts) => (await scanProductStarts(plant(sources, opts))).starts
   .map(({ file, line, entry, licensed, declared }) => ({ file, line, entry, licensed, declared }));
 
 const CP = "import { spawnSync } from 'node:child_process';\nimport { join } from 'node:path';\n";
@@ -156,4 +160,54 @@ test('the reader — a child_process it cannot follow is reported, never passed'
     'req.test.mjs': "require('node:child_process').spawnSync(process.execPath, ['snowarch.mjs']);\n",
   }));
   assert.deepEqual(unresolved, ['req.test.mjs: a require of child_process']);
+});
+
+// ARC-09-C202 — a name is read where it is written. The reader kept one map per file, name → every value bound to it
+// anywhere in the file, so one test's `target` or `env` lent its value to another test's start: C194's probe relabelled
+// a start in its own file that way. A reference now reads the bindings visible from where it is written, the innermost
+// scope first, and falls back to every binding only when none is visible.
+//
+// Each case runs twice, the second time with its path spelled through a `.` segment (`plant`'s `dotted`): the reader
+// once compared the name TypeScript gives a source with the path it was given, so on Windows, where every path has
+// backslashes, no binding was ever scoped, and three of these cases failed on every Windows cell (run 40070298452).
+const both = (name, fn) => {
+  test(name, () => fn({}));
+  test(`${name} — the path spelled through a . segment`, () => fn({ dotted: true }));
+};
+
+both('ARC-09-C202 — a name another test binds does not make a start a product start', async (opts) => {
+  const test2 = (body) => `test('x', () => {\n${body}\n});\n`;
+  assert.deepEqual(await scan({
+    'overmatch.test.mjs': `${CP}${test2("  const target = 'tools/snowarch/bin/snowarch.mjs';\n"
+      + '  spawnSync(process.execPath, [target], { env: licensedEnv() });')}${test2("  const target = 'probe.mjs';\n"
+      + '  spawnSync(process.execPath, [target]);')}`,
+  }, opts), [{ file: 'overmatch.test.mjs', line: 5, entry: 'cli', licensed: true, declared: null }]);
+});
+
+both('ARC-09-C202 — a licensedEnv another test binds does not license a start', async (opts) => {
+  const test2 = (body) => `test('x', () => {\n${body}\n});\n`;
+  assert.deepEqual(await scan({
+    'miss.test.mjs': `${CP}const CLI = 'tools/snowarch/bin/snowarch.mjs';\n`
+      + `${test2('  const env = licensedEnv();\n  spawnSync(process.execPath, [CLI], { env });')}`
+      + `${test2('  const env = { ...process.env };\n  spawnSync(process.execPath, [CLI], { env });')}`,
+  }, opts), [
+    { file: 'miss.test.mjs', line: 6, entry: 'cli', licensed: true, declared: null },
+    { file: 'miss.test.mjs', line: 10, entry: 'cli', licensed: false, declared: null },
+  ]);
+});
+
+both('ARC-09-C202 — an assignment in a block still reaches the start after it', async (opts) => {
+  // Scope must not lose a value the file-wide reading found: the assignment joins the binding it assigns to.
+  assert.deepEqual(await scan({
+    'assign.test.mjs': `${CP}let script = 'probe.mjs';\nif (process.env.X) {\n  script = 'tools/snowarch/bin/snowarch.mjs';\n}\n`
+      + 'spawnSync(process.execPath, [script]);\n',
+  }, opts), [{ file: 'assign.test.mjs', line: 7, entry: 'cli', licensed: false, declared: null }]);
+});
+
+both('ARC-09-C202 — a for…of variable is its loop\'s, and does not reach a sibling loop\'s start', async (opts) => {
+  assert.deepEqual(await scan({
+    'loops.test.mjs': `${CP}for (const p of ['tools/snowarch/bin/snowarch.mjs']) {\n`
+      + '  spawnSync(process.execPath, [p], { env: licensedEnv() });\n}\n'
+      + "for (const p of ['probe.mjs']) {\n  spawnSync(process.execPath, [p]);\n}\n",
+  }, opts), [{ file: 'loops.test.mjs', line: 4, entry: 'cli', licensed: true, declared: null }]);
 });
