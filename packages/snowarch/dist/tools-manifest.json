@@ -35,7 +35,7 @@
             "false",
             "all"
           ],
-          "description": "For a list a person will read, pass display_value: 'all' with `fields`: each field then carries its stored value and its label. A choice whose label hides its code (negative codes too) shows as 'Label (value)' (\"Resolved (6)\"); a label that already carries the value (\"3 - Moderate\"), or differs from it only by case (\"Normal\"), shows once; a reference shows by name, its sys_id only on request; a date shows as its label, with its difference from UTC noted once, not beside each date. A date's label is in the format and time zone of the ServiceNow user the server signs in as; its stored value is UTC. Use only the stored value in any query, filter, encoded query or write, never the label. Default 'false' returns stored values only, as before; 'true' is refused."
+          "description": "For a list a person will read, pass display_value: 'all' with `fields`: each field then carries its stored value and its label. A choice whose label hides its code (negative codes too) shows as 'Label (value)' (\"Resolved (6)\"); a label that already carries the value (\"3 - Moderate\"), or differs from it only by case (\"Normal\"), shows once; a reference shows by name, its sys_id only on request; a date shows as its label, with its difference from UTC noted once per distinct offset, not beside each date. A date's label is in the format and time zone of the ServiceNow user the server signs in as; its stored value is UTC. Use only the stored value in any query, filter, encoded query or write, never the label. Default 'false' returns stored values only, as before; 'true' is refused."
         }
       },
       "required": [
@@ -89,7 +89,7 @@
             "false",
             "all"
           ],
-          "description": "For a list a person will read, pass display_value: 'all' with `fields`: each field then carries its stored value and its label. A choice whose label hides its code (negative codes too) shows as 'Label (value)' (\"Resolved (6)\"); a label that already carries the value (\"3 - Moderate\"), or differs from it only by case (\"Normal\"), shows once; a reference shows by name, its sys_id only on request; a date shows as its label, with its difference from UTC noted once, not beside each date. A date's label is in the format and time zone of the ServiceNow user the server signs in as; its stored value is UTC. Use only the stored value in any query, filter, encoded query or write, never the label. Default 'false' returns stored values only, as before; 'true' is refused."
+          "description": "For a list a person will read, pass display_value: 'all' with `fields`: each field then carries its stored value and its label. A choice whose label hides its code (negative codes too) shows as 'Label (value)' (\"Resolved (6)\"); a label that already carries the value (\"3 - Moderate\"), or differs from it only by case (\"Normal\"), shows once; a reference shows by name, its sys_id only on request; a date shows as its label, with its difference from UTC noted once per distinct offset, not beside each date. A date's label is in the format and time zone of the ServiceNow user the server signs in as; its stored value is UTC. Use only the stored value in any query, filter, encoded query or write, never the label. Default 'false' returns stored values only, as before; 'true' is refused."
         }
       },
       "required": [

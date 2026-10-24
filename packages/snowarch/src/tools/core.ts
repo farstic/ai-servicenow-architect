@@ -45,9 +45,10 @@ const DISPLAY_VALUE = {
     + '\'Label (value)\' ("Resolved (6)"); a label '
     + 'that already carries the value ("3 - Moderate"), or differs from it only by case ("Normal"), shows once; a '
     + 'reference shows by name, its sys_id only on request; a date shows as its label, with its difference from UTC '
-    + 'noted once, not beside each date. A date\'s label is in the format and time zone of the ServiceNow user the '
-    + 'server signs in as; its stored value is UTC. Use only the stored value in any query, filter, encoded query or '
-    + 'write, never the label. Default \'false\' returns stored values only, as before; \'true\' is refused.',
+    + 'noted once per distinct offset, not beside each date. A date\'s label is in the format and time zone of the '
+    + 'ServiceNow user the server signs in as; its stored value is UTC. Use only the stored value in any query, '
+    + 'filter, encoded query or write, never the label. Default \'false\' returns stored values only, as before; '
+    + '\'true\' is refused.',
 };
 
 /** Why 'true' is refused: the reason, said where the refusal is. */
