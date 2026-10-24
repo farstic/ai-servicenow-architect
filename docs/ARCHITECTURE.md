@@ -1272,7 +1272,7 @@ about one registry rather than several:
 | `E-12` | docs | docs corpus present | — | yes |
 | `E-13` | docs | docs pin | — | yes |
 | `E-14` | docs | docs family | — | — |
-| `E-15` | docs | sparse set | — | yes |
+| `E-15` | docs | corpus completeness | — | yes |
 | `E-16` | docs | citations | — | — |
 | `E-17` | roster | roster from directory listing | yes | — |
 | `E-18` | roster | skill descriptions | yes | — |

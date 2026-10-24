@@ -32,9 +32,9 @@ const die = (m) => { writeSync(2, `install-metrics: ${m}\n`); process.exit(2); }
 /**
  * Bytes under a directory: the sum of file sizes, walked.
  *
- * Walked rather than `git ls-files | wc -l`, which counts TRACKED paths — 49,000 of them — when
- * what a reader wants is what is on their disk after a SPARSE checkout, which is 34,000. Two
- * different numbers, and the smaller one is the honest answer to "what did this cost me".
+ * Walked rather than `git ls-files | wc -l`, which counts TRACKED paths, when what a reader wants is
+ * what is on their disk: the whole corpus by default (ARC-09-C244), the cited areas when they asked for
+ * sparse. The walk is the honest answer to "what did this cost me" in either case.
  *
  * Symlinks are counted as links, not as what they point at — a fixture tree links the corpus in,
  * and following it would report the same 179 MB as if it had been copied.

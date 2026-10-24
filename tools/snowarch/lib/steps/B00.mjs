@@ -17,14 +17,14 @@
 // been uninstalled.
 import { execFileSync } from 'node:child_process';
 import { batchCommand, isBatch } from '../spawn-batch.mjs';
-import { statfsSync } from 'node:fs';
+import { existsSync, statfsSync } from 'node:fs';
 import { arch, platform, release } from 'node:os';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { EXIT_PREREQ } from '../exit.mjs';
 import { pathKey } from '../path-key.mjs';
 import { remedyFor } from '../remedies.mjs';
 import { formatVersion, meetsFloor, parseVersion } from '../versions.mjs';
-import { MODE, RETRY_WAITS_MS, attemptSuffix } from '../docs/sync.mjs';
+import { CORPUS_DIR, MODE, RETRY_WAITS_MS, attemptSuffix } from '../docs/sync.mjs';
 import { corpusProbe, probeNetwork, probeRetryReason } from '../probe-net.mjs';
 import { which } from '../which.mjs';
 import { INPUTS } from '../inputs.mjs';
@@ -41,8 +41,8 @@ export const inputs = INPUTS.B00.resolve;
 
 /** Disk. Not a configured floor — it is what this repository costs, and the numbers are its own. */
 const GIB = 1024 ** 3;
-export const DISK_SPARSE = 1 * GIB;      // sparse docs ≈ 300 MB + deps ≈ 72 MB + headroom
-export const DISK_FULL = 1.5 * GIB;      // `--docs full` is the whole corpus
+export const DISK_SPARSE = 1 * GIB;      // the floor: a sparse corpus ≈ 345 MB + deps ≈ 72 MB + headroom
+export const DISK_FULL = 1.5 * GIB;      // a fresh whole corpus ≈ 495 MB on disk (ARC-09-C244) + deps + headroom
 
 const mb = (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`;
 const gb = (bytes) => `${(bytes / GIB).toFixed(1)} GB`;
@@ -174,10 +174,14 @@ export function checkClaudeCode({ exec, floors, plat, skip }) {
 }
 
 /** 4. Enough disk for the corpus, the dependencies and some headroom. */
-export function checkDisk({ root, docs, plat, statfs = statfsSync }) {
+export function checkDisk({ root, docs, plat, statfs = statfsSync,
+  hasCorpus = existsSync(join(root, CORPUS_DIR, 'markdown')) }) {
   // `MODE.full` rather than the word: it is ARC-03's vocabulary for a checkout shape, and it is
   // also spelled like a preset the contract owns, so a quoted copy here is the wrong kind of name.
-  const need = docs === MODE.full ? DISK_FULL : DISK_SPARSE;
+  // ARC-09-C244 — a FRESH whole corpus needs DISK_FULL. An install that already holds a corpus keeps the floor every
+  // run has asked for: what a sparse corpus lacks (151 MB on disk, measured) fits in that floor's headroom, and the
+  // move to the whole corpus must not stop an upgrade that would otherwise pass.
+  const need = docs === MODE.full && !hasCorpus ? DISK_FULL : DISK_SPARSE;
   let free;
   try {
     const s = statfs(root);

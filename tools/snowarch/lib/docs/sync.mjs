@@ -7,7 +7,7 @@
 // PATTERN, cone mode never engages, and the checkout silently omits the corpus's five root files,
 // LICENSE among them. Every check the recipe otherwise performs passes: exit 0, correct HEAD, empty
 // status. Only a completeness check catches it.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { statePath as statePathOf } from '../local-paths.mjs';
@@ -358,12 +358,30 @@ export function checkCompleteness(root, corpusDir, areas, pin) {
 }
 
 /**
+ * ARC-09-C244 — the docs mode a run uses when nothing on its command line names one, from what the
+ * state recorded (`state.docs`).
+ *
+ * The whole corpus is the default: the Architect reads what is on disk, and a page that is not there
+ * cannot be read. A recorded `sparse` stays sparse only when it carries `optIn: true`, which only
+ * `--docs sparse` writes. Without the marker it is the default an older release recorded, and it reads
+ * as the whole corpus, so an install that was sparse moves to full once, the next time its bootstrap
+ * runs. A recorded `skip` stays skip. ONE definition, read by the plan, the upgrade's plan, `docs sync`,
+ * the corpus status and the doctor.
+ */
+export function effectiveDocsMode(recorded) {
+  const mode = recorded?.mode;
+  if (mode === 'skip') return 'skip';
+  if (mode === MODE.sparse && recorded.optIn === true) return MODE.sparse;
+  return MODE.full;
+}
+
+/**
  * The mode to sync in, when the caller did not say.
  *
- * ARC-06 writes `.local/bootstrap-state.json`; this only ever READS it, and only this one field.
+ * ARC-06 writes `.local/bootstrap-state.json`; this only ever READS it, and only its `docs` field.
  * `skip` is a bootstrap flag — it means "do not call sync at all" — so a state file carrying it is
- * refused rather than silently treated as `sparse`, which would materialise a corpus the operator
- * deliberately declined.
+ * refused rather than silently treated as a mode, which would materialise a corpus the operator
+ * deliberately declined. Anything else is `effectiveDocsMode`'s answer.
  */
 export function resolveMode(root, requested) {
   if (requested) {
@@ -379,18 +397,18 @@ export function resolveMode(root, requested) {
   const statePath = statePathOf(root);
   if (existsSync(statePath)) {
     try {
-      const recorded = JSON.parse(readFileSync(statePath, 'utf8'))?.docs?.mode;
-      if (recorded === 'skip') {
+      const recorded = JSON.parse(readFileSync(statePath, 'utf8'))?.docs;
+      if (recorded?.mode === 'skip') {
         throw new SyncError('.local/bootstrap-state.json records `docs.mode` "skip": skip means do not '
           + 'call sync. Run with an explicit --mode sparse or --mode full to override.', EXIT.git);
       }
-      if (recorded === MODE.sparse || recorded === MODE.full) return recorded;
+      return effectiveDocsMode(recorded);
     } catch (e) {
       if (e instanceof SyncError) throw e;
       // A corrupt state file is ARC-06's problem to report, not a reason to refuse to sync.
     }
   }
-  return MODE.sparse;
+  return effectiveDocsMode(null);
 }
 
 /** What the checkout looks like right now — every question the reconcile needs, asked once. */
@@ -589,8 +607,12 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   const completeness = checkCompleteness(root, CORPUS_DIR, areas, docs.pin);
   const after = inspect(root, config, areas);
   const elapsed = (Date.now() - t0) / 1000;
-  const changed = !state.present || !state.atPin || !state.indexed || !state.sameSet || repaired > 0
+  // ARC-09-C244 — the mode step's work, by the conditions step 3 acted on. `sameSet` compares the cone list, which
+  // a full checkout does not have, so counting it in full mode reported every full run as a change.
+  const modeWork = mode === MODE.full ? state.sparseOn : (!state.sparseOn || !state.coneOn || !state.sameSet);
+  const changed = !state.present || !state.atPin || !state.indexed || modeWork || repaired > 0
     || (mode === MODE.full) !== !after.sparseOn;
+  const areaCount = areaCountOf(corpus, mode, areas);
 
   // Printed once, on success, and nowhere else: `--quiet` suppresses it and `--json` never carries
   // it, because a caller parsing JSON is not a reader who needs to be told whose documentation this
@@ -598,12 +620,24 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   const attribute = () => say(ATTRIBUTION);
 
   if (!changed) {
-    say(`[docs] up to date (pin ${docs.pin.slice(0, 7)}, ${mode}, ${areas.length} areas)`);
+    say(`[docs] up to date (pin ${docs.pin.slice(0, 7)}, ${mode}, ${areaCount} areas)`);
     attribute();
   } else {
     say(`[docs] ${elapsed.toFixed(1)} s · pin ${docs.pin.slice(0, 7)} · ${mode} · `
       + `${completeness.ok ? 'complete' : 'INCOMPLETE'}`);
     attribute();
   }
-  return { completeness, repaired, areas, mode, elapsed, changed, state: after };
+  return { completeness, repaired, areas, areaCount, mode, elapsed, changed, state: after };
+}
+
+/**
+ * ARC-09-C244 — how many areas a checkout holds: the cone's list when sparse, and every directory under
+ * `markdown/` when the whole corpus is there, the ones nothing cites included. The list alone would call
+ * the whole corpus "20 areas".
+ */
+function areaCountOf(corpus, mode, areas) {
+  if (mode !== MODE.full) return areas.length;
+  try {
+    return readdirSync(join(corpus, 'markdown'), { withFileTypes: true }).filter((e) => e.isDirectory()).length;
+  } catch { return areas.length; }
 }

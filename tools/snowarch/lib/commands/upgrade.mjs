@@ -48,6 +48,7 @@ import { manifestSays, refreshManifest, refreshWithUpgrade } from '../licence/fe
 import { DISTRIBUTION_FROM, MANIFESTS_FROM, archiveDiffers, checkTree, signedRelease, writeManifestCache }
   from '../licence/manifest.mjs';
 import { hashFor, INPUTS, STEP_IDS } from '../inputs.mjs';
+import { MODE, effectiveDocsMode } from '../docs/sync.mjs';
 
 /**
  * What U7 says about a doctor report — the tally AND the checks it counted, as one list.
@@ -459,7 +460,8 @@ export function planContext({ root, config, ctx = {}, state = null }) {
     ...stepContext({ root, config, env: ctx.env ?? process.env, node: ctx.node ?? nodeInfo(),
       flags: { yes: true }, state, licence: ctx.licence }),
     mode: state?.mode ?? ctx.mode ?? 'design',
-    docs: state?.docs?.mode ?? ctx.docs ?? 'sparse',
+    // ARC-09-C244 — the recorded mode as effectiveDocsMode reads it: an unmarked sparse plans B02 for the whole corpus.
+    docs: state?.docs?.mode ? effectiveDocsMode(state.docs) : (ctx.docs ?? MODE.full),
   };
 }
 
