@@ -175,3 +175,54 @@ test('the fixture this cannot produce, produced', () => {
     assert.ok(!existsSync(join(dir, DEAD)), 'the dead path must not resolve');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ARC-09-C250 — NOTHING THAT WORKS IS REMOVED. The owner's rule (2026-10-24): CLAUDE.md changes are additions. The
+// list in tests/fixtures/claude-md-resources.txt was taken from CLAUDE.md at develop 00faaa57: every backticked span,
+// every bold span, every command flag, and every sentence that states a rule. A change that removes one edits the list
+// in the same pull request, where the reviewer and the owner see it. Bold spans are in because the nine sub-agent names
+// are bold, not backticked, and a list without them did not notice their removal.
+const RESOURCES = readFileSync(join(root, 'tests/fixtures/claude-md-resources.txt'), 'utf8').trimEnd().split('\n')
+  .filter((l) => l && !l.startsWith('#'))
+  .map((l) => ({ kind: l.slice(0, l.indexOf('\t')), text: l.slice(l.indexOf('\t') + 1) }));
+const removedFrom = (text) => RESOURCES.filter((r) => !text.includes(r.text));
+const named = (list) => list.map((r) => `${r.kind}: ${r.text}`);
+
+// The two additions the owner approved on 2026-10-24 (ARC-09-C250, W1 and W2), applied unless CLAUDE.md has them.
+const W1_AT = 'If the corpus does not cover it, say so rather than recalling it.';
+const W1 = ' In a Grep pattern write each `_` of a table, field or role name as `\\\\?_`: the corpus escapes underscores '
+  + '(`sc\\_req\\_item`).';
+const W2_AFTER = '- `docs/PLATFORM-NOTES.md`';
+const W2 = '- `vendor/docs-map.md` — the corpus map (area · title · pages · products, and how to find a page). Find a page by '
+  + 'Grep over `markdown/*/index.md` or `^product: <name>`, never by reading an `index.md` whole.';
+const withAdditions = (text) => {
+  let t = text.includes(W1) ? text : text.replace(W1_AT, () => `${W1_AT}${W1}`);
+  if (!t.includes(W2)) {
+    const all = t.split('\n');
+    all.splice(all.findIndex((l) => l.startsWith(W2_AFTER)) + 1, 0, W2);
+    t = all.join('\n');
+  }
+  return t;
+};
+
+test('ARC-09-C250 — nothing that works is removed: every listed span, rule and flag is still in CLAUDE.md', () => {
+  assert.ok(RESOURCES.length >= 150, `the list holds ${RESOURCES.length} entries — it read nothing`);
+  assert.deepEqual(named(removedFrom(doc)), [],
+    'removed from CLAUDE.md: a removal edits tests/fixtures/claude-md-resources.txt in the same pull request');
+  // ...and in the state a release cut writes, which rewrites only the Version line the list leaves out.
+  const base = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version.replace(/-.*$/, '');
+  assert.deepEqual(named(removedFrom(writeMarker(doc, `${base}-rc.99`).text)), []);
+});
+
+test('ARC-09-C250 — the approved additions, W1 and W2, remove nothing', () => {
+  const added = withAdditions(doc);
+  assert.ok(added.includes(W1) && added.includes(W2), 'W1 and W2 are not both in the text the case checks');
+  assert.deepEqual(named(removedFrom(added)), []);
+});
+
+test('ARC-09-C250 — the guard names a deleted rule, and only that rule', () => {
+  for (const pick of ['self-authorization is prohibited', 'A change to an instance is never filed there']) {
+    const rule = RESOURCES.find((r) => r.kind === 'rule' && r.text.includes(pick));
+    assert.ok(rule && doc.includes(rule.text), `"${pick}" is not a listed rule of CLAUDE.md`);
+    assert.deepEqual(named(removedFrom(doc.replace(rule.text, ''))), named([rule]));
+  }
+});
