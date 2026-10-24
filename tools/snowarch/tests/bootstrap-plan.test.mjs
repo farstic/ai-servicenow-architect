@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { COLUMNS, DOCS, EXPLANATIONS, HEADER, LINES, MODES, ORIENTATION, applyChoice, buildPlan,
+import { COLUMNS, DOCS, DOCS_OFFERED, EXPLANATIONS, HEADER, LINES, MODES, ORIENTATION, applyChoice, buildPlan,
   choicesLine, explainLines, formatPlan, resolveChoice, runPlanScreen }
   from '../lib/plan.mjs';
 import { LIVE_YES_WITHOUT_FILE, USAGE, bootstrapCommand,
@@ -44,7 +44,7 @@ test('the plan proposes the safe thing, and says what live would need', () => {
   const root = makeCheckout();
   const plan = buildPlan({ ctx: ctxOf(root), state: null, flags: {} });
   assert.equal(plan.mode, 'design-only');
-  assert.equal(plan.docs, 'sparse');
+  assert.equal(plan.docs, 'full', 'the whole corpus is the default (ARC-09-C244)');
 
   const text = formatPlan(plan, ctxOf(root));
   // ARC-07-C10 — "toggle", not "change": at the S06 sitting the owner pressed 1 seven times
@@ -59,7 +59,7 @@ test('the plan proposes the safe thing, and says what live would need', () => {
   assert.match(text, /^ {2}1 {2}Mode {3}design-only/m);
   assert.match(text, /live needs a ServiceNow instance/);
   assert.match(text, /Node 22\.11\.0 found/);
-  assert.match(text, /^ {2}2 {2}Docs {3}sparse \(19 areas\)/m);
+  assert.match(text, /^ {2}2 {2}Docs {3}full {17}full = whole corpus · skip = none/m);
   // A LITERAL, AND IT STAYS ONE. Deriving this from `plannedSteps` would make it agree with itself
   // whatever the titles say — the ARC-07-C23 trap, where an assertion derived on both sides could
   // not see a step move. This is the one place the five titles are written out, so a retitle shows
@@ -117,8 +117,11 @@ test('the parser: Enter runs, q quits, 1 and 2 cycle, anything else is refused b
 
   const openedDocs = applyChoice(plan, '2');
   assert.equal(openedDocs.action, 'choose');
-  assert.deepEqual(openedDocs.line.values, DOCS);
+  // ARC-09-C244 — the line OFFERS the whole corpus and skip; sparse is a flag, never a choice here, while `DOCS`
+  // still says what a flag may name.
+  assert.deepEqual(openedDocs.line.values, DOCS_OFFERED);
   assert.equal(openedDocs.plan.docs, plan.docs);
+  assert.deepEqual(DOCS_OFFERED, ['full', 'skip']);
   assert.deepEqual(DOCS, ['sparse', 'full', 'skip']);
 
   // ...and the answer is resolved by number or by name, the wizard's two spellings.
@@ -230,6 +233,22 @@ test('a bad --mode, --docs or --from is refused by name, and writes nothing', as
   // which carries no launcher, so a bare `USAGE()` would make a launcher-free assertion quietly
   // platform-dependent. Pinning says the case does not care which shell rather than picking one.
   assert.match(USAGE({ platform: 'linux', env: {} }), /--from BNN/);
+});
+
+// ARC-09-C244 — the accepted plan's docs mode reaches the state with the marker that keeps a sparse one sparse, and
+// the whole corpus carries none. The state is written when the plan is accepted, before any step: this fixture's
+// upstream is file:///dev/null, so B02 fails here, and what B02 itself records is b02-docs.test.mjs's case.
+test('ARC-09-C244 — a sparse plan is recorded as asked for; the whole corpus is the unmarked default', async () => {
+  for (const [docs, optIn] of [['sparse', true], ['full', undefined]]) {
+    const root = makeCheckout();
+    const code = await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true, docs }), log: recorder(),
+      out: sink(), err: sink() });
+    const s = loadState(root, SPELL);
+    assert.equal(s.steps.B02.status, 'fail', `${docs}: the run did not reach B02`);
+    assert.notEqual(code, 0);
+    assert.equal(s.docs.mode, docs);
+    assert.equal(s.docs.optIn, optIn, `${docs}: the marker`);
+  }
 });
 
 test('AC 1 — a design-only run writes the state the other consumers read', async () => {
@@ -539,7 +558,7 @@ test('ARC-07-C12 — a number opens that line\'s choices, the way the wizard ask
   // under a toggle, `1` flips Mode and `2` flips DOCS, so `['1','2','']` reaches `mode: live` either
   // way and the case passed against the behaviour it was written to replace. Under choices the `2`
   // answers Mode's question, so Docs is untouched — which only the new model can produce.
-  assert.equal(r.plan.docs, 'sparse',
+  assert.equal(r.plan.docs, 'full',
     'Docs moved — the `2` was read as a second line rather than as Mode\'s answer');
 
   // THE WIZARD'S SHAPE, asserted as a shape rather than a sentence: the label, then numbered options.
@@ -783,9 +802,9 @@ test('ARC-07-W14 — each option says what it gives you, and the corpus cost is 
   assert.match(mode, /live — also connects one ServiceNow instance/);
   assert.match(mode, /the wizard asks for URL and login/);
 
-  assert.match(docs, /sparse — the documentation the specialists cite/);
-  assert.match(docs, /\(recommended\)/);
-  assert.match(docs, /full — all of it/);
+  // ARC-09-C244 — the whole corpus is the recommended answer, and sparse is not offered at all.
+  assert.match(docs, /full — the whole ServiceNow documentation, ~\d+ MB \(recommended\)/);
+  assert.doesNotMatch(docs, /sparse/);
   assert.match(docs, /skip — none for now; the health check reports FAIL until/);
 
   // NO SECOND `(current)`: this renderer appends its own and the ruled text carried one too, which
@@ -806,13 +825,15 @@ test('ARC-07-W14 — the corpus figure is what the disk loses, not what you read
   const onDisk = Number(/about (\d+) MB on disk/.exec(page)?.[1]);
   assert.ok(onDisk > 0, 'the install page no longer states the corpus cost on disk');
 
-  const sparse = LINES[2].meaning.sparse;
-  const stated = Number(/~(\d+) MB/.exec(sparse)?.[1]);
-  assert.ok(stated > 0, `the sparse option names no size: ${sparse}`);
+  // ARC-09-C244 — the whole corpus is the option with a size now: 293 MB of files (299 on Windows) and about
+  // 495 MB with its `.git`, measured by docs-real (run 40076281656).
+  const full = LINES[2].meaning.full;
+  const stated = Number(/~(\d+) MB/.exec(full)?.[1]);
+  assert.ok(stated > 0, `the full option names no size: ${full}`);
   assert.ok(Math.abs(stated - onDisk) <= 10,
     `the screen says ~${stated} MB and the page says ${onDisk} MB on disk`);
   // ...and it is NOT the working-tree figure, which is the number the brief reached for.
-  for (const tree of [179, 180, 183]) {
+  for (const tree of [293, 299]) {
     assert.notEqual(stated, tree,
       `~${tree} MB is the working tree — the page says that is not what the disk loses`);
   }

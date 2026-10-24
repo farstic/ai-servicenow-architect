@@ -3,10 +3,15 @@ name: docs-real
 # The recipe against the real corpus, on all three operating systems.
 #
 # `ci.yml` proves the docs code with fixtures in seconds. This proves the thing fixtures cannot: that
-# a 300 MB sparse blobless checkout of somebody else's repository actually lands, on Windows as well
-# as on Unix, with every cited area present and no dead citation. It needs the network and about a
-# minute per OS, so it is NOT one of `main`'s required contexts — it runs weekly, on demand, and
-# whenever the code or configuration that decides the checkout changes.
+# a blobless checkout of somebody else's repository actually lands, on Windows as well as on Unix,
+# with every cited area present and no dead citation. It needs the network and a minute or two per
+# cell, so it is NOT one of `main`'s required contexts — it runs weekly, on demand, and whenever the
+# code or configuration that decides the checkout changes.
+#
+# ARC-09-C244 — every OS runs three docs modes: `full`, the whole corpus, which is what an install
+# gets by default; `sparse`, the cited areas only, which is the opt-in; and `switch`, a sparse
+# checkout made full, which is what an upgrade does once to an install that was sparse. Each cell's
+# summary line carries the time, the files and the bytes that the Notes and docs/INSTALL.md quote.
 #
 # Before ARC-06 there is no launcher; the steps call `node scripts/…` directly.
 
@@ -47,27 +52,48 @@ permissions:
 
 jobs:
   real:
-    name: ${{ matrix.os }}${{ matrix.git-bash && ' (Git Bash on PATH)' || '' }}
+    name: ${{ matrix.os }} · ${{ matrix.docs }}${{ matrix.git-bash && ' (Git Bash on PATH)' || '' }}${{ matrix.root == 'long' && ' (long root)' || '' }}
     runs-on: ${{ matrix.os }}
+    # The long-root cell checks out into `root-dir`, so its `run` steps start there; every other cell
+    # has no `root-dir` and starts in the workspace, as before.
+    defaults:
+      run:
+        working-directory: ${{ matrix.root-dir || '.' }}
     strategy:
       fail-fast: false            # one OS failing is a finding about that OS, not a reason to hide the others
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        docs: [full, sparse, switch]
+        # A key of the matrix only so the long-root entry below can override it: an `include` that
+        # only ADDS keys is merged into the cell it matches instead of making a new one.
+        root: [workspace]
         git-bash: [false]
         include:
           # AC 5: the same Windows job with Git Bash left on PATH. If the recipe ever grew a
           # dependency on bash, this cell would be the one that passes and the stripped one that
-          # fails — which is the comparison worth having.
+          # fails — which is the comparison worth having. In full, the mode an install gets.
           - os: windows-latest
+            docs: full
             git-bash: true
+          # ARC-09-C244 — the whole corpus under a checkout root of 132 characters, which puts about
+          # 3,800 corpus paths past MAX_PATH (260), the longest at about 352. The workspace root
+          # already puts the longest one there (272), but it is the only one. They have to land and
+          # be read through the corpus repo's own `core.longpaths`, with the image's system and
+          # global settings cleared below.
+          - os: windows-latest
+            docs: full
+            root: long
+            root-dir: a-checkout-root-long-enough-that-hundreds-of-corpus-paths-pass-windows-max-path
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: false
+          path: ${{ matrix.root-dir || '' }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: ${{ matrix.root-dir && format('{0}/package-lock.json', matrix.root-dir) || 'package-lock.json' }}
       - run: npm ci --ignore-scripts
 
       - name: Remove every long-path setting the image may have shipped with
@@ -117,4 +143,6 @@ jobs:
       # cell prove nothing: `shell: bash` resolves independently of PATH. There is no shell logic
       # left to depend on; the retry, the timing and the assertions are all in Node.
       - name: Sync, verify and assert the real corpus
+        env:
+          DOCS_MODE: ${{ matrix.docs }}
         run: node scripts/ci/assert-docs.mjs

@@ -76,11 +76,11 @@ Installing the AI ServiceNow Architect into this folder only — nothing else on
 Two choices below, then it runs on its own (about a minute; live adds a short wizard).
 Plan — Enter runs it as shown · type a number to choose that line's value · "?" explains · q quits
   1  Mode   design-only          live needs a ServiceNow instance (wizard runs in this terminal); Node 24.16.0 found
-  2  Docs   sparse (20 areas)    full = whole corpus · skip = none (the doctor will report FAIL)
+  2  Docs   full                 full = whole corpus · skip = none (the doctor will report FAIL)
   Steps  B01 workspace · B02 docs · B05 tool list · B07 Claude settings · B09 summary
 release manifest: v2.1.0-rc.1 fetched (372 files)
 [B01/09] workspace … ok (2 s)
-[docs] 31.5 s · pin 11b39be · sparse · complete
+[docs] 31.7 s · pin 11b39be · full · complete
 [B02/09] docs … ok (32 s)
 [B03/09] mode … ok (0.0 s)
 [B04/09] deps … skipped (design-only)
@@ -274,16 +274,16 @@ was built, the doctor reports what was configured — never a password, never an
 
 ### What the corpus costs
 
-**The corpus costs about 302 MB on disk and about 30 seconds to fetch** — a sparse, blobless
-checkout of 19 areas out of 49,000 tracked paths. Two measurements, because they count different
-things: the **working tree** is 179 MB on Linux and macOS, 183 MB on Windows, 34,360 files (25.3 s
-Ubuntu · 27.5 s macOS · 35.1 s Windows, measured 2026-09-09 by `docs-real.yml`), and **tree plus
-`.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Windows (measured 2026-09-06, ARC-00 S-07). The
-first is what you read, the second is what the disk loses. `--docs full` takes the whole corpus
-instead: **447 MB and 48,997 files** (measured 2026-09-09 on the reference
-macOS machine — ARC-00 S-07 did not measure full mode). Every release re-measures all three
-platforms and attaches the same table as `install-metrics.md` —
-[releases](https://github.com/farstic/snowarch/releases), the first one pending.
+**The documentation costs about 495 MB on disk and about 25–42 seconds to fetch** — the whole corpus, all
+56 areas and 51,665 files, in a blobless checkout. Two measurements, because they count different things:
+the **working tree** is 293 MB on Linux and macOS and 299 MB on Windows, and **tree plus `.git`** is 493
+MB Ubuntu / 500 MB macOS / 499 MB Windows (25.0 s Ubuntu · 31.7 s macOS · 42.4 s Windows, measured
+2026-10-24 by `docs-real.yml`). The first is what you read, the second is what the disk loses. An install
+made before 2.2.5, which fetched only the areas the specialists cite, moves to the whole corpus once, on
+its upgrade to 2.2.5: about 150 MB more on disk, and 7 to 14 seconds on the CI machines. `--docs sparse`
+keeps only the cited areas (about 345 MB on disk) and exists for CI; the Architect cannot read the other
+areas then. Every release re-measures all three platforms and attaches the same table as
+`install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases), the first one pending.
 
 ### Upgrading
 

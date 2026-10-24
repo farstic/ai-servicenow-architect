@@ -504,6 +504,18 @@ test('bootstrap.ps1 carries a UTF-8 BOM, because 5.1 reads a file without one as
   assert.ok(/[^\u0000-\u007F]/.test(ps1), 'bootstrap.ps1 is pure ASCII — the BOM has no subject');
   // ...and the console side of the same problem is handled too, with a catch that says something.
   assert.match(ps1, /\[Console\]::OutputEncoding = \[Text\.Encoding\]::UTF8/);
+});
+
+test('every file bootstrap.ps1 dot-sources carries a UTF-8 BOM too: 5.1 decodes each file on its own', () => {
+  // ARC-09-C244 — docs-recipe.ps1 had none. 5.1 read its em dash as `â€”`, and PowerShell takes the last of those
+  // characters for a double quote: the attribution string ended early, and `function Invoke-DocsRecipeFull` fell
+  // inside a string ("The term 'Invoke-DocsRecipeFull' is not recognized", the Windows no-node cell). The sparse
+  // function still ran, so nothing failed until the whole corpus became the default.
+  const sourced = [...ps1.matchAll(/^\. "\$Root\\(.+?)"\r?$/gm)].map((m) => m[1].split('\\').join('/'));
+  assert.ok(sourced.length > 0, 'bootstrap.ps1 dot-sources nothing — the test has no subject');
+  for (const rel of sourced) {
+    assert.deepEqual([...readFileSync(join(root, rel)).subarray(0, 3)], [0xEF, 0xBB, 0xBF], `${rel} has no BOM`);
+  }
   assert.ok(!/catch \{ \}/.test(ps1), 'an empty catch block (PSAvoidUsingEmptyCatchBlock)');
   // The BOM is declared where the tooling reads it, not just left in the bytes.
   assert.match(readFileSync(join(root, '.editorconfig'), 'utf8'),

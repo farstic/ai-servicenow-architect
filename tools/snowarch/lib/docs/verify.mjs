@@ -79,7 +79,7 @@ export function formatResult(r, spell) {
   if (r.status === 'missing') {
     lines.push(r.allowMissing
       ? 'citations: not verified until the corpus is present'
-      : `corpus missing — run ${spell.bootstrap} --docs sparse (or ${spell.cli} docs sync)`);
+      : `corpus missing — run ${spell.bootstrap} (or ${spell.cli} docs sync)`);
     return { text: lines.join('\n'), code: r.allowMissing ? EXIT.ok : EXIT.missing };
   }
   for (const d of r.dead) {

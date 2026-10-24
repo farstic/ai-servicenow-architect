@@ -55,7 +55,7 @@ test('the live fixture renders to exactly these bytes', () => {
     // checkout has none, and from 2.0.13 that refuses (ARC-11-C6).
     'Licence: missing',
     `Engine: snowarch ${LIVE.engine.version} · contract ${LIVE.engine.contractSha.slice(0, 12)}`,
-    `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · sparse`,
+    `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · full`,
     // The roster moves when a skill is added, the way the tally moves when a check is — fso-insurance-
     // specialist took it from 28 to 29 — so it is read from the fixture by the same rule, not spelled.
     `Roster: ${LIVE.engine.roster.skills} skills / ${LIVE.engine.roster.agents} agents`,

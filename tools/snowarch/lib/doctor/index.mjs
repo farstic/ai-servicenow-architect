@@ -37,6 +37,7 @@ import { contractSha, root as configRoot, version as engineVersion } from '../co
 import { collectPrereqs } from './prereqs.mjs';
 import { buildReport } from './report-json.mjs';
 import { configuredDocs } from '../docs/status.mjs';
+import { effectiveDocsMode } from '../docs/sync.mjs';
 import { renderText, useColour } from './report-text.mjs';
 import { exitCodeFor, runChecks, selectSections } from './runner.mjs';
 import { maskForJson, storeMaskValues } from './json-boundary.mjs';
@@ -423,7 +424,7 @@ export async function fixCommand({ root, config, registry, options, env, home, n
     env,
     platform: process.platform,
     mode: state?.mode ?? null,
-    docsMode: state?.docs?.mode ?? 'sparse',
+    docsMode: effectiveDocsMode(state?.docs),   // ARC-09-C244
     registration: state?.registration ?? 'project',
     storePath: storePath(root),
   };

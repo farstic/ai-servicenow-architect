@@ -61,8 +61,10 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
 
+      # ARC-09-C244 — sparse, and said so: the bump checks the pages the skills cite, before and after the move, and
+      # runs no `docs verify`, so the cited areas are all it needs.
       - name: Obtain the corpus at the current pin
-        run: node scripts/docs.mjs sync
+        run: node scripts/docs.mjs sync --mode sparse
 
       - name: Refresh the pin and render the pull-request body
         id: plan

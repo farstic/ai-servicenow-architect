@@ -765,13 +765,14 @@ jobs:
       - name: 'ARC-11-C6 — a fixture licence for the steps outside the allowed set'
         id: licence
         run: node scripts/ci/licence-fixture.mjs
-      # Gate 6 is `docs verify`, which needs the corpus. The same sparse recipe B02 uses.
-      - name: The pinned corpus, sparse
+      # Gate 6 is `docs verify`, which needs the corpus, and the whole of it (ARC-09-C244): its identifier guard reads
+      # the whole corpus, as an install has by default, and says "not checked" on a sparse one.
+      - name: The pinned corpus, whole
         env:
           NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}
           SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}
           CLAUDE_PROJECT_DIR: ${{ steps.licence.outputs.root }}
-        run: node tools/snowarch/bin/snowarch.mjs docs sync --yes
+        run: node tools/snowarch/bin/snowarch.mjs docs sync --yes --mode full
       # ARC-09-S0x AC (acceptance item B09-07). The criterion is that the release runs on
       # windows-latest **under pwsh, with no Git Bash** — and until this acceptance pass this step
       # was `shell: bash` on all three OSes, which on windows-latest IS Git Bash. So the cell was

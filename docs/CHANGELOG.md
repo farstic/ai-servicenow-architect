@@ -9,8 +9,9 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A patch release, in progress: `./snowarch doctor --json` masks every ServiceNow-hosted instance URL in a value, not
-only the first.**
+**A patch release, in progress: the whole ServiceNow documentation is on disk by default, so the Architect can read
+every area. An install made before 2.2.5 moves to it once, on this upgrade: about 150 MB more on disk, and 7 to 14
+seconds on the CI machines.**
 
 ### Fixed
 
@@ -56,6 +57,10 @@ only the first.**
   a new server, which is on the default instance; the Architect is instructed to name the instance from that read in
   its write-approval question (`About to … on instance "<label>"`), so check that name before you approve
   (ARC-09-C245).
+- On Windows without Node, `bootstrap.cmd --docs full` stopped at B02 with "The term 'Invoke-DocsRecipeFull' is not
+  recognized": Windows PowerShell 5.1 read the recipe file it loads as the ANSI code page, because the file had no
+  byte-order mark, and misread it. The file has one now, so the whole corpus, the default from this release, installs
+  there too (ARC-09-C244).
 
 ### Changed
 
@@ -66,6 +71,12 @@ only the first.**
   filters and writes still use the stored value (ARC-09-C225).
 - The install page says that Git for Windows 2.54 and 2.55's `… is not a commit!` line during the clone is harmless,
   and links to the troubleshooting paragraph that explains it (ARC-09-C224).
+- The bootstrap now fetches the whole ServiceNow documentation, all 56 areas, instead of only the areas the specialists
+  cite, so the Architect can read the pages it needs in every area, Virtual Agent, Security Operations and Field Service
+  among them. An install made before 2.2.5 moves to the whole corpus once, on its upgrade to 2.2.5: about 150 MB more on
+  disk; the move took 7 to 14 seconds on the CI machines (macOS, Linux and Windows), and a move that is interrupted is
+  finished by the next run. `--docs sparse` keeps only the cited areas, for CI; the doctor then warns that the Architect
+  cannot read the others (ARC-09-C244).
 
 ### Added
 

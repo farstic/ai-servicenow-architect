@@ -354,9 +354,10 @@ test('F7 clears the cache the re-run then rewrites', async (t) => {
  * F2 through an INJECTED step runner.
  *
  * The real one clones a 35,000-file submodule; what this story owns is which MODE it asks for —
- * the recorded one, with `skip` rewritten to `sparse` and SAID — so that is what is asserted.
+ * the recorded one, with `skip` rewritten to the default and SAID — so that is what is asserted. ARC-09-C244: the
+ * default is the whole corpus.
  */
-test('F2 syncs with the recorded docs mode, and rewrites "skip" to "sparse" out loud', async () => {
+test('F2 syncs with the recorded docs mode, and rewrites "skip" to the whole corpus out loud', async () => {
   const asked = [];
   const run = async (ctx) => { asked.push(ctx.docs); return { status: 'ok', detail: 'synced' }; };
   const action = { id: 'F2', check: 'E-15', kind: 'sparse-mismatch', title: 't',
@@ -374,8 +375,8 @@ test('F2 syncs with the recorded docs mode, and rewrites "skip" to "sparse" out 
 
   const skipped = await applyPlan({ actions: [action] },
     { root: '/nowhere', docsMode: 'skip', config: {} }, { run });
-  assert.deepEqual(asked, ['sparse', 'full', 'sparse'], 'a "skip" mode was passed through');
-  assert.match(skipped[0].detail, /recorded mode was "skip" — synced as "sparse"/);
+  assert.deepEqual(asked, ['sparse', 'full', 'full'], 'a "skip" mode was passed through');
+  assert.match(skipped[0].detail, /recorded mode was "skip" — synced as "full"/);
 });
 
 test('F1 is design-only\'s noop and live\'s repair', async () => {
@@ -473,12 +474,13 @@ test('F2 runs the real B02, syncs the corpus, and records the mode it synced', a
     { root: w.root, config, docsMode: 'skip', mode: 'design', platform: process.platform });
 
   assert.equal(applied.result, 'applied', applied.detail);
-  assert.match(applied.detail, /recorded mode was "skip" — synced as "sparse"/);
+  assert.match(applied.detail, /recorded mode was "skip" — synced as "full"/);
   assert.ok(existsSync(join(w.root, 'vendor/ServiceNowDocs/markdown')), 'no corpus after F2');
 
   // The rewrite is in the STORE, not only on the screen: the next run must not offer it again.
   const state = JSON.parse(readFileSync(join(w.root, '.local', 'bootstrap-state.json'), 'utf8'));
-  assert.equal(state.docs.mode, 'sparse', 'the recorded docs mode was not updated');
+  assert.equal(state.docs.mode, 'full', 'the recorded docs mode was not updated');
+  assert.equal(state.docs.optIn, undefined, 'the whole corpus carries no opt-in marker');
   assert.equal(state.docs.pin, upstream.pin);
 });
 
