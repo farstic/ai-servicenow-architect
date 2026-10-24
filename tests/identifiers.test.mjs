@@ -51,7 +51,8 @@ const CAPITALS = {
 const DOTTED_REAL = { checked: 32, scriptCode: 12 };   // 12 variables in example code, on 19 sites
 // ARC-09-C148 put it back to 14: C144's citation c_Business-portal-NotifPref.md had put NotifPref in sight, and a
 // backticked corpus path is now unread whole.
-const CAMEL_REAL = { checked: 14, excused: 3 };         // SnSysId, AceGrid, GlobalCo: names an example invents
+// ARC-09-C250 (M2, F8d) names EmployeeWorks, a product the corpus prints on 120 pages: +1 camelcase name.
+const CAMEL_REAL = { checked: 15, excused: 3 };         // SnSysId, AceGrid, GlobalCo: names an example invents
 // What the C144 arm rests on: the names written as words, and the 14 an example invents (15 entries; SLA Risk Badge in two files).
 // ARC-09-C250 (M, R16) quotes three ITSM Mobile Agent major incident notifications: +3 spaced names, each in the corpus.
 const SPACED_REAL = { checked: 75, excused: 14 };
