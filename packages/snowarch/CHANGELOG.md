@@ -5,6 +5,13 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**`normalizeInstanceUrl` never quotes credentials back (ARC-09-C240).** A URL with a username and a password that
+`new URL` could not parse — a `#`, `?` or `/` in the password, or a port out of range — was refused as `URL_INVALID`
+with the input quoted, password included. Any `@` is now `URL_HAS_CREDENTIALS`, checked before anything else, so no
+refusal quotes an `@`. An http(s) scheme typed wrong (`https//`, `https:/`, `https:`) is `URL_INVALID`, quoted as
+typed, and never checked as `https://https…`. A parsed host that is not letters, digits, dots and hyphens, or a
+bracketed IPv6 literal, is `URL_INVALID` before any path check, so a host in quotes or backticks stays refused.
+
 **`snow_core_capabilities_read` keeps the instance a session switched to (ARC-09-C245).** It reloads the store before
 it answers (ARC-07-C3), and the reload put the session on the store's default instance: after `snow_core_instance_switch`,
 the read that comes before every write moved the session back with nothing said, and the next call went to the default.

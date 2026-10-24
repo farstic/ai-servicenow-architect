@@ -116,6 +116,57 @@ describe('normalizeInstanceUrl', () => {
       { ok: true, url: PDI, proposed: false, notes: [] });
   });
 
+  // ARC-09-C240 — a URL that carries credentials is refused, and never quoted back. C223 sent a host typed without a
+  // scheme through `new URL` as `https://<host>`; when the password held `#`, `?` or `/`, or the port was out of range,
+  // that parse threw, and the refusal quoted the input, password included. With the scheme typed, those forms were
+  // quoted back before C223 too. A quote or backtick around the host, which C223 began to accept as `https://"host"`,
+  // and an http(s) scheme typed wrong, are refused as 2.2.4 refused them.
+  const user = ['u', 'ser'].join('');
+  const pass = ['p', 'w', '1'].join('');            // assembled, never spelled
+  const credentialShaped = [
+    `${user}:${pass}#x@acme.service-now.com`,
+    `${user}:${pass}?x@acme.service-now.com`,
+    `${user}:${pass}/x@acme.service-now.com`,
+    `${user}:${pass}@acme.service-now.com:99999`,
+    `https://${user}:${pass}#x@acme.service-now.com`,
+    `https://${user}:${pass}@acme.service-now.com:99999`,
+    `https://${user}:${pass}/x@acme.service-now.com`,
+  ];
+  const quotedBack = (input: string) =>
+    ({ ok: false, code: 'URL_INVALID', message: `"${input}" is not a URL — enter https://<host>` });
+
+  it('ARC-09-C240 — every credential-shaped input is URL_HAS_CREDENTIALS, and the password is not in the message', () => {
+    for (const input of credentialShaped) {
+      const r = normalizeInstanceUrl(input);
+      expect(!r.ok && r.code, input).toBe('URL_HAS_CREDENTIALS');
+      expect(!r.ok && r.message, input).not.toContain(pass);
+    }
+  });
+
+  it('ARC-09-C240 — a quote or backtick around the host is not a URL, quoted as typed', () => {
+    for (const input of ['"acme.service-now.com"', "'acme.service-now.com'", '`acme.service-now.com`',
+      '"https://acme.service-now.com"']) {
+      expect(normalizeInstanceUrl(input), input).toEqual(quotedBack(input));
+    }
+  });
+
+  it('ARC-09-C240 — an http(s) scheme typed wrong is not a URL, quoted as typed, never prefixed', () => {
+    for (const input of ['https//acme.service-now.com', 'https:/acme.service-now.com', 'https:acme.service-now.com']) {
+      expect(normalizeInstanceUrl(input), input).toEqual(quotedBack(input));
+    }
+  });
+
+  it('ARC-09-C240 — ...while these stay as they were', () => {
+    expect(normalizeInstanceUrl('https:///acme.service-now.com')).toEqual(
+      { ok: true, url: VANITY, proposed: false, notes: [] });
+    expect(normalizeInstanceUrl('htps://acme.service-now.com')).toMatchObject({ ok: false, code: 'URL_NOT_HTTPS' });
+    expect(normalizeInstanceUrl('acme.service-now.com:99999')).toEqual(quotedBack('acme.service-now.com:99999'));
+    expect(normalizeInstanceUrl(`${user}@acme.service-now.com`)).toMatchObject(
+      { ok: false, code: 'URL_HAS_CREDENTIALS' });
+    expect(normalizeInstanceUrl('snow.acme.internal:8443')).toEqual(
+      { ok: true, url: `${ONPREM}:8443`, proposed: true, notes: [] });
+  });
+
   it('nonsense is URL_INVALID, and the input is quoted back', () => {
     const r = normalizeInstanceUrl('not a url');
     expect(!r.ok && r.code).toBe('URL_INVALID');
