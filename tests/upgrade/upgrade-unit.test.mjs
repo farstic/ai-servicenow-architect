@@ -650,7 +650,7 @@ test('ARC-09-C56 — the remedy U7 prints is one a user can paste', async (t) =>
   assert.equal(sv03.includes('<label>'), false,
     `a mask reached the user's own terminal: ${sv03}`);
 
-  // The title is the registry's, resolved by id, because the cache does not store it.
+  // The title is the target's own, from its report: the cache does not store one (ARC-09-C200).
   assert.equal(sv03,
     'SV-03 WARN instances: instances: pdi: flags explicit, preset custom '
     + '— ./snowarch instance test pdi');
