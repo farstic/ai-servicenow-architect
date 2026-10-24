@@ -20,7 +20,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { manifestFromArchive, signManifest, writeManifestCache } from '../../tools/snowarch/lib/licence/manifest.mjs';
+import { COVERAGE, manifestFromArchive, signManifest, writeManifestCache } from '../../tools/snowarch/lib/licence/manifest.mjs';
 import { licenceFixture } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { bootstrapUser, buildEnforcementWorld, buildManifestWorld, buildWorld, git, snowarch } from './harness.mjs';
 
@@ -100,18 +100,63 @@ test('ARC-11-C7 — a target with no signed manifest, or one that is not its own
   assert.equal(git(w.user, ['status', '--porcelain']), status, 'the working tree changed after a refusal');
 }, MINUTES);
 
-test('ARC-11-C7 — a covered directory with a file the release does not ship stops the upgrade after U5, before U6', async (t) => {
+// ARC-09-C197 — a file the move would leave under a directory the target covers, and that its manifest does not list,
+// is U4's to name before anything moves; U5 found it only after the move. U5's check stays, for what U4 cannot see.
+
+test('ARC-09-C197 — a covered directory with a file the release does not ship is refused at U4, and nothing moves', async (t) => {
   const w = await buildWorld(t);
   bootstrapUser(w.user);
   // No manifest held, so the launcher cannot put the tree back before `upgrade` runs (ARC-11-C141); `upgrade` is in
-  // the repair set and runs, and the file the checkout leaves is U5's to find.
+  // the repair set and runs, and the file under a directory both releases cover is U4's to name.
   rmSync(join(w.user, '.local', 'release-manifest.json'));
   mkdirSync(join(w.user, '.claude', 'skills', 'mine'), { recursive: true });
   writeFileSync(join(w.user, '.claude', 'skills', 'mine', 'SKILL.md'), 'a skill nobody shipped\n');
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(r.status, 2, r.text);
+  assert.match(r.text, /release manifest: v9\.1\.0 fetched \(\d+ files\)/);
+  assert.match(r.text, /upgrade: 1 file is in folders v9\.1\.0 manages but not in its signed file list: \.claude\/skills\/mine\/SKILL\.md — move it out of those folders; nothing was changed/);
+  assert.match(r.text, /after the upgrade those folders must hold exactly what the release signed/);
+  assert.doesNotMatch(r.text, /\[U5\/7\]/, 'the refusal came after the tree started to move');
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
+  assert.equal(readFileSync(join(w.user, '.claude', 'skills', 'mine', 'SKILL.md'), 'utf8'), 'a skill nobody shipped\n');
+}, MINUTES);
+
+test('ARC-09-C197 — a file under a directory the target newly covers is refused at U4, by name, and nothing moves', async (t) => {
+  // v9.1.0 is signed over a coverage with one more directory than v9.0.0's; U4 reads it on its own (ARC-09-C192).
+  const w = await buildWorld(t, { coverage: { 'v9.1.0': { ...COVERAGE, covers: [...COVERAGE.covers, 'notes/'] } } });
+  bootstrapUser(w.user);
+  mkdirSync(join(w.user, 'notes'), { recursive: true });
+  writeFileSync(join(w.user, 'notes', 'mine.md'), 'my own notes\n');
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const status = git(w.user, ['status', '--porcelain']);
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(r.status, 2, r.text);
+  assert.match(r.text, /release manifest: v9\.1\.0 fetched \(\d+ files\)/);
+  assert.match(r.text, /upgrade: 1 file is in folders v9\.1\.0 manages but not in its signed file list: notes\/mine\.md — move it out of those folders; nothing was changed/);
+  assert.doesNotMatch(r.text, /\[U5\/7\]/, 'the refusal came after the tree started to move');
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
+  assert.equal(git(w.user, ['status', '--porcelain']), status, 'the working tree changed after a refusal');
+}, MINUTES);
+
+test('ARC-11-C7 — a signed file the move does not write stops the upgrade after U5, before U6, with the way back', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  // No manifest held, so the launcher cannot put NOTICE back before `upgrade` runs (ARC-11-C141).
+  rmSync(join(w.user, '.local', 'release-manifest.json'));
+  // A sparse checkout that leaves NOTICE out: git status stays clean (U1), git archive still has it (U4's check of
+  // the manifest), and the move does not write it, so only U5's check of the moved tree can see it. Measured on
+  // git 2.39.5, with NOTICE the same in both releases; a filter or an eol attribute reaches git archive too.
+  git(w.user, ['config', 'core.sparseCheckout', 'true']);
+  assert.equal(git(w.user, ['config', '--get', 'core.sparseCheckout']), 'true', 'core.sparseCheckout did not take');
+  mkdirSync(join(w.user, '.git', 'info'), { recursive: true });
+  writeFileSync(join(w.user, '.git', 'info', 'sparse-checkout'), '/*\n!/NOTICE\n');
+  git(w.user, ['read-tree', '-mu', 'HEAD']);
+  assert.equal(existsSync(join(w.user, 'NOTICE')), false, 'the sparse checkout left NOTICE in place');
+  assert.equal(git(w.user, ['status', '--porcelain', '--untracked-files=no']), '', 'U1 would refuse this tree');
   const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.equal(r.status, 1, r.text);
-  assert.match(r.text, /release manifest: v9\.1\.0 fetched \(\d+ files\)/);
-  assert.match(r.text, /upgrade: the tree at v9\.1\.0 is not what its signed manifest records — 1 file differs, the first \.claude\/skills\/mine\/SKILL\.md \(extra\); the upgrade stops before the bootstrap — return with: git checkout /);
+  assert.match(r.text, /upgrade: the tree at v9\.1\.0 is not what its signed manifest records — 1 file differs, the first NOTICE \(missing\); the upgrade stops before the bootstrap — return with: git checkout /);
   assert.doesNotMatch(r.text, /\[U6\/7\]/, 'the bootstrap ran on a tree that is not the release');
 }, MINUTES);
 
