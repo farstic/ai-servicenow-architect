@@ -157,3 +157,44 @@ test('the reader — a child_process it cannot follow is reported, never passed'
   }));
   assert.deepEqual(unresolved, ['req.test.mjs: a require of child_process']);
 });
+
+// ARC-09-C202 — a name is read where it is written. The reader kept one map per file, name → every value bound to it
+// anywhere in the file, so one test's `target` or `env` lent its value to another test's start: C194's probe relabelled
+// a start in its own file that way. A reference now reads the bindings visible from where it is written, the innermost
+// scope first, and falls back to every binding only when none is visible.
+test('ARC-09-C202 — a name another test binds does not make a start a product start', async () => {
+  const test2 = (body) => `test('x', () => {\n${body}\n});\n`;
+  assert.deepEqual(await scan({
+    'overmatch.test.mjs': `${CP}${test2("  const target = 'tools/snowarch/bin/snowarch.mjs';\n"
+      + '  spawnSync(process.execPath, [target], { env: licensedEnv() });')}${test2("  const target = 'probe.mjs';\n"
+      + '  spawnSync(process.execPath, [target]);')}`,
+  }), [{ file: 'overmatch.test.mjs', line: 5, entry: 'cli', licensed: true, declared: null }]);
+});
+
+test('ARC-09-C202 — a licensedEnv another test binds does not license a start', async () => {
+  const test2 = (body) => `test('x', () => {\n${body}\n});\n`;
+  assert.deepEqual(await scan({
+    'miss.test.mjs': `${CP}const CLI = 'tools/snowarch/bin/snowarch.mjs';\n`
+      + `${test2('  const env = licensedEnv();\n  spawnSync(process.execPath, [CLI], { env });')}`
+      + `${test2('  const env = { ...process.env };\n  spawnSync(process.execPath, [CLI], { env });')}`,
+  }), [
+    { file: 'miss.test.mjs', line: 6, entry: 'cli', licensed: true, declared: null },
+    { file: 'miss.test.mjs', line: 10, entry: 'cli', licensed: false, declared: null },
+  ]);
+});
+
+test('ARC-09-C202 — an assignment in a block still reaches the start after it', async () => {
+  // Scope must not lose a value the file-wide reading found: the assignment joins the binding it assigns to.
+  assert.deepEqual(await scan({
+    'assign.test.mjs': `${CP}let script = 'probe.mjs';\nif (process.env.X) {\n  script = 'tools/snowarch/bin/snowarch.mjs';\n}\n`
+      + 'spawnSync(process.execPath, [script]);\n',
+  }), [{ file: 'assign.test.mjs', line: 7, entry: 'cli', licensed: false, declared: null }]);
+});
+
+test('ARC-09-C202 — a for…of variable is its loop\'s, and does not reach a sibling loop\'s start', async () => {
+  assert.deepEqual(await scan({
+    'loops.test.mjs': `${CP}for (const p of ['tools/snowarch/bin/snowarch.mjs']) {\n`
+      + '  spawnSync(process.execPath, [p], { env: licensedEnv() });\n}\n'
+      + "for (const p of ['probe.mjs']) {\n  spawnSync(process.execPath, [p]);\n}\n",
+  }), [{ file: 'loops.test.mjs', line: 4, entry: 'cli', licensed: true, declared: null }]);
+});
