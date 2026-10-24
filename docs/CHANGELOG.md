@@ -31,10 +31,17 @@ seconds on the CI machines.**
   brings you this release is still run by the one you have installed, so that one checks only after the move
   (ARC-09-C197).
 - A file the Architect wrote under `clients/` could cite a documentation path that does not exist, and nothing checked
-  it before the file reached you. A check now runs after every such write: it resolves each path the file cites, and
-  reports each dead one, with its line, to the Architect, with the instruction to correct it before presenting the file.
-  It is a hook the bootstrap writes beside the session banner's, in `.claude/settings.local.json`, when Node is present
-  (ARC-09-C231).
+  it before the file reached you. A check now runs after every such write: it looks each cited path up in the
+  documentation's own index, and reports each one the documentation does not have, with its line, to the Architect, with
+  the instruction to correct it before presenting the file. A real page this install did not download is not reported as
+  dead; the Architect is told the citation stands. Notes `/snowarch finding` writes under
+  `clients/<engagement>/findings/` are not checked, because they record a path as you saw it. The check is a hook the
+  bootstrap writes beside the session banner's, in `.claude/settings.local.json`, when Node is present; it runs
+  whichever way the folder was reached, through a link included, and it does nothing if you move to a release without it
+  (ARC-09-C231, ARC-09-C239).
+- The session banner did not appear when the path of the folder you installed into held a space: the hook command left
+  the project path unquoted. It is quoted now; the bootstrap, or `./snowarch doctor --fix`, rewrites the entry
+  (ARC-09-C239).
 - After `./snowarch upgrade` moved the checkout, the doctor lines it closed with were titled by the release you had
   installed, not the one you moved to: a check the new release added could print without its title, and one it renamed
   under its old one. The lines now print exactly the checks the new release's doctor reported in that run, with its
