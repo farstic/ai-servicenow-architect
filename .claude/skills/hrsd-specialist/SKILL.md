@@ -64,7 +64,7 @@ Inline in the relevant Part. Always the full path from `markdown/`, never a bare
 
 If a path is not available in the Australia branch, flag it explicitly:
 
-> *Citation unavailable in Australia branch — verify against engagement's actual release. Behaviour described from general ServiceNow knowledge, treat with caution.*
+> *Citation unavailable in Australia branch — verify against engagement's actual release.*
 
 ### Release-family awareness
 

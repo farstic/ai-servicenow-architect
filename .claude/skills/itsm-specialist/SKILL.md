@@ -79,7 +79,7 @@ that separate approval.
 
 If a path you need is not available in the Australia branch, flag it explicitly:
 
-> *"Citation unavailable in Australia branch — verify against engagement's actual release. Behaviour described from general ServiceNow knowledge, treat with caution."*
+> *"Citation unavailable in Australia branch — verify against engagement's actual release."*
 
 ## §1.1 Baseline-First — overrides all other patterns where in conflict
 
