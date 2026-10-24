@@ -20,7 +20,7 @@ import { plannedSteps } from '../../steps/index.mjs';
 import { version as engineVersionOf } from '../../config.mjs';
 import { spellings } from '../../text.mjs';
 import { defineCheck } from '../registry.mjs';
-import { isOurSessionStartHook, projectEntryEnabled } from '../../settings-local.mjs';
+import { isOurPostWriteHook, isOurSessionStartHook, projectEntryEnabled } from '../../settings-local.mjs';
 import { RUNNING_STEP_ENV } from '../../spawn-env.mjs';
 import { which } from '../../which.mjs';
 
@@ -138,27 +138,41 @@ export function configProblems(config, root) {
  * back. `problems` is both, as E-08 reports them.
  * @returns {{problems: string[], entry: string[], scriptMissing: boolean, present: boolean}}
  */
-export function sessionStartProblems(local, root) {
+export const sessionStartProblems = (local, root) => ourHookProblems(local, root,
+  { event: 'SessionStart', isOurs: isOurSessionStartHook, script: 'tools/snowarch/hooks/session-start.mjs' });
+
+/** ARC-09-C231 — the citation hook's script. */
+const POST_SCRIPT = 'tools/snowarch/hooks/post-write.mjs';
+
+/**
+ * ARC-09-C231 — the PostToolUse citation hook, read the same way: the same shape, the same three kinds of problem.
+ * @returns {{problems: string[], entry: string[], scriptMissing: boolean, present: boolean}}
+ */
+export const postWriteProblems = (local, root) => ourHookProblems(local, root,
+  { event: 'PostToolUse', isOurs: isOurPostWriteHook, script: POST_SCRIPT });
+
+/** One of our hooks in `event`, against its `script`: what `sessionStartProblems` read, for any hook we write. */
+function ourHookProblems(local, root, { event, isOurs, script }) {
   const entry = [];
   let scriptMissing = false;
-  const entries = local?.hooks?.SessionStart;
+  const entries = local?.hooks?.[event];
   const hooks = (Array.isArray(entries) ? entries : []).flatMap((e) => e.hooks ?? []);
   // ARC-09-C193 — the writer's own definition of our hook, so the two cannot disagree about which entry is ours.
-  const hook = hooks.find(isOurSessionStartHook);
+  const hook = hooks.find(isOurs);
   if (!hook) return { problems: [], entry, scriptMissing, present: false };
   const command = String(hook.command ?? '');
-  if (!/^node\s/.test(command)) entry.push(`SessionStart does not run node (${command})`);
+  if (!/^node\s/.test(command)) entry.push(`${event} does not run node (${command})`);
   // B07 writes the path ${CLAUDE_PROJECT_DIR}-relative, so the entry follows the checkout wherever it moves; an
   // absolute path to another checkout's script, or a script elsewhere in this one, is a hook at a wrong path.
-  if (!/\$\{CLAUDE_PROJECT_DIR\}\/tools\/snowarch\/hooks\/session-start\.mjs$/.test(command)) {
-    entry.push(`SessionStart does not run \${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs (${command})`);
-  } else if (!existsSync(join(root, 'tools', 'snowarch', 'hooks', 'session-start.mjs'))) {
+  if (!command.endsWith(`\${CLAUDE_PROJECT_DIR}/${script}`)) {
+    entry.push(`${event} does not run \${CLAUDE_PROJECT_DIR}/${script} (${command})`);
+  } else if (!existsSync(join(root, ...script.split('/')))) {
     scriptMissing = true;
   }
   if (!(Number(hook.timeout) <= 10)) {
-    entry.push(`SessionStart timeout is ${hook.timeout}, which is more than 10 s`);
+    entry.push(`${event} timeout is ${hook.timeout}, which is more than 10 s`);
   }
-  const problems = [...entry, ...(scriptMissing ? ['tools/snowarch/hooks/session-start.mjs is not on disk'] : [])];
+  const problems = [...entry, ...(scriptMissing ? [`${script} is not on disk`] : [])];
   return { problems, entry, scriptMissing, present: true };
 }
 
@@ -358,8 +372,11 @@ export function engineRepoChecks() {
         let local = null;
         try { local = readJson(ctx.root, SETTINGS_LOCAL); } catch { local = null; }
         const hook = sessionStartProblems(local, ctx.root);
+        // ARC-09-C231 — the citation hook's script, a tracked file like SessionStart's. Its entry, absent or wrong, is
+        // E-10's to WARN; a script gone is a tree that is not the release, so it fails here as session-start.mjs does.
+        const post = postWriteProblems(local, ctx.root);
         const settingsWrong = problems.length > 0;
-        problems.push(...hook.problems);
+        problems.push(...hook.problems, ...(post.scriptMissing ? [`${POST_SCRIPT} is not on disk`] : []));
         if (problems.length === 0) {
           return ok(`MCP_TIMEOUT ${settings.env.MCP_TIMEOUT} · SessionStart hook `
             + `${hook.present ? 'present' : 'not installed'}`,
@@ -372,10 +389,13 @@ export function engineRepoChecks() {
         const cures = [
           ...(settingsWrong ? ['git checkout -- .claude/settings.json'] : []),
           ...(hook.scriptMissing ? [`git checkout -- ${SCRIPT} (on a release tree E-32 names it as missing too)`] : []),
+          ...(post.scriptMissing ? [`git checkout -- ${POST_SCRIPT} (on a release tree E-32 names it as missing too)`]
+            : []),
           ...(hook.entry.length > 0 ? [`${cliOf(ctx)} doctor --fix`] : []),
         ];
         const command = settingsWrong ? 'git checkout -- .claude/settings.json'
-          : hook.scriptMissing ? `git checkout -- ${SCRIPT}` : `${cliOf(ctx)} doctor --fix`;
+          : hook.scriptMissing ? `git checkout -- ${SCRIPT}`
+            : post.scriptMissing ? `git checkout -- ${POST_SCRIPT}` : `${cliOf(ctx)} doctor --fix`;
         return fail(problems.join('; '), {
           remedy: cures.join('; then '),
           command,
@@ -528,6 +548,22 @@ export function engineRepoChecks() {
           }
           if (hook.entry.length > 0) {
             return fail(hook.entry.join('; '), {
+              remedy: `${cliOf(ctx)} doctor --fix (or re-run the bootstrap)`,
+              data: { ...data, fix: { kind: 'hook-wrong' } },
+            });
+          }
+          // ARC-09-C231 — the citation hook, read the same way and cured by the same writer, but a WARN: without it the
+          // session keeps its Licence: line, and what it loses is the check of the citations it writes under clients/.
+          const post = postWriteProblems(settings, ctx.root);
+          if (!post.present) {
+            return warn('.claude/settings.local.json has no PostToolUse citation hook, so a dead citation in a file '
+              + 'written under clients/ is not caught when it is written', {
+              remedy: `${cliOf(ctx)} doctor --fix (or re-run the bootstrap)`,
+              data: { ...data, fix: { kind: 'hook-absent' } },
+            });
+          }
+          if (post.entry.length > 0) {
+            return warn(post.entry.join('; '), {
               remedy: `${cliOf(ctx)} doctor --fix (or re-run the bootstrap)`,
               data: { ...data, fix: { kind: 'hook-wrong' } },
             });

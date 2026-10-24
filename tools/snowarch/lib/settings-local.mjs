@@ -23,13 +23,23 @@ export const NOT_IGNORED =
   '.claude/settings.local.json is not gitignored — add it to .gitignore (it must stay untracked '
   + 'so Claude Code applies its approvals)';
 
-/** The SessionStart hook, S-05 variant B: it lives in the LOCAL file, and only when Node can run it. */
+/** Our hooks, S-05 variant B: they live in the LOCAL file, and only when Node can run them. */
 export const hookEntry = () => ({
   SessionStart: [{
     matcher: 'startup|resume',
     hooks: [{
       type: 'command',
       command: 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs',
+      timeout: 10,
+    }],
+  }],
+  // ARC-09-C231 — the citation check: a file written under clients/ has its citations resolved, and a dead path goes
+  // back to the model before the file is presented.
+  PostToolUse: [{
+    matcher: 'Write|Edit',
+    hooks: [{
+      type: 'command',
+      command: 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/post-write.mjs',
       timeout: 10,
     }],
   }],
@@ -45,10 +55,17 @@ export const hookEntry = () => ({
 const OUR_SESSION_START = /(?:^|[\s"'/\\])tools[/\\]snowarch[/\\](?:[^\s"']*[/\\])?session-start\.mjs(?:$|[\s"'])/;
 export const isOurSessionStartHook = (hook) => OUR_SESSION_START.test(String(hook?.command ?? ''));
 
-/** The SessionStart groups with our hook taken out of each; a group that held only ours is dropped. */
-function withoutOurSessionStart(groups) {
+/** ARC-09-C231 — which PostToolUse hook is ours, by the same rule: one that runs a `post-write.mjs` of our tree. */
+const OUR_POST_WRITE = /(?:^|[\s"'/\\])tools[/\\]snowarch[/\\](?:[^\s"']*[/\\])?post-write\.mjs(?:$|[\s"'])/;
+export const isOurPostWriteHook = (hook) => OUR_POST_WRITE.test(String(hook?.command ?? ''));
+
+/** Which hook of each event is ours. */
+const OURS = Object.freeze({ SessionStart: isOurSessionStartHook, PostToolUse: isOurPostWriteHook });
+
+/** An event's groups with our hook taken out of each; a group that held only ours is dropped. */
+function withoutOurs(groups, isOurs) {
   return (Array.isArray(groups) ? groups : [])
-    .map((g) => (Array.isArray(g?.hooks) ? { ...g, hooks: g.hooks.filter((h) => !isOurSessionStartHook(h)) } : g))
+    .map((g) => (Array.isArray(g?.hooks) ? { ...g, hooks: g.hooks.filter((h) => !isOurs(h)) } : g))
     .filter((g) => !Array.isArray(g?.hooks) || g.hooks.length > 0);
 }
 
@@ -61,8 +78,8 @@ function withoutOurSessionStart(groups) {
  * side "the banner never appears" and "the toggle I set two months ago" are the same event.
  */
 export const HOOKS_LEFT_ALONE =
-  'note: disableAllHooks is set in .claude/settings.local.json — the SessionStart banner will not '
-  + 'run; this installation did not set it and has left it alone';
+  'note: disableAllHooks is set in .claude/settings.local.json — the SessionStart banner and the citation check '
+  + 'will not run; this installation did not set it and has left it alone';
 
 const without = (list, value) => (Array.isArray(list) ? list.filter((v) => v !== value) : []);
 const withValue = (list, value) => (Array.isArray(list) && list.includes(value)
@@ -124,11 +141,14 @@ export function computeSettings(current, { mode, nodePresent, registration, serv
   // ARC-09-C193 — OURS REPLACED, THE USER'S KEPT. `Object.assign(hooks, hookEntry())` replaced the whole key, so a
   // user's own SessionStart hook was lost at every bootstrap and upgrade, and with Node absent every SessionStart hook
   // was deleted. Our hook is taken out of each group, a group it leaves empty is dropped, and ours is written once.
+  // ARC-09-C231 — the same for every event we write: SessionStart's banner and PostToolUse's citation check.
   const hooks = { ...(current.hooks ?? {}) };
-  const theirs = withoutOurSessionStart(hooks.SessionStart);
-  const sessionStart = nodePresent ? [...theirs, ...hookEntry().SessionStart] : theirs;
-  if (sessionStart.length > 0) hooks.SessionStart = sessionStart;
-  else delete hooks.SessionStart;
+  for (const [event, ours] of Object.entries(hookEntry())) {
+    const theirs = withoutOurs(hooks[event], OURS[event]);
+    const merged = nodePresent ? [...theirs, ...ours] : theirs;
+    if (merged.length > 0) hooks[event] = merged;
+    else delete hooks[event];
+  }
   if (Object.keys(hooks).length > 0) next.hooks = hooks;
   else if ('hooks' in current) delete next.hooks;
 
