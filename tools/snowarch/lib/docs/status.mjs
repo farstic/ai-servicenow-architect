@@ -344,7 +344,7 @@ export function formatStatus(s, spell = spellings(), { engineering = false } = {
   if (!s.present) {
     return {
       text: [
-        `docs corpus: MISSING — run ${spell.bootstrap} --docs sparse `
+        `docs corpus: MISSING — run ${spell.bootstrap} `
         + '(or node scripts/docs.mjs sync)',
         // The doctor's exact line, so `docs status` and the doctor cannot disagree about what an
         // absent corpus means or what to do about it.
