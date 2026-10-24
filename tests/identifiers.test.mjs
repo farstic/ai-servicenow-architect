@@ -46,12 +46,15 @@ const CAPITALS = {
 };
 // What the two C104 arms rest on in the real roster. A change is a decision made in review.
 // The fill-in (2026-10-14) took the ITSM skill's notifications and auto-close from the corpus: +3 dotted names, each in it.
-const DOTTED_REAL = { checked: 29, scriptCode: 12 };   // 12 variables in example code, on 19 sites
+// ARC-09-C250 (M) took its two assignment notifications from the corpus: +2 dotted names, each in it.
+// ARC-09-C250 (M, R17) quotes `current.rfc` from a documented Problem-form example: +1 dotted name, in the corpus.
+const DOTTED_REAL = { checked: 32, scriptCode: 12 };   // 12 variables in example code, on 19 sites
 // ARC-09-C148 put it back to 14: C144's citation c_Business-portal-NotifPref.md had put NotifPref in sight, and a
 // backticked corpus path is now unread whole.
 const CAMEL_REAL = { checked: 14, excused: 3 };         // SnSysId, AceGrid, GlobalCo: names an example invents
 // What the C144 arm rests on: the names written as words, and the 14 an example invents (15 entries; SLA Risk Badge in two files).
-const SPACED_REAL = { checked: 72, excused: 14 };
+// ARC-09-C250 (M, R16) quotes three ITSM Mobile Agent major incident notifications: +3 spaced names, each in the corpus.
+const SPACED_REAL = { checked: 75, excused: 14 };
 const kinds = (r) => r.excused.reduce((a, e) => (e.by === 'allow-list' ? a : { ...a, [e.by]: (a[e.by] ?? 0) + 1 }), {});
 
 // A fixture corpus small enough to read: two `cmdb_ci_cloud_` names (a family), one `cmdb_ci_lone_`
@@ -321,8 +324,9 @@ test('a ride-along on a marker line, and a platform name retyped in capitals, ea
   cpSync(join(ROOT, '.claude'), join(dir, '.claude'), { recursive: true });
   const hr = join(dir, '.claude', 'skills', 'hrsd-specialist', 'SKILL.md');
   const text = readFileSync(hr, 'utf8');
-  assert.ok(text.includes('- `employment_status` (Choice'), 'the marker line this plant edits');
-  writeFileSync(hr, text.replace('- `employment_status` (Choice', '- `employment_status` and `sn_hr_core_wrong_table_y` (Choice'));
+  assert.ok(text.includes('- `employment_status` — not documented'), 'the marker line this plant edits');
+  writeFileSync(hr, text.replace('- `employment_status` — not documented',
+    '- `employment_status` and `sn_hr_core_wrong_table_y` — not documented'));
   const csm = join(dir, '.claude', 'skills', 'csm-specialist', 'SKILL.md');
   writeFileSync(csm, `${readFileSync(csm, 'utf8')}\nAlso \`SN_CUSTOMERSERVICE_CONTRACT\` and \`Sn_Entitlement_Condition\`.\n`);
   const r = verifyIdentifiers({ root: dir, corpusDir: CORPUS, index: realIndexOnce() });
