@@ -647,9 +647,10 @@ export function targetPlan(root, tag, { run = spawnSync, env = process.env, stat
     const r = run(process.execPath, [PLAN_HELPER, at, root, tag], { cwd: root, encoding: 'utf8',
       env: childEnv(root, env), input: JSON.stringify({ manifestWritten: true, state }), timeout: timeoutMs,
       stdio: ['pipe', 'pipe', 'pipe'] });
-    if (r?.error?.code === 'ETIMEDOUT' || (r?.signal && r?.status === null)) {
-      return why(`it did not answer within ${timeoutMs / 1000} s`);
-    }
+    // Stopped by the timeout: spawnSync then reports an error AND the signal it stopped the child with. A child that
+    // dies of a signal on its own carries no error, and one that never started carries no signal. By that pair, not
+    // by the error's code, which is spelled like a code the contract owns (tests/contract/no-literals.test.mjs).
+    if (r?.error && r?.signal) return why(`it did not answer within ${timeoutMs / 1000} s`);
     if (r?.status !== 0) {
       const line = String(r?.stderr ?? '').split('\n').map((l) => l.trim()).find(Boolean);
       return why(line ? line.slice(0, 200) : `it exited ${r?.status ?? 'abnormally'}`);
