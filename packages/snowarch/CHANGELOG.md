@@ -5,6 +5,13 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**`snow_core_capabilities_read` keeps the instance a session switched to (ARC-09-C245).** It reloads the store before
+it answers (ARC-07-C3), and the reload put the session on the store's default instance: after `snow_core_instance_switch`,
+the read that comes before every write moved the session back with nothing said, and the next call went to the default.
+It and `snow_core_instances_reload` now keep the session on its instance. When that instance no longer loads, the answer
+carries `instanceChanged: { from, to, reason }`; the reason is "no longer in the store", or the loader's own code and
+message. A new server process, as a resumed session starts, is on the store's default instance and says so.
+
 **The `display_value` description states the owner's rendering rule (ARC-09-C225).** It told the model to show a field
 as 'Label (value)' wherever the two differ, naming choices, references and dates. It now says: "A choice whose label
 hides its code (negative codes too) shows as 'Label (value)' ("Resolved (6)"); a label that already carries the value
