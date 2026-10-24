@@ -339,6 +339,27 @@ test('ARC-09-C244 — a sparse run under the marker puts the debris back, keeps 
   assert.ok(lines.some((l) => l.includes('the switch to the whole corpus was interrupted')), lines.join(' · '));
 });
 
+test('ARC-09-C244 — under the marker, a sparse run sets the cone again after a disable killed past its index', () => {
+  const w = workspace();
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  const corpus = corpusOf(w);
+  // The state between the two halves of `disable`, measured on git 2.39.5: every file written and no skip-worktree
+  // bit left, the patterns file untouched, and the worktree config not yet turned off.
+  git(['sparse-checkout', 'disable'], corpus);
+  assert.ok(existsSync(join(corpus, ...UNCITED.split('/'))), 'the disable did not write the uncited area');
+  git(['config', '--worktree', 'core.sparseCheckout', 'true'], corpus);
+  git(['config', '--worktree', 'core.sparseCheckoutCone', 'true'], corpus);
+  assert.equal(git(['config', '--get', 'core.sparseCheckout'], corpus).trim(), 'true', 'the config is not sparse');
+  assert.equal(git(['config', '--get', 'core.sparseCheckoutCone'], corpus).trim(), 'true', 'the config is not cone');
+  writeFileSync(switchMarker(corpus), '');
+  const r = syncCorpus({ ...w, mode: 'sparse', log: silent });
+  assert.equal(r.completeness.ok, true);
+  assert.equal(existsSync(join(corpus, ...UNCITED.split('/'))), false, 'the cone was not set again');
+  for (const a of AREAS) assert.ok(existsSync(join(corpus, ...a.split('/'))), `${a} is not on disk`);
+  assert.equal(git(['config', '--get', 'core.sparseCheckout'], corpus).trim(), 'true', 'the cone is gone');
+  assert.equal(existsSync(switchMarker(corpus)), false, 'the marker outlived the sparse run');
+});
+
 test('ARC-09-C244 — a marker left by a switch given up for sparse goes, so it cannot excuse a later edit', () => {
   const w = workspace();
   syncCorpus({ ...w, mode: 'sparse', log: silent });
