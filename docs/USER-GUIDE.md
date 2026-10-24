@@ -63,6 +63,9 @@ force refuses every MCP tool, and every command but `licence`, `doctor`, `status
 `valid_until` is a calendar date in UTC: the last day counts, until 00:00 UTC of the next day, and the
 commands print it as `<date> (UTC, N days)`.
 
+The banner also prints `Docs on disk:` — the release family, the corpus mode, and how many of the
+documentation map's areas this checkout has, naming the largest that are not installed.
+
 ### Reading the Mode line
 
 `Mode:` is the answer to "can this session touch a real instance?", and it comes from the doctor —
