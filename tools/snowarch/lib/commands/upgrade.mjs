@@ -107,6 +107,9 @@ function readCacheThisRun(root, { read = readFileSync, notBefore = null } = {}) 
  *
  * Returns `null` on any unreadable or shapeless cache: a caller that prints nothing is honest, and
  * one that falls back to the masked line prints `<label>` as though it were the instance's name.
+ *
+ * `modeLine` is in REPORT_CACHE_KEYS (`doctor-cache.mjs`), the keys the doctor's own cache promises
+ * (ARC-09-C200), so a rename is a change to that list rather than a Mode line that goes quiet here.
  */
 export function readCachedModeLine(root, { read = readFileSync, notBefore = null } = {}) {
   const line = readCacheThisRun(root, { read, notBefore })?.modeLine;
