@@ -228,10 +228,16 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
     return declared.sort((a, b) => (a.end - a.pos) - (b.end - b.pos))[0] ?? v.getSourceFile();
   };
 
-  /** `lookup`, read from a reference's own place: the bindings visible there, the innermost scope's only. */
+  /**
+   * `lookup`, read from a reference's own place: the bindings visible there, the innermost scope's only.
+   *
+   * The reference must be in `file`'s own source, asked of the parsed source itself and never of its name: TypeScript
+   * folds a source file's name, every backslash of a Windows path to a slash, so `fileName !== file` held for every
+   * file on Windows and no binding was scoped there (run 40070298452).
+   */
   const lookupAt = (file, ref, hopped) => {
     const found = lookup(file, ref.text, hopped);
-    if (!found || found.file !== file || found.nodes.length < 2 || ref.getSourceFile().fileName !== file) return found;
+    if (!found || found.file !== file || found.nodes.length < 2 || ref.getSourceFile() !== parse(file).src) return found;
     const scoped = found.nodes.map((v) => ({ v, s: scopeOf(found.nodes, v) })).filter(({ s }) => encloses(s, ref));
     if (!scoped.length) return found;
     const inner = scoped.reduce((a, b) => ((b.s.end - b.s.pos) < (a.s.end - a.s.pos) ? b : a)).s;
