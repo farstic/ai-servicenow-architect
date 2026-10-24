@@ -226,6 +226,23 @@ function recordedRun() {
   return { run, adds };
 }
 
+/** git through spawnSync, every call recorded; the one other command, the helper, is a stand-in target that fails. */
+function standInRun() {
+  const adds = [];
+  const calls = [];
+  let asked = null;
+  const run = (cmd, args, options) => {
+    if (cmd !== 'git') {
+      asked = args[1];
+      return { status: 1, stdout: '', stderr: 'plan-at-target: no planSteps\n' };
+    }
+    calls.push(args);
+    if (args[0] === 'worktree' && args[1] === 'add') adds.push(args.at(-2));
+    return spawnSync('git', args, options);
+  };
+  return { run, adds, calls, asked: () => asked };
+}
+
 test('ARC-09-C241 — planSteps hands a kept worktree to rerunAtTag, which then adds none', (t) => {
   const { repo, git } = fixtureCheckout(t);
   const ctx = { root: repo, config: loadConfig(ROOT) };
@@ -272,16 +289,48 @@ test('ARC-09-C241 — the helper hands the target\'s planSteps the worktree it r
   assert.equal(seen(repo), null, 'the helper handed over a tree that is not the tag\'s checkout');
 });
 
-test('ARC-09-C241 — planForMove makes one worktree, asks the target in it, and plans the fallback in it', () => {
-  const { run, calls } = fakeRun({ helper: { status: 1, stdout: '', stderr: 'plan-at-target: no planSteps\n' } });
+test('ARC-09-C241 — planForMove makes one worktree, asks the target in it, and plans the fallback in it', (t) => {
+  const { repo } = fixtureCheckout(t);
+  const ctx = { root: repo, config: loadConfig(ROOT) };
+  const fresh = planSteps(repo, 'v9.2.0', { ctx, state: null, run: spawnSync });
+  const { run, adds, asked } = standInRun();
   let handed;
-  const plan = planForMove('/checkout', 'v9.2.0', { signed: true, run,
-    ownPlan: (root, tag, options) => { handed = options.keepWorktree; return OWN; } });
-  assert.deepEqual(plan, { ...OWN, installedBecause: 'the target\'s own plan could not be read: plan-at-target: no planSteps' });
-  const adds = calls.filter((c) => c.cmd === 'git' && c.args[0] === 'worktree' && c.args[1] === 'add');
-  assert.equal(adds.length, 1, JSON.stringify(adds.map((c) => c.args)));
-  const helper = calls.find((c) => c.cmd === process.execPath);
-  assert.equal(handed, helper.args[1], 'the fallback did not plan in the worktree the target was asked in');
-  assert.ok(calls.some((c) => c.cmd === 'git' && c.args[1] === 'remove' && c.args.at(-1) === helper.args[1]),
-    'the shared worktree was not removed');
+  const plan = planForMove(repo, 'v9.2.0', { ctx, state: null, run, signed: true,
+    ownPlan: (root, tag, options) => { handed = options.keepWorktree; return planSteps(root, tag, options); } });
+  assert.equal(adds.length, 1, `U4 made ${adds.length} worktrees of the tag`);
+  assert.ok(asked(), 'the stand-in target was never asked');
+  assert.equal(handed, asked(), 'the fallback did not plan in the worktree the target was asked in');
+  assert.deepEqual(plan.steps, fresh.steps, 'the fallback in the shared worktree planned otherwise than a fresh one');
+  assert.match(plan.installedBecause, /plan-at-target: no planSteps/);
+  assert.equal(existsSync(asked()), false, 'the shared worktree was not removed');
 });
+
+test('ARC-09-C241 — a worktree that is not ours beyond doubt is never reset or cleaned, and the plan stays right',
+  (t) => {
+    // reset --hard and clean -fd are destructive, and `git -C ""` runs in the current directory: a bug that handed
+    // over an empty path, the checkout itself or some other directory must not reach either.
+    const { repo, git } = fixtureCheckout(t);
+    const ctx = { root: repo, config: loadConfig(ROOT) };
+    const foreign = tempDir('snowarch-c241-foreign-', t);
+    writeFileSync(join(foreign, 'package.json'), '{"name":"not a worktree"}\n');
+    // The checkout at the tag, with a change of its own: had anything been reset here, the change would be gone.
+    git(['checkout', '-q', 'v9.2.0']);
+    assert.equal(git(['rev-parse', 'HEAD']), git(['rev-parse', 'v9.2.0^{commit}']), 'the checkout did not move to v9.2.0');
+    writeFileSync(join(repo, 'package.json'), '{"name":"fixture","version":"9.2.0","edited":"by the user"}\n');
+    const fresh = planSteps(repo, 'v9.2.0', { ctx, state: null, run: spawnSync });
+    for (const [why, at] of [['an empty path', ''], ['the checkout itself', repo], ['a foreign directory', foreign]]) {
+      const scratch = tempDir('snowarch-c241-scratch-', t);
+      const { run, calls } = standInRun();
+      let handed = 'never asked';
+      const plan = planForMove(repo, 'v9.2.0', { ctx, state: null, run, signed: true,
+        makeWorktree: () => ({ at, scratch }),
+        ownPlan: (root, tag, options) => { handed = options.keepWorktree; return planSteps(root, tag, options); } });
+      const destructive = calls.filter((a) => a.includes('reset') || a.includes('clean'));
+      assert.deepEqual(destructive, [], `${why}: a reset or a clean ran`);
+      assert.equal(handed, null, `${why}: the fallback planned in it`);
+      assert.deepEqual(plan.steps, fresh.steps, `${why}: the plan is not the one a fresh worktree gives`);
+    }
+    assert.match(readFileSync(join(repo, 'package.json'), 'utf8'), /"edited":"by the user"/,
+      'the change in the checkout is gone');
+    assert.equal(readFileSync(join(foreign, 'package.json'), 'utf8'), '{"name":"not a worktree"}\n');
+  });

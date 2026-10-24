@@ -23,11 +23,11 @@
  *   hook reads it. A banner that could fetch would be a banner that could hang a session start.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 
 import { CACHE_FILE } from '../doctor-cache.mjs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localDir, storePath } from '../local-paths.mjs';
 
@@ -686,22 +686,43 @@ function removeTagWorktree(root, { at, scratch }, run) {
   rmSync(scratch, { recursive: true, force: true });
 }
 
+/** The same directory, by its real path: git records a temp directory as macOS's /private/var, node as /var. */
+function samePath(a, b) {
+  const real = (p) => { try { return realpathSync.native(p); } catch { return null; } };
+  const ra = real(a);
+  return ra !== null && ra === real(b);
+}
+
 /**
  * ARC-09-C241 — the shared worktree back to what the tag holds, before this release plans in it: the target's code ran
  * there and may have changed it. It is our own scratch checkout, so it is reset in place. `.local`, the link to the
  * checkout's own state that rerunAtTag makes, is left out of both the check and the clean. False when it cannot be
  * made clean, and the fallback then makes a worktree of its own.
+ *
+ * reset --hard and clean -fd are destructive, and `git -C ""` runs in the current directory, so nothing runs in `at`
+ * unless it is ours beyond doubt: a non-empty absolute path that exists, one of this repository's worktrees but not its
+ * main one, at the tag's commit. Anything else is refused, and the fallback makes a fresh worktree.
  */
-function asTagged(at, run) {
-  const git = (args) => run('git', ['-C', at, ...args], { encoding: 'utf8', stdio: 'pipe' });
+function asTagged(root, tag, at, run) {
+  if (typeof at !== 'string' || at === '' || !isAbsolute(at) || !existsSync(at)) return false;
+  const git = (cwd, args) => run('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
+  const listed = git(root, ['worktree', 'list', '--porcelain']);
+  if (listed?.status !== 0) return false;
+  const [main, ...linked] = String(listed.stdout ?? '').split('\n').filter((l) => l.startsWith('worktree '))
+    .map((l) => l.slice('worktree '.length));
+  if (main === undefined || samePath(main, at) || !linked.some((p) => samePath(p, at))) return false;
+  const head = git(at, ['rev-parse', 'HEAD']);
+  const tagged = git(root, ['rev-parse', `${tag}^{commit}`]);
+  if (head?.status !== 0 || tagged?.status !== 0
+    || String(head.stdout ?? '').trim() !== String(tagged.stdout ?? '').trim()) return false;
   const clean = () => {
-    const r = git(['status', '--porcelain', '--', '.', ':(exclude).local']);
+    const r = git(at, ['status', '--porcelain', '--', '.', ':(exclude).local']);
     return r?.status === 0 ? String(r.stdout ?? '').trim() === '' : null;
   };
   const first = clean();
   if (first !== false) return first === true;
-  git(['reset', '--hard', '--quiet']);
-  git(['clean', '-fdq', '-e', '.local']);
+  git(at, ['reset', '--hard', '--quiet']);
+  git(at, ['clean', '-fdq', '-e', '.local']);
   return clean() === true;
 }
 
@@ -715,16 +736,16 @@ function asTagged(at, run) {
  * and U4 used to make two, or three when it fell back.
  */
 export function planForMove(root, target, { ctx, state, opts = {}, run = spawnSync, env = process.env,
-  signed = false, askTarget = targetPlan, ownPlan = planSteps } = {}) {
+  signed = false, askTarget = targetPlan, ownPlan = planSteps, makeWorktree = addTagWorktree } = {}) {
   if (!signed) {
     return { ...ownPlan(root, target, { ctx, state, opts, run, manifestWritten: signed }),
       installedBecause: UNSIGNED_REASON };
   }
-  const shared = addTagWorktree(root, target, run);
+  const shared = makeWorktree(root, target, run);
   try {
     const asked = askTarget(root, target, { run, env, state, worktree: shared?.at ?? null });
     if (asked.plan) return { ...asked.plan, installedBecause: null };
-    const keepWorktree = shared && asTagged(shared.at, run) ? shared.at : null;
+    const keepWorktree = shared && asTagged(root, target, shared.at, run) ? shared.at : null;
     return { ...ownPlan(root, target, { ctx, state, opts, run, manifestWritten: signed, keepWorktree }),
       installedBecause: asked.reason };
   } finally {
