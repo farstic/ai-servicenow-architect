@@ -11,6 +11,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 
+import { storePath } from './local-paths.mjs';
+import { nameRe, storeHostValues } from './mask-values.mjs';
+
 /** The end marker, by kind of file: a last heading in markdown, a last comment line in a Gherkin Feature. */
 export const MARKERS = Object.freeze({
   markdown: '## Internal — not in the client copy',
@@ -60,8 +63,40 @@ export const LEXICON = Object.freeze([
   { term: 'Constraint Envelope', re: /\bConstraint Envelopes?\b/g },
   { term: 'consult flag', re: /\bconsult flags?\b/gi },
   { term: 'OPEN QUESTION', re: /\bOPEN QUESTIONS?\b/g },
-  { term: 'PDI', re: /\bPDIs?\b/g },
+  { term: 'PDI', re: /\bPDIs?\b|\b[Pp]ersonal [Dd]eveloper [Ii]nstances?\b/g },
 ]);
+
+/** Labels too short or too common to be a name (the architect's ruling): a client's own words stay clean. */
+const COMMON_LABELS = new Set(['dev', 'test', 'prod', 'uat', 'sit', 'qa']);
+
+/**
+ * This engagement's own instance labels, from an `Instances:` line in its state file (bold, listed or backticked
+ * alike), or `null` when there is no such line, or no state file.
+ */
+export function engagementInstances(root, engagement) {
+  let text;
+  try { text = readFileSync(join(root, 'clients', engagement, `${engagement}-engagement-state.md`), 'utf8'); } catch {
+    return null;
+  }
+  const m = /^[\s>*-]*\**Instances\**\s*:\s*\**\s*(.*)$/im.exec(text);
+  return m ? m[1].split(/[,;\s]+/).map((l) => l.replace(/[`'"*]/g, '')).filter(Boolean) : null;
+}
+
+/**
+ * Another engagement's labels: configured here and not among this engagement's `own`, less the short and the common.
+ * With no `Instances:` line (`own` null) there are none: only a PDI is checked, so a client's own names are never hits.
+ */
+export function otherInstanceLabels(configured, own) {
+  if (!own) return [];
+  const mine = new Set(own.map((l) => l.toLowerCase()));
+  return configured.filter((l) => l.length >= 4 && !COMMON_LABELS.has(l.toLowerCase()) && !mine.has(l.toLowerCase()));
+}
+
+/** The lexicon for one engagement's copy: LEXICON, and another engagement's instance labels as names. */
+export function lexiconFor(root, engagement) {
+  const others = otherInstanceLabels(storeHostValues(storePath(root)).labels, engagementInstances(root, engagement));
+  return [...LEXICON, ...others.map((l) => ({ term: 'another engagement\'s instance', re: nameRe(escape(l)) }))];
+}
 
 /**
  * Each hit of `lexicon` in `text`: `{ line, term, match, text }`, by line and then by column. Where two terms cover
@@ -104,7 +139,7 @@ export function copyPathFor(rel) {
  * Make the client copy of `file` under `root`: `{ dest, hits }`, or `{ refused }` with nothing written. `file` is
  * a path below `root` or an absolute one inside it.
  */
-export function clientCopy({ root, file, lexicon = LEXICON }) {
+export function clientCopy({ root, file, lexicon = null }) {
   const rel = (isAbsolute(file) ? relative(root, file) : file).split(sep).join('/');
   const dest = copyPathFor(rel);
   if (!dest) return { refused: `${rel} is not a file under clients/<name>/ (and not a copy under for-client/)` };
@@ -113,5 +148,6 @@ export function clientCopy({ root, file, lexicon = LEXICON }) {
   if (cut.refused) return { refused: cut.refused };
   mkdirSync(dirname(join(root, dest)), { recursive: true });
   writeFileSync(join(root, dest), cut.text);
-  return { source: rel, dest, hits: scanInternal(cut.text, { lexicon }) };
+  const words = lexicon ?? lexiconFor(root, rel.split('/')[1]);
+  return { source: rel, dest, hits: scanInternal(cut.text, { lexicon: words }) };
 }
