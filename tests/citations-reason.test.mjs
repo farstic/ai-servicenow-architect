@@ -64,6 +64,16 @@ test('ARC-09-C239 — a corpus with no git directory cannot tell, so every path 
   assert.equal(r.dead.length, 4);
 });
 
+test('ARC-09-C239 — a corpus whose git cannot be read (a gitlink to nowhere) also leaves every path dead', () => {
+  const root = synced('sparse');
+  rmSync(join(root, CORPUS_DIR, '.git'), { recursive: true, force: true });
+  writeFileSync(join(root, CORPUS_DIR, '.git'), 'gitdir: ../no-such-git-directory\n');
+  assert.ok(existsSync(join(root, CORPUS_DIR, '.git')), 'the broken gitlink was not written');
+  const r = verifyCitations({ root, roots: [citing(root, CITED)] });
+  assert.deepEqual(new Set(Object.values(reasons(r))), new Set(['missing']));
+  assert.equal(r.dead.length, 4);
+});
+
 test('ARC-09-C239 — on the whole corpus nothing is outside: the uncited area is on disk', () => {
   const root = synced('full');
   const r = verifyCitations({ root, roots: [citing(root, CITED)] });

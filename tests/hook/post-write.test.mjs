@@ -9,7 +9,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -84,6 +84,19 @@ test('ARC-09-C231 — a file outside clients/ is not checked, dead citation or n
 test('ARC-09-C231 — with no corpus nothing can be checked, so nothing is said (the doctor reports the corpus)', async (t) => {
   const root = project(t, { corpus: false });
   assert.deepEqual(await report(written(root, 'clients/acme/envelopes/seeded.md'), { root }), SILENT);
+});
+
+// ARC-09-C239 — the hook's own root is a real path (Node resolves the script's links), and the written path is spelled
+// the way the session reached it. A checkout reached through a link is still checked, in both directions.
+test('ARC-09-C239 — a checkout reached through a link is still checked, whichever side carries the link', async (t) => {
+  const root = project(t);
+  const link = join(tempDir('snowarch-c239-link-', t), 'checkout');
+  symlinkSync(root, link, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.equal(realpathSync.native(link), realpathSync.native(root), 'the link does not lead to the checkout');
+  for (const [base, file] of [[root, link], [link, root]]) {
+    const r = await report(written(file, 'clients/acme/envelopes/seeded.md'), { root: base });
+    assert.equal(r.code, 2, `root ${base === root ? 'real' : 'linked'}: ${JSON.stringify(r)}`);
+  }
 });
 
 test('ARC-09-C231 — input without a file path is no finding', async (t) => {
