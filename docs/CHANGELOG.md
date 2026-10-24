@@ -34,6 +34,11 @@ only the first.**
   reports each dead one, with its line, to the Architect, with the instruction to correct it before presenting the file.
   It is a hook the bootstrap writes beside the session banner's, in `.claude/settings.local.json`, when Node is present
   (ARC-09-C231).
+- `./snowarch upgrade` worked out the steps it would re-run with the release you had installed, so a new release that
+  changed what a step depends on could re-run a step its plan never named. The plan is now the new release's own
+  answer, asked once its files have passed the check against its signed manifest; when it cannot be asked, the plan
+  says it was worked out by the installed release, and why. The upgrade that brings you this release is still planned
+  by the one you have installed, so the change shows from your next upgrade on (ARC-09-C195).
 
 ### Changed
 
