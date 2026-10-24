@@ -622,15 +622,15 @@ const MASKED_SV03 = { id: 'SV-03', status: 'warn', title: 'instances',
 
 /** U7 with a cache and a stdout that DISAGREE — which copy reaches the terminal is the whole test. */
 async function u7Checks(t, { cached = [CACHED_SV03], stdout = [MASKED_SV03],
-  doctorStatus = 0, cacheError = null, at = '2026-09-24T12:00:00.000Z' } = {}) {
+  doctorStatus = 0, cacheError = null, at = '2026-09-24T12:00:00.000Z',
+  summary = { ok: 14, warn: stdout.length, fail: 0, skip: 25 } } = {}) {
   const root = treeWithCachedChecks(t, cached, { at });
   const lines = [];
   const log = { step: (l) => lines.push(l), fail: (l) => lines.push(l), warn: (l) => lines.push(l) };
   const run = (_cmd, args) => (args.includes('doctor')
     ? { status: doctorStatus,
       stdout: doctorStatus === 0
-        ? JSON.stringify({ mode: 'live', modeLine: MASKED,
-          summary: { ok: 14, warn: stdout.length, fail: 0, skip: 25 }, checks: stdout,
+        ? JSON.stringify({ mode: 'live', modeLine: MASKED, summary, checks: stdout,
           ...(cacheError ? { cacheError } : {}) })
         : '' }
     : { status: 0 });
@@ -664,16 +664,20 @@ test('ARC-09-C56 — the tally still comes from the run, not from the cache', as
     `the tally moved or changed: ${JSON.stringify(lines.filter((l) => l.startsWith('DOCTOR')))}`);
 });
 
-test('ARC-09-C56 — a check the registry cannot name prints its id, never `undefined`', async (t) => {
-  // The bounded risk the spike measured: `registry.mjs` refuses id reuse, so an unresolvable id can
-  // only ever mean a RETIRED check — never the wrong title. The fallback is one line.
-  const retired = { id: 'SV-99', status: 'warn', detail: 'a check that no longer exists',
+test('ARC-09-C200 — a check the running release cannot name prints the target\'s title', async (t) => {
+  // C56 titled these lines from the running release's registry, and reasoned that an id it cannot name is a
+  // RETIRED check, because `registry.mjs` refuses id reuse. That holds inside one release. U7 runs in the process
+  // that started the upgrade, so its registry is the old release's while the doctor it spawned is the target's:
+  // an id it cannot name is as likely a check the target ADDED. The target's report names its own checks.
+  const added = { id: 'E-99', status: 'warn', detail: 'a check this release does not know',
     remedy: './snowarch doctor' };
-  const lines = await u7Checks(t, { cached: [retired], stdout: [{ ...retired, title: 'gone' }] });
-  const sv99 = lines.find((l) => l.startsWith('SV-99')) ?? '';
-  assert.notEqual(sv99, '', `the retired check lost its line entirely: ${JSON.stringify(lines)}`);
-  assert.equal(sv99.includes('undefined'), false, `\`undefined\` reached the terminal: ${sv99}`);
-  assert.equal(sv99, 'SV-99 WARN: a check that no longer exists — ./snowarch doctor');
+  const lines = await u7Checks(t, { cached: [added], stdout: [{ ...added, title: 'a newer check' }] });
+  assert.ok(lines.includes('E-99 WARN a newer check: a check this release does not know — ./snowarch doctor'),
+    JSON.stringify(lines));
+  // A report that gives it no title still prints a true line, never `undefined`.
+  const untitled = await u7Checks(t, { cached: [added], stdout: [added] });
+  assert.equal(untitled.find((l) => l.startsWith('E-99')),
+    'E-99 WARN: a check this release does not know — ./snowarch doctor');
 });
 
 // The four-condition binding is C53's, reused — not restated. Each case is a way the cached lines
@@ -700,6 +704,47 @@ test('ARC-09-C56 — a cache older than this run is not this run', async (t) => 
     `yesterday's labels were printed as this run's measurement: ${sv03}`);
   // ...and the line is still THERE, from the stdout — silence would lose the check entirely.
   assert.match(sv03, /^SV-03 WARN/, `the check lost its line instead of falling back: ${sv03}`);
+});
+
+// ─── ARC-09-C200 — U7 prints the TARGET's checks, and takes only words from the cache ──────────
+//
+// `finish()` runs in the process that started the upgrade, at the move and at a re-run alike, with no re-exec.
+// So the cache path U7 read and the registry that titled its lines were the RUNNING release's, while the doctor
+// it spawned, and the cache that doctor wrote, are the TARGET's. The target's report now decides which checks
+// are printed, with which title and which status. The cache lends an entry its unmasked detail and remedy only
+// when it is this run's cache and the entry has the same id and the same status; otherwise the report's masked
+// text stands, which is vague but true.
+
+test('ARC-09-C200 — a check the target retitled prints the target\'s title', async (t) => {
+  const lines = await u7Checks(t, { stdout: [{ ...MASKED_SV03, title: 'instance status' }] });
+  assert.ok(lines.includes('SV-03 WARN instance status: instances: pdi: flags explicit, preset custom '
+    + '— ./snowarch instance test pdi'), JSON.stringify(lines));
+});
+
+test('ARC-09-C200 — a verdict only the cache holds is not printed', async (t) => {
+  // The tally is the report's, so a line the report did not count would be another run's.
+  const lines = await u7Checks(t, {
+    cached: [CACHED_SV03, { id: 'E-32', status: 'fail', detail: 'three files differ from the manifest' },
+      { id: 'SV-05', status: 'warn', detail: 'a check this run did not report' }],
+    stdout: [MASKED_SV03,
+      { id: 'E-32', status: 'skip', title: 'build integrity', detail: 'left out of this run by name' }],
+    summary: { ok: 14, warn: 1, fail: 0, skip: 26 } });
+  assert.deepEqual(lines.filter((l) => /^(E-32|SV-05) /.test(l)), []);
+  assert.ok(lines.includes('DOCTOR: 14 ok, 1 warn, 0 fail (26 skip)'), JSON.stringify(lines));
+});
+
+test('ARC-09-C200 — a cached entry whose status differs lends no words', async (t) => {
+  const lines = await u7Checks(t, { cached: [{ ...CACHED_SV03, status: 'fail' }] });
+  assert.ok(lines.includes('SV-03 WARN instances: instances: <label>: flags explicit, preset custom '
+    + '— ./snowarch instance test <label>'), JSON.stringify(lines));
+});
+
+test('ARC-09-C200 — a cached entry without a field keeps the report\'s words for it', async (t) => {
+  // A target that renames `detail` in its cache: the remedy is still the cache's, the detail the report's.
+  const { detail, ...rest } = CACHED_SV03;
+  const lines = await u7Checks(t, { cached: [{ ...rest, message: detail }] });
+  assert.ok(lines.includes('SV-03 WARN instances: instances: <label>: flags explicit, preset custom '
+    + '— ./snowarch instance test pdi'), JSON.stringify(lines));
 });
 
 /**
