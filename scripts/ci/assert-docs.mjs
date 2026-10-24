@@ -28,7 +28,7 @@ if (!MODES.includes(MODE)) {
 }
 /** `full` and `switch` both end with the whole corpus; only `sparse` ends with the cone. */
 const WHOLE = MODE !== 'sparse';
-// The sparse cap is ARC-03-S11's: 350 MB over a cone of about 195 MB. The whole corpus is about 293 MB
+// The sparse cap is ARC-03-S11's: 350 MB over a cone of about 217 MB. The whole corpus is about 293 MB
 // of files at aa447ce, and its cap leaves room of the same kind, so a corpus that doubled upstream
 // would fail here rather than pass unnoticed.
 const CAP_BYTES = (WHOLE ? 500 : 350) * 1000 * 1000;
