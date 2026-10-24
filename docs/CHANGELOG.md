@@ -24,6 +24,11 @@ only the first.**
   breached or not. It selected by a stage value no row holds (PN-25), so finished and cancelled SLAs could come back,
   and it left out breached SLAs still running. Where `com.snc.sla.compatibility.breach` is set to true, a breached SLA's
   stage is Breached, and the list still leaves it out (ARC-09-C229).
+- `./snowarch upgrade` moved the checkout and only then stopped when a folder the release manages held a file the
+  release does not ship, such as a skill of your own under `.claude/skills/`. From this release on, the upgrade names
+  such files before anything moves, and changes nothing until you move them out of those folders. The upgrade that
+  brings you this release is still run by the one you have installed, so that one checks only after the move
+  (ARC-09-C197).
 
 ### Changed
 

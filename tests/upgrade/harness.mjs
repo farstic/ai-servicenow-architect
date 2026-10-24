@@ -410,14 +410,16 @@ function licencesRepo(scratch) {
  * `unsigned` tags get none, and `altered` ones a manifest with one hash changed and signed all the same: a record that
  * verifies and is not the tag's (ARC-11-C7's two refusals at U4). `foreign` ones are signed over another commit, as a
  * final's is over its distribution commit when the install's origin carries the engineering tag (ARC-09-C185c).
+ * `coverage` signs a tag over a coverage of its own, `{ [tag]: { covers, excludes, ignores } }`: a release that covers
+ * a directory the one before it did not (ARC-09-C197). U4 reads it on that coverage (ARC-09-C192).
  */
-function publishManifests(work, licences, tags, { unsigned = [], altered = [], foreign = [] } = {}) {
+function publishManifests(work, licences, tags, { unsigned = [], altered = [], foreign = [], coverage = {} } = {}) {
   const clone = join(dirname(licences.bare), 'licences-work');
   initFixtureRepo(gitRaw, clone, ['--quiet', '--initial-branch=main']);
   mkdirSync(join(clone, 'releases'), { recursive: true });
   const { primary } = licenceFixture();
   for (const tag of tags.filter((x) => !unsigned.includes(x))) {
-    const manifest = manifestFromArchive(work, tag);
+    const manifest = manifestFromArchive(work, tag, coverage[tag] ? { coverage: coverage[tag] } : {});
     if (altered.includes(tag)) manifest.files['CLAUDE.md'] = '0'.repeat(64);
     if (foreign.includes(tag)) manifest.commit = 'd'.repeat(40);
     const doc = signManifest(manifest, primary.privateKey);
@@ -447,7 +449,7 @@ export function republishManifests(licences, dir, tags) {
 }
 
 export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null,
-  unsigned = [], altered = [], foreign = [] } = {}) {
+  unsigned = [], altered = [], foreign = [], coverage = {} } = {}) {
   const marks = [];
   const worldStart = process.hrtime.bigint();
   const scratch = tempDir('snowarch-upgrade-', t);
@@ -562,7 +564,8 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   const tB = process.hrtime.bigint();
   await tagRelease(work, '9.2.0', { claudeFloor });
   marks.push(`tag-B=${Math.round(Number(process.hrtime.bigint() - tB) / 1e6)}ms`);
-  phase('manifests', marks, () => publishManifests(work, licences, ['v9.0.0', 'v9.1.0', 'v9.2.0'], { unsigned, altered, foreign }));
+  phase('manifests', marks, () => publishManifests(work, licences, ['v9.0.0', 'v9.1.0', 'v9.2.0'],
+    { unsigned, altered, foreign, coverage }));
 
   // ── the bare origin, and the user's clone at v9.0.0 ───────────────────────────────────────
   const origin = join(scratch, 'origin.git');
