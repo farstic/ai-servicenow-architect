@@ -22,7 +22,9 @@ const MARKER = /^\*\*Version:\*\* /;
 
 test('criterion 1 — the budget, in the state a release cut writes', () => {
   assert.ok(lines.length <= 200, `${lines.length} lines, cap 200`);
-  assert.ok(Buffer.byteLength(doc) <= 20_000, `${Buffer.byteLength(doc)} bytes, cap 20,000`);
+  // ARC-09-C250 — the owner's decision (2026-10-24): CLAUDE.md gains W1 and W2 and loses nothing, and the cap rises
+  // from 20,000 to 20,400 bytes to hold them.
+  assert.ok(Buffer.byteLength(doc) <= 20_400, `${Buffer.byteLength(doc)} bytes, cap 20,400`);
   // ARC-09-C185a — a release cut rewrites the Version marker (writers.mjs writeMarker), and the file the cut leaves
   // is the one the release's own suite reads. A -dev tree at the cap went green while `release.mjs 2.2.1-rc.99`
   // rolled back on this very case. So the budget is held at the longest version the cut writes for this release: an
@@ -31,8 +33,8 @@ test('criterion 1 — the budget, in the state a release cut writes', () => {
   const longest = `${base}-rc.99`;
   const cut = writeMarker(doc, longest);
   assert.ok(cut.ok, cut.message);
-  assert.ok(Buffer.byteLength(cut.text) <= 20_000,
-    `${Buffer.byteLength(cut.text)} bytes once the cut writes ${longest}, cap 20,000`);
+  assert.ok(Buffer.byteLength(cut.text) <= 20_400,
+    `${Buffer.byteLength(cut.text)} bytes once the cut writes ${longest}, cap 20,400`);
   console.log(`    CLAUDE.md: ${lines.length} lines · ${Buffer.byteLength(doc)} bytes · ${Buffer.byteLength(cut.text)} at ${longest}`);
 });
 
