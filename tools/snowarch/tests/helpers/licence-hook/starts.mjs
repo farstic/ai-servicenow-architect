@@ -19,6 +19,9 @@
  * to their values: `const` and `let` declarations, plain assignments, a `for…of` variable (bound to what it
  * iterates), destructured names, a function's return expressions, and a name imported from a relative
  * module, followed into that module once. A name from a package or a built-in is known and not followed.
+ * Each name is READ WHERE IT IS WRITTEN (ARC-09-C202): a reference takes the bindings whose scope encloses it,
+ * the innermost scope first, so one test's `env` or `target` lends nothing to another test's start; only a name
+ * with no binding visible from its place falls back to every binding in the file.
  *
  * A start is a PRODUCT START when that value names an entry point: the CLI (`snowarch.mjs`), the package CLI
  * (`dist/cli/index.js`, behind the same gate from step 4b), the server (`server.js`) or a launcher (`snowarch`,
@@ -188,6 +191,59 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
 
   const isFunction = (n) => ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isArrowFunction(n);
 
+  // ARC-09-C202 — SCOPE. The bindings stay one list per name and file; what changes is which of them a reference
+  // reads. A binding's scope is where it was declared: a `let`/`const` its block, a `var` its function, a `for…of`
+  // variable its loop, a function declaration the block it is in. An assignment is not a declaration: it joins the
+  // binding of the name it assigns to, seen from where it is written, so `let x; if (…) { x = … }` reaches a later
+  // `spawn(x)` exactly as the file-wide reading did.
+  const isScope = (s) => ts.isBlock(s) || ts.isSourceFile(s) || ts.isForOfStatement(s) || ts.isForStatement(s)
+    || ts.isForInStatement(s) || ts.isCaseClause(s) || ts.isDefaultClause(s) || isFunction(s);
+  const enclosingScope = (n) => {
+    let s = n.parent;
+    while (s && !isScope(s)) s = s.parent;
+    return s ?? n.getSourceFile();
+  };
+  const encloses = (s, ref) => s.pos <= ref.pos && ref.end <= s.end;
+  const isAssignment = (v) => Boolean(v.parent) && ts.isBinaryExpression(v.parent) && v.parent.right === v;
+  const declarationScope = (v) => {
+    const parent = v.parent;
+    if (ts.isFunctionDeclaration(v)) return enclosingScope(v);
+    if (parent && ts.isForOfStatement(parent) && parent.expression === v) return parent;
+    if (parent && ts.isVariableDeclaration(parent)) {
+      const list = parent.parent;
+      if (ts.isVariableDeclarationList(list) && (list.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) === 0) {
+        let s = enclosingScope(parent);
+        while (!ts.isSourceFile(s) && !isFunction(s)) s = enclosingScope(s);
+        return s;
+      }
+      return enclosingScope(parent);
+    }
+    return v.getSourceFile();
+  };
+  /** The scope a binding is visible in: its declaration's, or for an assignment, that of the binding it assigns. */
+  const scopeOf = (nodes, v) => {
+    if (!isAssignment(v)) return declarationScope(v);
+    const at = v.parent.left;
+    const declared = nodes.filter((d) => !isAssignment(d)).map(declarationScope).filter((s) => encloses(s, at));
+    return declared.sort((a, b) => (a.end - a.pos) - (b.end - b.pos))[0] ?? v.getSourceFile();
+  };
+
+  /**
+   * `lookup`, read from a reference's own place: the bindings visible there, the innermost scope's only.
+   *
+   * The reference must be in `file`'s own source, asked of the parsed source itself and never of its name: TypeScript
+   * folds a source file's name, every backslash of a Windows path to a slash, so `fileName !== file` held for every
+   * file on Windows and no binding was scoped there (run 40070298452).
+   */
+  const lookupAt = (file, ref, hopped) => {
+    const found = lookup(file, ref.text, hopped);
+    if (!found || found.file !== file || found.nodes.length < 2 || ref.getSourceFile() !== parse(file).src) return found;
+    const scoped = found.nodes.map((v) => ({ v, s: scopeOf(found.nodes, v) })).filter(({ s }) => encloses(s, ref));
+    if (!scoped.length) return found;
+    const inner = scoped.reduce((a, b) => ((b.s.end - b.s.pos) < (a.s.end - a.s.pos) ? b : a)).s;
+    return { ...found, nodes: scoped.filter(({ s }) => s === inner).map(({ v }) => v) };
+  };
+
   /** A function's value is what it returns: a concise body, or each `return`'s expression. */
   const valueNodes = (node) => {
     if (!isFunction(node)) return [node];
@@ -202,9 +258,12 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
     return out;
   };
 
-  /** The identifiers in `node` that are references: not property names, not a member's name, not a parameter. */
+  /**
+   * The identifiers in `node` that are references: not property names, not a member's name, not a parameter. The
+   * identifier itself, its first occurrence per name, because a name is read where it is written (ARC-09-C202).
+   */
   const references = (node) => {
-    const out = new Set();
+    const out = new Map();
     const local = new Set();
     const walk = (n) => {
       if (ts.isParameter(n)) bindName(n.name, n, (name) => local.add(name));
@@ -215,12 +274,12 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
           || (ts.isMethodDeclaration(parent) && parent.name === n)
           || (ts.isBindingElement(parent) && parent.propertyName === n)
           || ts.isParameter(parent);
-        if (!isName) out.add(n.text);
+        if (!isName && !out.has(n.text)) out.set(n.text, n);
       }
       ts.forEachChild(n, walk);
     };
     walk(node);
-    return [...out].filter((n) => !local.has(n) && !GLOBALS.has(n));
+    return [...out.values()].filter((n) => !local.has(n.text) && !GLOBALS.has(n.text));
   };
 
   /** The string values a node can take, followed through its references; and the references that led nowhere. */
@@ -244,11 +303,13 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
         ts.forEachChild(n, lits);
       };
       lits(v);
-      for (const name of references(v)) {
-        const key = `${file}#${name}`;
+      for (const ref of references(v)) {
+        const name = ref.text;
+        // Per place, not per name: the same name written in two scopes is two questions.
+        const key = `${file}#${name}#${ref.pos}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const found = lookup(file, name, hopped);
+        const found = lookupAt(file, ref, hopped);
         if (!found) { lost.push(name); continue; }
         if (depth >= 8) continue;
         for (const n of found.nodes) {
@@ -270,7 +331,7 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
   const arrayOf = (file, node, hopped = false) => {
     if (ts.isArrayLiteralExpression(node)) return { file, node };
     if (ts.isIdentifier(node)) {
-      const found = lookup(file, node.text, hopped);
+      const found = lookupAt(file, node, hopped);
       const only = found?.nodes.length === 1 ? found.nodes[0] : null;
       return only ? arrayOf(found.file, only, found.hopped) : null;
     }
@@ -309,7 +370,7 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
   /** `x.file` and `x.args` where `x = spawnFor(cmd, args)`: the command and the arguments it was given. */
   const unwrapSpawnFor = (file, node) => {
     if (!ts.isPropertyAccessExpression(node) || !ts.isIdentifier(node.expression)) return null;
-    const found = lookup(file, node.expression.text, false);
+    const found = lookupAt(file, node.expression, false);
     const call = found?.nodes.length === 1 ? found.nodes[0] : null;
     if (!call || !ts.isCallExpression(call) || !/(?:^|\.)spawnFor$/.test(call.expression.getText())) return null;
     return { file: found.file, cmd: call.arguments[0] ?? null, args: call.arguments[1] ?? null };
