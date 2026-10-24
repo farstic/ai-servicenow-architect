@@ -36,6 +36,8 @@ export const WIRING = Object.freeze([
   '.claude/settings.json',
   'packages/snowarch/package.json',
   'tools/snowarch/hooks/session-start.mjs',
+  // ARC-09-C231 — the citation hook's script, which E-08 looks for once the entry registers it.
+  'tools/snowarch/hooks/post-write.mjs',
 ]);
 
 const git = (dir, args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: 'pipe' });

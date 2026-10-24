@@ -715,6 +715,7 @@ anything), and the table below, which is generated from it.
 |  | `node present` | literal | no Node means the hook is disabled |
 |  | `hooks disabled` | literal | S-05: the launcher may have turned them off |
 |  | `registration` | literal | project or user changes what is written |
+|  | `hooks written` | literal | the hook entries this release writes |
 | `B08` the doctor | `packages/snowarch/dist/contract.json` | file | by sha — a different server answers differently |
 |  | `store mtime+size` | literal | NEVER the content: see the credential rule above |
 |  | `mode` | literal | design-only skips the server section |
@@ -1319,8 +1320,8 @@ REFUSED with the check's own command, and a grep test proves the module cannot r
 | `F5` | `store-mode` | restore the store directory mode | `.local/` |
 | `F6` | `toggles-mismatch` | rewrite the mode toggles | `.claude/settings.local.json` |
 | `F6` | `hooks-disabled-by-bootstrap` | remove the bootstrap's hook toggle | `.claude/settings.local.json` |
-| `F6` | `hook-absent` | register the SessionStart hook | `.claude/settings.local.json` |
-| `F6` | `hook-wrong` | rewrite the SessionStart hook | `.claude/settings.local.json` |
+| `F6` | `hook-absent` | register the hooks | `.claude/settings.local.json` |
+| `F6` | `hook-wrong` | rewrite the hooks | `.claude/settings.local.json` |
 | `F8` | `integrity-restore` | put the signed files back | `the covered files E-32 names; what it replaces is kept in .local/integrity-removed/` |
 | `F7` | `cache-stale` | clear the stale doctor cache | `.local/doctor-last.json` |
 <!-- /generated:doctor-fixes -->

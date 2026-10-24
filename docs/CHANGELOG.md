@@ -29,6 +29,11 @@ only the first.**
   such files before anything moves, and changes nothing until you move them out of those folders. The upgrade that
   brings you this release is still run by the one you have installed, so that one checks only after the move
   (ARC-09-C197).
+- A file the Architect wrote under `clients/` could cite a documentation path that does not exist, and nothing checked
+  it before the file reached you. A check now runs after every such write: it resolves each path the file cites, and
+  reports each dead one, with its line, to the Architect, with the instruction to correct it before presenting the file.
+  It is a hook the bootstrap writes beside the session banner's, in `.claude/settings.local.json`, when Node is present
+  (ARC-09-C231).
 
 ### Changed
 

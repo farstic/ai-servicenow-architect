@@ -2033,7 +2033,7 @@ unnoticed — they run on the machines that have no Node to check them.
 
 `.claude/settings.local.json` belongs to the operator. Anything that writes it — B07, ARC-08's
 `--fix`, `snowarch mode` — goes through `applyToggles()` in `tools/snowarch/lib/settings-local.mjs`,
-which reads the file, applies only the two array members and the hook entry, and writes the same
+which reads the file, applies only the two array members and the hook entries, and writes the same
 object back: other keys untouched, other array members preserved, key order kept. Invalid JSON is
 the only failure mode and it changes nothing. A second writer would be a second opinion about what
 "the toggles" are, and the first casualty would be someone's permission grants.

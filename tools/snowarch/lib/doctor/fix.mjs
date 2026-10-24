@@ -269,8 +269,10 @@ export const FIXERS = Object.freeze([
     apply: fixToggles },
   // ARC-11-C10 — the SessionStart hook, through the same merge writer: with node present it writes B07's entry,
   // replacing a wrong one, and it refuses a file that is not gitignored or does not parse, with its own reason.
-  { id: 'F6', kind: 'hook-absent', title: 'register the SessionStart hook', apply: fixToggles },
-  { id: 'F6', kind: 'hook-wrong', title: 'rewrite the SessionStart hook', apply: fixToggles },
+  // ARC-09-C231 — the writer writes both of our hooks, SessionStart's and the PostToolUse citation check, so the
+  // same two fixes cure either.
+  { id: 'F6', kind: 'hook-absent', title: 'register the hooks', apply: fixToggles },
+  { id: 'F6', kind: 'hook-wrong', title: 'rewrite the hooks', apply: fixToggles },
   { id: 'F8', kind: 'integrity-restore', title: 'put the signed files back', apply: fixIntegrity },
   { id: 'F7', kind: 'cache-stale', title: 'clear the stale doctor cache', apply: fixCache },
 ]);

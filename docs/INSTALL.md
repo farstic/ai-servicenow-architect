@@ -207,7 +207,7 @@ When Node is absent the launcher finishes the whole design-only install in `sh` 
 `bootstrap.cmd`, with no Git Bash involved — and says what is waiting: `DOCTOR: unavailable until
 Node 20+ is installed (design-only is complete)`. Nothing is half-done, and installing Node later
 needs no re-clone. If `disableAllHooks` is set in your `.claude/settings.local.json` the session
-banner will not run; the bootstrap neither sets nor removes that key, it says so and leaves it.
+banner and the citation check will not run; the bootstrap neither sets nor removes that key, it says so and leaves it.
 
 ### Start `claude` at the checkout root
 
