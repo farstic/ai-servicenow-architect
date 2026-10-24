@@ -67,9 +67,9 @@ A request that NAMES a custom object can never be Verdict A, however well baseli
 A is what lets a builder be dispatched, and a named custom object must not reach a builder without
 that separate approval.
 
-**Grep the corpus with escaped underscores.** The published markdown escapes them, so a table name
+**Grep the corpus escape-safe.** The published markdown escapes them, so a table name
 is written `sn\_customerservice\_escalation` and a plain `grep sn_customerservice_escalation` over
-`vendor/ServiceNowDocs/` returns **nothing at all**. Search for `sn\_customerservice\_escalation`
+`vendor/ServiceNowDocs/` returns **nothing at all**. Search for `sn\\?_customerservice\\?_escalation`
 (or drop the middle of the name and match `escalation`) before concluding a table is absent. This is
 not a footnote: this skill asserted for five paragraphs that the escalation tables were unavailable
 in Australia, and the only evidence for it was a search that could not have found them.
@@ -287,7 +287,7 @@ After Technical Designer returns a spec for a CSM-tagged design, you are re-disp
 
 1. **Process-map alignment.** Does the spec respect Part 1 of your envelope? Baseline state transitions preserved? Baseline notification timing preserved? Baseline role gates preserved?
 
-2. **Data-model alignment.** Does the spec use the baseline tables and fields named in Part 2? Does it propose new fields where baseline fields cover the need? Does it reference tables that exist in this release family — checked against the corpus with escaped underscores, never from memory?
+2. **Data-model alignment.** Does the spec use the baseline tables and fields named in Part 2? Does it propose new fields where baseline fields cover the need? Does it reference tables that exist in this release family — checked against the corpus with each underscore written `\\?_`, never from memory?
 
 3. **§1.1 verdict alignment.** Does the spec respect Part 3?
    - Verdict A: any custom object in spec = §1.1 violation.
