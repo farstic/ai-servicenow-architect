@@ -7,7 +7,7 @@
 // PATTERN, cone mode never engages, and the checkout silently omits the corpus's five root files,
 // LICENSE among them. Every check the recipe otherwise performs passes: exit 0, correct HEAD, empty
 // status. Only a completeness check catches it.
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { statePath as statePathOf } from '../local-paths.mjs';
@@ -331,7 +331,45 @@ export function repairRootFiles(corpusPath) {
   return { repaired: skipped.length };
 }
 
-export function checkCompleteness(root, corpusDir, areas, pin) {
+/** Index entries still marked skip-worktree: none in a whole corpus whose switch finished. */
+function skipWorktreeCount(corpus) {
+  return run(['ls-files', '-t'], corpus, true).split('\n').filter((l) => l.startsWith('S ')).length;
+}
+
+/**
+ * ARC-09-C244 — the file that marks a switch to the whole corpus in progress, in the corpus repo's own git directory:
+ * written before `sparse-checkout disable`, removed once the whole corpus is complete. `null` with no git directory.
+ */
+export function switchMarker(corpus) {
+  const dir = probe(['rev-parse', '--absolute-git-dir'], corpus);
+  return dir.ok && dir.out ? join(dir.out, 'snowarch-switching') : null;
+}
+
+/**
+ * ARC-09-C244 — what an interrupted switch leaves: tracked files outside the cited areas, modified on disk (a file
+ * git had half-written, its skip-worktree bit gone), and nothing else. `null` when anything else is dirty — an edit
+ * inside the cone, an untracked file — which is refused exactly as before.
+ */
+function switchDebris(corpus, areas) {
+  const inCone = (p) => ROOT_FILES.includes(p) || ALWAYS_DIRS.some((d) => p === d || p.startsWith(`${d}/`))
+    || areas.some((a) => p.startsWith(`${a}/`));
+  const debris = [];
+  for (const e of run(['status', '--porcelain', '-z'], corpus, true).split('\0').filter(Boolean)) {
+    const path = e.slice(3);
+    if (e.slice(0, 2) !== ' M' || inCone(path)) return null;
+    debris.push(path);
+  }
+  return debris.length > 0 ? debris : null;
+}
+
+/** Debris back to what the cone had: absent and skip-worktree, so the retried disable writes it again. No fetch. */
+function returnDebris(corpus, debris) {
+  for (const p of debris) rmSync(join(corpus, ...p.split('/')), { force: true });
+  execFileSync('git', withLongPaths(['update-index', '--skip-worktree', '--stdin']),
+    { cwd: corpus, input: `${debris.join('\n')}\n`, encoding: 'utf8', stdio: 'pipe' });
+}
+
+export function checkCompleteness(root, corpusDir, areas, pin, { mode } = {}) {
   const corpus = join(root, corpusDir);
   const missingRoot = [...ROOT_FILES, ...ALWAYS_DIRS].filter((f) => !existsSync(join(corpus, f)));
   const missingAreas = areas.filter((a) => !existsSync(join(corpus, ...a.split('/'))));
@@ -346,10 +384,19 @@ export function checkCompleteness(root, corpusDir, areas, pin) {
   // citation. It is reported as a WARNING naming the repair, and `verify` is where it becomes an
   // error. What DOES fail a sync is a broken checkout: a missing root file (ADR-0008's silent
   // omission), the wrong pin, or a superproject that still calls the submodule uninitialised.
+  // ARC-09-C244 — the whole corpus is complete only with nothing left skip-worktree and every area of the pinned tree
+  // on disk; a switch that stopped part-way leaves either. Asked only in full mode: two git reads.
+  let skipped = 0, treeAreasMissing = [];
+  if (mode === MODE.full && head !== null) {
+    skipped = skipWorktreeCount(corpus);
+    const tree = run(['ls-tree', '--name-only', 'HEAD', 'markdown/'], corpus, true).split('\n').filter(Boolean);
+    treeAreasMissing = tree.filter((a) => !existsSync(join(corpus, ...a.split('/'))));
+  }
   return {
     ok: missingRoot.length === 0 && head === pin
-        && submodule !== null && !submodule.startsWith('-'),
-    missingRoot, missingAreas, head, pin,
+        && submodule !== null && !submodule.startsWith('-')
+        && skipped === 0 && treeAreasMissing.length === 0,
+    missingRoot, missingAreas, head, pin, skipped, treeAreasMissing,
     // A leading '-' from `git submodule status` means the superproject considers it UNINITIALISED,
     // which a clean `git status` inside the submodule does not reveal. Recipe C's fifth step
     // (`git submodule init`) is what clears it.
@@ -520,9 +567,10 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   const mode = resolveMode(root, requestedMode);
   const ctx = { upstream: docs.upstream, pin: docs.pin, spell: spellings() };
   const say = quiet ? () => {} : log;
-  // Only the three steps that TOUCH THE NETWORK are declared retryable. The class gate would make
-  // it harmless to declare the local ones too — `sparse-checkout set` cannot emit a libcurl error —
-  // but a retry on a step that cannot fail transiently is code with no failure to answer for.
+  // Only the steps that TOUCH THE NETWORK are declared retryable: a retry on a step that cannot fail transiently is
+  // code with no failure to answer for. ARC-09-C244 added two, on a blobless checkout that is populated: a widening
+  // `sparse-checkout set` and `sparse-checkout disable` fetch the blobs they bring in, and the switch to the whole
+  // corpus fetches every out-of-cone blob in its `disable`.
   // `checkout` is here because a blobless clone fetches the blobs AT checkout: that is the step the
   // 408 on `no-node, macos-latest` landed on.
   const retryAt = (phaseName) => ({ phase: phaseName, say, sleep });
@@ -535,6 +583,10 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   };
 
   let state = inspect(root, config, areas);
+  // ARC-09-C244 — a switch to the whole corpus marks itself, so the run after an interrupted one can tell its debris
+  // from somebody's edit.
+  const marker = state.present ? switchMarker(corpus) : null;
+  const marked = Boolean(marker && existsSync(marker));
 
   // 1. The refusal comes first and is absolute. Someone edited a doc; sync's job is to say so, not
   //    to decide their edit was unimportant. `--force` is never reached for from here.
@@ -543,10 +595,22 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   // as a staged deletion — and telling someone they have local changes they never made, about a
   // corpus that was never checked out, would send them to `git stash` for a problem `sync` is
   // supposed to fix. Populated is asked first.
+  // ARC-09-C244's one exception, and only under the switching marker: files outside the cited areas that a killed
+  // `disable` left half-written are no one's edit — the cone never had them — so they go back to what the cone had
+  // and the switch writes them again. Without the marker, or with anything else dirty, the refusal stands.
   if (state.present && state.dirty && state.indexed) {
-    throw new SyncError(`${CORPUS_DIR} has local changes — commit, stash or discard them, `
-      + 'then re-run', EXIT.dirty);
+    const debris = mode === MODE.full && marked ? switchDebris(corpus, areas) : null;
+    if (!debris) {
+      throw new SyncError(`${CORPUS_DIR} has local changes — commit, stash or discard them, `
+        + 'then re-run', EXIT.dirty);
+    }
+    returnDebris(corpus, debris);
+    say(`[docs] the switch to the whole corpus was interrupted: ${debris.length} file(s) it left half-written will be `
+      + 'written again');
+    state = inspect(root, config, areas);
   }
+  // A marker that outlived a switch given up for sparse marks nothing any more.
+  if (marked && mode !== MODE.full) rmSync(marker, { force: true });
 
   if (!state.present) {
     phase(`clone (depth 1, blobless, ${mode})`, () => runMapped(
@@ -559,30 +623,56 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
 
   // 3. Mode. Sparse→full and full→sparse are config changes on the existing checkout; neither
   //    re-clones, which is what keeps `.git` the same size across a switch.
-  if (mode === MODE.full) {
-    if (state.sparseOn) phase('sparse disable (full mode)', () => runMapped(['sparse-checkout', 'disable'], corpus, ctx));
-  } else {
-    if (state.sparseOn && !state.coneOn) {
-      phase('sparse init --cone (pattern-mode config found)', () => runMapped(['sparse-checkout', 'init', '--cone'], corpus, ctx));
+  // ARC-09-C244 — skip-worktree entries in a checkout whose sparse checkout is off are not the whole corpus, and the
+  // completeness check below says so; however they got there, `disable` again clears them (measured on git 2.39.5: it
+  // clears the bit and writes the file).
+  const leftSkipped = mode === MODE.full && state.present && state.indexed && !state.sparseOn
+    ? skipWorktreeCount(corpus) : 0;
+  const modeStep = () => {
+    if (mode === MODE.full) {
+      if (state.sparseOn || leftSkipped > 0) {
+        phase('sparse disable (full mode)', () => runMapped(['sparse-checkout', 'disable'], corpus, ctx,
+          retryAt('sparse disable')));
+      }
+    } else {
+      if (state.sparseOn && !state.coneOn) {
+        phase('sparse init --cone (pattern-mode config found)', () => runMapped(['sparse-checkout', 'init', '--cone'], corpus, ctx));
+      }
+      if (!state.sparseOn || !state.coneOn || !state.sameSet) {
+        phase(`sparse set (${areas.length} areas)`, () => runMapped(['sparse-checkout', 'set', '--cone', ...coneArgs(areas)],
+          corpus, ctx, retryAt('sparse set')));
+      }
     }
-    if (!state.sparseOn || !state.coneOn || !state.sameSet) {
-      phase(`sparse set (${areas.length} areas)`, () => runMapped(['sparse-checkout', 'set', '--cone', ...coneArgs(areas)], corpus, ctx));
-    }
-  }
+  };
 
   // 4. The pin. `cat-file -e` decides whether the fetch is needed: GitHub serves reachable SHAs by
   //    hash (S-07), but a fetch we do not need is ~30 s we do not spend.
-  if (!state.pinPresent) {
-    phase(`fetch pin ${docs.pin.slice(0, 7)}`, () => runMapped(['fetch', '--depth', '1', 'origin', docs.pin], corpus, ctx, retryAt('fetch')));
-  }
-  // ALWAYS after a fresh clone, and whenever the tree is not populated — never merely when HEAD
-  // differs. `git clone --no-checkout` leaves an empty index and an empty working tree, and when the
-  // pin happens to be the branch tip its HEAD is already correct: "at the pin" was true and "there
-  // are files" was false. Every run until 2026-09-09 had a pin seven weeks behind the tip, so the
-  // fetch-by-hash path always ran and hid this. The first bump made pin == tip and the install
-  // produced an empty corpus that called itself complete.
-  if (!state.atPin || !state.indexed) {
-    phase(`checkout --detach ${docs.pin.slice(0, 7)}`, () => runMapped(['checkout', '--detach', docs.pin], corpus, ctx, retryAt('checkout')));
+  const movePin = () => {
+    if (!state.pinPresent) {
+      phase(`fetch pin ${docs.pin.slice(0, 7)}`, () => runMapped(['fetch', '--depth', '1', 'origin', docs.pin], corpus, ctx, retryAt('fetch')));
+    }
+    // ALWAYS after a fresh clone, and whenever the tree is not populated — never merely when HEAD
+    // differs. `git clone --no-checkout` leaves an empty index and an empty working tree, and when the
+    // pin happens to be the branch tip its HEAD is already correct: "at the pin" was true and "there
+    // are files" was false. Every run until 2026-09-09 had a pin seven weeks behind the tip, so the
+    // fetch-by-hash path always ran and hid this. The first bump made pin == tip and the install
+    // produced an empty corpus that called itself complete.
+    if (!state.atPin || !state.indexed) {
+      phase(`checkout --detach ${docs.pin.slice(0, 7)}`, () => runMapped(['checkout', '--detach', docs.pin], corpus, ctx, retryAt('checkout')));
+    }
+  };
+
+  // ARC-09-C244 — the switch an upgrade makes, a populated sparse checkout going full, moves the pin FIRST, in the cone
+  // shape, and disables after, so a release that also moves the pin fetches the out-of-cone blobs once, at the new
+  // pin. It marks itself before the disable. A fresh clone keeps the order below: one download, at the checkout.
+  const switching = mode === MODE.full && state.present && state.indexed && (state.sparseOn || leftSkipped > 0);
+  if (switching) {
+    movePin();
+    if (marker) writeFileSync(marker, `${new Date().toISOString()}\n`);
+    modeStep();
+  } else {
+    modeStep();
+    movePin();
   }
 
   // 5. The gitlink. absorbgitdirs is allowed to fail — before the superproject knows about the
@@ -604,12 +694,19 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   const { repaired } = repairRootFiles(corpus);      // 6. ADR-0008
   if (repaired) say(`[docs] repaired ${repaired} root path(s) left skip-worktree by this git`);
 
-  const completeness = checkCompleteness(root, CORPUS_DIR, areas, docs.pin);
+  const completeness = checkCompleteness(root, CORPUS_DIR, areas, docs.pin, { mode });
+  // The switch is over once the whole corpus is complete; until then the marker stays for the next run. Its path is
+  // asked again: step 5 can move the git directory, the marker with it, and leave `.git` a file.
+  if (marker && mode === MODE.full && completeness.ok) {
+    const now = switchMarker(corpus);
+    if (now) rmSync(now, { force: true });
+  }
   const after = inspect(root, config, areas);
   const elapsed = (Date.now() - t0) / 1000;
   // ARC-09-C244 — the mode step's work, by the conditions step 3 acted on. `sameSet` compares the cone list, which
   // a full checkout does not have, so counting it in full mode reported every full run as a change.
-  const modeWork = mode === MODE.full ? state.sparseOn : (!state.sparseOn || !state.coneOn || !state.sameSet);
+  const modeWork = mode === MODE.full ? (state.sparseOn || leftSkipped > 0)
+    : (!state.sparseOn || !state.coneOn || !state.sameSet);
   const changed = !state.present || !state.atPin || !state.indexed || modeWork || repaired > 0
     || (mode === MODE.full) !== !after.sparseOn;
   const areaCount = areaCountOf(corpus, mode, areas);
