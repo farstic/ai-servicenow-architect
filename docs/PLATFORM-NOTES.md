@@ -601,6 +601,12 @@ an install before the installer runs. `bootstrap.ps1` is 5.1-clean (no `??`, no 
 its JSON through .NET rather than `Set-Content -Encoding UTF8`, which on 5.1 means "UTF-8 *with* a
 BOM" and produces files `JSON.parse` refuses.
 
+**Every file `bootstrap.ps1` dot-sources needs the BOM too**, because 5.1 decodes each file on its own.
+`tools/snowarch/launcher/docs-recipe.ps1` had none. 5.1 read its em dash as `â€”`, took the last of those
+characters for a double quote and ended a string early, so `bootstrap.cmd --docs full` stopped at B02 with
+"The term 'Invoke-DocsRecipeFull' is not recognized" (ARC-09-C244, fixed in 2.2.5).
+`tests/launcher-parity.test.mjs` checks the BOM of every file `bootstrap.ps1` dot-sources.
+
 **Line endings.** `.gitattributes` gives `*.ps1` and `*.cmd` `text eol=crlf`: the index keeps LF and
 every checkout converts. A lone LF in a `.cmd` is a batch file that stops at the first line.
 
