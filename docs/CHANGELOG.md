@@ -50,6 +50,10 @@ only the first.**
   `https://acme.service-now.com`, to accept with Enter, as a single word such as `acme` already was; a host with a path
   or credentials gets that refusal's own reason. Under `--yes`, where nothing is asked, the URL used is now printed for
   both forms (ARC-09-C223).
+- A live `./snowarch bootstrap` with no licence in force skipped the instance steps, yet it closed by saying that `/mcp`
+  would show the server connected, listed commands that are refused without a licence, and never said that the
+  bootstrap has to run again once the licence is installed. It now says the instance steps were skipped, and to install
+  the licence and run the bootstrap again to finish (ARC-09-C235).
 
 ### Changed
 
