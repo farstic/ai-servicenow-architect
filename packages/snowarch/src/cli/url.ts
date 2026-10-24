@@ -48,6 +48,12 @@ export type Environment = (typeof ENVIRONMENTS)[number];
 
 const bad = (code: ErrorCodeName, message: string): UrlBad => ({ ok: false, code, message });
 
+/** The refusal for something that is not a URL at all, quoting what the user typed. */
+const notAUrl = (typed: string): UrlBad => bad('URL_INVALID', `"${typed}" is not a URL — enter https://<host>`);
+
+/** A scheme the user typed, any scheme: what separates `acme.service-now.com` from a URL. */
+const SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
+
 /**
  * Normalise, or refuse with the reason.
  *
@@ -68,6 +74,16 @@ export function normalizeInstanceUrl(input: string): UrlResult {
     return { ok: true, url: `https://${trimmed.toLowerCase()}.service-now.com`, proposed: true, notes: [] };
   }
 
+  // ARC-09-C223 — a host typed without a scheme is checked AS `https://<host>`, through every check
+  // below in their order, so a refusal names its own reason (a path, credentials) rather than calling
+  // the host "not a URL". One that passes is a PROPOSAL, in the bare word's shape, for the caller to
+  // show. Something that is not a URL even with the scheme is quoted back as typed.
+  if (!SCHEME.test(trimmed)) {
+    const asHttps = normalizeInstanceUrl(`https://${trimmed}`);
+    if (asHttps.ok) return { ...asHttps, proposed: true };
+    return asHttps.code === 'URL_INVALID' ? notAUrl(trimmed) : asHttps;
+  }
+
   if (/^http:\/\//i.test(trimmed)) {
     return bad('URL_NOT_HTTPS',
       'ServiceNow instances are served over https only; use https://<host>');
@@ -77,7 +93,7 @@ export function normalizeInstanceUrl(input: string): UrlResult {
   try {
     parsed = new URL(trimmed);
   } catch {
-    return bad('URL_INVALID', `"${trimmed}" is not a URL — enter https://<host>`);
+    return notAUrl(trimmed);
   }
 
   if (parsed.protocol !== 'https:') {
