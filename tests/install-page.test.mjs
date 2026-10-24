@@ -311,7 +311,7 @@ test('the page stays a page, and the tail stays a tail', () => {
   // fact, and every figure on it carries where it was measured.
   assert.match(read(INSTALL), /### What the corpus costs/);
   // ARC-09-C244 — the corpus costs are the whole corpus, measured by docs-real on all three platforms.
-  assert.match(read(INSTALL), /measured 2026-10-24 by `docs-real\.yml`/);
+  assert.match(read(INSTALL), /measured\s+2026-10-24\s+by\s+`docs-real\.yml`/);
 });
 
 test('the server package\'s generated tables are current too', () => {

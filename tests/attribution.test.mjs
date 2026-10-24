@@ -55,7 +55,7 @@ test('the install figures are attributed to a measurement, not asserted from now
   assert.match(readme, /about 495 MB on disk/);
   assert.match(readme, /293 MB on Linux and macOS/);
   assert.match(readme, /51,665 files/);
-  assert.match(readme, /measured 2026-10-24 by `docs-real\.yml`/);
+  assert.match(readme, /measured\s+2026-10-24\s+by\s+`docs-real\.yml`/);
 });
 
 test('NOTICE claims only what the checkout enforces', () => {
