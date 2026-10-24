@@ -596,20 +596,23 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   // corpus that was never checked out, would send them to `git stash` for a problem `sync` is
   // supposed to fix. Populated is asked first.
   // ARC-09-C244's one exception, and only under the switching marker: files outside the cited areas that a killed
-  // `disable` left half-written are no one's edit — the cone never had them — so they go back to what the cone had
-  // and the switch writes them again. Without the marker, or with anything else dirty, the refusal stands.
+  // `disable` left half-written are no one's edit — the cone never had them — so they go back to what the cone had,
+  // in either mode: a full run then writes them again, and a sparse run keeps the cone. Refusing would name files
+  // nobody edited and ask for them to be discarded (the architect's ruling, 2026-10-24). Without the marker, or with
+  // anything else dirty, the refusal stands.
   if (state.present && state.dirty && state.indexed) {
-    const debris = mode === MODE.full && marked ? switchDebris(corpus, areas) : null;
+    const debris = marked ? switchDebris(corpus, areas) : null;
     if (!debris) {
       throw new SyncError(`${CORPUS_DIR} has local changes — commit, stash or discard them, `
         + 'then re-run', EXIT.dirty);
     }
     returnDebris(corpus, debris);
-    say(`[docs] the switch to the whole corpus was interrupted: ${debris.length} file(s) it left half-written will be `
-      + 'written again');
+    say(`[docs] the switch to the whole corpus was interrupted: ${debris.length} file(s) it left half-written `
+      + (mode === MODE.full ? 'will be written again' : 'are removed, and the cited areas stay as they were'));
     state = inspect(root, config, areas);
   }
-  // A marker that outlived a switch given up for sparse marks nothing any more.
+  // A marker that outlived a switch given up for sparse marks nothing any more. It goes after its debris, never before,
+  // so it cannot excuse a later edit.
   if (marked && mode !== MODE.full) rmSync(marker, { force: true });
 
   if (!state.present) {
