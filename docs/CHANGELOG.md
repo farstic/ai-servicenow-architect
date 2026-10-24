@@ -68,6 +68,11 @@ seconds on the CI machines.**
   recognized": Windows PowerShell 5.1 read the recipe file it loads as the ANSI code page, because the file had no
   byte-order mark, and misread it. The file has one now, so the whole corpus, the default from this release, installs
   there too (ARC-09-C244).
+- The HR Service Delivery gateway gave `sn_hr_core.basic` as the role employees receive for the Employee Center, and as
+  read access to HR cases filtered by the case's subject or HR group. It is the HR agent role, and it contains write
+  access to all HR cases, so a design that followed the old text would have given every employee agent access. The
+  gateway now names the employee client roles (`sn_hr_core.hrsm_*`), the client role assignment rules that grant them,
+  and the COE security policies that limit which groups can open an HR case (ARC-09-C250).
 
 ### Changed
 
