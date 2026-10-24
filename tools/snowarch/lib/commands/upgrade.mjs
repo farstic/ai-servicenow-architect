@@ -28,6 +28,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node
 import { CACHE_FILE } from '../doctor-cache.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { localDir, storePath } from '../local-paths.mjs';
 
 import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from '../exit.mjs';
@@ -594,6 +595,91 @@ export function planSteps(root, tag, { ctx, state, opts = {}, run = spawnSync, m
   return { steps, estimate: false };
 }
 
+/** ARC-09-C195 — how long U4 waits for the target's own plan before planning with this release's tables. */
+export const PLAN_TIMEOUT_MS = 30_000;
+
+/** ARC-09-C195 — the helper U4 runs in a child to ask the target, shipped beside this release's modules. */
+export const PLAN_HELPER = fileURLToPath(new URL('../plan-at-target.mjs', import.meta.url));
+
+/** Why a target from before signed manifests is not asked: its files were not checked, and its code would run. */
+const UNSIGNED_REASON = `the target is from before ${MANIFESTS_FROM}, which signed no manifest, so its own runner `
+  + 'is not asked';
+
+/** The answer `planSteps` gives, as the helper prints it: the steps, each with its words, and the estimate flag. */
+function isPlan(p) {
+  return Boolean(p) && Array.isArray(p.steps) && typeof p.estimate === 'boolean'
+    && p.steps.every((s) => Boolean(s) && typeof s.step === 'string' && typeof s.title === 'string'
+      && typeof s.why === 'string' && Array.isArray(s.files) && s.files.every((f) => typeof f === 'string'));
+}
+
+/**
+ * ARC-09-C195 — U4's plan from the TARGET's own runner: `{ plan }`, or the `{ reason }` it could not be had.
+ *
+ * The plan is the runner's decision taken early (ARC-08-C29), and U4 runs in the installed release's process, so the
+ * STEPS, INPUTS and hashFor it decided with were the installed release's: a step whose inputs the target changed was
+ * missing from the plan and present in the run (2.2.4's B07 against 2.2.5's "hooks written"). So this makes a
+ * worktree of the tag and runs `PLAN_HELPER` in a child, which calls the target's own `planSteps` and prints its
+ * answer on stdout, the only channel read. Stderr is read for the reason only, one line of it.
+ *
+ * The child is the target's code running before the user says Y, so the caller asks only once the tag's files have
+ * passed the signed-manifest check, and the child gets `PLAN_TIMEOUT_MS`: no answer in time is a reason like any
+ * failure. A child the timeout stops never reaches the `finally` that removes the worktree its planSteps made, so a
+ * worktree registered while it ran is removed here too, and the checkout is left as it was found. The first entry
+ * `git worktree list` gives is the main worktree, which is never one of those.
+ */
+export function targetPlan(root, tag, { run = spawnSync, env = process.env, state = null,
+  timeoutMs = PLAN_TIMEOUT_MS } = {}) {
+  const git = (args) => run('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' });
+  const registered = () => {
+    const listed = git(['worktree', 'list', '--porcelain']);
+    if (listed?.status !== 0) return null;
+    return String(listed.stdout ?? '').split('\n').filter((l) => l.startsWith('worktree '))
+      .map((l) => l.slice('worktree '.length)).slice(1);
+  };
+  const before = registered();
+  const scratch = mkdtempSync(join(tmpdir(), 'snowarch-target-'));
+  const at = join(scratch, 'at-tag');
+  const why = (detail) => ({ reason: `the target's own plan could not be read: ${detail}` });
+  try {
+    if (git(['worktree', 'add', '--detach', '--quiet', at, tag])?.status !== 0) {
+      return why('the tag could not be checked out to ask it');
+    }
+    const r = run(process.execPath, [PLAN_HELPER, at, root, tag], { cwd: root, encoding: 'utf8',
+      env: childEnv(root, env), input: JSON.stringify({ manifestWritten: true, state }), timeout: timeoutMs,
+      stdio: ['pipe', 'pipe', 'pipe'] });
+    // Stopped by the timeout: spawnSync then reports an error AND the signal it stopped the child with. A child that
+    // dies of a signal on its own carries no error, and one that never started carries no signal. By that pair, not
+    // by the error's code, which is spelled like a code the contract owns (tests/contract/no-literals.test.mjs).
+    if (r?.error && r?.signal) return why(`it did not answer within ${timeoutMs / 1000} s`);
+    if (r?.status !== 0) {
+      const line = String(r?.stderr ?? '').split('\n').map((l) => l.trim()).find(Boolean);
+      return why(line ? line.slice(0, 200) : `it exited ${r?.status ?? 'abnormally'}`);
+    }
+    let plan;
+    try { plan = JSON.parse(r.stdout); } catch { return why('its answer was not JSON'); }
+    return isPlan(plan) ? { plan } : why('its answer had an unexpected shape');
+  } finally {
+    git(['worktree', 'remove', '--force', at]);
+    rmSync(scratch, { recursive: true, force: true });
+    if (before !== null) {
+      for (const left of registered() ?? []) if (!before.includes(left)) git(['worktree', 'remove', '--force', left]);
+    }
+  }
+}
+
+/**
+ * ARC-09-C195 — the plan U4 prints for a move: the target's own when it can be had, otherwise this release's
+ * computation with the reason beside it, as `installedBecause`, which `renderPlan` prints. `signed` is U4's
+ * signed-manifest check having passed: a target before signed manifests is not asked at all.
+ */
+export function planForMove(root, target, { ctx, state, opts = {}, run = spawnSync, env = process.env,
+  signed = false, askTarget = targetPlan, ownPlan = planSteps } = {}) {
+  const asked = signed ? askTarget(root, target, { run, env, state }) : { reason: UNSIGNED_REASON };
+  if (asked.plan) return { ...asked.plan, installedBecause: null };
+  return { ...ownPlan(root, target, { ctx, state, opts, run, manifestWritten: signed }),
+    installedBecause: asked.reason };
+}
+
 /** What the store will do, said before it is done. */
 /**
  * ARC-07-C31 slice 4 — one caller, `line 611` below, so a default is within the rule and named.
@@ -665,7 +751,7 @@ const short = (sha) => (sha ? String(sha).slice(0, 7) : '—');
 
 /** The plan block, exactly as the story writes it. */
 export function renderPlan({ from, to, commits, date, tagInfo, floor, steps, store,
-  restart = null, estimate = false }) {
+  restart = null, estimate = false, installedBecause = null }) {
   const lines = [`Upgrade plan: ${from} → ${to}`
     + `${commits === null ? '' : ` (${commits} commit${commits === 1 ? '' : 's'}`
       + `${date ? `, ${date}` : ''})`}`];
@@ -688,6 +774,8 @@ export function renderPlan({ from, to, commits, date, tagInfo, floor, steps, sto
     lines.push('  (the list above is a file-change estimate: the tag could not be checked out to '
       + "compare the runner's own inputs)");
   }
+  // ARC-09-C195 — and when the runner that decided was this release's rather than the target's.
+  if (installedBecause) lines.push(`  (computed by the installed release — ${installedBecause})`);
   lines.push(`  ${store.line}`);
   lines.push('  credentials: untouched (.local/instances.json is never read or written by the upgrade)');
   if (restart) lines.push(`  after the upgrade: ${restart}`);
@@ -957,8 +1045,10 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   // inputs, compare with the recorded state) and falls back to the file diff only when the tag
   // cannot be checked out — in which case the plan says so rather than printing the other answer
   // under the same heading.
-  const { steps, estimate } = planSteps(root, target, { ctx, state, opts,
-    manifestWritten: manifest !== null });
+  // ARC-09-C195 — and the runner asked is the TARGET's: once its files have passed the manifest check, its own
+  // planSteps answers through the helper, and this release's tables plan only when it cannot, which the plan says.
+  const { steps, estimate, installedBecause } = planForMove(root, target, { ctx, state, opts, env,
+    signed: manifest !== null });
   const store = storePlan(root, target, { opts, spell: spellings({ platform, env }) });
   const floor = floorCheck(tagInfo, { exec: probe });
   const commits = Number(git(root, ['rev-list', '--count', `HEAD..${target}`], { ...opts, allowFail: true }) ?? '');
@@ -967,6 +1057,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   log.step(renderPlan({
     from: fromLabel, to: target,
     commits: Number.isFinite(commits) ? commits : null, date, tagInfo, floor, steps, store, estimate,
+    installedBecause,
     restart: 'restart claude (the MCP server binary changed) — or run /mcp → servicenow → reconnect',
   }));
 

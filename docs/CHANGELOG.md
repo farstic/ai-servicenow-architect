@@ -40,6 +40,11 @@ only the first.**
   titles, and keep the instance names and commands this machine's doctor cache holds for the same run. The upgrade that
   brings you this release is still run by the one you have installed, so the change shows from your next upgrade on
   (ARC-09-C200).
+- `./snowarch upgrade` worked out the steps it would re-run with the release you had installed, so a new release that
+  changed what a step depends on could re-run a step its plan never named. The plan is now the new release's own
+  answer, asked once its files have passed the check against its signed manifest; when it cannot be asked, the plan
+  says it was worked out by the installed release, and why. The upgrade that brings you this release is still planned
+  by the one you have installed, so the change shows from your next upgrade on (ARC-09-C195).
 - `./snowarch instance add` refused a host typed without `https://`, such as `acme.service-now.com`, as not a URL, and
   with a port or a username in front it said to use https. Such a host is now offered back as
   `https://acme.service-now.com`, to accept with Enter, as a single word such as `acme` already was; a host with a path

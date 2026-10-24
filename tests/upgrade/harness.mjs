@@ -449,7 +449,7 @@ export function republishManifests(licences, dir, tags) {
 }
 
 export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null,
-  unsigned = [], altered = [], foreign = [], coverage = {} } = {}) {
+  unsigned = [], altered = [], foreign = [], coverage = {}, b07Literal = false } = {}) {
   const marks = [];
   const worldStart = process.hrtime.bigint();
   const scratch = tempDir('snowarch-upgrade-', t);
@@ -501,6 +501,16 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // One area REMOVED rather than added: every area the file names must exist upstream, and a
   // release that asks for one that does not is a broken release rather than a test.
   writeFileSync(areas, `${AREAS.slice(0, -1).join('\n')}\n`);
+  // ARC-09-C195 — release A also changes what B07 depends on, as 2.2.5 did with "hooks written": a literal input the
+  // release before it cannot see. Off by default. An anchor that moved throws, so the case never tests nothing.
+  if (b07Literal) {
+    const inputs = join(work, 'tools/snowarch/lib/inputs.mjs');
+    const anchor = '      TEXT(`hooks written=${JSON.stringify(hookEntry())}`),\n';
+    const src = readFileSync(inputs, 'utf8');
+    if (src.split(anchor).length !== 2) throw new Error('harness: B07\'s "hooks written" line moved in inputs.mjs');
+    const added = "      TEXT('c195 fixture=a literal this release adds'),\n";
+    writeFileSync(inputs, src.replace(anchor, () => `${anchor}${added}`));
+  }
   phase('rewrite-version-A', marks, () => rewriteVersion(work, '9.1.0'));
   commit(work, 'feat(docs): one fewer area', upstream.pin);
   const tA = process.hrtime.bigint();
