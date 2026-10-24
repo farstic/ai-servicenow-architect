@@ -354,6 +354,7 @@ test('ARC-09-C244 — under the marker, a sparse run sets the cone again after a
   writeFileSync(switchMarker(corpus), '');
   const r = syncCorpus({ ...w, mode: 'sparse', log: silent });
   assert.equal(r.completeness.ok, true);
+  assert.equal(r.changed, true, 'a run that set the cone again reported no change');
   assert.equal(existsSync(join(corpus, ...UNCITED.split('/'))), false, 'the cone was not set again');
   for (const a of AREAS) assert.ok(existsSync(join(corpus, ...a.split('/'))), `${a} is not on disk`);
   assert.equal(git(['config', '--get', 'core.sparseCheckout'], corpus).trim(), 'true', 'the cone is gone');

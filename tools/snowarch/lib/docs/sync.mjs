@@ -641,7 +641,11 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
       if (state.sparseOn && !state.coneOn) {
         phase('sparse init --cone (pattern-mode config found)', () => runMapped(['sparse-checkout', 'init', '--cone'], corpus, ctx));
       }
-      if (!state.sparseOn || !state.coneOn || !state.sameSet) {
+      // ARC-09-C244 — under the marker, the cone is set again even when its list is unchanged. A `disable` killed after
+      // its index write leaves every file on disk and the config still sparse (git 2.39.5 turns it off last), and a
+      // sparse run must end with the cited areas only, however far the switch got (the architect's ruling,
+      // 2026-10-24). The refusals above ran first.
+      if (!state.sparseOn || !state.coneOn || !state.sameSet || marked) {
         phase(`sparse set (${areas.length} areas)`, () => runMapped(['sparse-checkout', 'set', '--cone', ...coneArgs(areas)],
           corpus, ctx, retryAt('sparse set')));
       }
@@ -709,7 +713,7 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   // ARC-09-C244 — the mode step's work, by the conditions step 3 acted on. `sameSet` compares the cone list, which
   // a full checkout does not have, so counting it in full mode reported every full run as a change.
   const modeWork = mode === MODE.full ? (state.sparseOn || leftSkipped > 0)
-    : (!state.sparseOn || !state.coneOn || !state.sameSet);
+    : (!state.sparseOn || !state.coneOn || !state.sameSet || marked);
   const changed = !state.present || !state.atPin || !state.indexed || modeWork || repaired > 0
     || (mode === MODE.full) !== !after.sparseOn;
   const areaCount = areaCountOf(corpus, mode, areas);
