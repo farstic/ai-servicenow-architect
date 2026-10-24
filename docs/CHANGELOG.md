@@ -59,6 +59,10 @@ seconds on the CI machines.**
   `https://acme.service-now.com`, to accept with Enter, as a single word such as `acme` already was; a host with a path
   or credentials gets that refusal's own reason. Under `--yes`, where nothing is asked, the URL used is now printed for
   both forms (ARC-09-C223).
+- `./snowarch instance add` quoted a URL back with its password in it when the URL carried a username and a password
+  and did not parse, for example with `#`, `?` or `/` in the password, or a port out of range. Any `@` in the URL is
+  now refused as credentials, before anything else, and nothing is quoted back. A scheme typed as `https:/` or
+  `https:` is now refused as not a URL, as `https//` already was, instead of being taken as `https://` (ARC-09-C240).
 - After `snow_core_instance_switch`, the capabilities read that comes before every write moved the session back to the
   default instance without saying so, so the write that followed went to that instance. The read now keeps the session
   on the instance it was switched to, and says so when that instance can no longer be loaded. A resumed session starts
