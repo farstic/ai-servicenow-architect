@@ -549,6 +549,44 @@ describe('ARC-07-W2 — the URL prompt re-asks', () => {
 });
 
 /**
+ * ARC-09-C223 — a bare host is proposed as a bare word is, and under --yes the URL used is said.
+ *
+ * A host typed without a scheme was refused as "not a URL". It is now a proposal: shown, with Enter to
+ * accept, at the prompt. Under --yes nobody is asked, and a proposal was taken without a word, which a
+ * bare word already did: so both forms now print the URL that will be stored (the architect's ruling).
+ */
+describe('ARC-09-C223 — a proposed URL', () => {
+  const BARE_HOST = 'dev12345.service-now.com';
+  const stored = (path: string) => (loadStore(path) as { store: Store }).store.instances.pdi?.url;
+
+  it('ARC-09-C223 — a bare host typed at the prompt is proposed, and Enter accepts it', async () => {
+    const w = workspace();
+    try {
+      const terminal = io([BARE_HOST, '', '']);
+      const result = await runAdd({ ...baseOptions, url: undefined }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(terminal.written()).toContain(`Proposed URL: ${URL_PDI} — Enter to accept, or type the full URL`);
+      expect(stored(w.store)).toBe(URL_PDI);
+    } finally { w.cleanup(); }
+  });
+
+  it('ARC-09-C223 — under --yes a bare word or host is used as proposed, and the URL is printed', async () => {
+    for (const url of ['dev12345', BARE_HOST]) {
+      const w = workspace();
+      try {
+        const terminal = io([]);
+        const result = await runAdd({ ...baseOptions, url, yes: true }, terminal,
+          { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+        expect(result.exitCode, url).toBe(EXIT_OK);
+        expect(terminal.written(), url).toContain(`Using ${URL_PDI}, proposed from what you entered.`);
+        expect(stored(w.store), url).toBe(URL_PDI);
+      } finally { w.cleanup(); }
+    }
+  });
+});
+
+/**
  * ARC-07-W3 — an empty username or password is re-asked, and the prompts say what is expected.
  *
  * `readCredentials` returned `null` for an empty answer to either prompt, and the caller turned that
