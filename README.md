@@ -56,6 +56,11 @@ cd snowarch
 .\bootstrap.cmd
 ```
 
+Git for Windows 2.54 and 2.55 may also print `warning: refs/tags/<tag> <sha> is not a commit!` while the tag is
+checked out. It is harmless: a release tag is a tag object that points at the commit, and the checkout is at the
+release all the same, as `git describe --tags` shows.
+[Troubleshooting](docs/TROUBLESHOOTING.md#two-things-that-are-true-of-several-codes-at-once) has the detail.
+
 Then run `claude` in that same folder, `snowarch` — the bootstrap's Next line prints its full path, such as `C:\Users\you\snowarch`. Started from any other folder, the one above it included, Claude Code loads none of this product, and `/mcp` shows nothing.
 
 ### What you will see
