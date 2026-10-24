@@ -210,6 +210,16 @@ test('check 4 — disk, with the full corpus asking for more than the sparse one
   assert.equal(tight.status, 'fail', '--docs full raises the requirement');
   assert.match(tight.remedy, /free up \d+ MB on \/r/);
 
+  // ARC-09-C244 — the whole corpus is the default. A fresh install fetches all of it and needs DISK_FULL; one that
+  // already holds a corpus keeps the floor every run asks for, since what a sparse corpus lacks (151 MB on disk,
+  // measured) fits in that floor's headroom, and the move to the whole corpus must not stop an upgrade that would pass.
+  assert.equal(checkDisk({ root: '/r', docs: 'full', plat: 'darwin', hasCorpus: true,
+    statfs: statfs(DISK_SPARSE * 1.1) }).status, 'ok', 'a corpus already on disk keeps the floor');
+  assert.equal(checkDisk({ root: '/r', docs: 'full', plat: 'darwin', hasCorpus: true,
+    statfs: statfs(DISK_SPARSE * 0.9) }).status, 'fail', 'and the floor still holds');
+  assert.equal(checkDisk({ root: '/r', docs: 'full', plat: 'darwin', hasCorpus: false,
+    statfs: statfs(DISK_SPARSE * 1.1) }).status, 'fail', 'a fresh whole corpus needs DISK_FULL');
+
   // An unmeasurable filesystem is a warning, not a failure: refusing to install because statfs is
   // unsupported would be refusing over the measurement rather than the thing measured.
   const unmeasured = checkDisk({ root: '/r', docs: 'sparse', plat: 'darwin',

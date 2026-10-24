@@ -27,7 +27,7 @@ const EVERY_KEY = [
   'present', 'path', 'pin', 'gitlink', 'head', 'pinMatchesGitlink', 'headMatchesPin',
   'family', 'branch', 'familyMatches', 'sparse', 'areasExpected', 'areasPresent', 'areasMissing',
   'mode', 'fileCount', 'sizeBytes', 'citations', 'longpaths', 'schema', 'gitlinkStaged',
-  'rootMissing',
+  'rootMissing', 'areaCount', 'areasInTree', 'skipWorktree',
 ];
 
 let scratch, upstream, upstreamUrl;
@@ -51,31 +51,43 @@ before(() => {
 
 after(() => { rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 
-test('a good checkout: every key present, every flag true, four ok lines, exit 0', () => {
-  const w = workspace();
-  syncCorpus({ ...w, log: () => {} });
-  const s = docsStatus({ root: w.root });
+// ARC-09-C244 — both shapes are a good checkout: the whole corpus, which is the default, and the cone, which
+// `--docs sparse` asks for. With nothing recorded, the mode is read off the shape.
+for (const [mode, shape] of [[MODE.full, SPARSE.full], [MODE.sparse, SPARSE.cone]]) {
+  test(`a good checkout: every key present, every flag true, four ok lines, exit 0 (${mode})`, () => {
+    const w = workspace();
+    syncCorpus({ ...w, mode, log: () => {} });
+    const s = docsStatus({ root: w.root });
 
-  assert.deepEqual(Object.keys(s).sort(), [...EVERY_KEY].sort());
-  assert.equal(s.schema, SCHEMA);
-  assert.equal(s.present, true);
-  assert.equal(s.headMatchesPin, true);
-  assert.equal(s.pinMatchesGitlink, true);
-  assert.equal(s.familyMatches, true);
-  assert.equal(s.sparse, SPARSE.cone);
-  assert.deepEqual(s.areasMissing, []);
-  assert.equal(s.mode, MODE.sparse);
-  assert.ok(s.fileCount > 0 && s.sizeBytes > 0);
-  assert.equal(s.citations.status, 'ok');
-  // `null` on anything but Windows: the setting does not exist there, and `false` would read as
-  // "off", which is a different claim from "not applicable".
-  assert.equal(s.longpaths, process.platform === 'win32' ? true : null);
+    assert.deepEqual(Object.keys(s).sort(), [...EVERY_KEY].sort());
+    assert.equal(s.schema, SCHEMA);
+    assert.equal(s.present, true);
+    assert.equal(s.headMatchesPin, true);
+    assert.equal(s.pinMatchesGitlink, true);
+    assert.equal(s.familyMatches, true);
+    assert.equal(s.sparse, shape);
+    assert.deepEqual(s.areasMissing, []);
+    assert.equal(s.mode, mode);
+    // ARC-09-C244 — the areas on disk: the whole corpus has the one nothing cites as well.
+    assert.equal(s.areaCount, mode === MODE.full ? AREAS.length + 1 : AREAS.length);
+    // ...and the completeness fields are asked for, never computed by default (the banner reads docsStatus too).
+    assert.equal(s.areasInTree, null);
+    assert.equal(s.skipWorktree, null);
+    const c = docsStatus({ root: w.root, verify: false, completeness: true });
+    assert.equal(c.areasInTree, AREAS.length + 1, 'every area of the pinned tree');
+    assert.equal(c.skipWorktree > 0, mode === MODE.sparse, 'the cone leaves the uncited area skip-worktree');
+    assert.ok(s.fileCount > 0 && s.sizeBytes > 0);
+    assert.equal(s.citations.status, 'ok');
+    // `null` on anything but Windows: the setting does not exist there, and `false` would read as
+    // "off", which is a different claim from "not applicable".
+    assert.equal(s.longpaths, process.platform === 'win32' ? true : null);
 
-  const f = formatStatus(s);
-  assert.equal(f.code, 0);
-  assert.equal(f.text.split('\n').filter((l) => l.trim().endsWith('ok')).length, 4, f.text);
-  assert.ok(!f.text.includes('MISMATCH'));
-});
+    const f = formatStatus(s);
+    assert.equal(f.code, 0);
+    assert.equal(f.text.split('\n').filter((l) => l.trim().endsWith('ok')).length, 4, f.text);
+    assert.ok(!f.text.includes('MISMATCH'));
+  });
+}
 
 test('criterion 3 — HEAD off the pin: flag, line and exit 1', () => {
   const w = workspace();
@@ -195,7 +207,7 @@ test('criterion 5 — one area missing: n−1 of n, MISMATCH, and the area is na
 
 test('pattern-mode sparse is its own value, and fails the checkout line', () => {
   const w = workspace();
-  syncCorpus({ ...w, log: () => {} });
+  syncCorpus({ ...w, mode: MODE.sparse, log: () => {} });
   // `--worktree`, not a plain `config`: `sparse-checkout` turns on `extensions.worktreeConfig` and
   // stores cone mode in `config.worktree`, which OUTRANKS the repository config. Writing the plain
   // key leaves the effective value untouched — `git config --get` still answers `true` — so a test
@@ -251,11 +263,17 @@ test('the recorded mode wins over the checkout shape, and both are reported', ()
   const w = workspace();
   syncCorpus({ ...w, mode: MODE.full, log: () => {} });
   mkdirSync(join(w.root, '.local'), { recursive: true });
-  writeFileSync(join(w.root, '.local/bootstrap-state.json'), JSON.stringify({ docs: { mode: MODE.sparse } }));
+  // ARC-09-C244 — a sparse that was asked for, which only `--docs sparse` records (`optIn`).
+  writeFileSync(join(w.root, '.local/bootstrap-state.json'),
+    JSON.stringify({ docs: { mode: MODE.sparse, optIn: true } }));
 
   const s = docsStatus({ root: w.root, verify: false });
   assert.equal(s.mode, MODE.sparse, 'the state file owns `mode`');
   assert.equal(s.sparse, SPARSE.full, 'the checkout owns `sparse`');
+
+  // ...and an unmarked sparse is the default an older release recorded: it reads as the whole corpus.
+  writeFileSync(join(w.root, '.local/bootstrap-state.json'), JSON.stringify({ docs: { mode: MODE.sparse } }));
+  assert.equal(docsStatus({ root: w.root, verify: false }).mode, MODE.full);
 });
 
 test('with no state file the mode is inferred from the checkout', () => {
@@ -330,7 +348,7 @@ test('no corpus and no state file: the mode is skip, because there is nothing to
 test('a recorded mode still wins over the inference — a broken install is not a skipped one', () => {
   const w = workspace();
   mkdirSync(join(w.root, '.local'), { recursive: true });
-  writeFileSync(join(w.root, '.local/bootstrap-state.json'), JSON.stringify({ docs: { mode: 'sparse' } }));
+  writeFileSync(join(w.root, '.local/bootstrap-state.json'), JSON.stringify({ docs: { mode: 'sparse', optIn: true } }));
   const s = docsStatus({ root: w.root, verify: false });
   assert.equal(s.mode, 'sparse', 'an operator who asked for sparse and has no corpus is broken, not skipped');
   assert.match(formatStatus(s).text, /docs mode "sparse"/);

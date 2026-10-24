@@ -12,14 +12,21 @@ import {
   MARKER, PLATFORM_PREFIXES, PROPOSED, REASONS, checkAllowList, corpusIndex, formatIdentifiers, readAllowList,
   rosterWants, scanRoster, verifyIdentifiers,
 } from '../tools/snowarch/lib/docs/identifiers.mjs';
+import { SPARSE, sparseOf } from '../tools/snowarch/lib/docs/status.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = join(ROOT, 'vendor', 'ServiceNowDocs');
 const HAS_CORPUS = existsSync(join(CORPUS, 'markdown'));
+// ARC-09-C244 — the guard reads the whole corpus. A sparse checkout holds only the cited areas, so the real-roster
+// cases run where the whole corpus is on disk, and say why they did not anywhere else.
+const WHOLE_CORPUS = HAS_CORPUS && ![SPARSE.cone, SPARSE.pattern].includes(sparseOf(CORPUS));
+const NOT_WHOLE = HAS_CORPUS ? 'the guard reads the whole corpus; this checkout\'s is sparse'
+  : 'the plant needs the bundled corpus; this cell has none';
 
 // The allow-list's size by reason. A change here is a decision about the roster, made in review.
 // ARC-09-C144 added 15 example-name entries: names an example invents, written as words (a flow, an action, an alias).
-const EXPECTED = { 'example-field': 9, 'payload-key': 23, 'example-role': 3, 'script-variable': 5, 'example-name': 63, 'script-code': 12 };
+// ARC-09-C244 took two payload-key entries out, affected_ci and validation_errors: the whole corpus prints both.
+const EXPECTED = { 'example-field': 9, 'payload-key': 21, 'example-role': 3, 'script-variable': 5, 'example-name': 63, 'script-code': 12 };
 // The excuses the real roster rests on, by kind (sites), and the absent names written only in capitals
 // or in mixed case. A new member of either is a decision made in review, as a new allow-list entry is:
 // the marker covers its whole line, and a platform name retyped in capitals is never looked at.
@@ -80,6 +87,25 @@ function fixture(t, skill, { corpus = PAGE, other = null } = {}) {
 const FILE = '.claude/skills/fx/SKILL.md';
 const run = (root, opts = {}) => verifyIdentifiers({ root, tools: TOOLS, prefixes: PREFIXES, allow: [], glued: [], ...opts });
 const names = (r) => r.unexcused.map((u) => u.identifier);
+
+test('ARC-09-C244 — on a sparse checkout the guard says it did not check, and fails only on its own list', (t) => {
+  const dir = fixture(t, 'Use `sys_user` and `sn_invented_table`.\n');
+  for (const shape of [SPARSE.cone, SPARSE.pattern]) {
+    const r = run(dir, { shape });
+    assert.equal(r.status, 'sparse', shape);
+    assert.deepEqual(names(r), [], 'nothing is judged against the cited areas alone');
+    const f = formatIdentifiers(r);
+    assert.match(f.text, /^identifiers: not checked — the corpus is sparse; the guard reads the whole corpus$/m);
+    assert.equal(f.code, 0);
+  }
+  // The list's own errors count whatever the corpus: an entry for a name the roster does not write.
+  const listed = run(dir, { shape: SPARSE.cone, allow: [{ file: FILE, identifier: 'never_written_here', reason: 'payload-key' }] });
+  assert.ok(listed.allowErrors.length > 0, 'the plant made no list error');
+  assert.equal(formatIdentifiers(listed).code, 1);
+  // ...and the whole corpus, or a fixture with no checkout, is judged as before.
+  assert.deepEqual(names(run(dir, { shape: SPARSE.full })), ['sn_invented_table']);
+  assert.deepEqual(names(run(dir)), ['sn_invented_table']);
+});
 
 test('a name the corpus has passes; a platform-prefixed name it lacks fails, whatever else is on the line', (t) => {
   const r = run(fixture(t, 'Use `sys_user` and `sn_invented_table`.\n'));
@@ -265,7 +291,13 @@ const realIndexOnce = () => (realIndex ??= (() => {
 })());
 
 test('the real roster against the bundled corpus: nothing unexcused, nothing stale, every prefix live', () => {
-  const r = verifyIdentifiers({ root: ROOT, ...(HAS_CORPUS ? { index: realIndexOnce() } : {}) });
+  const r = verifyIdentifiers({ root: ROOT, ...(WHOLE_CORPUS ? { index: realIndexOnce() } : {}) });
+  if (HAS_CORPUS && !WHOLE_CORPUS) {
+    // ARC-09-C244 — a sparse checkout is not judged: the guard says so and passes on its own list's errors.
+    assert.equal(r.status, 'sparse');
+    assert.match(formatIdentifiers(r).text, /^identifiers: not checked — the corpus is sparse; the guard reads the whole corpus$/m);
+    return;
+  }
   if (!HAS_CORPUS) {
     // A cell without the corpus examines nothing and must say so; CI's release rehearsal runs the
     // real check through `docs verify` after it syncs the corpus.
@@ -284,7 +316,7 @@ test('the real roster against the bundled corpus: nothing unexcused, nothing sta
 });
 
 test('a ride-along on a marker line, and a platform name retyped in capitals, each move what the real-tree test holds', (t) => {
-  if (!HAS_CORPUS) { t.skip('the plant needs the bundled corpus; this cell has none'); return; }
+  if (!WHOLE_CORPUS) { t.skip(NOT_WHOLE); return; }
   const dir = tempDir('c81-ride-', t);
   cpSync(join(ROOT, '.claude'), join(dir, '.claude'), { recursive: true });
   const hr = join(dir, '.claude', 'skills', 'hrsd-specialist', 'SKILL.md');
@@ -303,7 +335,7 @@ test('a ride-along on a marker line, and a platform name retyped in capitals, ea
 });
 
 test('the regression this guards: `sn_customerservice_contract` back in the CSM skill fails', (t) => {
-  if (!HAS_CORPUS) { t.skip('the plant needs the bundled corpus; this cell has none'); return; }
+  if (!WHOLE_CORPUS) { t.skip(NOT_WHOLE); return; }
   const dir = tempDir('c81-plant-', t);
   cpSync(join(ROOT, '.claude'), join(dir, '.claude'), { recursive: true });
   const skill = join(dir, '.claude', 'skills', 'csm-specialist', 'SKILL.md');
@@ -495,7 +527,7 @@ test('spaced arm: its counts follow the other two lines, and an index built with
 });
 
 test('the regression this guards: an invented baseline notification in the ITSM skill fails', (t) => {
-  if (!HAS_CORPUS) { t.skip('the plant needs the bundled corpus; this cell has none'); return; }
+  if (!WHOLE_CORPUS) { t.skip(NOT_WHOLE); return; }
   const dir = tempDir('c144-plant-', t);
   cpSync(join(ROOT, '.claude'), join(dir, '.claude'), { recursive: true });
   const skill = join(dir, '.claude', 'skills', 'itsm-specialist', 'SKILL.md');
@@ -505,7 +537,7 @@ test('the regression this guards: an invented baseline notification in the ITSM 
 });
 
 test('the real roster: the three arms hold, and what they rest on is pinned', () => {
-  if (!HAS_CORPUS) return;
+  if (!WHOLE_CORPUS) return;
   const r = verifyIdentifiers({ root: ROOT, index: realIndexOnce() });
   assert.deepEqual(r.dotted.unexcused, []);
   assert.deepEqual(r.camel.unexcused, []);
