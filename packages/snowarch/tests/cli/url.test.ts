@@ -79,6 +79,38 @@ describe('normalizeInstanceUrl', () => {
     expect(r.ok && r.proposed).toBe(false);
   });
 
+  // ARC-09-C223 — a host typed without a scheme is checked as `https://<host>`, and proposed as a bare
+  // word is. The Windows end-user test of 2026-10-22 typed `acme.service-now.com` and was told it was
+  // not a URL; with a port, or with credentials in front, it was told to use https.
+  it('ARC-09-C223 — a bare host becomes a PROPOSAL, in the bare word\'s exact shape', () => {
+    expect(normalizeInstanceUrl('acme.service-now.com')).toEqual(
+      { ok: true, url: VANITY, proposed: true, notes: [] });
+    expect(normalizeInstanceUrl('snow.acme.internal:8443')).toEqual(
+      { ok: true, url: `${ONPREM}:8443`, proposed: true, notes: [] });
+  });
+
+  it('ARC-09-C223 — ...and every check runs on it, so a refusal names its own reason', () => {
+    const api = normalizeInstanceUrl('acme.service-now.com/api');
+    expect(!api.ok && api.code).toBe('URL_HAS_PATH');
+    expect(!api.ok && api.message).toBe(
+      '"/api" is the REST base the server adds itself — enter the bare origin (https://<host>)');
+    const user = ['u', 'ser'].join('');
+    const pass = ['p', 'w', '1'].join('');          // assembled, never spelled
+    const creds = normalizeInstanceUrl(`${user}:${pass}@acme.service-now.com`);
+    expect(!creds.ok && creds.code).toBe('URL_HAS_CREDENTIALS');
+    expect(!creds.ok && creds.message).not.toContain(pass);
+  });
+
+  it('ARC-09-C223 — a bare word, a URL with a scheme and nonsense are as they were', () => {
+    expect(normalizeInstanceUrl('acme')).toEqual({ ok: true, url: VANITY, proposed: true, notes: [] });
+    expect(!normalizeInstanceUrl('http://acme.service-now.com').ok
+      && normalizeInstanceUrl('http://acme.service-now.com')).toMatchObject({ code: 'URL_NOT_HTTPS' });
+    expect(normalizeInstanceUrl(VANITY)).toEqual({ ok: true, url: VANITY, proposed: false, notes: [] });
+    // Checked as https, but quoted back as typed: the user did not type the scheme.
+    expect(normalizeInstanceUrl('not a url')).toMatchObject(
+      { ok: false, code: 'URL_INVALID', message: '"not a url" is not a URL — enter https://<host>' });
+  });
+
   it('the host is lowercased, the input trimmed', () => {
     expect(normalizeInstanceUrl('  https://DEV12345.Service-Now.com  ')).toEqual(
       { ok: true, url: PDI, proposed: false, notes: [] });
