@@ -18,6 +18,7 @@ import { USAGE as STORE_USAGE } from './store.mjs';
 import { USAGE as UPGRADE_USAGE } from './commands/upgrade.mjs';
 import { USAGE as STATUS_USAGE } from './commands/status.mjs';
 import { USAGE as LICENCE_USAGE } from './commands/licence.mjs';
+import { USAGE as CLIENT_COPY_USAGE } from './commands/client-copy.mjs';
 import { licenceStatus, REFUSED, refusalLines, refusesCommand } from './licence/state.mjs';
 import { ensureIntegrity } from '../../../packages/snowarch/dist/licence/integrity.js';
 import { localDir } from './local-paths.mjs';
@@ -159,6 +160,11 @@ async function licenceCommand(args) {
   return run(args);
 }
 
+async function clientCopyCommand(args) {
+  const { clientCopyCommand: run } = await import('./commands/client-copy.mjs');
+  return run(args);
+}
+
 export const COMMANDS = {
   // `readOnly`: it reads three files and prints. ARC-07-C33 — it used to leave `.local/logs/version-*.log`.
   version: { summary: 'print the version, the release tag, the commit, the contract sha and the floors',
@@ -204,6 +210,10 @@ export const COMMANDS = {
   // and a per-run log under `.local/logs/` is a copy of both that nobody asked to keep.
   licence: { summary: 'show, verify and check this checkout\'s licence; the owner issues and revokes them',
     run: licenceCommand, usage: LICENCE_USAGE, booleans: ['refresh', 'perpetual'], readOnly: true },
+  // ARC-09-C232 — the client copy of a deliverable (governance §4.5). `readOnly`: the copy it writes is its product,
+  // and a per-run log under `.local/logs/` would keep a client deliverable's terms that nobody asked to keep.
+  'client-copy': { summary: 'write a deliverable\'s client copy under clients/<name>/for-client/ and scan it',
+    run: clientCopyCommand, usage: CLIENT_COPY_USAGE, readOnly: true },
 };
 
 /**

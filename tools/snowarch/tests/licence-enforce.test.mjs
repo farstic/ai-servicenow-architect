@@ -37,7 +37,10 @@ test('ARC-11-C6 — every command but the allowed ones is refused for a refused 
       assert.equal(refusesCommand(name, { state, enforced: false }), expected, `${name} with ${state}, enforced: false`);
     }
   }
-  assert.deepEqual(Object.keys(COMMANDS).filter((n) => !CLI_ALLOWED.includes(n)).sort(), ['docs', 'instance', 'mode', 'store']);
+  // ARC-09-C232 — `client-copy` makes a client deliverable, and a licence gates deliverables (CLAUDE.md §1), so it is
+  // refused with the others.
+  assert.deepEqual(Object.keys(COMMANDS).filter((n) => !CLI_ALLOWED.includes(n)).sort(),
+    ['client-copy', 'docs', 'instance', 'mode', 'store']);
   // `mode` is refused, but for one form: `mode design`, which uninstall needs.
   const missing = { state: 'missing' };
   assert.equal(refusesCommand('mode', missing, ['design']), false, 'mode design');

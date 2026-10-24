@@ -113,5 +113,5 @@ export function clientCopy({ root, file, lexicon = LEXICON }) {
   if (cut.refused) return { refused: cut.refused };
   mkdirSync(dirname(join(root, dest)), { recursive: true });
   writeFileSync(join(root, dest), cut.text);
-  return { dest, hits: scanInternal(cut.text, { lexicon }) };
+  return { source: rel, dest, hits: scanInternal(cut.text, { lexicon }) };
 }
