@@ -54,6 +54,16 @@ const notAUrl = (typed: string): UrlBad => bad('URL_INVALID', `"${typed}" is not
 /** A scheme the user typed, any scheme: what separates `acme.service-now.com` from a URL. */
 const SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 
+/** ARC-09-C240 — an http(s) scheme typed wrong: `https//`, `https:/`, `https:`. Not `https://`, nor `https:///`. */
+const MISTYPED_SCHEME = /^https?(?::(?!\/\/)|\/)/i;
+
+/** ARC-09-C240 — a host an instance can have: letters, digits, dots and hyphens, or a bracketed IPv6 literal. */
+const HOST = /^(?:[a-z0-9.-]+|\[[0-9a-f:.]+\])$/;
+
+/** The refusal for credentials in the URL. Its VALUE is never echoed back: that is the point of refusing it. */
+const credentials = (): UrlBad => bad('URL_HAS_CREDENTIALS',
+  'Never put a username or password in the URL; the wizard will ask for them separately.');
+
 /**
  * Normalise, or refuse with the reason.
  *
@@ -69,10 +79,19 @@ export function normalizeInstanceUrl(input: string): UrlResult {
     return bad('URL_REQUIRED', `URL_REQUIRED — ${fillRemedy('URL_REQUIRED')}.`);
   }
 
+  // ARC-09-C240 — an instance origin never holds `@`, so any `@` is a username or a password, refused before anything
+  // is parsed. A parse that threw used to quote the input back, password included (a `#`, `?` or `/` in the password,
+  // or a port out of range). So no refusal below ever quotes an `@`.
+  if (trimmed.includes('@')) return credentials();
+
   // A bare word is a PROPOSAL, not a decision: the caller shows it and Enter accepts.
   if (BARE.test(trimmed.toLowerCase())) {
     return { ok: true, url: `https://${trimmed.toLowerCase()}.service-now.com`, proposed: true, notes: [] };
   }
+
+  // ARC-09-C240 — an http(s) scheme typed wrong is quoted back as typed, as 2.2.4 did, never checked as
+  // `https://https…`, whose refusal would be about a path the user never typed.
+  if (MISTYPED_SCHEME.test(trimmed)) return notAUrl(trimmed);
 
   // ARC-09-C223 — a host typed without a scheme is checked AS `https://<host>`, through every check
   // below in their order, so a refusal names its own reason (a path, credentials) rather than calling
@@ -100,11 +119,10 @@ export function normalizeInstanceUrl(input: string): UrlResult {
     return bad('URL_NOT_HTTPS',
       'ServiceNow instances are served over https only; use https://<host>');
   }
-  if (parsed.username !== '' || parsed.password !== '') {
-    // The VALUE is never echoed back — that is the point of refusing it.
-    return bad('URL_HAS_CREDENTIALS',
-      'Never put a username or password in the URL; the wizard will ask for them separately.');
-  }
+  if (parsed.username !== '' || parsed.password !== '') return credentials();
+  // ARC-09-C240 — `new URL` keeps a quote or backtick in the host, and C223 began to propose `https://"host"`. A host
+  // an instance cannot have is not a URL, quoted back as typed, as 2.2.4 did; it is checked before any path is.
+  if (!HOST.test(parsed.hostname)) return notAUrl(trimmed);
   if (parsed.pathname === '/api' || parsed.pathname.startsWith('/api/')) {
     // Its own message, because this is the mistake that produced P-23 and the generic one would
     // not tell the reader why the thing they were told to paste is wrong.
