@@ -9,8 +9,9 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A patch release, in progress: `./snowarch doctor --json` masks every ServiceNow-hosted instance URL in a value, not
-only the first.**
+**A patch release, in progress: the whole ServiceNow documentation is on disk by default, so the Architect can read
+every area. An install made before 2.2.5 moves to it once, on this upgrade: about 150 MB more on disk, and 7 to 14
+seconds on the CI machines.**
 
 ### Fixed
 
@@ -66,6 +67,12 @@ only the first.**
   filters and writes still use the stored value (ARC-09-C225).
 - The install page says that Git for Windows 2.54 and 2.55's `… is not a commit!` line during the clone is harmless,
   and links to the troubleshooting paragraph that explains it (ARC-09-C224).
+- The bootstrap now fetches the whole ServiceNow documentation, all 56 areas, instead of only the areas the specialists
+  cite, so the Architect can read the pages it needs in every area, Virtual Agent, Security Operations and Field Service
+  among them. An install made before 2.2.5 moves to the whole corpus once, on its upgrade to 2.2.5: about 150 MB more on
+  disk; the move took 7 to 14 seconds on the CI machines (macOS, Linux and Windows), and a move that is interrupted is
+  finished by the next run. `--docs sparse` keeps only the cited areas, for CI; the doctor then warns that the Architect
+  cannot read the others (ARC-09-C244).
 
 ### Added
 
