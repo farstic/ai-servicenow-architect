@@ -20,6 +20,7 @@ import { keyPair, listRepo, manifestDoc, productKeys } from './helpers/licence.m
 import { readManifestCache } from '../lib/licence/manifest.mjs';
 import { readDefaultLabel, readDefaultSummary } from '../../../packages/snowarch/dist/store/label.js';
 import { makeCheckout } from './helpers/workspace.mjs';
+import { INPUTS } from '../lib/inputs.mjs';
 
 // Four levels up: tests → snowarch → tools → the repository root. The shared cloud-sync fixture
 // lives under the SERVER package, because that is where the list is authored; this module is
@@ -604,4 +605,37 @@ test('ARC-11-C7 — B01 fetches nothing on a development version, or with no lic
     assert.equal(r.data.manifest, undefined);
     assert.match(r.detail, /^\.local\/ \w+ \([^)]+\)$/);
   }
+});
+
+// ARC-09-C231 — the PostToolUse citation hook, written beside SessionStart by the same writer and under the same
+// rules: only when Node can run it, ours replaced wherever it was carried from, the user's own kept.
+const POST_WRITE = Object.freeze({ matcher: 'Write|Edit', hooks: [Object.freeze({ type: 'command',
+  command: 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/post-write.mjs', timeout: 10 })] });
+
+test('ARC-09-C231 — with Node present the citation hook is written beside SessionStart, and only once', () => {
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const once = computeSettings({}, { ...opts, nodePresent: true });
+  assert.deepEqual(once.hooks.PostToolUse, [POST_WRITE], 'the citation hook is not exactly ours');
+  assert.deepEqual(once.hooks.SessionStart, hookEntry().SessionStart, 'the SessionStart hook moved');
+  assert.deepEqual(computeSettings(once, { ...opts, nodePresent: true }).hooks.PostToolUse, [POST_WRITE],
+    'a second run added a second citation hook');
+});
+
+test('ARC-09-C231 — a user\'s own PostToolUse hook is kept, a carried copy of ours replaced, and ours leaves without Node', () => {
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node /home/someone/my-own-check.js' }] };
+  const carried = { matcher: 'Write|Edit', hooks: [{ type: 'command',
+    command: POST_WRITE.hooks[0].command.replace('${CLAUDE_PROJECT_DIR}', '/home/someone/snowarch-2.2.4') }] };
+  const current = { hooks: { PostToolUse: [mine, carried] } };
+  assert.deepEqual(computeSettings(current, { ...opts, nodePresent: true }).hooks.PostToolUse, [mine, POST_WRITE],
+    'the user\'s hook was not kept, or ours is not there exactly once');
+  assert.deepEqual(computeSettings(current, { ...opts, nodePresent: false }).hooks.PostToolUse, [mine],
+    'with Node absent the writer kept ours, or removed the user\'s');
+});
+
+test('ARC-09-C231 — B07\'s inputs carry the hooks it writes, so a release that changes them re-runs B07 once', () => {
+  const texts = INPUTS.B07.resolve({ mode: 'design-only', node: { present: true },
+    state: { hooksDisabledByBootstrap: false, registration: 'project' } });
+  assert.ok(texts.some((text) => text.includes('tools/snowarch/hooks/post-write.mjs')),
+    `B07's inputs do not carry the citation hook: ${JSON.stringify(texts)}`);
 });
