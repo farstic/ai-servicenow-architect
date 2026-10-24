@@ -50,6 +50,12 @@ only the first.**
   `https://acme.service-now.com`, to accept with Enter, as a single word such as `acme` already was; a host with a path
   or credentials gets that refusal's own reason. Under `--yes`, where nothing is asked, the URL used is now printed for
   both forms (ARC-09-C223).
+- After `snow_core_instance_switch`, the capabilities read that comes before every write moved the session back to the
+  default instance without saying so, so the write that followed went to that instance. The read now keeps the session
+  on the instance it was switched to, and says so when that instance can no longer be loaded. A resumed session starts
+  a new server, which is on the default instance; the Architect is instructed to name the instance from that read in
+  its write-approval question (`About to … on instance "<label>"`), so check that name before you approve
+  (ARC-09-C245).
 
 ### Changed
 
