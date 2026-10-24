@@ -55,6 +55,12 @@ An unresolved question about the engagement itself goes in the same file under *
 `OQ-ES-1`, `OQ-ES-2`… (`governance/governance-rules.md` §4.4): a story and a design number their own
 questions from 1 as well, and the kind in the id is what stops the three being confused in one answer.
 
+Two optional lines in the same file serve client copies (`governance/governance-rules.md` §4.5).
+`Client copies: yes` gives every deliverable for the engagement a client copy without asking each time;
+the default is no. `Instances:` names the engagement's own instance labels, as in
+`Instances: <name>-dev, <name>-prod`, so that a client copy which mentions another engagement's instance
+is caught and the client's own is never flagged; without the line, only a PDI is checked.
+
 ## 4 — Connect the instance, if the engagement is live
 
 ```
