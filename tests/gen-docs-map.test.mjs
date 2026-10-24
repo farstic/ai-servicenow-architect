@@ -28,8 +28,9 @@ function fixture(t) {
   const put = (rel, text) => { mkdirSync(dirname(join(corpus, rel)), { recursive: true }); writeFileSync(join(corpus, rel), text); };
   mkdirSync(corpus, { recursive: true });
   initFixtureRepo((args) => git(args, corpus), corpus, ['-q', '-b', 'australia']);
-  put('llms.txt', `# ServiceNow docs\n\n- [Alpha publication](${URL_OF('alpha')})\n`);
-  put('markdown/alpha/index.md', page('Alpha TOC'));
+  put('llms.txt', `# ServiceNow docs\n\n- [Alpha publication](${URL_OF('alpha')})\n- [Beta, renamed](${URL_OF('beta')})\n`);
+  // The family word an index title opens with is a release label: alpha's two titles are the same name.
+  put('markdown/alpha/index.md', page('Australia Alpha publication'));
   put('markdown/alpha/a.md', page('A', 'Product One'));
   put('markdown/alpha/b.md', page('B', 'Product One'));
   put('markdown/alpha/nested/c.md', page('C', 'Product Two'));
@@ -56,16 +57,19 @@ test('ARC-09-C250 — the map says how to find a page, then gives each area one 
   }
   assert.deepEqual(rows(map).map(cells), [
     ['`markdown/alpha/`', 'Alpha publication', '3', 'Product One (2) · Product Two (1)'],
-    ['`markdown/beta/`', 'Beta Files', '1', 'Piped/Name (1)'],
+    ['`markdown/beta/`', 'Beta, renamed / Beta Files', '1', 'Piped/Name (1)'],
     ['`markdown/delta-x/`', 'x Combined Product Files', '0', ''],
   ]);
 });
 
-test('ARC-09-C250 — a title comes from llms.txt, else from the area index.md; a pipe never reaches a cell', (t) => {
+test('ARC-09-C250 — a title is llms.txt\'s, the index.md title beside it when they differ; no pipe in a cell', (t) => {
   const { corpus, pin } = fixture(t);
   const map = buildMap({ corpus, pin });
-  assert.ok(map.includes('| Alpha publication |'), 'llms.txt\'s title is not used');
-  assert.ok(map.includes('| Beta Files |'), 'the index.md title is not the fallback');
+  // The same name once, the family word set aside; two names, both; no llms.txt title, the index title as it is.
+  assert.ok(map.includes('| Alpha publication |'), 'a name the two titles share is not shown once');
+  assert.ok(map.includes('| Beta, renamed / Beta Files |'), 'a renamed area does not show both of its names');
+  assert.ok(map.includes('| x Combined Product Files |'), 'the index.md title is not the fallback');
+  // A pipe never reaches a cell.
   for (const row of rows(map)) assert.equal(row.split('|').length, 6, `a cell holds a pipe: ${row}`);
 });
 

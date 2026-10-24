@@ -11,11 +11,11 @@ How to find a page:
 
 | Area | Title | Pages | Top products |
 |---|---|---|---|
-| `markdown/acct-lifecycle-events/` | Account Lifecycle Events | 152 |  |
-| `markdown/api-reference/` | API implementation and reference | 1253 | Server API Reference (448) · Web Services (249) · REST APIs (136) |
-| `markdown/application-development/` | Building applications | 1592 | Automated Test Framework \(ATF\) (185) · UI Builder (183) · App Engine Studio (137) |
+| `markdown/acct-lifecycle-events/` | Account Lifecycle Events / Customer Success Management | 152 |  |
+| `markdown/api-reference/` | API implementation and reference / API Reference | 1253 | Server API Reference (448) · Web Services (249) · REST APIs (136) |
+| `markdown/application-development/` | Building applications / Build or modify applications | 1592 | Automated Test Framework \(ATF\) (185) · UI Builder (183) · App Engine Studio (137) |
 | `markdown/application-portfolio-management/` | Enterprise Architecture | 674 |  |
-| `markdown/better-together/` | Solutions | 14 |  |
+| `markdown/better-together/` | Solutions / Better Together | 14 |  |
 | `markdown/build-workflows/` | Build workflows | 761 | Workflow Studio (543) · Legacy Workflow (85) · Workflow Activities (53) |
 | `markdown/cloud-governance-suite/` | Cloud Governance Suite | 1 |  |
 | `markdown/cloud-observability/` | Cloud Observability | 1 |  |
@@ -28,42 +28,42 @@ How to find a page:
 | `markdown/delta-yokohama-australia/` | australia Combined Product Files | 392 |  |
 | `markdown/delta-zurich-australia/` | australia Combined Product Files | 349 |  |
 | `markdown/employee-service-management/` | Employee Service Management | 5097 | Employee Experience Foundation (896) · HR Service Delivery (685) · Contract Management Pro (271) |
-| `markdown/environmental-social-governance/` | Environmental, Social, and Governance Management (formerly Environmental, Social, and Governance) | 238 |  |
+| `markdown/environmental-social-governance/` | Environmental, Social, and Governance Management (formerly Environmental, Social, and Governance) / Operational Sustainability Management (formerly Environmental, Social, and Governance) | 238 |  |
 | `markdown/field-service-management/` | Field Service Management | 985 | Work Order Management (329) · Field Service Scheduling (216) · Workforce Optimization for Field Service (97) |
-| `markdown/financial-services-operations/` | Financial Services Operations (FSO) | 727 | Dispute Management (172) · Insurance Claims (109) · Financial Services Payment Operations (31) |
-| `markdown/glossary/` | ServiceNow AI Platform glossary | 2 |  |
+| `markdown/financial-services-operations/` | Financial Services Operations (FSO) / Financial Services Operations | 727 | Dispute Management (172) · Insurance Claims (109) · Financial Services Payment Operations (31) |
+| `markdown/glossary/` | ServiceNow AI Platform glossary / NOW Platform Glossary | 2 |  |
 | `markdown/governance-risk-compliance/` | Governance, Risk, and Compliance | 2508 | GRC: Risk Management Workspace (316) · GRC Common Functions (281) · Third-party Risk Management (237) |
-| `markdown/government-industry/` | Public Sector Digital Services (PSDS) | 397 |  |
+| `markdown/government-industry/` | Public Sector Digital Services (PSDS) / Public Sector | 397 |  |
 | `markdown/healthcare-life-sciences/` | Healthcare and Life Sciences | 541 | Healthcare and Life Sciences Service Management Core (120) · Vaccine Administration Management (49) · EMR Help (39) |
 | `markdown/hyperautomation-low-code/` | App development and low-code | 1 |  |
 | `markdown/impact/` | Impact | 422 | Accelerator and Initiative List (142) · Value Library (12) · Impact Product Adoption Roadmap (7) |
 | `markdown/industrial-connected-workforce/` | Industrial Connected Workforce | 205 | Digital Factory Workspace (146) · Industrial Connected Workforce Mobile Experience (37) · Industrial Knowledge Management (7) |
-| `markdown/industry-products/` | Industry Products | 1 |  |
+| `markdown/industry-products/` | Industry Products / CRM and Industry Products | 1 |  |
 | `markdown/integrate-applications/` | Workflow Data Fabric | 2312 | Integration Hub (686) · Orchestration (184) · ERP Integration Framework (149) |
-| `markdown/intelligent-experiences/` | Enable AI experiences | 2054 | AI Control Tower (144) · NLU Service (69) · Predictive Intelligence (62) |
-| `markdown/it-asset-management/` | IT Asset Management | 1686 | Software Asset Management (473) · Enterprise Asset Management (410) · Hardware Asset Management (344) |
+| `markdown/intelligent-experiences/` | Enable AI experiences / Enable AI | 2054 | AI Control Tower (144) · NLU Service (69) · Predictive Intelligence (62) |
+| `markdown/it-asset-management/` | IT Asset Management / Asset Management | 1686 | Software Asset Management (473) · Enterprise Asset Management (410) · Hardware Asset Management (344) |
 | `markdown/it-business-management/` | Strategic Portfolio Management | 2254 | Portfolio Planning (336) · Scenario Planning in SPW (271) · Strategic Planning (228) |
 | `markdown/it-operations-management/` | IT Operations Management | 3081 | Event Management (466) · Discovery (437) · Discovery and Service Mapping Patterns (359) |
 | `markdown/it-service-management/` | IT Service Management | 2751 | Service Operations Workspace (372) · Digital End-User Experience \(DEX\) (227) · DevOps Change Velocity (215) |
-| `markdown/manufacturing/` | Manufacturing Commercial Operations | 202 |  |
-| `markdown/mobile/` | Mobile Platform | 634 |  |
+| `markdown/manufacturing/` | Manufacturing Commercial Operations / Manufacturing | 202 |  |
+| `markdown/mobile/` | Mobile Platform / Mobile Configuration and Navigation | 634 |  |
 | `markdown/now-intelligence/` | Platform Analytics | 1213 | Performance Analytics (313) · Process Mining (195) · Reporting (128) |
 | `markdown/now-platform/` | ServiceNow AI Platform | 1 |  |
-| `markdown/operational-technology/` | Operational Technology | 568 | Operational Technology Manager (103) · Industrial Process Manager (71) · Industrial Workspace (64) |
+| `markdown/operational-technology/` | Operational Technology / Operational Technology Management | 568 | Operational Technology Manager (103) · Industrial Process Manager (71) · Industrial Workspace (64) |
 | `markdown/order-management/` | Sales Customer Relationship Management | 1058 |  |
-| `markdown/platform-administration/` | Administer the ServiceNow AI Platform | 2182 | Search Administration (320) · AI Search (243) · Table Administration and Data Management (130) |
-| `markdown/platform-security/` | Secure your instance | 1680 | Authentication (364) · Instance Security Hardening Settings (336) · Edge Encryption (91) |
-| `markdown/platform-user-interface/` | Configure user experiences | 873 | Service Portal (235) · Content Management System (82) · Adoption Services (70) |
-| `markdown/proactive-service-exp-workflows/` | Product Support for Technology | 73 | Product Support for Technology (73) |
-| `markdown/release-notes/` | release notesPreliminary release notes for Release Testing Preview (RTP) | 385 |  |
-| `markdown/retail-industry/` | Retail | 156 | \[Legacy\] Retail Task Management (17) |
+| `markdown/platform-administration/` | Administer the ServiceNow AI Platform / ServiceNow AI Platform Administration | 2182 | Search Administration (320) · AI Search (243) · Table Administration and Data Management (130) |
+| `markdown/platform-security/` | Secure your instance / Platform security | 1680 | Authentication (364) · Instance Security Hardening Settings (336) · Edge Encryption (91) |
+| `markdown/platform-user-interface/` | Configure user experiences / ServiceNow AI Platform user interface | 873 | Service Portal (235) · Content Management System (82) · Adoption Services (70) |
+| `markdown/proactive-service-exp-workflows/` | Product Support for Technology / Proactive Service Experience Workflows | 73 | Product Support for Technology (73) |
+| `markdown/release-notes/` | release notesPreliminary release notes for Release Testing Preview (RTP) / Release Notes | 385 |  |
+| `markdown/retail-industry/` | Retail / Retail Industry | 156 | \[Legacy\] Retail Task Management (17) |
 | `markdown/roles-by-product/` | Roles By Product | 16 |  |
-| `markdown/security-management/` | Security Operations | 2842 | Security Incident Response (906) · Vulnerability Response (433) · Threat Intelligence Security Center (343) |
+| `markdown/security-management/` | Security Operations / Security Management | 2842 | Security Incident Response (906) · Vulnerability Response (433) · Threat Intelligence Security Center (343) |
 | `markdown/service-exchange/` | Service Exchange | 104 | Service Exchange (103) |
 | `markdown/service-management-for-the-enterprise/` | Service Management | 69 | Planned Maintenance \(Family\) (15) |
-| `markdown/servicenow-platform/` | Extend ServiceNow AI Platform capabilities | 3092 | Configuration Management Database \(CMDB\) (387) · Knowledge Management (290) · Service Catalog (276) |
+| `markdown/servicenow-platform/` | Extend ServiceNow AI Platform capabilities / ServiceNow AI Platform Capabilities | 3092 | Configuration Management Database \(CMDB\) (387) · Knowledge Management (290) · Service Catalog (276) |
 | `markdown/source-to-pay-operations/` | Finance and Supply Chain | 1381 | Sourcing and Procurement Operations (472) · Supplier Lifecycle Operations (288) · Accounts Payable Operations (254) |
-| `markdown/telecom-media-technology/` | Telecommunications, Media, and Technology (TMT) | 229 | Now Assist for Telecom, Media and Technology (62) · Field Service Management for Telecommunications (3) · Strategic Portfolio Management for Telecom (2) |
+| `markdown/telecom-media-technology/` | Telecommunications, Media, and Technology (TMT) / Telecommunications, Media, and Technology | 229 | Now Assist for Telecom, Media and Technology (62) · Field Service Management for Telecommunications (3) · Strategic Portfolio Management for Telecom (2) |
 | `markdown/telecom-network-inventory/` | Telecommunications Network Inventory | 353 | Telecommunications Network Inventory (353) |
-| `markdown/telecom-service-ops/` | Telecommunications Service Operations Management | 118 | Telecommunications Service Operations Management (118) |
+| `markdown/telecom-service-ops/` | Telecommunications Service Operations Management / Telecom Service Operations Management | 118 | Telecommunications Service Operations Management (118) |
 | `markdown/vocabulary/` | vocabulary | 1 |  |

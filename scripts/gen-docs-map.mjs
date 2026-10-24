@@ -70,6 +70,19 @@ function llmsTitles(corpus) {
   return titles;
 }
 
+/**
+ * The title cell. llms.txt's title, with the area index.md's beside it when the two differ — "<llms> / <index>" — so an
+ * area renamed since llms.txt was written is found by either name: acct-lifecycle-events is "Account Lifecycle Events"
+ * there and "Customer Success Management" in its index, and its pages carry no `product:` to find it by. An index
+ * title opens with the release family ("Australia Customer Success Management"), a release label rather than a name,
+ * so it is compared and shown without it. With no llms.txt title, the index title alone, as it is.
+ */
+function titleOf(llms, index, family) {
+  const own = index && family ? index.replace(new RegExp(`^${family}\\s+`, 'i'), '') : index;
+  if (llms && own && llms.toLowerCase() !== own.toLowerCase()) return `${llms} / ${own}`;
+  return llms ?? index;
+}
+
 /** The release family the corpus's own links name (`…/ServiceNowDocs/<family>/markdown/…`), or null. */
 function familyOf(corpus) {
   const path = join(corpus, 'llms.txt');
@@ -111,7 +124,7 @@ export function buildMap({ corpus, pin, family = familyOf(corpus) }) {
     }
     const top = [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).slice(0, TOP)
       .map(([name, n]) => `${cell(name)} (${n})`).join(' · ');
-    const title = titles.get(area) ?? (existsSync(index) ? field(frontmatter(index), 'title') : null) ?? area;
+    const title = titleOf(titles.get(area), existsSync(index) ? field(frontmatter(index), 'title') : null, family) ?? area;
     return `| \`markdown/${area}/\` | ${cell(title)} | ${pages.length} | ${top} |`;
   });
   return [
