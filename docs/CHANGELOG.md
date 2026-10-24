@@ -90,6 +90,9 @@ seconds on the CI machines.**
   disk; the move took 7 to 14 seconds on the CI machines (macOS, Linux and Windows), and a move that is interrupted is
   finished by the next run. `--docs sparse` keeps only the cited areas, for CI; the doctor then warns that the Architect
   cannot read the others (ARC-09-C244).
+- `--docs sparse` holds 24 areas instead of 20: acct-lifecycle-events, customer-relationship-management,
+  delta-xanadu-australia, healthcare-life-sciences and release-notes, which the skills now cite, join it, and
+  now-platform, which none cites, leaves it (ARC-09-C250).
 
 ### Added
 
