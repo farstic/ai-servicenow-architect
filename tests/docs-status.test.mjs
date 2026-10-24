@@ -238,6 +238,9 @@ test('criterion 2 — an absent corpus is a valid object, one MISSING block, exi
   const f = formatStatus(s);
   assert.equal(f.code, 3);
   assert.match(f.text, /^docs corpus: MISSING/);
+  // ARC-09-C244 — the remedy fetches what an install fetches by default, the whole corpus; `--docs sparse` is never
+  // offered.
+  assert.doesNotMatch(f.text, /--docs sparse/, 'the remedy offers the sparse corpus');
   // Two lines now: the remedy, then the doctor's exact E-12 sentence, so `docs status` and ARC-08
   // cannot disagree about what an absent corpus means.
   const lines = f.text.split('\n');

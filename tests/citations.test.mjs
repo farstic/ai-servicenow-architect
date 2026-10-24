@@ -50,7 +50,10 @@ test('criterion 2 — an absent corpus is `missing`, exit 3, and never says SKIP
     const { text, code } = formatResult(r, SPELL);
     assert.equal(code, EXIT.missing);
     assert.match(text,
-      new RegExp(`corpus missing — run ${esc(SPELL.bootstrap)} --docs`));
+      new RegExp(`corpus missing — run ${esc(SPELL.bootstrap)} \\(or ${esc(SPELL.cli)} docs sync\\)`));
+    // ARC-09-C244 — the remedy fetches what an install fetches by default, the whole corpus; `--docs sparse` is never
+    // offered.
+    assert.doesNotMatch(text, /--docs sparse/, 'the remedy offers the sparse corpus');
     assert.doesNotMatch(text, /SKIP/i, 'the word SKIP must appear nowhere — that was the old defect');
   });
 });
