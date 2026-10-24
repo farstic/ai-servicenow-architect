@@ -10,8 +10,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { statePath } from '../local-paths.mjs';
-import { ALWAYS_DIRS, CORPUS_DIR, MODE, ROOT_FILES, effectiveDocsMode, readAreas } from './sync.mjs';
+import { ALWAYS_DIRS, CORPUS_DIR, MODE, ROOT_FILES, readAreas } from './sync.mjs';
+import { SPARSE, modeOf, recordedMode, sparseOf } from './shape.mjs';
 import { verifyCitations } from './verify.mjs';
 import { needSpell, spellings } from '../text.mjs';
 import { restoreRemedy } from '../licence/manifest.mjs';
@@ -40,15 +40,8 @@ export const E12_ABSENT = (mode, spell) =>
 /** The object's version. Additions are non-breaking; a removal or a changed meaning is not. */
 export const SCHEMA = 1;
 
-/**
- * The four shapes a checkout can be in.
- *
- * `full` is `MODE.full` rather than a second spelling of the word: "the whole corpus is on disk" is
- * the same claim whether it arrives as a requested mode or as an observed shape, and writing it
- * twice would be two definitions of one fact — and two literals for the ARC-05-S10 scan to judge,
- * where the allow-list already carries exactly one argued row for this homograph.
- */
-export const SPARSE = Object.freeze({ cone: 'cone', full: MODE.full, pattern: 'pattern', none: 'none' });
+// ARC-09-C239 — the mode and the shape live in shape.mjs, light enough for the citation hook; read from here as before.
+export { SPARSE, modeOf, recordedMode, sparseOf };
 
 const git = (args, cwd) => {
   try {
@@ -99,40 +92,6 @@ function branchOf(corpus) {
   return m ? m[1] : null;
 }
 
-/**
- * `cone` | `full` | `pattern` | `none`.
- *
- * `pattern` is the ADR-0008 shape — sparse checkout on, cone mode off, which is what git 2.34.1
- * silently produces from `set --cone` and which omits the corpus's root files. It is reported as
- * its own value rather than folded into `cone`, because the remedy differs.
- */
-export function sparseOf(corpus) {
-  if (!existsSync(join(corpus, '.git'))) return SPARSE.none;
-  const on = git(['config', '--get', 'core.sparseCheckout'], corpus).out === 'true';
-  if (!on) return SPARSE.full;
-  return git(['config', '--get', 'core.sparseCheckoutCone'], corpus).out === 'true' ? SPARSE.cone : SPARSE.pattern;
-}
-
-/**
- * The recorded mode, and the checkout's shape, are two different questions.
- *
- * `mode` is what the operator ASKED for — ARC-06 writes it to `.local/bootstrap-state.json` — and
- * `sparse` is what is on disk. They can disagree (a state file saying `sparse` over a full
- * checkout), and reporting both is the point: the disagreement is the finding.
- *
- * ARC-09-C244 — read as every other reader reads it (`effectiveDocsMode`): a recorded `sparse` without the
- * `optIn` marker is the default an older release wrote, and the default is now the whole corpus. So it reports
- * `full`, and a cone still on disk is the disagreement E-15 names, with `docs sync` as the cure.
- */
-function recordedMode(root) {
-  const p = statePath(root);
-  if (!existsSync(p)) return null;
-  try {
-    const docs = JSON.parse(readFileSync(p, 'utf8'))?.docs;
-    const m = docs?.mode;
-    return (m === MODE.sparse || m === MODE.full || m === 'skip') ? effectiveDocsMode(docs) : null;
-  } catch { return null; }
-}
 
 /**
  * ARC-09-C244 — how complete the checkout is against its own pinned tree: how many areas the tree has under
@@ -313,7 +272,7 @@ export function docsStatus({ root = process.cwd(), verify = true, measure: doMea
     rootMissing: [...ROOT_FILES, ...ALWAYS_DIRS].filter((f) => !existsSync(join(corpus, f))),
     areaCount: areaDirs(corpus),
     ...(completeness ? completenessOf(corpus) : {}),
-    mode: base.mode ?? (sparse === SPARSE.full ? MODE.full : MODE.sparse),
+    mode: modeOf(base.mode, sparse),
     longpaths: process.platform === 'win32'
       ? git(['config', '--get', 'core.longpaths'], corpus).out === 'true'
       : null,

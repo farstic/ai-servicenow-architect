@@ -20,7 +20,7 @@ import { plannedSteps } from '../../steps/index.mjs';
 import { version as engineVersionOf } from '../../config.mjs';
 import { spellings } from '../../text.mjs';
 import { defineCheck } from '../registry.mjs';
-import { isOurPostWriteHook, isOurSessionStartHook, projectEntryEnabled } from '../../settings-local.mjs';
+import { hookEntry, isOurPostWriteHook, isOurSessionStartHook, projectEntryEnabled } from '../../settings-local.mjs';
 import { RUNNING_STEP_ENV } from '../../spawn-env.mjs';
 import { which } from '../../which.mjs';
 
@@ -131,7 +131,8 @@ export function configProblems(config, root) {
  * at every session start, so the hook is written locally and only when Node is present (S-05
  * variant B). A check that looked for it in the committed file would fail every correct install.
  *
- * The shape is that writer's: ONE `command` string, `${CLAUDE_PROJECT_DIR}`-relative, `timeout: 10`.
+ * The shape is that writer's (`hookEntry`): `${CLAUDE_PROJECT_DIR}`-relative, `timeout: 10`. ARC-09-C239 — SessionStart a
+ * shell command with the path quoted; the citation hook `node` with its loader as `args`, in exec form.
  *
  * ARC-11-C10 — what is wrong is told apart from where the cure is: `entry` holds the problems the entry itself has,
  * which B07's writer rewrites (`doctor --fix`); `scriptMissing` is the tracked file gone, which no rewrite brings
@@ -161,13 +162,27 @@ function ourHookProblems(local, root, { event, isOurs, script }) {
   const hook = hooks.find(isOurs);
   if (!hook) return { problems: [], entry, scriptMissing, present: false };
   const command = String(hook.command ?? '');
-  if (!/^node\s/.test(command)) entry.push(`${event} does not run node (${command})`);
+  const args = Array.isArray(hook.args) ? hook.args.map(String) : [];
+  const shown = [command, ...args].join(' ');
+  if (!/^node(\s|$)/.test(command)) entry.push(`${event} does not run node (${shown})`);
   // B07 writes the path ${CLAUDE_PROJECT_DIR}-relative, so the entry follows the checkout wherever it moves; an
   // absolute path to another checkout's script, or a script elsewhere in this one, is a hook at a wrong path.
-  if (!command.endsWith(`\${CLAUDE_PROJECT_DIR}/${script}`)) {
-    entry.push(`${event} does not run \${CLAUDE_PROJECT_DIR}/${script} (${command})`);
-  } else if (!existsSync(join(root, ...script.split('/')))) {
-    scriptMissing = true;
+  // ARC-09-C239 — in either of the forms an entry of ours has had: a shell command naming the script, quoted or not,
+  // or the exec-form loader, which names it in its argument and reads the project path inside Node.
+  const runsOurs = args.length === 0
+    ? command.replace(/"/g, '').endsWith(`\${CLAUDE_PROJECT_DIR}/${script}`)
+    : args[0] === '-e' && args.length === 2 && args[1].includes('process.env.CLAUDE_PROJECT_DIR')
+      && args[1].includes(`'${script}'`);
+  if (!runsOurs) {
+    entry.push(`${event} does not run \${CLAUDE_PROJECT_DIR}/${script} (${shown})`);
+  } else {
+    // ARC-09-C239 — the right script, but not as B07 writes it now: SessionStart without the quotes, or the citation
+    // hook through a shell. B07's writer rewrites it, as `doctor --fix` does.
+    const want = hookEntry()[event][0].hooks[0];
+    if (command !== want.command || JSON.stringify(args) !== JSON.stringify(want.args ?? [])) {
+      entry.push(`${event} is not in the form B07 writes (${shown})`);
+    }
+    if (!existsSync(join(root, ...script.split('/')))) scriptMissing = true;
   }
   if (!(Number(hook.timeout) <= 10)) {
     entry.push(`${event} timeout is ${hook.timeout}, which is more than 10 s`);
