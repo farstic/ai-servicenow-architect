@@ -112,10 +112,18 @@ if (MODE === 'switch') {
 const syncSeconds = sync(WHOLE ? 'full' : 'sparse');
 
 const status = describe();
-step('docs verify', ['scripts/docs.mjs', 'verify']);
 
 const fail = [];
 const check = (ok, what) => { if (!ok) fail.push(what); };
+
+// `docs verify` is one assertion among the others: a failure is recorded with what it printed, and the cell goes
+// on measuring. C244's first run lost every full cell's bytes, files and longest-path read to a verify that threw.
+try {
+  step('docs verify', ['scripts/docs.mjs', 'verify']);
+} catch (e) {
+  writeSync(1, `${e.stdout ?? ''}${e.stderr ?? ''}::endgroup::\n`);
+  check(false, `docs verify exited ${e.status ?? 'abnormally'} — its output is in the group above`);
+}
 
 const files = walk(corpus);
 // Two lengths, because they answer different questions and S-07 was misread once over exactly this:
