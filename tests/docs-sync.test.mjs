@@ -290,7 +290,9 @@ test('ARC-09-C244 — an interrupted switch, marked, is finished: its debris goe
   const page = debrisOf(w);
   const r = syncCorpus({ ...w, mode: 'full', log: silent });
   assert.equal(r.completeness.ok, true);
-  assert.equal(readFileSync(page, 'utf8'), `# ${UNCITED}\n`, 'the debris is not the pinned page');
+  // The corpus checkout follows the machine's `core.autocrlf`, as an installed corpus does, so a Windows runner
+  // restores the page CRLF: git behaving correctly. The claim is the page's content, so line endings are set aside.
+  assert.equal(readFileSync(page, 'utf8').replace(/\r\n/g, '\n'), `# ${UNCITED}\n`, 'the debris is not the pinned page');
   assert.equal(existsSync(switchMarker(corpusOf(w))), false, 'the marker outlived the switch');
 });
 
