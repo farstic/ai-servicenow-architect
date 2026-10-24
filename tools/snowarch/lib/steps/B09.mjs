@@ -15,6 +15,7 @@ import { recordedInstance } from '../state.mjs';
 import { writeDoctorCache } from '../doctor-cache.mjs';
 import { RUNNING_STEP_ENV, childEnv } from '../spawn-env.mjs';
 import { EXPECTED_DIALOGS, summaryBlock } from '../text.mjs';
+import { packageCliRefused } from '../licence/state.mjs';
 // ARC-08-C18 — `nonOkLines`/`failureLines` moved to the doctor's human renderer, which is where
 // their other two readers already live. Same definition, imported rather than copied: B09's
 // install summary, the upgrade report and `./snowarch status` must print a failing check the
@@ -115,6 +116,9 @@ export const run = async (ctx) => {
     env: ctx.env,
     warnings: warningsFrom(state),
     failures: counts.failures ?? [],
+    // ARC-09-C235 — the run's own licence (stepContext reads it once): without one in force, B06 and B08 skipped, and
+    // the block says how to finish instead of promising a connected server.
+    licenceInForce: !packageCliRefused(ctx),
   });
 
   // Design-only runs never reach B08, so the banner would have no cache at all on a first install.

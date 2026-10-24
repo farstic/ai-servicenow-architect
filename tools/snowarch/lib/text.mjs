@@ -358,7 +358,8 @@ export function changeLaterBlock({ label, platform, env } = {}) {
  * One sentence per dialog, always. The alternative — one sentence saying "you may see one or two" —
  * is the sort of hedge that makes a user distrust every other line in the summary.
  */
-export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, root = ROOT_SLOT, platform, env } = {}) {
+export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, root = ROOT_SLOT, platform, env,
+  licenceInForce = true } = {}) {
   const s = spellings({ platform, env });
   // ARC-09-C157 — the folder by name, on a line of its own so it copies cleanly: "here" sent the Windows colleague's
   // `claude` one folder up (2026-10-15), where it loads none of this product and /mcp shows nothing.
@@ -369,6 +370,14 @@ export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, root = 
   }
   lines.push('      (If you are already inside Claude Code in this folder: exit it and start '
     + '`claude` again.)');
+  // ARC-09-C235 — A LIVE RUN WITH NO LICENCE IN FORCE skipped B06 and B08, and the server refuses to start (ARC-11-C6),
+  // so /mcp cannot show it connected. What finishes the install is the licence and then this bootstrap again, which
+  // runs what was skipped. The architect's words, naming the licensed path only.
+  if (mode === 'live' && !licenceInForce) {
+    lines.push('      The instance steps were skipped: no licence in force (E-31 above). Install the licence, then',
+      `      run ${s.cli} bootstrap again to finish — /mcp shows ${serverKey} ✔ connected after that.`);
+    return lines.join('\n');
+  }
   lines.push(mode === 'live'
     ? `      In Claude, /mcp should show: ${serverKey} ✔ connected · /snowarch status quotes the `
       + 'Mode line above.'
@@ -378,7 +387,8 @@ export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, root = 
 
 /** The whole closing block, as one string — what `--json`'s `next` field carries verbatim. */
 export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = true,
-  dialogs = EXPECTED_DIALOGS, serverKey, root = ROOT_SLOT, platform, env, warnings = [], failures = [] } = {}) {
+  dialogs = EXPECTED_DIALOGS, serverKey, root = ROOT_SLOT, platform, env, warnings = [], failures = [],
+  licenceInForce = true } = {}) {
   const lines = [
     doctorLine({ ...counts, nodeUsable, platform, env }),
     // ARC-08-C? (Sitting A) — every FAIL, in full, directly under the count that announced it.
@@ -387,13 +397,15 @@ export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = 
     // on, and the one run that saw the failure is the one run that should have said what it was.
     ...failures.map((f) => `      ${f}`),
     modeLine({ mode, instance }),
-    nextBlock({ mode, dialogs, serverKey, root, platform, env }),
+    nextBlock({ mode, dialogs, serverKey, root, platform, env, licenceInForce }),
   ];
   // ARC-07-W12 — LIVE ONLY, and not for tidiness: four of the five rows name an instance, and in
   // design-only there is none. The design ending already carries its own change line, which is the
   // asymmetry this block was written to remove. It goes BEFORE the warnings recap, because the
   // warning has to be the last thing on screen — the same rule the wizard's save path states.
-  if (mode === 'live') lines.push(changeLaterBlock({ label: instance?.label, platform, env }));
+  // ARC-09-C235 — and not without a licence in force: four of its five commands are refused then, and its heading's
+  // "the bootstrap does not need re-running" is the opposite of what the reader has to do.
+  if (mode === 'live' && licenceInForce) lines.push(changeLaterBlock({ label: instance?.label, platform, env }));
   if (warnings.length > 0) {
     lines.push(`Warnings: ${warnings.length}`, ...warnings.map((w) => `      ${w}`));
   }
