@@ -263,8 +263,12 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ['tests/upgrade/upgrade-unit.test.mjs', [
     { at: 'E-27 FAIL Claude Code registration status: design-only i', kind: 'PINNED', n: 2, why: 'no product line carries this sentence' },
     { at: 'E-28 WARN release currency: v9.9.8 available — ~ upgrade', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'E-99 WARN a newer check: a check this release does not k', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'E-99 WARN: a check this release does not know — ~ doctor', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'SV-03 WARN instance status: instances: pdi: flags explic', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'SV-03 WARN instances: instances: <label>: flags explicit', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'SV-03 WARN instances: instances: <label>: flags explicit', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/format.ts)' },
     { at: 'SV-03 WARN instances: instances: pdi: flags explicit, pr', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
-    { at: 'SV-99 WARN: a check that no longer exists — ~ doctor', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
     { at: '— ~ instance test pdi$', kind: 'PINNED', n: 1, why: 'regex syntax in the sentence' },
   ]],
   ['tests/upgrade/upgrade.e2e.test.mjs', [

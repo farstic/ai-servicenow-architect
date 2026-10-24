@@ -43,8 +43,8 @@ import { capabilitiesLine, renderSummaryLine,
   summaryLine } from '../../tools/snowarch/lib/doctor/report-text.mjs';
 import { summariseMerged, dedupeKeyFor,
   engineBlock } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
-import { cachePath, cacheSensitiveValue, cacheStale, collectInputs, INPUT_FILES,
-  inputsPath, writeReportCache } from '../../tools/snowarch/lib/doctor-cache.mjs';
+import { cachePath, cacheSensitiveValue, cacheStale, collectInputs, COMPATIBILITY_KEYS, INPUT_FILES,
+  inputsPath, REPORT_CACHE_KEYS, writeReportCache } from '../../tools/snowarch/lib/doctor-cache.mjs';
 import { redact } from '../../tools/snowarch/lib/redact.mjs';
 import { doctorLine } from '../../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -434,6 +434,15 @@ test('a secret-shaped key is refused by the cache exactly as by the state file',
   const root = tempDir('c9-key-', t);
   const report = { mode: 'design', checks: [], server: { instances: [{ label: 'pdi', password: 'x' }] } };
   assert.throws(() => writeReportCache(root, report), /the key names a secret/);
+});
+
+test('ARC-09-C200 — the doctor\'s own cache carries every key U7 reads from it, modeLine included', (t) => {
+  // U7 reads `modeLine` from the cache this run's doctor wrote. COMPATIBILITY_KEYS cannot promise it: every
+  // writer must produce those keys, and the bootstrap's cache and the launchers' have no Mode line to write.
+  assert.deepEqual(REPORT_CACHE_KEYS, [...COMPATIBILITY_KEYS, 'modeLine']);
+  const root = tempDir('c200-keys-', t);
+  const { payload } = writeReportCache(root, { mode: 'design', modeLine: 'Mode: design-only', checks: [] });
+  for (const key of REPORT_CACHE_KEYS) assert.ok(key in payload, `the doctor's cache does not carry ${key}`);
 });
 
 /**

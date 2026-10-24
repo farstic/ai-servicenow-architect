@@ -40,7 +40,6 @@ import { loadState, notHereReason, recordedHere } from '../state.mjs';
 import { STEPS, outputMissingOf } from '../steps/index.mjs';
 import { checkGit, checkNode, makeExec } from '../steps/B00.mjs';
 import { nodeInfo, stepContext } from '../bootstrap.mjs';
-import { engineChecks } from '../doctor/checks/index.mjs';
 import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
@@ -108,6 +107,9 @@ function readCacheThisRun(root, { read = readFileSync, notBefore = null } = {}) 
  *
  * Returns `null` on any unreadable or shapeless cache: a caller that prints nothing is honest, and
  * one that falls back to the masked line prints `<label>` as though it were the instance's name.
+ *
+ * `modeLine` is in REPORT_CACHE_KEYS (`doctor-cache.mjs`), the keys the doctor's own cache promises
+ * (ARC-09-C200), so a rename is a change to that list rather than a Mode line that goes quiet here.
  */
 export function readCachedModeLine(root, { read = readFileSync, notBefore = null } = {}) {
   const line = readCacheThisRun(root, { read, notBefore })?.modeLine;
@@ -115,36 +117,33 @@ export function readCachedModeLine(root, { read = readFileSync, notBefore = null
 }
 
 /**
- * The non-ok checks the doctor cached for THIS MACHINE, titled, or `null` (ARC-09-C56).
+ * The checks U7 prints: the TARGET doctor's, as its report gives them, with the unmasked words this
+ * machine's cache holds for them where the two agree (ARC-09-C200).
  *
- * The cache stores `{id, status, detail, remedy?}` and DROPS `title`, so the title is resolved by
- * id from the registry that owns it. A copy of the titles kept beside the registry would be the
- * second copy of a sentence this repository keeps removing.
+ * `finish()` runs in the process that started the upgrade, so this module is the RUNNING release's,
+ * while the doctor U7 spawned is the target's. C56 read these lines from the cache and titled them
+ * from this release's registry, reasoning that an id the registry cannot name is a RETIRED check,
+ * because ids are never reused. That holds inside one release and not across this boundary: a check
+ * the target added printed untitled, and one it retitled printed this release's title. So the report
+ * decides which checks are printed, with which title and which status, and the cache's path and keys
+ * decide nothing about that.
  *
- * There IS a titled copy in the cache — `payload.report` mirrors the whole stored report — but it
- * is not in `COMPATIBILITY_KEYS`, which pins `checks` and not `report`. Reading the mirror would
- * build a user-facing line on a key nothing promises to keep.
- *
- * An id the registry cannot name is left WITHOUT a title, and `nonOkLines` is what omits it from
- * the line — the `?? null` below is a normalisation, not the fallback, and degrading it proves
- * nothing because `undefined` is as falsy as `null` at the template that reads it. `registry.mjs`
- * refuses id reuse ("ids are never reused"), so an unresolvable id can only ever mean a RETIRED
- * check — never the wrong title — and `SV-99 WARN: <detail>` is a true line where `undefined` is
- * a broken one.
+ * The cache is still read, for the one thing the report cannot give: the user's own words. `--json`
+ * is masked at its boundary, and a remedy of `./snowarch instance test <label>` fails when pasted
+ * (C56). An entry takes its `detail` and `remedy` from the cache only when the cache is this run's
+ * (the caller's binding), the cached entry has the same id and the same status, and the field is a
+ * string. Anything else keeps the report's masked text, which is vague but true, so a moved cache or
+ * a renamed key degrades to that and never to a wrong line.
  */
-export function readCachedChecks(root, { read = readFileSync, notBefore = null,
-  titles = checkTitles } = {}) {
-  const checks = readCacheThisRun(root, { read, notBefore })?.checks;
-  if (!Array.isArray(checks) || checks.length === 0) return null;
-  const byId = titles();
-  return checks.map((c) => ({ ...c, title: byId.get(c.id) ?? null }));
-}
-
-/** `id → title`, from the registry that defines them. Built once; the registry is static. */
-let TITLES = null;
-function checkTitles() {
-  if (TITLES === null) TITLES = new Map(engineChecks().map((c) => [c.id, c.title]));
-  return TITLES;
+function checksForU7(report, cache) {
+  const words = new Map((Array.isArray(cache?.checks) ? cache.checks : []).map((c) => [c?.id, c]));
+  return (Array.isArray(report?.checks) ? report.checks : []).map((check) => {
+    const own = words.get(check.id);
+    if (!own || own.status !== check.status) return check;
+    return { ...check,
+      ...(typeof own.detail === 'string' ? { detail: own.detail } : {}),
+      ...(typeof own.remedy === 'string' ? { remedy: own.remedy } : {}) };
+  });
 }
 
 /** `--check` found a newer release. A code, so a script can ask without parsing prose. */
@@ -1211,8 +1210,12 @@ export async function finish({ root, env, log, run, target, latest, remote, now,
   // answer and deliberately so: a masked LINE still names the check, its status and its remedy's
   // shape, so it degrades to vague-but-true. A masked Mode line degrades to false, because
   // `instance=<label>` reads as the instance's name. Silence costs a reader the check entirely.
-  const cachedChecks = wroteThisRun ? readCachedChecks(root, { notBefore: startedAt }) : null;
-  for (const line of doctorLines(report, cachedChecks)) log.step(line);
+  //
+  // ARC-09-C200 — WHICH checks, with which titles and statuses, is the report's to say; the cache
+  // lends only its words, entry by entry, where it agrees (`checksForU7`). The cache's path, keys and
+  // titles were the running release's idea of the target's.
+  const cache = wroteThisRun ? readCacheThisRun(root, { notBefore: startedAt }) : null;
+  for (const line of doctorLines(report, checksForU7(report, cache))) log.step(line);
 
   const cachedModeLine = wroteThisRun ? readCachedModeLine(root, { notBefore: startedAt }) : null;
   if (cachedModeLine) log.step(cachedModeLine);
