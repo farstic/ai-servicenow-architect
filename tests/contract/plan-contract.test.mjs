@@ -49,8 +49,9 @@ test('ARC-09-C195 — planSteps keeps its name, reads the options older helpers 
 
   assert.equal(typeof upgrade.planSteps, 'function', 'planSteps is no longer exported by commands/upgrade.mjs');
   const { result, read } = optionsRead(upgrade.planSteps, repo, 'v9.2.0',
-    { ctx: { root: repo, config: loadConfig(ROOT) }, state: null, manifestWritten: true });
-  for (const name of ['ctx', 'state', 'manifestWritten']) {
+    { ctx: { root: repo, config: loadConfig(ROOT) }, state: null, manifestWritten: true, keepWorktree: null });
+  // ARC-09-C241 — a helper from C241 on also passes the worktree it runs in, so that the target plans in it.
+  for (const name of ['ctx', 'state', 'manifestWritten', 'keepWorktree']) {
     assert.ok(read.has(name), `planSteps no longer reads the option ${name} (it read ${[...read].join(', ')})`);
   }
   assert.equal(typeof result.estimate, 'boolean');
