@@ -20,6 +20,14 @@ not, with a caller's `query` in front, joined with `^`; each record's `has_breac
 description says to find a breach by `has_breached`, and that where `com.snc.sla.compatibility.breach` is set to true a
 breached SLA's stage is Breached, which the list leaves out.
 
+**`instance add` offers `https://<host>` for a host typed without a scheme (ARC-09-C223).** `normalizeInstanceUrl`
+refused `acme.service-now.com` as `URL_INVALID` ("not a URL"), and a host with a port, or with credentials in front, as
+`URL_NOT_HTTPS`, because `new URL` read the text before the first `:` as a scheme. An input with no scheme that is not a
+bare word is now checked as `https://<input>` through the same checks, in their order: one that passes is a proposal in
+the bare word's shape (`proposed: true`), and one that fails gets that check's own code and sentence; nonsense is still
+`URL_INVALID`, quoted back as typed. Under `--yes`, where nobody is asked, the wizard now prints `Using <url>, proposed
+from what you entered.` for a bare word and a bare host alike.
+
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
