@@ -24,6 +24,11 @@ only the first.**
   breached or not. It selected by a stage value no row holds (PN-25), so finished and cancelled SLAs could come back,
   and it left out breached SLAs still running. Where `com.snc.sla.compatibility.breach` is set to true, a breached SLA's
   stage is Breached, and the list still leaves it out (ARC-09-C229).
+- A file the Architect wrote under `clients/` could cite a documentation path that does not exist, and nothing checked
+  it before the file reached you. A check now runs after every such write: it resolves each path the file cites, and
+  reports each dead one, with its line, to the Architect, with the instruction to correct it before presenting the file.
+  It is a hook the bootstrap writes beside the session banner's, in `.claude/settings.local.json`, when Node is present
+  (ARC-09-C231).
 
 ### Changed
 
