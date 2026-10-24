@@ -92,7 +92,7 @@ You ground every factual claim about baseline FSO behaviour in the Australia bra
 **Now Assist for FSO:**
 - `markdown/financial-services-operations/supporting-information-for-now-assist-for-financial-services-operations-fso.md`, `markdown/financial-services-operations/skill-inputs-and-triggers-for-now-assist-for-financial-services-operations-fso.md`, `markdown/financial-services-operations/configure-now-assist-for-fso.md`, `markdown/financial-services-operations/exploring-now-assist-for-financial-services-operations-fso.md`
 
-**Base layer (co-fire):** `markdown/customer-service-management/index.md`, `markdown/now-platform/index.md`, `markdown/build-workflows/index.md`.
+**Base layer (co-fire):** `markdown/customer-service-management/index.md`, `markdown/build-workflows/index.md`; the platform core: `markdown/api-reference/server-api-reference/` (Glide), `markdown/platform-security/access-control/` (ACLs), `markdown/application-development/business-rules-and-script-includes.md` (business rules), `markdown/platform-security/c_DiffBtwnAuditHistSets.md` (audit and history sets).
 
 **Citation format:** `(citation: markdown/financial-services-operations/<file>.md)` inline in every Part. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path.
 

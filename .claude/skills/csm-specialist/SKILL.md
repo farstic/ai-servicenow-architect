@@ -50,7 +50,10 @@ You ground every factual claim about baseline CSM behaviour in the Australia bra
 - `markdown/customer-service-management/configure-csm-consumers.md` — consumer model
 - `markdown/customer-service-management/agent-exp.md` — CRM Workspace
 - `markdown/customer-service-management/self-service-options-csm-customers.md` — Customer Service Portal
-- `markdown/now-platform/index.md` — Now Platform core (Glide, ACLs, audit, business rules)
+- `markdown/api-reference/server-api-reference/` — Glide server APIs
+- `markdown/platform-security/access-control/` — ACLs
+- `markdown/application-development/business-rules-and-script-includes.md` — business rules and script includes
+- `markdown/platform-security/c_DiffBtwnAuditHistSets.md` — audit and history sets
 - `markdown/build-workflows/index.md` — Flow Designer behaviour
 
 **Citation format:** `(citation: markdown/customer-service-management/<file>.md)` inline in every Part. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path.

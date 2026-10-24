@@ -53,9 +53,13 @@ You ground every factual claim about baseline ITSM behaviour in the Australia br
 **Primary publication paths:**
 - `markdown/it-service-management/index.md` — table of contents for the entire ITSM publication
 - `markdown/it-service-management/<process>.md` — per-process documentation (incident, problem, change, request fulfilment, MIM, on-call)
-- `markdown/now-platform/index.md` — Now Platform core (Glide, ACLs, audit, business rules)
+- `markdown/api-reference/server-api-reference/` — Glide server APIs
+- `markdown/platform-security/access-control/` — ACLs
+- `markdown/application-development/business-rules-and-script-includes.md` — business rules and script includes
+- `markdown/platform-security/c_DiffBtwnAuditHistSets.md` — audit and history sets
 - `markdown/build-workflows/index.md` — Flow Designer behaviour
-- `markdown/intelligent-experiences/index.md` — Now Assist for ITSM, AI Search
+- `markdown/it-service-management/now-assist-for-it-service-management-itsm/` — Now Assist for ITSM
+- `markdown/platform-administration/ai-search/` — AI Search
 
 **Citation format:** Cite paths inline in every Part of the constraint envelope where baseline behaviour is referenced. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path. Use this format:
 

@@ -37,7 +37,7 @@ ServiceNow CSM cases extend `task`, which inherits the platform's audit history 
 
 Baseline notifications fire on key state transitions but are not required for this audit-trail requirement.
 
-(citation: markdown/customer-service-management/csm-case-management.md, markdown/now-platform/index.md for audit history)
+(citation: markdown/customer-service-management/csm-case-management.md, markdown/platform-security/c_DiffBtwnAuditHistSets.md for audit history)
 
 ## Part 2 — Data Model Alignment
 
@@ -61,7 +61,7 @@ Baseline notifications fire on key state transitions but are not required for th
 
 **Baseline reference fields:** no reference qualifiers material to this requirement.
 
-(citation: markdown/now-platform/index.md, markdown/customer-service-management/csm-data-management.md)
+(citation: markdown/platform-security/c_DiffBtwnAuditHistSets.md, markdown/platform-security/c_UnderstandingTheSysAuditTable.md, markdown/customer-service-management/csm-data-management.md)
 
 ## Part 3 — §1.1 Baseline-First Verdict
 
@@ -75,7 +75,7 @@ The audit-trail requirement is fully satisfied by three baseline constructs:
 
 No custom object needed. No new table. No new field. Pure configuration: ensure `sys_dictionary.audit = true` on the fields the engagement wants to audit (typically all of: `state`, `assigned_to`, `priority`, `category`, `account`, `contact`, `consumer`, `contract`, `entitlement`).
 
-(citation: markdown/now-platform/index.md for audit history)
+(citation: markdown/platform-security/c_DiffBtwnAuditHistSets.md for audit history)
 
 ## Part 4 — Routing Recommendation
 

@@ -53,7 +53,7 @@ that separate approval.
 | HR Knowledge (scoped KB) | `markdown/servicenow-platform/knowledge-management/` + HR scope considerations |
 | Scoped HR data security | `markdown/platform-security/` (with HR-specific overlays) |
 | Notifications (HR-specific) | `markdown/servicenow-platform/notify/` |
-| Audit history (sys_history_set) | `markdown/platform-administration/table-administration-and-data-management/` |
+| Audit history (sys_history_set) | `markdown/platform-security/c_DiffBtwnAuditHistSets.md` |
 | Flow Designer for HR | `markdown/build-workflows/` (HR-specific Flow patterns) |
 
 ### Citation format
