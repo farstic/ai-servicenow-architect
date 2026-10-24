@@ -94,6 +94,29 @@ test('AC 1 — a release that moves one declared input re-runs exactly that step
   assert.match(snowarch(w.user, ['version'], { bin: w.bin }).stdout, /tag:\s+v9\.1\.0 \(exact\)/);
 }, MINUTES);
 
+test('ARC-09-C195 — a release that changes what a step depends on: the plan names the step the run re-runs',
+  async (t) => {
+    // U4 runs in the installed release's process. Here v9.1.0 adds a literal to B07's inputs, which v9.0.0's tables
+    // cannot see, so the plan left B07 out and U6 re-ran it: ARC-08-C29 across versions. U4 now asks v9.1.0's runner.
+    const w = await buildWorld(t, { b07Literal: true });
+    bootstrapUser(w.user);
+    assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.0.0');
+    const before = state(w.user);
+
+    const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+    assert.equal(r.status, 0, r.text);
+    const planned = r.text.match(/steps that will re-run: ([^\n]*)/)?.[1] ?? '';
+    assert.match(planned, /\bB07 the local toggles \(inputs changed\)/, `the plan left B07 out: ${planned}`);
+    assert.match(planned, /\bB02 the documentation corpus \(vendor\/docs-areas\.txt changed\)/, planned);
+    assert.doesNotMatch(r.text, /computed by the installed release/, 'the target was not the one that planned');
+
+    // …and the run re-ran what the plan named.
+    const after = state(w.user);
+    for (const id of ['B02', 'B07']) {
+      assert.notEqual(after.steps[id].finishedAt, before.steps[id].finishedAt, `${id} did not re-run`);
+    }
+  }, MINUTES);
+
 test('AC 2 — a release that moves the store schema migrates it, with a backup', async (t) => {
   const w = await buildWorld(t);
   bootstrapUser(w.user);
