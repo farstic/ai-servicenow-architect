@@ -251,8 +251,8 @@ test('ARC-09-C244 — a sparse checkout made full says so once, then is up to da
 // ARC-09-C244 — the switch an upgrade makes, made robust (the architect's rulings 2 to 4, 2026-10-24): the pin first,
 // an interrupted switch finished, not refused, and the whole corpus complete only with nothing left skip-worktree.
 const phasesOf = (lines) => lines.filter((l) => PHASE_LINE.test(l)).map((l) => l.replace(/ … .*$/, ''));
-/** The switch refuses, as a sync always has: local changes, exit `dirty`. */
-const refusesDirty = (w) => assert.throws(() => syncCorpus({ ...w, mode: 'full', log: silent }),
+/** A sync refuses, as it always has: local changes, exit `dirty`. */
+const refusesDirty = (w, mode = 'full') => assert.throws(() => syncCorpus({ ...w, mode, log: silent }),
   (e) => e instanceof SyncError && e.code === EXIT.dirty);
 
 test('ARC-09-C244 — the switch moves the pin first, then disables the cone', () => {
@@ -301,23 +301,42 @@ test('ARC-09-C244 — without the marker, an out-of-cone change is refused exact
   refusesDirty(w);
 });
 
-test('ARC-09-C244 — with the marker, a change inside the cone is still refused', () => {
-  const w = workspace();
-  syncCorpus({ ...w, mode: 'sparse', log: silent });
-  writeFileSync(switchMarker(corpusOf(w)), '');
-  writeFileSync(join(corpusOf(w), ...AREAS[0].split('/'), 'index.md'), 'edited by a human\n');
-  refusesDirty(w);
-});
+// The debris goes back under the marker in either mode, so either mode keeps every other refusal.
+for (const mode of ['sparse', 'full']) {
+  test(`ARC-09-C244 — with the marker, a change inside the cone is still refused (${mode})`, () => {
+    const w = workspace();
+    syncCorpus({ ...w, mode: 'sparse', log: silent });
+    writeFileSync(switchMarker(corpusOf(w)), '');
+    writeFileSync(join(corpusOf(w), ...AREAS[0].split('/'), 'index.md'), 'edited by a human\n');
+    refusesDirty(w, mode);
+  });
 
-test('ARC-09-C244 — with the marker, a new file outside the cone is still refused, and kept', () => {
+  test(`ARC-09-C244 — with the marker, a new file outside the cone is still refused, and kept (${mode})`, () => {
+    const w = workspace();
+    syncCorpus({ ...w, mode: 'sparse', log: silent });
+    writeFileSync(switchMarker(corpusOf(w)), '');
+    const dir = join(corpusOf(w), ...UNCITED.split('/'));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'my-notes.md'), 'mine\n');
+    refusesDirty(w, mode);
+    assert.equal(readFileSync(join(dir, 'my-notes.md'), 'utf8'), 'mine\n', 'the sync touched a file nobody tracks');
+  });
+}
+
+test('ARC-09-C244 — a sparse run under the marker puts the debris back, keeps the cone, then drops the marker', () => {
   const w = workspace();
   syncCorpus({ ...w, mode: 'sparse', log: silent });
   writeFileSync(switchMarker(corpusOf(w)), '');
-  const dir = join(corpusOf(w), ...UNCITED.split('/'));
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, 'my-notes.md'), 'mine\n');
-  refusesDirty(w);
-  assert.equal(readFileSync(join(dir, 'my-notes.md'), 'utf8'), 'mine\n', 'the sync touched a file nobody tracks');
+  const page = debrisOf(w);
+  const lines = [];
+  const r = syncCorpus({ ...w, mode: 'sparse', log: (l) => lines.push(l) });
+  assert.equal(r.completeness.ok, true);
+  assert.equal(existsSync(page), false, 'the debris is still on disk');
+  assert.match(git(['ls-files', '-t', '--', `${UNCITED}/index.md`], corpusOf(w)), /^S /, 'the debris is not skip-worktree');
+  for (const a of AREAS) assert.ok(existsSync(join(corpusOf(w), ...a.split('/'))), `${a} is not on disk`);
+  assert.equal(git(['config', '--get', 'core.sparseCheckout'], corpusOf(w)).trim(), 'true', 'the cone is gone');
+  assert.equal(existsSync(switchMarker(corpusOf(w))), false, 'the marker outlived the sparse run');
+  assert.ok(lines.some((l) => l.includes('the switch to the whole corpus was interrupted')), lines.join(' · '));
 });
 
 test('ARC-09-C244 — a marker left by a switch given up for sparse goes, so it cannot excuse a later edit', () => {
