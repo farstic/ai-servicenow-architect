@@ -166,7 +166,8 @@ test('AC 2 — the live block names the instance and one dialog per expected dia
     B01: { status: 'ok' },
     B08: { status: 'ok', data: { instance: { label: 'pdi', environment: 'pdi', preset: 'full' } } },
   });
-  const r = await runB09(ctxFor(root, { mode: 'live', state }));
+  // ARC-09-C235 — with a licence in force, as a live run that reaches B08 has one: without, the block says how to finish.
+  const r = await runB09(ctxFor(root, { mode: 'live', state, licence: { state: 'ok' } }));
   const lines = r.next.split('\n');
   assert.equal(lines[1], 'Mode: live — instance=pdi (pdi) preset=full');
   assert.equal(lines.filter((l) => /answer Yes\./.test(l)).length, EXPECTED_DIALOGS);
@@ -324,4 +325,51 @@ test('ARC-07-W15 — the fallback tally is not called a health check', () => {
     dialogs: EXPECTED_DIALOGS, serverKey: 'servicenow', platform: 'linux', env: {} });
   assert.match(block.split('\n')[0], /^DOCTOR: /);
   assert.doesNotMatch(block, /Health check/);
+});
+
+// ARC-09-C235 — a live run with no licence in force skipped B06 and B08, yet closed by promising that /mcp would show the
+// server connected (the server refuses without a licence, ARC-11-C6), listed five commands to "change later" when four
+// of them are refused too, and never said that the bootstrap has to run again to do what it skipped. The words are the
+// architect's; the launcher is the reader's shell's, and the server key the config's.
+const FINISH = (cli, key) => [
+  '      The instance steps were skipped: no licence in force (E-31 above). Install the licence, then',
+  `      run ${cli} bootstrap again to finish — /mcp shows ${key} ✔ connected after that.`,
+];
+
+test('ARC-09-C235 — a live run with no licence in force says how to finish, and promises nothing it cannot keep', () => {
+  for (const platform of ['linux', 'win32']) {
+    const block = summaryBlock({ mode: 'live', licenceInForce: false, counts: { ok: 3, warn: 0, fail: 1 },
+      serverKey: 'servicenow', root: '/r', platform, env: {} });
+    const lines = block.split('\n');
+    const finish = FINISH(spellings({ platform, env: {} }).cli, 'servicenow');
+    const at = lines.indexOf(finish[0]);
+    assert.ok(at > 0, `no finish line on ${platform}: ${block}`);
+    assert.deepEqual(lines.slice(at, at + 2), finish);
+    assert.doesNotMatch(block, /\/mcp should show/);
+    assert.doesNotMatch(block, /^Change later/m);
+    for (const l of finish) assert.ok(l.length <= 100, `${l.length} columns: ${l}`);
+  }
+});
+
+test('ARC-09-C235 — with a licence in force, and in design-only, the block is as it was', () => {
+  const args = { counts: { ok: 3, warn: 0, fail: 0 }, serverKey: 'servicenow', root: '/r', platform: 'linux', env: {} };
+  assert.equal(summaryBlock({ ...args, mode: 'live', licenceInForce: true }), summaryBlock({ ...args, mode: 'live' }));
+  assert.match(summaryBlock({ ...args, mode: 'live', licenceInForce: true }), /\/mcp should show: servicenow ✔ connected/);
+  assert.equal(summaryBlock({ ...args, mode: 'design-only', licenceInForce: false }),
+    summaryBlock({ ...args, mode: 'design-only' }));
+});
+
+test('ARC-09-C235 — B09 reads the licence from the run, end to end', async () => {
+  const root = makeCheckout();
+  const state = stateWith({
+    B01: { status: 'ok' },
+    B08: { status: 'ok', data: { instance: { label: 'pdi', environment: 'pdi', preset: 'full' } } },
+  });
+  const key = config(root).mcp.serverKey;
+  const missing = await runB09(ctxFor(root, { mode: 'live', state, licence: { state: 'missing' } }));
+  assert.ok(missing.next.includes(FINISH('./snowarch', key).join('\n')), missing.next);
+  assert.doesNotMatch(missing.next, /^Change later/m);
+  const ok = await runB09(ctxFor(root, { mode: 'live', state, licence: { state: 'ok' } }));
+  assert.match(ok.next, new RegExp(`/mcp should show: ${key} ✔ connected`));
+  assert.match(ok.next, /^Change later, /m);
 });
