@@ -11,7 +11,7 @@ import { run as runB01, ensureLocalDir, committedFilesUnchanged } from '../lib/s
 import { run as runB07, writeConfig, CONFIG_FILE } from '../lib/steps/B07.mjs';
 import { run as runB03 } from '../lib/steps/B03.mjs';
 import {
-  INVALID_JSON, NOT_IGNORED, SETTINGS_LOCAL, applyToggles, computeSettings, hookEntry, isIgnored,
+  INVALID_JSON, NOT_IGNORED, POST_WRITE_LOADER, SETTINGS_LOCAL, applyToggles, computeSettings, hookEntry, isIgnored,
 } from '../lib/settings-local.mjs';
 import { cloudSyncProvider, cloudSyncWarning, isUnderCloudSyncFolder } from '../lib/cloud-sync.mjs';
 import { checkMcpJson, checkSettingsJson } from '../lib/registration.mjs';
@@ -132,14 +132,16 @@ test('ARC-09-C192 — a settings.local.json carried from an older install ends w
   // Derived, not spelled: the hook's command is the same in 2.2.0 (measured at its tag), and a test that spelled the hook's
   // path would be counted among the banner tests, which may not name the version-of-record file (ARC-09-C137).
   const ours = hookEntry().SessionStart[0].hooks[0];
+  // ARC-09-C239 — 2.2.0's command is today's without the quotes around the project path.
+  const old = { ...ours, command: ours.command.replace(/"/g, '') };
   const carried = {
     permissions: { allow: ['Bash(git status:*)'] },
     env: { NODE_EXTRA_CA_CERTS: '/etc/ssl/corporate.pem' },
     disabledMcpjsonServers: [KEY],
     hooks: {
       SessionStart: [
-        { matcher: 'startup|resume', hooks: [ours] },
-        { matcher: 'startup', hooks: [{ type: 'command', command: ours.command.replace('${CLAUDE_PROJECT_DIR}', '/home/someone/snowarch-2.2.0') }] },
+        { matcher: 'startup|resume', hooks: [old] },
+        { matcher: 'startup', hooks: [{ type: 'command', command: old.command.replace('${CLAUDE_PROJECT_DIR}', '/home/someone/snowarch-2.2.0') }] },
       ],
       PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine' }] }],
     },
@@ -609,8 +611,12 @@ test('ARC-11-C7 — B01 fetches nothing on a development version, or with no lic
 
 // ARC-09-C231 — the PostToolUse citation hook, written beside SessionStart by the same writer and under the same
 // rules: only when Node can run it, ours replaced wherever it was carried from, the user's own kept.
+// ARC-09-C239 — in exec form: node runs the loader, with no shell, and the loader finds the script itself.
 const POST_WRITE = Object.freeze({ matcher: 'Write|Edit', hooks: [Object.freeze({ type: 'command',
-  command: 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/post-write.mjs', timeout: 10 })] });
+  command: 'node', args: ['-e', POST_WRITE_LOADER], timeout: 10 })] });
+// The shell form ARC-09-C231 wrote before it, as a dev or rc install has it. SessionStart's quoted command is
+// asserted in tests/hook/hook-entry.test.mjs, which spells its path; this file may not (ARC-09-C137).
+const POST_WRITE_SHELL = 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/post-write.mjs';
 
 test('ARC-09-C231 — with Node present the citation hook is written beside SessionStart, and only once', () => {
   const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
@@ -625,12 +631,20 @@ test('ARC-09-C231 — a user\'s own PostToolUse hook is kept, a carried copy of 
   const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
   const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node /home/someone/my-own-check.js' }] };
   const carried = { matcher: 'Write|Edit', hooks: [{ type: 'command',
-    command: POST_WRITE.hooks[0].command.replace('${CLAUDE_PROJECT_DIR}', '/home/someone/snowarch-2.2.4') }] };
+    command: POST_WRITE_SHELL.replace('${CLAUDE_PROJECT_DIR}', '/home/someone/snowarch-elsewhere') }] };
   const current = { hooks: { PostToolUse: [mine, carried] } };
   assert.deepEqual(computeSettings(current, { ...opts, nodePresent: true }).hooks.PostToolUse, [mine, POST_WRITE],
     'the user\'s hook was not kept, or ours is not there exactly once');
   assert.deepEqual(computeSettings(current, { ...opts, nodePresent: false }).hooks.PostToolUse, [mine],
     'with Node absent the writer kept ours, or removed the user\'s');
+});
+
+test('ARC-09-C239 — an exec-form copy of ours is recognised as ours too, and replaced, not doubled', () => {
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const copy = { matcher: 'Write|Edit', hooks: [{ type: 'command', command: 'node',
+    args: ['-e', POST_WRITE_LOADER.replace('tools/snowarch/hooks/', 'tools/snowarch/old/')], timeout: 10 }] };
+  assert.deepEqual(computeSettings({ hooks: { PostToolUse: [copy] } }, { ...opts, nodePresent: true }).hooks.PostToolUse,
+    [POST_WRITE], 'a copy of ours was kept beside ours');
 });
 
 test('ARC-09-C231 — B07\'s inputs carry the hooks it writes, so a release that changes them re-runs B07 once', () => {
