@@ -309,7 +309,8 @@ test('the real repository: four ok lines, and the object every key', () => {
   if (s.present) {
     assert.equal(s.headMatchesPin, true);
     assert.equal(s.familyMatches, true);
-    assert.equal(s.sparse, SPARSE.cone);
+    // ARC-09-C244 — the shape the mode asks for: the whole corpus by default, the cone when sparse was asked for.
+    assert.equal(s.sparse, s.mode === MODE.full ? SPARSE.full : SPARSE.cone);
     assert.deepEqual(s.areasMissing, []);
   }
 });
