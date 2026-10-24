@@ -48,8 +48,8 @@ If items 1, 2, 3, or 4 are missing, **stop and return a clarification request** 
 6. **Verify ServiceNow capability claims** by reading the local corpus under `vendor/ServiceNowDocs/markdown/` (locate the file with `Grep`) for any non-trivial baseline behaviour you depend on; if the corpus does not cover a claim, say so instead of recalling it.
 7. **Apply the document structure** per the SKILL — HLD 8 sections, LLD per-component, PDD 9 sections. Each section populated or marked "Not applicable" with rationale.
 8. **Apply the Baseline-first audit block** at the end of every document. List custom tables proposed, new scoped apps, custom state values, custom Connection Aliases, custom CMDB CI Classes — each with count and approval status. Compliance status: COMPLIANT (zero custom objects, or all pre-approved) or PENDING (one or more custom objects awaiting approval).
-9. **Identify all routing-time consults that fire** (§3.1) and restate them in the document and the §6.2 manifest.
-10. **Write the document** following all SKILL output rules: filename, header block, change log, structured sections, Baseline-first audit, downstream handoff manifest.
+9. **Identify all routing-time consults that fire** (§3.1) and restate them below the document's end marker and in the §6.2 manifest.
+10. **Write the document** following all SKILL output rules: filename, header block, change log, structured sections, `Decisions we need from you`, then the end marker `## Internal — not in the client copy` and after it the Baseline-first audit, the open decisions and the downstream handoff manifest (`governance/governance-rules.md` §4.5).
 
 ## Output contract
 
@@ -59,8 +59,9 @@ Return to the orchestrator a structured response containing:
    - Suggested file path (e.g., `clients/<client>/<programme-or-component>-{hld|lld|pdd}.md`).
    - Header block with metadata and change log.
    - Structured sections (HLD: 8; LLD: per-component; PDD: 9), each populated or marked "Not applicable" with rationale.
-   - Baseline-first audit block — non-optional.
-   - Downstream handoff manifest.
+   - `Decisions we need from you`, above the end marker.
+   - **Client copy** — when the task or the engagement state asks for one, name the command the main thread runs: `./snowarch client-copy <path>`.
+   - The end marker `## Internal — not in the client copy`; after it, the Baseline-first audit block — non-optional — the open decisions and the downstream handoff manifest.
    - **Word / PDF export** — you have no shell: write the markdown Word-ready, figures linked as `diagrams/fig-NN-<slug>.png`, never a Mermaid block, and name the commands the main thread runs — `scripts/render-drawio.sh <diagrams-dir> png`, then `python3 scripts/md-to-docx.py --src <md> --out <docx> --footer-text "<text>"` (`scripts/md-to-docx.ps1` on Windows), then `scripts/render-pdf.sh` (`scripts/render-pdf-pages.ps1` on Windows) for QA.
 2. **Coverage statement** — one sentence per document confirming which input requirements the document covers; explicit gaps called out.
 3. **Decisions made** — any non-default choices you resolved without escalating (e.g., proposed two documents instead of one hybrid; chose LLD over HLD per audience), each with rationale.

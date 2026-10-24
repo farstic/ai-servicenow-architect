@@ -86,13 +86,16 @@ Feature: <short, action-oriented feature name>
     Then <expected fallback>
     And the user receives <notification>
 
+  # Decisions we need from you
+  # 1. <decision the client must make before build, in the client's words>
+
+  # --- internal: not in the client copy ---
   # OPEN QUESTIONS
   # OQ-ST-1. <question for the product owner>
   # OQ-ST-2. ASSUMPTION: <stated assumption that needs confirmation>
-  # OQ-ST-3. <decision the client must make before build>
 ```
 
-A Feature without an `OPEN QUESTIONS` block is suspicious. If you genuinely have none, write `# OPEN QUESTIONS: None.` and justify briefly.
+A Feature without an `OPEN QUESTIONS` block is suspicious. If you genuinely have none, write `# OPEN QUESTIONS: None.` and justify briefly. Everything from the end marker on — the OPEN QUESTIONS, the proposed supporting stories, the conventions checklist — is internal (`governance/governance-rules.md` §4.5): it stays in the working file and is cut from the client copy.
 
 ## ServiceNow conventions (mandatory)
 
@@ -173,7 +176,7 @@ If you receive a raw workshop transcript, follow this two-step pattern:
 
 1. **First, list the explicit requirements** you extracted (verbatim quotes are fine here, attributed to the speaker).
 2. **Then list the inferred requirements** with explicit `INFERRED:` labels.
-3. **Then produce the Feature files**, with the open questions section pulling in every inference for client confirmation.
+3. **Then produce the Feature files**, with the open questions section below the end marker pulling in every inference to confirm, and a decision the client must make above it, under `Decisions we need from you`.
 
 If the transcript is dense and ambiguous, propose Discovery Specialist as a routing-time consult before authoring — they will produce a structured requirements list that you then convert to Gherkin (PP-04 — Transcript-to-stories chain).
 

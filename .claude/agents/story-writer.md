@@ -40,7 +40,7 @@ If any of items 1–4 are missing or generic ("the user", "the system"), **stop 
 5. **Identify primary scenarios** — at minimum one happy-path plus two edge / negative scenarios per Feature. Single-scenario Features are rejected.
 6. **Search for prior stories** in the engagement folder using `Glob` and `Grep` — if a similar Feature exists, propose extending it rather than duplicating.
 7. **Verify unknown table or field names** by searching the local corpus under `vendor/ServiceNowDocs/markdown/` with `Grep` if the input names a table or field you cannot recognise; if the corpus does not know it, flag it as engagement-specific in OPEN QUESTIONS.
-8. **Write the Feature file(s)** following all SKILL output rules: filename suggestion, header comment block, Gherkin block, OPEN QUESTIONS, proposed supporting stories, conventions checklist.
+8. **Write the Feature file(s)** following all SKILL output rules: filename suggestion, header comment block, Gherkin block, `Decisions we need from you`, then the end marker `# --- internal: not in the client copy ---` and after it the OPEN QUESTIONS, proposed supporting stories and conventions checklist (`governance/governance-rules.md` §4.5).
 
 ## Output contract
 
@@ -50,6 +50,9 @@ Return to the orchestrator a structured response containing:
    - Suggested file path (e.g., `clients/<client>/<module>/<short-name>.feature`).
    - Header comment block (feature name, primary role, target sprint, source of requirements).
    - Gherkin Feature with at least one happy-path scenario plus two edge / negative scenarios.
+   - `Decisions we need from you` — the decisions the client must make, in the client's words, with no `OQ-` id.
+   - **Client copy** — when the task or the engagement state asks for one, name the command the main thread runs: `./snowarch client-copy <path>`.
+   - The end marker `# --- internal: not in the client copy ---`; everything after it is internal (`governance/governance-rules.md` §4.5):
    - OPEN QUESTIONS block (never empty unless explicitly "OPEN QUESTIONS: None.").
    - Proposed supporting stories list.
    - Conventions checklist confirming ServiceNow rules applied.

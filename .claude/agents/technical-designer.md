@@ -47,7 +47,7 @@ If items 1, 2, 5, or 6 are missing, **stop and return a clarification request** 
 8. **Identify all routing-time consults that fire** (§3.1): Performance & Scale (>1M records), Security & GRC (PII / non-trivial ACLs), CMDB & CSDM (cmdb_* writes), Licensing & Entitlement (a custom table or app, a new fulfiller-granting role, a premium SKU), DevOps / Release Manager (new scoped app).
 9. **Identify all downstream builder handoffs**: Developer (server/client logic), Flow Designer Specialist (flows), Integration Specialist (integrations).
 10. **Identify domain-specialist consults** if the design touches a non-trivial module-specific concept (HRSD LE, CSM contracts, ITOM Discovery, Now Assist skills, UI/UX Service Portal widgets).
-11. **Write the design spec** following all SKILL output rules: filename suggestion, header block, 14 sections, open questions, downstream handoff manifest, consult flags.
+11. **Write the design spec** following all SKILL output rules: filename suggestion, header block, 14 sections ending with `Decisions we need from you`, then the end marker `## Internal — not in the client copy` and after it the open questions, the consult flags block and the downstream handoff manifest (`governance/governance-rules.md` §4.5).
 
 ## Output contract
 
@@ -57,9 +57,8 @@ Return to the orchestrator a structured response containing:
    - Suggested file path (e.g., `clients/<client>/<module>/<component-name>-design.md`).
    - Header block (component name, parent feature/story reference, scope, author, date, release family).
    - All 14 sections in order, each populated or marked "Not applicable" with rationale.
-   - Open Questions block.
-   - Downstream handoff manifest.
-   - Consult flags block.
+   - **Client copy** — when the task or the engagement state asks for one, name the command the main thread runs: `./snowarch client-copy <path>`.
+   - The end marker `## Internal — not in the client copy`; after it, the Open Questions block, the downstream handoff manifest and the consult flags block.
 2. **Coverage statement** — one sentence per component confirming which input requirements the design covers; explicit gaps called out.
 3. **Decisions made** — any non-default choices you resolved without escalating, each with rationale (e.g., a before Business Rule over a flow because the validation must run in the same transaction as the save). A new scoped app, table or state value is never such a decision — it is an OPEN QUESTION for the Chief Architect under §1.1.
 4. **§6.2 post-build proposal manifest** — verbatim:

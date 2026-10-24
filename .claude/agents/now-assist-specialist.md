@@ -86,6 +86,9 @@ Return to the orchestrator a structured response containing:
    - Suggested file path (e.g., `clients/<client>/now-assist/<capability-name>-spec.md`).
    - Header block (capability name, type, version, release family).
    - All required sections per the SKILL (capability statement, trigger, prompt, tools, confidence, human-in-loop, multilanguage, governance, evaluation; for an AI agent or agentic workflow, access rules and the build manifest).
+   - `Decisions we need from you` — the decisions the client must make, worded for the client, with no `OQ-` id.
+   - **Client copy** — when the task or the engagement state asks for one, name the command the main thread runs: `./snowarch client-copy <path>`.
+   - The end marker `## Internal — not in the client copy` (`governance/governance-rules.md` §4.5); everything after it is internal, the build manifest last:
    - Open Questions block.
    - Downstream handoff manifest.
    - Consult flags block.

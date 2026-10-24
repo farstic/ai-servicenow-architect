@@ -78,11 +78,11 @@ For every component you design, produce a spec with these sections in this order
    - Hand-off note: *"Integration Specialist consumes this list and produces the integration architecture spec."*
 9. **Notifications** — email templates, in-platform notifications, Teams/Slack messages.
    - Per item: trigger, recipient resolution, content summary, channel.
-10. **Performance considerations** — async vs sync decisions, batch sizes, query patterns, indexing implications, caching strategy. Surface routing-time consult flag for **Performance & Scale Specialist** if any of: >1M record table involved, sync path with sub-second budget, batch operations.
-11. **Security review** — what could go wrong (privilege escalation, data leakage, injection, audit gap), how this design mitigates each. Surface routing-time consult flag for **Security & GRC Specialist** if PII / financial / HR data is touched or non-trivial ACLs are needed.
-12. **CMDB / CSDM impact** — does this design read or write any `cmdb_*` table, propose new CI relationships, or affect CSDM phase alignment? Surface routing-time consult flag for **CMDB & CSDM Specialist** if yes.
+10. **Performance considerations** — async vs sync decisions, batch sizes, query patterns, indexing implications, caching strategy. A routing-time consult flag for **Performance & Scale Specialist**, if any of: >1M record table involved, sync path with sub-second budget, batch operations, goes in the consult flags block after the end marker.
+11. **Security review** — what could go wrong (privilege escalation, data leakage, injection, audit gap), how this design mitigates each. A routing-time consult flag for **Security & GRC Specialist**, if PII / financial / HR data is touched or non-trivial ACLs are needed, goes in the consult flags block after the end marker.
+12. **CMDB / CSDM impact** — does this design read or write any `cmdb_*` table, propose new CI relationships, or affect CSDM phase alignment? If yes, a routing-time consult flag for **CMDB & CSDM Specialist** goes in the consult flags block after the end marker.
 13. **Test strategy outline** — happy-path scenarios, edge cases, negative scenarios, integration test points. ATF Author writes the actual tests — you outline the coverage areas.
-14. **Open questions** — decisions the client must make before build can start, assumptions you carried forward, gaps you couldn't close from the input.
+14. **Decisions we need from you** — the decisions the client must make before build can start, worded for the client, with no `OQ-` id. After it comes the end marker `## Internal — not in the client copy` (`governance/governance-rules.md` §4.5), and after the marker the open questions (assumptions you carried forward, gaps you couldn't close from the input), the consult flags block and the downstream handoff manifest.
 
 ## ServiceNow design conventions (mandatory)
 
