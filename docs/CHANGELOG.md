@@ -68,6 +68,12 @@ seconds on the CI machines.**
   recognized": Windows PowerShell 5.1 read the recipe file it loads as the ANSI code page, because the file had no
   byte-order mark, and misread it. The file has one now, so the whole corpus, the default from this release, installs
   there too (ARC-09-C244).
+- The HR Service Delivery gateway gave `sn_hr_core.basic` as the role employees receive for the Employee Center, and as
+  read access to HR cases filtered by the case's subject or HR group. It is the HR agent role, and it contains write
+  access to all HR cases, so a design that followed the old text would have given every employee agent access. The
+  gateway now names the employee client roles (`sn_hr_core.hrsm_*`), the client role assignment rules that grant them,
+  and the COE security policies that limit which groups can read or write the HR cases under a COE after creation.
+  The Technical Designer's worked example no longer gives employees the agent role in its ACL matrix (ARC-09-C250).
 
 ### Changed
 
@@ -84,6 +90,9 @@ seconds on the CI machines.**
   disk; the move took 7 to 14 seconds on the CI machines (macOS, Linux and Windows), and a move that is interrupted is
   finished by the next run. `--docs sparse` keeps only the cited areas, for CI; the doctor then warns that the Architect
   cannot read the others (ARC-09-C244).
+- `--docs sparse` holds 24 areas instead of 20: acct-lifecycle-events, customer-relationship-management,
+  delta-xanadu-australia, healthcare-life-sciences and release-notes, which the skills now cite, join it, and
+  now-platform, which none cites, leaves it (ARC-09-C250).
 
 ### Added
 

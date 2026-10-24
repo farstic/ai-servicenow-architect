@@ -43,7 +43,7 @@ This request touches three core baseline ITSM processes: incident lifecycle, on-
 
 ### Baseline notifications
 
-- Baseline ServiceNow notification records on `incident` include "Incident Opened", "Incident Commented", "Incident Resolved" and "Incident Closed" *(citation: `markdown/platform-administration/r_BaselineEmailNotifications.md`)*; a major incident notification's name is not documented in the bundled corpus — verify on the instance. The escalation notification in this request is **not** in the baseline set — but the mechanism (a notification record with a condition and a `Send to` resolution script) is baseline.
+- Baseline ServiceNow notification records on `incident` include "Incident Opened", "Incident Commented", "Incident Resolved" and "Incident Closed" *(citation: `markdown/platform-administration/r_BaselineEmailNotifications.md`)*; for major incidents, the corpus names notifications on other channels — the Slack notification "Major Incident Candidate assigned" *(citation: `markdown/it-service-management/incident-management/slack-notification-installed-with-MIM.md`)* and the ITSM Mobile Agent notification "Major Incident Promotion Notification" *(citation: `markdown/it-service-management/itsm-mobile-agent/configure-critical-notification.md`)* — but a major incident email notification's name is not documented in the bundled corpus — verify on the instance. The escalation notification in this request is **not** in the baseline set — but the mechanism (a notification record with a condition and a `Send to` resolution script) is baseline.
 - *(citation: `markdown/platform-administration/c_EmailNotifications.md`)*
 
 ## Part 2 — Data Model Alignment

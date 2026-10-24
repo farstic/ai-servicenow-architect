@@ -5,6 +5,11 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**The corpus map ships with every release (ARC-09-C250).** `vendor/docs-map.md` joins the release coverage beside
+`vendor/docs-areas.txt`, so a distribution carries it and its signed manifest covers it. The map is made from the whole
+corpus at the pin: an install that is sparse by choice still reads every area's row, and the session banner's
+`Docs on disk:` line sets those rows against the areas the install has.
+
 **`snow_core_capabilities_read` keeps the instance a session switched to (ARC-09-C245).** It reloads the store before
 it answers (ARC-07-C3), and the reload put the session on the store's default instance: after `snow_core_instance_switch`,
 the read that comes before every write moved the session back with nothing said, and the next call went to the default.
