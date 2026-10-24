@@ -23,7 +23,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { currentCapabilities } from '../../src/tools/status.js';
+import { currentCapabilities, reloadInstances } from '../../src/tools/status.js';
 import { instanceManager } from '../../src/servicenow/instances.js';
 import { ERROR_CODES } from '../../src/errors/codes.js';
 import { trackTempDir } from '../helpers/server-child.js';
@@ -113,6 +113,70 @@ describe('ARC-07-C3 — capabilities_read reports the store as it is now', () =>
     const caps = currentCapabilities() as { mode?: string; instance?: unknown };
     expect(caps.mode).toBe('unconfigured');
     expect(caps.instance).toBeNull();
+  });
+});
+
+/**
+ * ARC-09-C245 — the pre-flight read moved the session back to the default instance.
+ *
+ * `currentCapabilities()` reloads the store (ARC-07-C3 above), and `reload()` is `load()`, which puts the session on
+ * the store's default. `reloadInstances()` restored the label the session was on; this read did not. So after
+ * `snow_core_instance_switch` to x, the §2.0 pre-flight read that comes before every write put the session back on
+ * the default instance with nothing said, and the write went there.
+ */
+describe('ARC-09-C245 — the capabilities read keeps the instance the session switched to', () => {
+  const entry = (url: string, environment = 'pdi') => ({
+    url, environment,
+    auth: { method: 'basic', username: 'someone', password: 'unused-by-this-test' },
+    preset: 'pdi-developer', toolPackage: 'full', maxRecords: 100, prodWriteAck: false,
+  });
+  const writeInstances = (instances: Record<string, unknown>) => {
+    writeFileSync(join(home, '.local', 'instances.json'),
+      `${JSON.stringify({ version: 1, defaultInstance: 'pdi', instances }, null, 2)}\n`);
+    chmodSync(join(home, '.local', 'instances.json'), 0o600);
+  };
+  const BOTH = { pdi: entry('https://fixture.example'), x: entry('https://x.fixture.example') };
+
+  beforeEach(() => {
+    writeInstances(BOTH);
+    instanceManager.reload();
+  });
+
+  it('stays on the instance the session switched to', () => {
+    instanceManager.switch('x');
+    const caps = currentCapabilities() as { instance?: string; instanceChanged?: unknown };
+    expect(caps.instance).toBe('x');
+    expect(caps.instanceChanged).toBeUndefined();
+  });
+
+  it('says so, with the reason, when that instance no longer loads', () => {
+    instanceManager.switch('x');
+    writeInstances({ pdi: BOTH.pdi });
+    const gone = currentCapabilities() as { instance?: string; instanceChanged?: unknown };
+    expect(gone.instance).toBe('pdi');
+    expect(gone.instanceChanged).toEqual({ from: 'x', to: 'pdi', reason: 'no longer in the store' });
+
+    // Refused rather than removed: a production entry with write flags and no acknowledgement. The loader's own
+    // code and message are the reason, so the session can act on the difference.
+    writeInstances(BOTH);
+    instanceManager.reload();
+    instanceManager.switch('x');
+    writeInstances({ pdi: BOTH.pdi, x: entry('https://x.fixture.example', 'prod') });
+    const refused = currentCapabilities() as { instance?: string; instanceChanged?: { from: string; to: string; reason: string } };
+    expect(refused.instance).toBe('pdi');
+    expect(refused.instanceChanged?.from).toBe('x');
+    expect(refused.instanceChanged?.to).toBe('pdi');
+    expect(refused.instanceChanged?.reason).toMatch(/^[A-Z_]+: /);
+  });
+
+  it('reloadInstances keeps it too, and says the same when it no longer loads', () => {
+    instanceManager.switch('x');
+    expect((reloadInstances() as { instanceChanged?: unknown }).instanceChanged).toBeUndefined();
+    expect(instanceManager.getCurrentName()).toBe('x');
+
+    writeInstances({ pdi: BOTH.pdi });
+    expect((reloadInstances() as { instanceChanged?: unknown }).instanceChanged)
+      .toEqual({ from: 'x', to: 'pdi', reason: 'no longer in the store' });
   });
 });
 
