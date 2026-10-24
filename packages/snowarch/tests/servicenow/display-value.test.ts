@@ -184,15 +184,17 @@ describe('ARC-09-C205 — the schema: both tools declare display_value, with the
         type: 'string',
         enum: ['false', 'all'],
         // ARC-09-C225: the rendering is the owner's rule of 2026-10-23, its wording measured before and after.
+        // ARC-09-C249: the owner's DST amendment of 2026-10-24: once per distinct offset. A list that spans a change,
+        // such as EU 2026-10-25, has two offsets, and "noted once" was an hour off for half of it.
         description: 'For a list a person will read, pass display_value: \'all\' with `fields`: each field then carries '
           + 'its stored value and its label. A choice whose label hides its code (negative codes too) shows as '
           + '\'Label (value)\' ("Resolved (6)"); '
           + 'a label that already carries the value ("3 - Moderate"), or differs from it only by case ("Normal"), '
           + 'shows once; a reference shows by name, its sys_id only on request; a date shows as its label, with its '
-          + 'difference from UTC noted once, not beside each date. A date\'s label is in the format and time zone of '
-          + 'the ServiceNow user the server signs in as; its stored value is UTC. Use only the stored value in any '
-          + 'query, filter, encoded query or write, never the label. Default \'false\' returns stored values only, as '
-          + 'before; \'true\' is refused.',
+          + 'difference from UTC noted once per distinct offset, not beside each date. A date\'s label is in the format '
+          + 'and time zone of the ServiceNow user the server signs in as; its stored value is UTC. Use only the stored '
+          + 'value in any query, filter, encoded query or write, never the label. Default \'false\' returns stored '
+          + 'values only, as before; \'true\' is refused.',
       });
     }
   });
