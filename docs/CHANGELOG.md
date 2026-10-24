@@ -57,6 +57,10 @@ seconds on the CI machines.**
   a new server, which is on the default instance; the Architect is instructed to name the instance from that read in
   its write-approval question (`About to … on instance "<label>"`), so check that name before you approve
   (ARC-09-C245).
+- On Windows without Node, `bootstrap.cmd --docs full` stopped at B02 with "The term 'Invoke-DocsRecipeFull' is not
+  recognized": Windows PowerShell 5.1 read the recipe file it loads as the ANSI code page, because the file had no
+  byte-order mark, and misread it. The file has one now, so the whole corpus, the default from this release, installs
+  there too (ARC-09-C244).
 
 ### Changed
 
