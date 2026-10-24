@@ -15,6 +15,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { redact } from './redact.mjs';
 import { byValueEntries, ENV_WORDS, maskByValue, stemOf, storeHostValues } from './mask-values.mjs';
+import { FINDING_PATH } from './finding-path.mjs';
 
 const ENGINE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -178,7 +179,7 @@ const refuse = (why) => ({ ok: false,
 export function resolveFindingPath(root, arg) {
   const rel = String(arg ?? '').replace(/\\/g, '/').replace(/^\.\//, '');
   if (rel.split('/').includes('..')) return refuse(`"${rel}" contains ".."`);
-  const m = /^clients\/([^/]+)\/findings\/([^/]+)$/.exec(rel);
+  const m = FINDING_PATH.exec(rel);
   if (!m) return refuse(`"${rel}" is not under clients/<engagement>/findings/`);
   const [, engagement, name] = m;
   if (engagement === '_unfiled') return refuse('`_unfiled` holds design artefacts only, never a finding');

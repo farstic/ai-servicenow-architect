@@ -23,23 +23,37 @@ export const NOT_IGNORED =
   '.claude/settings.local.json is not gitignored — add it to .gitignore (it must stay untracked '
   + 'so Claude Code applies its approvals)';
 
+/**
+ * ARC-09-C239 — the citation hook's loader, run by `node -e` in exec form. It reads the project path inside Node, so no
+ * shell has to quote it, and it is a no-op when the script is not there, as after a move to a release that has no such
+ * script: that release does not know this entry, so only the entry itself can be the remedy. One mechanism covers that
+ * and every other failure of its own: an import that rejects, a script absent, half-written or broken, exits 0 with
+ * nothing printed, post-write.mjs's first promise. `process.argv[1]` is set to the script, so its isMain guard holds.
+ */
+export const POST_WRITE_LOADER = "try{const f=require('path').join(process.env.CLAUDE_PROJECT_DIR||'',"
+  + "'tools/snowarch/hooks/post-write.mjs');process.argv[1]=f;"
+  + "import(require('url').pathToFileURL(f).href).catch(()=>{process.exitCode=0})}catch{}";
+
 /** Our hooks, S-05 variant B: they live in the LOCAL file, and only when Node can run them. */
 export const hookEntry = () => ({
   SessionStart: [{
     matcher: 'startup|resume',
     hooks: [{
       type: 'command',
-      command: 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs',
+      // ARC-09-C239 — the project path in double quotes, so a checkout path with a space runs the banner too. Shell
+      // form still: an older release's writer reads `command` alone, and must keep recognising this entry as ours.
+      command: 'node "${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs"',
       timeout: 10,
     }],
   }],
   // ARC-09-C231 — the citation check: a file written under clients/ has its citations resolved, and a dead path goes
-  // back to the model before the file is presented.
+  // back to the model before the file is presented. ARC-09-C239 — in exec form, the loader above: no shell at all.
   PostToolUse: [{
     matcher: 'Write|Edit',
     hooks: [{
       type: 'command',
-      command: 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/post-write.mjs',
+      command: 'node',
+      args: ['-e', POST_WRITE_LOADER],
       timeout: 10,
     }],
   }],
@@ -55,9 +69,13 @@ export const hookEntry = () => ({
 const OUR_SESSION_START = /(?:^|[\s"'/\\])tools[/\\]snowarch[/\\](?:[^\s"']*[/\\])?session-start\.mjs(?:$|[\s"'])/;
 export const isOurSessionStartHook = (hook) => OUR_SESSION_START.test(String(hook?.command ?? ''));
 
-/** ARC-09-C231 — which PostToolUse hook is ours, by the same rule: one that runs a `post-write.mjs` of our tree. */
+/**
+ * ARC-09-C231 — which PostToolUse hook is ours, by the same rule: one that runs a `post-write.mjs` of our tree.
+ * ARC-09-C239 — read across `command` and `args`, because the exec-form loader names the script in its argument.
+ */
 const OUR_POST_WRITE = /(?:^|[\s"'/\\])tools[/\\]snowarch[/\\](?:[^\s"']*[/\\])?post-write\.mjs(?:$|[\s"'])/;
-export const isOurPostWriteHook = (hook) => OUR_POST_WRITE.test(String(hook?.command ?? ''));
+export const isOurPostWriteHook = (hook) => OUR_POST_WRITE.test(
+  [hook?.command, ...(Array.isArray(hook?.args) ? hook.args : [])].map((part) => String(part ?? '')).join(' '));
 
 /** Which hook of each event is ours. */
 const OURS = Object.freeze({ SessionStart: isOurSessionStartHook, PostToolUse: isOurPostWriteHook });
