@@ -41,7 +41,7 @@ export const inputs = INPUTS.B00.resolve;
 
 /** Disk. Not a configured floor — it is what this repository costs, and the numbers are its own. */
 const GIB = 1024 ** 3;
-export const DISK_SPARSE = 1 * GIB;      // the floor: a sparse corpus ≈ 345 MB + deps ≈ 72 MB + headroom
+export const DISK_SPARSE = 1 * GIB;      // the floor: a sparse corpus ≈ 372 MB + deps ≈ 72 MB + headroom
 export const DISK_FULL = 1.5 * GIB;      // a fresh whole corpus ≈ 495 MB on disk (ARC-09-C244) + deps + headroom
 
 const mb = (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`;
@@ -179,8 +179,9 @@ export function checkDisk({ root, docs, plat, statfs = statfsSync,
   // `MODE.full` rather than the word: it is ARC-03's vocabulary for a checkout shape, and it is
   // also spelled like a preset the contract owns, so a quoted copy here is the wrong kind of name.
   // ARC-09-C244 — a FRESH whole corpus needs DISK_FULL. An install that already holds a corpus keeps the floor every
-  // run has asked for: what a sparse corpus lacks (151 MB on disk, measured) fits in that floor's headroom, and the
-  // move to the whole corpus must not stop an upgrade that would otherwise pass.
+  // run has asked for: what a sparse corpus lacks (151 MB on disk, measured; a 24-area set made from 2.2.5 lacks
+  // 121 MB, docs-real run 40131491002) fits in that floor's headroom, and the move to the whole corpus must not stop
+  // an upgrade that would otherwise pass.
   const need = docs === MODE.full && !hasCorpus ? DISK_FULL : DISK_SPARSE;
   let free;
   try {

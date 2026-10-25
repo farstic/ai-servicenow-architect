@@ -50,7 +50,10 @@ You ground every factual claim about baseline CSM behaviour in the Australia bra
 - `markdown/customer-service-management/configure-csm-consumers.md` — consumer model
 - `markdown/customer-service-management/agent-exp.md` — CRM Workspace
 - `markdown/customer-service-management/self-service-options-csm-customers.md` — Customer Service Portal
-- `markdown/now-platform/index.md` — Now Platform core (Glide, ACLs, audit, business rules)
+- `markdown/api-reference/server-api-reference/` — Glide server APIs
+- `markdown/platform-security/access-control/` — ACLs
+- `markdown/application-development/business-rules-and-script-includes.md` — business rules and script includes
+- `markdown/platform-security/c_DiffBtwnAuditHistSets.md` — audit and history sets
 - `markdown/build-workflows/index.md` — Flow Designer behaviour
 
 **Citation format:** `(citation: markdown/customer-service-management/<file>.md)` inline in every Part. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path.
@@ -67,9 +70,9 @@ A request that NAMES a custom object can never be Verdict A, however well baseli
 A is what lets a builder be dispatched, and a named custom object must not reach a builder without
 that separate approval.
 
-**Grep the corpus with escaped underscores.** The published markdown escapes them, so a table name
+**Grep the corpus escape-safe.** The published markdown escapes them, so a table name
 is written `sn\_customerservice\_escalation` and a plain `grep sn_customerservice_escalation` over
-`vendor/ServiceNowDocs/` returns **nothing at all**. Search for `sn\_customerservice\_escalation`
+`vendor/ServiceNowDocs/` returns **nothing at all**. Search for `sn\\?_customerservice\\?_escalation`
 (or drop the middle of the name and match `escalation`) before concluding a table is absent. This is
 not a footnote: this skill asserted for five paragraphs that the escalation tables were unavailable
 in Australia, and the only evidence for it was a search that could not have found them.
@@ -196,11 +199,11 @@ For each table:
 | Resolved | 6 | Closed (auto), Open (reopen) | sn_customerservice_agent |
 | Closed | 3 | (terminal) | sn_customerservice_manager |
 
-*(citation: `markdown/api-reference/rest-apis/case-api.md` — the five values its `state` field lists. Any further state, such as a cancelled or awaiting-problem state, is not documented in the bundled corpus — verify on the instance.)*
+*(citation: `markdown/api-reference/rest-apis/case-api.md` — the five values its `state` field lists.)* The Case form reference lists a sixth customer service case state, Canceled, without its integer value *(citation: `markdown/customer-service-management/r_CustomerServiceCaseForm.md`)*. With the Case lines and workflows application, a case for an item with multiple lines, such as an order, is created in a Draft state, moves to New when it is submitted and from New to Work in Progress when an agent selects **Assign to me**, and agents can cancel it only in the Draft state *(citation: `markdown/customer-service-management/csm-case-lines-states.md`)*. Any further state of the base case, such as an awaiting-problem state, is not documented in the bundled corpus — verify on the instance.
 
 **Related tables:** `task_sla`, `sn_customerservice_task`, `sys_journal_field`, `sys_history_set`, `sn_shn_notes`.
 
-**Baseline notifications:** the case notifications a customer can switch on or off from the business portal — "Case opened for customer", "Case commented for customer", "Case resolved for customer", "Case closed for customer", "Case escalated for customer" and "Case assigned to a new group" *(citation: `markdown/customer-service-management/c_Business-portal-NotifPref.md`)*. A notification on assignment to an agent, on reopening, or while a case awaits the customer's information is not documented in the bundled corpus — verify on the instance.
+**Baseline notifications:** the case notifications a customer can switch on or off from the business portal — "Case opened for customer", "Case commented for customer", "Case resolved for customer", "Case closed for customer", "Case escalated for customer" and "Case assigned to a new group" *(citation: `markdown/customer-service-management/c_Business-portal-NotifPref.md`)*. When someone else assigns a case to an agent, the Customer Service mobile application notifies that agent *(citation: `markdown/customer-service-management/customer-service-mobile-overview.md`)*, and the Business Portal lists the notifications sent for cases awaiting information *(citation: `markdown/customer-service-management/use-the-business-portal.md`)*. A notification on reopening is not documented in the bundled corpus — verify on the instance.
 
 **Role gates:** `sn_customerservice_agent` for write; `sn_customerservice_manager` for terminal-state transitions; `sn_customerservice.partner` for partner-managed cases.
 
@@ -230,7 +233,7 @@ The CSM customer model has three core tables:
 
 1. The fields considered: Account, Consumer, Product, Asset, Contract and Case Channel (plus Sold Product and Install Base when Proactive Customer Service Operations is active).
 2. Each carries a relative weight — Account/Consumer 1, Product 2, Asset 3, Contract 4 — and the entitlement with the highest score is assigned to the case.
-3. SLA: the case's SLAs come from SLA Definitions [`contract_sla`], which carry their own conditions, duration and schedule *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*; whether a matched entitlement selects one is not documented in the bundled corpus — verify on the instance.
+3. SLA: the case's SLAs come from SLA Definitions [`contract_sla`], which carry their own conditions, duration and schedule *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*. An SLA can be attached to a service contract, a company or a product, and is associated to a case when the case is created or updated, by the conditions set in its definition *(citation: `markdown/customer-service-management/t_DefineSLAForCustServiceCase.md`)*. A CRM overview page states that entitlements derived from the product and contract data determine the SLA applied to the case automatically *(citation: `markdown/customer-relationship-management/crm-product-data.md`)*; how a matched entitlement selects an SLA definition is not documented in the bundled corpus — verify on the instance.
 
 **§1.1 hot spot:** custom entitlement-evaluation logic is the most common §1.1 violation in CSM. Custom entitlement logic named in the request is Verdict C; a custom path is rarely the only viable one, so the halt's OPEN QUESTION proposes the baseline calculation.
 
@@ -287,7 +290,7 @@ After Technical Designer returns a spec for a CSM-tagged design, you are re-disp
 
 1. **Process-map alignment.** Does the spec respect Part 1 of your envelope? Baseline state transitions preserved? Baseline notification timing preserved? Baseline role gates preserved?
 
-2. **Data-model alignment.** Does the spec use the baseline tables and fields named in Part 2? Does it propose new fields where baseline fields cover the need? Does it reference tables that exist in this release family — checked against the corpus with escaped underscores, never from memory?
+2. **Data-model alignment.** Does the spec use the baseline tables and fields named in Part 2? Does it propose new fields where baseline fields cover the need? Does it reference tables that exist in this release family — checked against the corpus with each underscore written `\\?_`, never from memory?
 
 3. **§1.1 verdict alignment.** Does the spec respect Part 3?
    - Verdict A: any custom object in spec = §1.1 violation.

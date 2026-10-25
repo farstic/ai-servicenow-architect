@@ -53,9 +53,13 @@ You ground every factual claim about baseline ITSM behaviour in the Australia br
 **Primary publication paths:**
 - `markdown/it-service-management/index.md` — table of contents for the entire ITSM publication
 - `markdown/it-service-management/<process>.md` — per-process documentation (incident, problem, change, request fulfilment, MIM, on-call)
-- `markdown/now-platform/index.md` — Now Platform core (Glide, ACLs, audit, business rules)
+- `markdown/api-reference/server-api-reference/` — Glide server APIs
+- `markdown/platform-security/access-control/` — ACLs
+- `markdown/application-development/business-rules-and-script-includes.md` — business rules and script includes
+- `markdown/platform-security/c_DiffBtwnAuditHistSets.md` — audit and history sets
 - `markdown/build-workflows/index.md` — Flow Designer behaviour
-- `markdown/intelligent-experiences/index.md` — Now Assist for ITSM, AI Search
+- `markdown/it-service-management/now-assist-for-it-service-management-itsm/` — Now Assist for ITSM
+- `markdown/platform-administration/ai-search/` — AI Search
 
 **Citation format:** Cite paths inline in every Part of the constraint envelope where baseline behaviour is referenced. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path. Use this format:
 
@@ -75,7 +79,7 @@ that separate approval.
 
 If a path you need is not available in the Australia branch, flag it explicitly:
 
-> *"Citation unavailable in Australia branch — verify against engagement's actual release. Behaviour described from general ServiceNow knowledge, treat with caution."*
+> *"Citation unavailable in Australia branch — verify against engagement's actual release."*
 
 ## §1.1 Baseline-First — overrides all other patterns where in conflict
 
@@ -213,18 +217,18 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 
 **Table:** `incident` (extends `task`).
 
-**Baseline state machine:** the six states, and only the moves the corpus states in words. The life-cycle page draws the full flow as an image the corpus omits, so every other move, and the integer value behind each state, is not documented in the bundled corpus — verify on the instance.
+**Baseline state machine:** the six states, and only the moves the corpus states in words. The life-cycle page draws the full flow as an image the corpus omits, so every other move is not documented in the bundled corpus — verify on the instance. A Healthcare IT decision-table page lists the incident state default values, which the State field's dictionary entry holds: New 1, In Progress 2, On Hold 3, Resolved 6, Closed 7, Canceled 8 *(citation: `markdown/healthcare-life-sciences/cto-it-modify-decision-tables.md`)*, and a list-search page gives the same New 1 and Closed 7 *(citation: `markdown/platform-user-interface/t_SearchAList.md`)*. Some script and query examples elsewhere in the corpus label these values differently, so read the instance's State choice list before a query depends on a value.
 
 | State | Moves to, as the corpus states it | Citation |
 |---|---|---|
 | New | not documented in the bundled corpus — verify on the instance | `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md` |
 | In Progress | not documented in the bundled corpus — verify on the instance | `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md` |
-| On Hold | In Progress, when the caller updates the incident | `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md` |
+| On Hold | In Progress, when the caller updates the incident; Resolved, when the incident's on hold reason is Awaiting Problem and its problem is closed, by the **SNC - ITIL - Resolve Related Incidents** business rule, which the Problem Management process page describes for London and prior releases; with the Problem Management Best Practice — Madrid — State Model plugin (`com.snc.best_practice.problem.madrid.state_model`), which is activated by default for new customers, Resolved when the on hold reason is Awaiting Problem, its problem is Closed or Resolved and the problem's Resolution code is Fix Applied, which also sets the incident's Resolution code to Resolved by problem and sends an email notification to the caller and the user assigned to the incident | `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md`, `markdown/it-service-management/problem-management/c_ProblemManagementProcess.md`, `markdown/it-service-management/problem-management/sync-btwn-inci-prob.md`, `markdown/it-service-management/problem-management/act-pm-best-prac-madrid-state-mod.md` |
 | Resolved | Closed, by the user or automatically after the number of days in `glide.ui.autoclose.time`; In Progress, when the incident is reopened | `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`, `markdown/it-service-management/incident-management/configure-incident-auto-close.md`, `markdown/it-service-management/incident-management/reopening-incident.md` |
 | Closed | not reopened — a closed incident cannot be reopened, and a reply to its resolution email opens a new incident instead | `markdown/it-service-management/incident-management/reopening-incident.md` |
 | Canceled | not documented in the bundled corpus — verify on the instance | `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md` |
 
-Three entries are stated without the state they leave: an incident is set to Resolved when the service is restored *(citation: `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`)*; it can be placed On Hold one or more times before it is closed, and it is Canceled when triage finds it a duplicate, unnecessary, or not an incident *(citation: `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md`)*.
+These entries are stated without the state they leave: an incident is set to Resolved when the service is restored *(citation: `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`)*; it can be placed On Hold one or more times before it is closed, and it is Canceled when triage finds it a duplicate, unnecessary, or not an incident *(citation: `markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md`)*; with the Incident Management Best Practice – San Diego plugin, creating a problem from an incident sets it On Hold, with the reason Awaiting Problem, until the problem is resolved *(citation: `markdown/it-service-management/incident-management/inc-mgmt-best-prac-plugin-sd.md`)*; and a child incident follows its parent into In Progress, into On Hold with an Awaiting Change, Awaiting Problem or Awaiting Vendor reason, and into Resolved, but is not closed with it — a sync that covers the standard incident life cycle states only: when a parent incident is proposed or accepted as a major incident, its child incidents' states do not change automatically, and when an ESS user reopens the parent, the child is not reopened *(citation: `markdown/it-service-management/incident-management/parent-child-state-sync.md`)*. In the major incident process, resolving a major incident resolves all its associated child incidents *(citation: `markdown/it-service-management/incident-management/major-incident-management-process.md`)*.
 
 **Related tables:** `task_sla` (SLA progress per incident), `incident_alert` (link to Event Management alerts), `sys_journal_field` (work_notes / comments stream), `sys_history_set` / `sys_history_line` (field-level audit).
 
@@ -234,12 +238,16 @@ Three entries are stated without the state they leave: an incident is set to Res
 - "Incident Commented" — two records, to the caller and to the assignee, when comments are added (`incident.commented`)
 - "Incident Resolved" — to the caller, asking for the feedback that decides whether it is closed (`incident.updated`)
 - "Incident Closed" — to the caller, when it is closed (`incident.updated`)
+- "Email assigned to" — to the assignee, when an incident is assigned to them (`incident.assigned`)
+- "Email assigned To Group" — to the members of the assignment group, when an incident is assigned to it (`incident.assigned.to.group`)
 
-A notification on assignment, on reopening or on auto-closure is not documented in the bundled corpus — verify on the instance.
+A notification on reopening or on auto-closure is not documented in the bundled corpus — verify on the instance.
 
-**Auto-close:** the **Autoclose Incidents** scheduled job runs the **Incident Autoclose** business rule, which closes a resolved incident after `glide.ui.autoclose.time` days *(citation: `markdown/it-service-management/incident-management/configure-incident-auto-close.md`)*. Other incident business rules are not documented in the bundled corpus by name — verify on the instance.
+**Auto-close:** the **Autoclose Incidents** scheduled job runs the **Incident Autoclose** business rule, which closes a resolved incident after `glide.ui.autoclose.time` days *(citation: `markdown/it-service-management/incident-management/configure-incident-auto-close.md`)*.
 
-**Role gates:** resolving takes `itil`, `list_updater`, `sn_incident_write` or `admin`, and closing takes `itil_admin` or `admin` *(citation: `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`)*; reopening a resolved incident takes `sn_incident_write`, or being its caller or requester *(citation: `markdown/it-service-management/incident-management/reopening-incident.md`)*. Any other gate, cancelling included, is not documented in the bundled corpus — verify on the instance.
+**Other business rules that act on incidents, as the corpus names them:** **incident query**, which lets a user without `itil` see an incident only as its caller, its opener or on its watch list *(citation: `markdown/it-service-management/incident-management/logging-incident.md`)*; **Populate Assignment Group based on CI/SO**, which fills the Assignment group from the support group of the CI, else of the service offering, when an incident is created or updated with Assignment group and Assigned to both empty *(citation: `markdown/it-service-management/incident-management/create-an-incident.md`)*; **Close Code**, a business rule the Incident Management Best Practice – San Diego plugin changes *(citation: `markdown/it-service-management/incident-management/inc-mgmt-best-prac-plugin-sd.md`)*; **mark_closed**, which calculates the Resolve time field on closure *(citation: `markdown/platform-administration/time-configuration/c_ResolveTime.md`)*; **incident event**, which queues the `incident.commented`, `incident.inserted` and `incident.updated` events *(citation: `markdown/platform-administration/system-events/events.md`)*; **Cascade Closure of ICPs**, which controls the closure of an incident's communication plans *(citation: `markdown/it-service-management/incident-communications-management/close-an-inci-comm-plan.md`)*; **Create Universal Request for Incident**, inactive by default *(citation: `markdown/it-service-management/incident-management/inci-mgmt-integ-with-univ-req.md`)*; **Incident Create Knowledge**, which does not run once the KCS Integration for Incident Management plugin is active *(citation: `markdown/it-service-management/incident-management/create-knowledge-incident.md`)*; and **SNC - ITIL - Resolve Related Incidents**, the On Hold row above *(citation: `markdown/it-service-management/problem-management/c_ProblemManagementProcess.md`)*. A complete list of incident business rules is not documented in the bundled corpus — verify on the instance.
+
+**Role gates:** resolving takes `itil`, `list_updater`, `sn_incident_write` or `admin`, and closing takes `itil_admin` or `admin` *(citation: `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`)*; reopening a resolved incident takes `sn_incident_write`, or being its caller or requester *(citation: `markdown/it-service-management/incident-management/reopening-incident.md`)*. On a closed or canceled incident, `admin` can still edit fourteen fields, among them Subcategory, Service, Description, Problem and Change Request *(citation: `markdown/it-service-management/incident-management/resolve-and-close-an-incident.md`)*. Creating an incident on the Incident form takes `itil`, `sn_incident_write` or `admin`, and incidents are also logged when a user fills out a record producer in the service catalog or sends an email to the instance *(citation: `markdown/it-service-management/incident-management/create-an-incident.md`)*; an ESS user cannot resolve, reopen or close a major incident, even as its caller *(citation: `markdown/it-service-management/incident-management/reopening-incident.md`)*. A role gate for cancelling an incident is not documented in the bundled corpus — verify on the instance.
 
 ### Major Incident Management (MIM)
 
@@ -247,7 +255,7 @@ A notification on assignment, on reopening or on auto-closure is not documented 
 
 **Baseline workbench:** the MIM Workbench is the UI surface for active MIMs — accessible via the Service Operations Workspace.
 
-**Baseline notifications:** stakeholders are kept informed through communication plans, defined by the incident's type or priority or by the target audience, and the communication tasks within them *(citation: `markdown/it-service-management/incident-management/major-incident-management-process.md`)*; the link in a major incident email notification can open the record in Service Operations Workspace *(citation: `markdown/it-service-management/incident-management/email-notif-redirt-inci-major-inci.md`)*. The name of each major incident notification is not documented in the bundled corpus — verify on the instance.
+**Baseline notifications:** stakeholders are kept informed through communication plans, defined by the incident's type or priority or by the target audience, and the communication tasks within them *(citation: `markdown/it-service-management/incident-management/major-incident-management-process.md`)*; the link in a major incident email notification can open the record in Service Operations Workspace *(citation: `markdown/it-service-management/incident-management/email-notif-redirt-inci-major-inci.md`)*. Activating Major Incident Management adds two Slack notifications: "Major Incident Candidate assigned", to the Major Incident Management Group when Major Incident State changes to Proposed, and "IAT conference notification", to the participants when a conference call starts *(citation: `markdown/it-service-management/incident-management/slack-notification-installed-with-MIM.md`)*. In ITSM Mobile Agent, three notifications are set as critical by default, the alerts a mobile device can still receive in Do Not Disturb mode: "Major Incident Promotion Notification", "Major Incident- ICA SLA Breached" and "Major Incident- ICT SLA Warning" *(citation: `markdown/it-service-management/itsm-mobile-agent/configure-critical-notification.md`)*. Service Operations Workspace sends automated email notifications to major incident managers at stages that include a change of state, assignment or user group *(citation: `markdown/it-service-management/service-operations-workspace/configure-email-notifications-mim-sow.md`)*; the name of each major incident email notification is not documented in the bundled corpus — verify on the instance.
 
 *Citation:* `markdown/it-service-management/incident-management/major-incident-overview.md`
 
@@ -285,7 +293,7 @@ A notification on assignment, on reopening or on auto-closure is not documented 
 
 ### Problem management
 
-**Table:** `problem` (extends `task`). Baseline state machine: Assess → Root Cause Analysis → Fix in Progress → Resolved → Closed. Related to `incident` via `problem.related_incidents` and to `change_request` by a change request reference (the reference field's name: not documented in the bundled corpus — verify on the instance).
+**Table:** `problem` (extends `task`). Baseline state machine: Assess → Root Cause Analysis → Fix in Progress → Resolved → Closed. Related to `incident` via `problem.related_incidents` and to `change_request` by the legacy Problem form's Change request field, described as "Change request associated with the problem" *(citation: `markdown/it-service-management/problem-management/legacy-problem-form.md`)*; a documented example customization of the Problem form's Create Change UI action stores the new change in `current.rfc` *(citations: `markdown/platform-administration/r_ScriptedTemplates.md`, `markdown/api-reference/server-api-reference/ActionAPIBoth.md`)*, but that `rfc` is the column behind the Change request field is not documented in the bundled corpus — verify on the instance.
 
 ### Change management
 

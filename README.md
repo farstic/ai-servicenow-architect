@@ -281,7 +281,7 @@ MB Ubuntu / 500 MB macOS / 499 MB Windows (25.0 s Ubuntu · 31.7 s macOS · 42.4
 2026-10-24 by `docs-real.yml`). The first is what you read, the second is what the disk loses. An install
 made before 2.2.5, which fetched only the areas the specialists cite, moves to the whole corpus once, on
 its upgrade to 2.2.5: about 150 MB more on disk, and 7 to 14 seconds on the CI machines. `--docs sparse`
-keeps only the cited areas (about 345 MB on disk) and exists for CI; the Architect cannot read the other
+keeps only the cited areas (about 372 MB on disk) and exists for CI; the Architect cannot read the other
 areas then. Every release re-measures all three platforms and attaches the same table as
 `install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases), the first one pending.
 

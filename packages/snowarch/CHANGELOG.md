@@ -5,6 +5,11 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**The corpus map ships with every release (ARC-09-C250).** `vendor/docs-map.md` joins the release coverage beside
+`vendor/docs-areas.txt`, so a distribution carries it and its signed manifest covers it. The map is made from the whole
+corpus at the pin: an install that is sparse by choice still reads every area's row, and the session banner's
+`Docs on disk:` line sets those rows against the areas the install has.
+
 **`normalizeInstanceUrl` never quotes credentials back (ARC-09-C240).** A URL with a username and a password that
 `new URL` could not parse — a `#`, `?` or `/` in the password, or a port out of range — was refused as `URL_INVALID`
 with the input quoted, password included. Any `@` is now `URL_HAS_CREDENTIALS`, checked before anything else, so no

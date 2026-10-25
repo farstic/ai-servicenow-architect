@@ -14,8 +14,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 
+import { verdictPath } from '../../packages/snowarch/dist/licence/integrity.js';
 import { COVERAGE, isCovered, manifestFromArchive, signManifest, writeManifestCache } from '../../tools/snowarch/lib/licence/manifest.mjs';
 import { licenceFixture, licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { readTraceImport } from '../../tools/snowarch/tests/helpers/read-trace.mjs';
@@ -51,6 +52,14 @@ const child = (root, args, extra = {}) => spawnSync(process.execPath, args, { cw
     SNOW_AUDIT_FILE: join(root, '.local', 'audit-under-test.jsonl'), ...extra }, { root }) });
 const bannerOf = (r) => r.stdout.trim().split('\n');
 
+/**
+ * ARC-09-C250 — the two covered files the `Docs on disk:` line reads at every start, by name: the configured family and
+ * the corpus map. tests/hook/docs-line.test.mjs owns what the line does with them. They are exempt only after the
+ * integrity event: `afterIntegrity` asserts each is read, and first read after the event's last read, so the event
+ * itself still reads none.
+ */
+const DOCS_LINE_READS = Object.freeze(['engine.config.json', 'vendor/docs-map.md']);
+
 /** The hook, with its reads and its stats traced: each as the set of covered files, relative to the checkout. */
 function traced(t, root) {
   const dir = tempDir('snowarch-hook-trace-', t);
@@ -61,16 +70,31 @@ function traced(t, root) {
   env.NODE_OPTIONS = `${env.NODE_OPTIONS} ${readTraceImport()}`;
   const r = spawnSync(process.execPath, [HOOK(root)], { cwd: root, input: STDIN, encoding: 'utf8', env });
   const real = realpathSync(root).replace(/\\/g, '/');
-  const covered = (file) => readFileSync(file, 'utf8').split('\n').filter(Boolean)
+  // Every traced path inside the checkout, relative to it, in the order the hook reached it.
+  const inOrder = (file) => readFileSync(file, 'utf8').split('\n').filter(Boolean)
     .map((p) => p.replace(/\\/g, '/'))
     .map((p) => (p.startsWith(`${real}/`) ? p.slice(real.length + 1) : null))
-    .filter((p) => p !== null && isCovered(p, FIXTURE_COVERAGE));
-  // A READ here is a covered file's bytes. Two reads are not that, and are left out by name: a covered directory's
-  // listing (the stat key's walk, which is how an added file is seen), and the version of record, which every start
-  // reads to know which release this is.
-  const content = (p) => !p.endsWith('/') && p !== VERSION_OF_RECORD;
+    .filter((p) => p !== null);
+  const covered = (file) => inOrder(file).filter((p) => isCovered(p, FIXTURE_COVERAGE));
+  // A READ here is a covered file's bytes. Three kinds are not that, and are left out by name: a covered directory's
+  // listing (the stat key's walk, which is how an added file is seen), the version of record, which every start
+  // reads to know which release this is, and the Docs on disk line's two reads, held to after the integrity event.
+  const content = (p) => !p.endsWith('/') && p !== VERSION_OF_RECORD && !DOCS_LINE_READS.includes(p);
   return { r, reads: [...new Set(covered(reads))].filter(content).sort(), stats: [...new Set(covered(stats))].sort(),
-    traced: readFileSync(reads, 'utf8').split('\n').filter(Boolean).length };
+    order: inOrder(reads), traced: readFileSync(reads, 'utf8').split('\n').filter(Boolean).length };
+}
+
+/**
+ * The Docs on disk line's reads come after the integrity event: each is read, and the first of them follows the
+ * event's last read — its verdict file, its stat walk's listings, and any file it found moved.
+ */
+function afterIntegrity(order, root, moved = []) {
+  const verdict = relative(root, verdictPath(root)).replace(/\\/g, '/');
+  assert.ok(order.includes(verdict), `the trace did not see the integrity event read ${verdict}`);
+  for (const p of DOCS_LINE_READS) assert.ok(order.includes(p), `the Docs on disk line did not read ${p}`);
+  const end = Math.max(...order.map((p, i) => (p === verdict || p.endsWith('/') || moved.includes(p) ? i : -1)));
+  const first = Math.min(...DOCS_LINE_READS.map((p) => order.indexOf(p)));
+  assert.ok(first > end, `a Docs on disk read (at ${first}) came before the integrity event's last read (at ${end})`);
 }
 
 test('ARC-11-C141 — on a verified tree the hook stats every covered file and reads none; an edit is read alone', (t) => {
@@ -85,6 +109,7 @@ test('ARC-11-C141 — on a verified tree the hook stats every covered file and r
   assert.equal(quiet.r.status, 0, quiet.r.stderr);
   assert.ok(quiet.traced > 20, `the trace saw ${quiet.traced} reads`);
   assert.deepEqual(quiet.reads, [], 'a start with nothing moved read a covered file');
+  afterIntegrity(quiet.order, root);
   const files = Object.keys(manifest.files).sort();
   assert.deepEqual(files.filter((p) => !quiet.stats.includes(p)), [], 'a covered file was not stat\'d');
   t.diagnostic(`stat key: ${quiet.stats.length} covered files stat'd, ${quiet.reads.length} read`);
@@ -93,6 +118,7 @@ test('ARC-11-C141 — on a verified tree the hook stats every covered file and r
   writeFileSync(join(root, SENTINEL), 'changed\n');
   const moved = traced(t, root);
   assert.deepEqual(moved.reads, [SENTINEL], `the hook read more than the one file that moved: ${moved.reads.join(', ')}`);
+  afterIntegrity(moved.order, root, [SENTINEL]);
   assert.match(bannerOf(moved.r)[2] ?? '', /^Integrity: restored — The AI Architect's own files are not yours to change under this licence: 1 file restored from v9\.1\.0, 0 moved to \.local\/integrity-removed\/\d{8}T\d{6}Z\/ \(tools\/snowarch\/e32-sentinel\.txt\)\. Your own material belongs under clients\/<name>\/\.$/,
     moved.r.stdout);
   assert.equal(readFileSync(join(root, SENTINEL), 'utf8'), 'read by an integrity check alone\n');
