@@ -228,3 +228,22 @@ test('ARC-09-C250 — the guard names a deleted rule, and only that rule', () =>
     assert.deepEqual(named(removedFrom(doc.replace(rule.text, ''))), named([rule]));
   }
 });
+
+// ARC-09-C250 — EVERY SENTENCE. A rewrite that carries none of the listed rule words, or a sentence one word shorter,
+// still removes what works: the list holds every sentence of CLAUDE.md at develop, so either is named. The first case is
+// C217c's variant B, which rewrites line 13's marker sentence and which the rule-word list did not notice.
+test('ARC-09-C250 — a rewritten sentence is named: C217c variant B\'s line 13', () => {
+  const old = 'A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — '
+    + 'verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.';
+  const rewrite = 'Only a name a corpus search misses carries "not documented in the bundled corpus — verify on the '
+    + 'instance", no citation; one found but unopened is cited by path as unverified; what the corpus does not settle is '
+    + 'an OPEN QUESTION.';
+  assert.ok(doc.includes(old), 'the sentence the rewrite replaces is not in CLAUDE.md');
+  assert.deepEqual(named(removedFrom(doc.replace(old, rewrite))), [`sentence: ${old}`]);
+});
+
+test('ARC-09-C250 — a sentence one word shorter is named', () => {
+  const sentence = 'If the corpus does not cover it, say so rather than recalling it.';
+  assert.ok(doc.includes(sentence), 'the sentence the case shortens is not in CLAUDE.md');
+  assert.deepEqual(named(removedFrom(doc.replace(sentence, sentence.replace(' rather', '')))), [`sentence: ${sentence}`]);
+});
