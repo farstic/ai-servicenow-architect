@@ -51,13 +51,18 @@ seconds on the CI machines.**
 - `./snowarch upgrade` worked out the steps it would re-run with the release you had installed, so a new release that
   changed what a step depends on could re-run a step its plan never named. The plan is now the new release's own
   answer, asked once its files have passed the check against its signed manifest; when it cannot be asked, the plan
-  says it was worked out by the installed release, and why. The upgrade that brings you this release is still planned
-  by the one you have installed, so the change shows from your next upgrade on (ARC-09-C195).
+  says it was worked out by the installed release, and why. Asking makes the plan step take longer, up to 30 seconds
+  when the new release does not answer. The upgrade that brings you this release is still planned by the one you have
+  installed, so the change shows from your next upgrade on (ARC-09-C195, ARC-09-C241).
 - `./snowarch instance add` refused a host typed without `https://`, such as `acme.service-now.com`, as not a URL, and
   with a port or a username in front it said to use https. Such a host is now offered back as
   `https://acme.service-now.com`, to accept with Enter, as a single word such as `acme` already was; a host with a path
   or credentials gets that refusal's own reason. Under `--yes`, where nothing is asked, the URL used is now printed for
   both forms (ARC-09-C223).
+- `./snowarch instance add` quoted a URL back with its password in it when the URL carried a username and a password
+  and did not parse, for example with `#`, `?` or `/` in the password, or a port out of range. Any `@` in the URL is
+  now refused as credentials, before anything else, and nothing is quoted back. A scheme typed as `https:/` or
+  `https:` is now refused as not a URL, as `https//` already was, instead of being taken as `https://` (ARC-09-C240).
 - After `snow_core_instance_switch`, the capabilities read that comes before every write moved the session back to the
   default instance without saying so, so the write that followed went to that instance. The read now keeps the session
   on the instance it was switched to, and says so when that instance can no longer be loaded. A resumed session starts

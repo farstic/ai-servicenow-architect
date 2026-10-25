@@ -23,11 +23,11 @@
  *   hook reads it. A banner that could fetch would be a banner that could hang a session start.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 
 import { CACHE_FILE } from '../doctor-cache.mjs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localDir, storePath } from '../local-paths.mjs';
 
@@ -576,10 +576,11 @@ export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktre
  * vanishing from the line.
  */
 export function planSteps(root, tag, { ctx, state, opts = {}, run = spawnSync, manifestWritten = false,
-  warnIsDone = false } = {}) {
+  warnIsDone = false, keepWorktree = null } = {}) {
   const byFile = new Map(stepsThatWillRun(root, tag, { ctx, opts })
     .map((s) => [s.step, s]));
-  const decided = rerunAtTag(root, tag, { ctx, state, run, manifestWritten, warnIsDone });
+  // ARC-09-C241 — a worktree of the tag the caller already made is planned in, and left for the caller to remove.
+  const decided = rerunAtTag(root, tag, { ctx, state, run, manifestWritten, warnIsDone, keepWorktree });
 
   // No worktree, no runner comparison: fall back to the file diff and SAY it is an estimate.
   if (decided === null) {
@@ -628,9 +629,12 @@ function isPlan(p) {
  * failure. A child the timeout stops never reaches the `finally` that removes the worktree its planSteps made, so a
  * worktree registered while it ran is removed here too, and the checkout is left as it was found. The first entry
  * `git worktree list` gives is the main worktree, which is never one of those.
+ *
+ * ARC-09-C241 — `worktree` is one the caller made of the tag: the target is asked in it, and it is left for the caller,
+ * which plans its fallback there. Without one, this makes and removes its own.
  */
 export function targetPlan(root, tag, { run = spawnSync, env = process.env, state = null,
-  timeoutMs = PLAN_TIMEOUT_MS } = {}) {
+  timeoutMs = PLAN_TIMEOUT_MS, worktree = null } = {}) {
   const git = (args) => run('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' });
   const registered = () => {
     const listed = git(['worktree', 'list', '--porcelain']);
@@ -639,13 +643,11 @@ export function targetPlan(root, tag, { run = spawnSync, env = process.env, stat
       .map((l) => l.slice('worktree '.length)).slice(1);
   };
   const before = registered();
-  const scratch = mkdtempSync(join(tmpdir(), 'snowarch-target-'));
-  const at = join(scratch, 'at-tag');
+  const own = worktree === null ? addTagWorktree(root, tag, run) : null;
+  const at = worktree ?? own?.at ?? null;
   const why = (detail) => ({ reason: `the target's own plan could not be read: ${detail}` });
   try {
-    if (git(['worktree', 'add', '--detach', '--quiet', at, tag])?.status !== 0) {
-      return why('the tag could not be checked out to ask it');
-    }
+    if (at === null) return why('the tag could not be checked out to ask it');
     const r = run(process.execPath, [PLAN_HELPER, at, root, tag], { cwd: root, encoding: 'utf8',
       env: childEnv(root, env), input: JSON.stringify({ manifestWritten: true, state }), timeout: timeoutMs,
       stdio: ['pipe', 'pipe', 'pipe'] });
@@ -661,25 +663,94 @@ export function targetPlan(root, tag, { run = spawnSync, env = process.env, stat
     try { plan = JSON.parse(r.stdout); } catch { return why('its answer was not JSON'); }
     return isPlan(plan) ? { plan } : why('its answer had an unexpected shape');
   } finally {
-    git(['worktree', 'remove', '--force', at]);
-    rmSync(scratch, { recursive: true, force: true });
+    if (own) removeTagWorktree(root, own, run);
     if (before !== null) {
       for (const left of registered() ?? []) if (!before.includes(left)) git(['worktree', 'remove', '--force', left]);
     }
   }
 }
 
+/** ARC-09-C241 — a worktree of the tag in a temp directory of its own, or null when git cannot make it. */
+function addTagWorktree(root, tag, run) {
+  const scratch = mkdtempSync(join(tmpdir(), 'snowarch-target-'));
+  const at = join(scratch, 'at-tag');
+  if (run('git', ['worktree', 'add', '--detach', '--quiet', at, tag],
+    { cwd: root, encoding: 'utf8', stdio: 'pipe' })?.status === 0) return { at, scratch };
+  rmSync(scratch, { recursive: true, force: true });
+  return null;
+}
+
+/** ARC-09-C241 — the worktree, and the temp directory that held it, both gone. */
+function removeTagWorktree(root, { at, scratch }, run) {
+  run('git', ['worktree', 'remove', '--force', at], { cwd: root, encoding: 'utf8', stdio: 'pipe' });
+  rmSync(scratch, { recursive: true, force: true });
+}
+
+/** The same directory, by its real path: git records a temp directory as macOS's /private/var, node as /var. */
+function samePath(a, b) {
+  const real = (p) => { try { return realpathSync.native(p); } catch { return null; } };
+  const ra = real(a);
+  return ra !== null && ra === real(b);
+}
+
+/**
+ * ARC-09-C241 — the shared worktree back to what the tag holds, before this release plans in it: the target's code ran
+ * there and may have changed it. It is our own scratch checkout, so it is reset in place. `.local`, the link to the
+ * checkout's own state that rerunAtTag makes, is left out of both the check and the clean. False when it cannot be
+ * made clean, and the fallback then makes a worktree of its own.
+ *
+ * reset --hard and clean -fd are destructive, and `git -C ""` runs in the current directory, so nothing runs in `at`
+ * unless it is ours beyond doubt: a non-empty absolute path that exists, one of this repository's worktrees but not its
+ * main one, at the tag's commit. Anything else is refused, and the fallback makes a fresh worktree.
+ */
+function asTagged(root, tag, at, run) {
+  if (typeof at !== 'string' || at === '' || !isAbsolute(at) || !existsSync(at)) return false;
+  const git = (cwd, args) => run('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
+  const listed = git(root, ['worktree', 'list', '--porcelain']);
+  if (listed?.status !== 0) return false;
+  const [main, ...linked] = String(listed.stdout ?? '').split('\n').filter((l) => l.startsWith('worktree '))
+    .map((l) => l.slice('worktree '.length));
+  if (main === undefined || samePath(main, at) || !linked.some((p) => samePath(p, at))) return false;
+  const head = git(at, ['rev-parse', 'HEAD']);
+  const tagged = git(root, ['rev-parse', `${tag}^{commit}`]);
+  if (head?.status !== 0 || tagged?.status !== 0
+    || String(head.stdout ?? '').trim() !== String(tagged.stdout ?? '').trim()) return false;
+  const clean = () => {
+    const r = git(at, ['status', '--porcelain', '--', '.', ':(exclude).local']);
+    return r?.status === 0 ? String(r.stdout ?? '').trim() === '' : null;
+  };
+  const first = clean();
+  if (first !== false) return first === true;
+  git(at, ['reset', '--hard', '--quiet']);
+  git(at, ['clean', '-fdq', '-e', '.local']);
+  return clean() === true;
+}
+
 /**
  * ARC-09-C195 — the plan U4 prints for a move: the target's own when it can be had, otherwise this release's
  * computation with the reason beside it, as `installedBecause`, which `renderPlan` prints. `signed` is U4's
  * signed-manifest check having passed: a target before signed manifests is not asked at all.
+ *
+ * ARC-09-C241 — ONE worktree of the tag: the target is asked in it, and when it cannot answer this release plans in it,
+ * once it is back to what the tag holds. Each worktree is a checkout of the whole tree, the slow part of U4 on Windows,
+ * and U4 used to make two, or three when it fell back.
  */
 export function planForMove(root, target, { ctx, state, opts = {}, run = spawnSync, env = process.env,
-  signed = false, askTarget = targetPlan, ownPlan = planSteps } = {}) {
-  const asked = signed ? askTarget(root, target, { run, env, state }) : { reason: UNSIGNED_REASON };
-  if (asked.plan) return { ...asked.plan, installedBecause: null };
-  return { ...ownPlan(root, target, { ctx, state, opts, run, manifestWritten: signed }),
-    installedBecause: asked.reason };
+  signed = false, askTarget = targetPlan, ownPlan = planSteps, makeWorktree = addTagWorktree } = {}) {
+  if (!signed) {
+    return { ...ownPlan(root, target, { ctx, state, opts, run, manifestWritten: signed }),
+      installedBecause: UNSIGNED_REASON };
+  }
+  const shared = makeWorktree(root, target, run);
+  try {
+    const asked = askTarget(root, target, { run, env, state, worktree: shared?.at ?? null });
+    if (asked.plan) return { ...asked.plan, installedBecause: null };
+    const keepWorktree = shared && asTagged(root, target, shared.at, run) ? shared.at : null;
+    return { ...ownPlan(root, target, { ctx, state, opts, run, manifestWritten: signed, keepWorktree }),
+      installedBecause: asked.reason };
+  } finally {
+    if (shared) removeTagWorktree(root, shared, run);
+  }
 }
 
 /** What the store will do, said before it is done. */

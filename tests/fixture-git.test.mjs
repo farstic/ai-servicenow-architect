@@ -130,7 +130,7 @@ test('ARC-09-C218 — the count finds a raw init that a new helper would add', (
 // ── ARC-09-C219 — the test files' own repositories ─────────────────────────────────────────────────────────────
 
 /** The repositories the test files create, each through initFixtureRepo; a test that adds one raises this number. */
-const TEST_REPOSITORIES = 41;                    // 41 since ARC-09-C250: the corpus map's fixture corpus
+const TEST_REPOSITORIES = 43;                    // 43 since ARC-09-C250 merged develop: C241's two plan repositories and C250's corpus map fixture corpus
 const SELF = 'tests/fixture-git.test.mjs';
 
 /** Test files that keep a raw `git init`, each with its reason. A file is exempt by name, never by pattern. */

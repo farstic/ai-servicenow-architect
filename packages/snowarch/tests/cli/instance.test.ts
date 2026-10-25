@@ -1,7 +1,7 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -583,6 +583,61 @@ describe('ARC-09-C223 — a proposed URL', () => {
         expect(stored(w.store), url).toBe(URL_PDI);
       } finally { w.cleanup(); }
     }
+  });
+});
+
+/**
+ * ARC-09-C240 — a URL with credentials in it is refused, its password never printed, and nothing written.
+ *
+ * The normaliser quoted some of these back, password included (tests/cli/url.test.ts). These are the wizard's two
+ * paths to it: `--url` on argv, where the refusal is exit 2, and the prompt, which re-asks until it is exhausted.
+ */
+describe('ARC-09-C240 — a URL with credentials in it', () => {
+  const user = ['u', 'ser'].join('');
+  const pass = ['p', 'w', '1'].join('');            // assembled, never spelled
+  const shaped = [
+    `${user}:${pass}#x@acme.service-now.com`,
+    `${user}:${pass}?x@acme.service-now.com`,
+    `${user}:${pass}/x@acme.service-now.com`,
+    `${user}:${pass}@acme.service-now.com:99999`,
+    `https://${user}:${pass}#x@acme.service-now.com`,
+    `https://${user}:${pass}@acme.service-now.com:99999`,
+    `https://${user}:${pass}/x@acme.service-now.com`,
+  ];
+  const NEVER = 'Never put a username or password in the URL; the wizard will ask for them separately.';
+  const files = (dir: string) => readdirSync(dir, { recursive: true }).map(String).sort();
+
+  it('ARC-09-C240 — on argv each is refused with exit 2, no password is printed, and nothing is written', async () => {
+    for (const url of shaped) {
+      const w = workspace();
+      try {
+        const before = files(w.dir);
+        const terminal = io([]);
+        const result = await runAdd({ ...baseOptions, url, yes: true }, terminal,
+          { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+        expect(result.exitCode, url).toBe(EXIT_USAGE);
+        expect(terminal.written(), url).toContain(NEVER);
+        expect(terminal.written(), url).not.toContain(pass);
+        expect(existsSync(w.store), url).toBe(false);
+        expect(files(w.dir), url).toEqual(before);
+      } finally { w.cleanup(); }
+    }
+  });
+
+  it('ARC-09-C240 — typed at the prompt, each refusal says why, none prints the password, and nothing is written', async () => {
+    const w = workspace();
+    try {
+      const before = files(w.dir);
+      const terminal = io(shaped.slice(0, MAX_ATTEMPTS));
+      const result = await runAdd({ ...baseOptions, url: undefined }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(terminal.written()).toContain(URL_EXHAUSTED);
+      expect(terminal.written()).not.toContain(pass);
+      expect(terminal.written().split(NEVER).length - 1).toBe(MAX_ATTEMPTS);
+      expect(existsSync(w.store)).toBe(false);
+      expect(files(w.dir)).toEqual(before);
+    } finally { w.cleanup(); }
   });
 });
 
