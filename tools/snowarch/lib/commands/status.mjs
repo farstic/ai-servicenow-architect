@@ -46,7 +46,8 @@ export const USAGE = (where) => [
   '',
   '  Exit: 0 when no check failed, 1 when one did: the panel is printed either way, so a 1 is not a',
   '  failure to render. It is also 1 when the doctor itself failed; then the one line printed is a',
-  '  Mode line that says doctor unavailable.',
+  '  Mode line that says doctor unavailable. Any other 1 is the command itself failing, and what it',
+  '  printed says why.',
 ].join('\n');
 
 /**

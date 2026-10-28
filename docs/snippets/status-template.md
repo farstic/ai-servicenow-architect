@@ -99,4 +99,4 @@ WARNs are never listed one by one — that is `./snowarch doctor`. On a quick ru
 
 **Exit code.** `0` when no check failed, `1` when one did: the panel is printed either way, so a `1` is not a failure
 to render. It is also `1` when the doctor itself failed; then the one line printed is a Mode line that says
-`doctor unavailable`.
+`doctor unavailable`. Any other `1` is the command itself failing, and what it printed says why.
