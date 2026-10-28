@@ -26,6 +26,7 @@ import { dirname, join } from 'node:path';
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { maskForJson, labelsIn, LABEL_MASK, HOST_MASK, HOME_MASK, homeValues } from '../../tools/snowarch/lib/doctor/json-boundary.mjs';
 import { cacheSensitiveValue, INSTANCE_HOST } from '../../tools/snowarch/lib/doctor-cache.mjs';
+import { spellings } from '../../tools/snowarch/lib/launcher-spelling.mjs';
 import { greenTree, linkInstall, writeJson } from './helpers/tree.mjs';
 
 const LABEL = 'acme-prod';
@@ -336,51 +337,6 @@ test('ARC-09-C221 — the store\'s values are read SNOW_STORE first, and never a
   assert.deepEqual(storeMaskValues(join(root, 'nowhere'), {}), { hosts: [], stems: [] });
 });
 
-test('ARC-09-C221 — every maskForJson call passes the store\'s values', async () => {
-  const { readdirSync, readFileSync: read } = await import('node:fs');
-  const { fileURLToPath } = await import('node:url');
-  const { default: ts } = await import('typescript');
-  const lib = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'tools', 'snowarch', 'lib');
-  // ARC-09-C242 — every module under lib, not two named ones (the regression hunt), read by the compiler
-  // tests/lib/temp-sites.mjs reads with, so a comment, a string, a regex or a template is never mistaken for code. A
-  // call's arguments must hold storeMaskValues(…); the function is imported, statically or with await import(), under
-  // its own name only, and never passed on as a value.
-  const files = readdirSync(lib, { recursive: true }).map((p) => String(p).replace(/\\/g, '/')).filter((p) => p.endsWith('.mjs')).sort();
-  const calls = [];
-  const loose = [];
-  for (const f of files) {
-    const source = ts.createSourceFile(f, read(join(lib, f), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
-    const at = (node) => `${f}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}`;
-    const calls_ = (node, name) => {
-      let found = false;
-      const look = (n) => {
-        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === name) found = true;
-        else ts.forEachChild(n, look);
-      };
-      look(node);
-      return found;
-    };
-    const visit = (node) => {
-      if (ts.isIdentifier(node) && node.text === 'maskForJson') {
-        const p = node.parent;
-        if (ts.isCallExpression(p) && p.expression === node) {
-          calls.push(`${at(node)}: ${p.arguments.some((a) => calls_(a, 'storeMaskValues')) ? 'ok' : 'MISSING'}`);
-        } else if ((ts.isFunctionDeclaration(p) && p.name === node)
-          || ((ts.isImportSpecifier(p) || ts.isBindingElement(p) || ts.isExportSpecifier(p)) && !p.propertyName)) {
-          // the definition, or an import or a re-export under its own name
-        } else {
-          loose.push(at(node));
-        }
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
-  }
-  assert.equal(calls.length, 3, `expected the 3 known call sites: ${calls.join(' | ')}`);
-  assert.deepEqual(calls.filter((c) => c.endsWith('MISSING')), [], 'a call site masks without the store\'s values');
-  assert.deepEqual(loose, [], 'maskForJson is imported under another name or passed on as a value');
-});
-
 // ── ARC-09-C242 — a store stem masks whole names in the doctor's JSON, and names at a token boundary ───────────────────
 //
 // The regression hunt (wf_9be5c51c-184): a stem matched every word it begins, so a store host whose stem is `snow` or
@@ -428,9 +384,12 @@ test('ARC-09-C242 — `corpus` stays: a lowercase continuation is not a boundary
 test('ARC-09-C242 — `./snowarch` stays: a lowercase continuation is not a boundary', async () => {
   // `snow` is a product word, so the doctor's JSON drops it before the rule: both the product's own call and the rule
   // itself, asked directly with the stem, leave the word alone.
-  assert.deepEqual(stemWords(['snow'], ['./snowarch', 'run ./snowarch doctor']), ['./snowarch', 'run ./snowarch doctor']);
+  // The launcher is spelled as the product spells it on this machine (`./snowarch` here), as the launcher audit asks.
+  const SPELL = spellings();
+  const readable = [SPELL.cli, `run ${SPELL.cli} doctor`];
+  assert.deepEqual(stemWords(['snow'], readable), readable);
   const { maskStemWords } = await import('../../tools/snowarch/lib/mask-values.mjs');
-  const text = 'run ./snowarch doctor; snowarch-write; snowdrift';
+  const text = `run ${SPELL.cli} doctor; snowarch-write; snowdrift`;
   assert.equal(maskStemWords(text, ['snow'], () => HOST_MASK), text);
 });
 

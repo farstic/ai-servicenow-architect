@@ -440,12 +440,12 @@ test('ARC-09-C242 — a store host is masked whole in a note: a bare name, an IP
   const { maskFinding } = await finding();
   for (const [url, note, gone] of [
     ['https://[fd00:42::17]', 'ping [FD00:42::17] fails; [fd00:42::17]:443 refused', ['fd00:42::17']],
-    ['https://snow', 'cannot reach snow:8443; DNS:snow.acmecorp.com; run ./snowarch doctor and snow_core_capabilities_read', ['snow:', 'acmecorp']],
+    ['https://snow', 'cannot reach snow:8443; DNS:snow.acmecorp.com; the snowarch doctor and snow_core_capabilities_read', ['snow:', 'acmecorp']],
     ['https://snow.', 'cannot reach snow:8443', ['snow:']]]) {
     reset();
     const out = maskFinding(note, { storeUrls: [url] });
     assert.deepEqual(survivors(out, gone), [], `${url}: ${out}`);
-    if (url === 'https://snow') assert.ok(out.includes('./snowarch doctor and snow_core_capabilities_read'), `a product word was masked: ${out}`);
+    if (url === 'https://snow') assert.ok(out.includes('the snowarch doctor and snow_core_capabilities_read'), `a product word was masked: ${out}`);
   }
   // A name that holds a bare store host as a part is masked whole first (the C242 review, round 2).
   reset();
