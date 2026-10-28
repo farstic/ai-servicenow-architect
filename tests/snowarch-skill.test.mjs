@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FIXED_REVIEW, maskFinding } from '../tools/snowarch/lib/finding.mjs';
+import { reset } from '../tools/snowarch/lib/redact.mjs';
+import { USAGE } from '../tools/snowarch/lib/commands/status.mjs';
 
 /**
  * `/snowarch` is the one skill whose wording IS the safety boundary.
@@ -26,6 +29,36 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SERVER_KEY = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')).mcp.serverKey;
 const REL = '.claude/skills/snowarch/SKILL.md';
 const doc = readFileSync(join(root, REL), 'utf8');
+
+// ARC-09-C243 — what the finding and Status text says is checked against the code and the texts it describes.
+const GUIDE = readFileSync(join(root, 'docs/USER-GUIDE.md'), 'utf8');
+const TEMPLATE = readFileSync(join(root, 'docs/snippets/status-template.md'), 'utf8');
+const HELP = USAGE({ platform: 'darwin', env: {} });
+
+const sectionOf = (t, name) => {
+  const at = t.indexOf(`\n## ${name}\n`);
+  assert.ok(at > 0, `no ## ${name} section`);
+  const end = t.indexOf('\n## ', at + 1);
+  return t.slice(at, end < 0 ? undefined : end);
+};
+const flat = (s) => s.replace(/\s+/g, ' ');
+const paragraphWith = (text, needle) => flat(text.split(/\n\s*\n/).find((p) => flat(p).includes(needle)) ?? '');
+
+/** Each FIXED_REVIEW entry, exactly as finding.mjs prints it, and the words the skill names its class with. */
+const CLASS_OF = {
+  'people: names of colleagues, users and customers': "people's names",
+  'places: cities, sites and offices': 'places',
+  'company names and abbreviations that neither the instance store nor aliases.txt holds': 'company names or abbreviations it was not given',
+  'ticket keys in other systems, such as Jira or Azure DevOps': 'ticket keys in other systems',
+  'record numbers with fewer than 6 digits': 'record numbers with fewer than 6 digits',
+  'a credential written in plain words that no rule recognises': 'a credential written in plain words that no rule recognises',
+};
+const MASKING = 'on its own and with its parts joined by a space, a hyphen, an underscore, a dot or nothing';
+const ITEM4 = 'Its first line says when it could not read your instance store or its credentials: then it may not have masked them.';
+
+const STATUS = 'status reports exit 1 as a failed check or its own fallback, and never says finding';
+const SAFE = 'the safe-to-send answer names what the masker cannot know, every class FIXED_REVIEW holds, and what was NOT read';
+const NAME = 'a common word is named only as the engagement not to use, and the masking it avoids is the masker\'s';
 
 const frontmatterOf = (text) => {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(text);
@@ -197,6 +230,43 @@ const CHECKS = {
     assert.match(section, /Send the text above to the person who issued your licence\./);
     assert.match(section, /`_unfiled`/, 'the section does not say that a finding never goes under `_unfiled`');
   },
+
+  // ARC-09-C243 — the regression hunt (wf_9be5c51c-184, area 0 F3 and F4, and the second half of area 2 F6).
+  [STATUS]: (t) => {
+    // § status says "a failed check" for what § finding calls a finding, and relays the fallback line the command's own
+    // catch prints when the doctor itself failed: that one is exit 1 too (status.mjs).
+    const s = flat(sectionOf(t, 'status'));
+    assert.ok(s.includes('`1` means a check failed, and the panel on the screen says which — report it as a failed check, never as "the command failed"'));
+    assert.ok(s.includes("The one other `1` is the command's own fallback, a Mode line that says `doctor unavailable`: relay that line as it is"));
+    assert.doesNotMatch(s, /\bfindings?\b/i, '§ status says "finding", which § finding defines as the note flow');
+  },
+  [SAFE]: (t, { fixed = FIXED_REVIEW } = {}) => {
+    // Every class the masker's "Read before sending" list holds is in the answer, and so is what its first line says it
+    // did not read. A seventh class in the code fails here until it is mapped above and named in the skill.
+    assert.deepEqual([...fixed], Object.keys(CLASS_OF), 'FIXED_REVIEW changed: name the new class in the skill, then here');
+    const para = paragraphWith(sectionOf(t, 'finding'), 'safe to send');
+    assert.ok(para.startsWith('The masker cannot know '), 'the paragraph no longer says what the masker cannot know');
+    for (const words of Object.values(CLASS_OF)) assert.ok(para.includes(words), `the safe-to-send answer leaves out "${words}"`);
+    assert.ok(para.includes('When its first line says the instance store was NOT read, the instance names were not masked by value either'));
+    assert.ok(para.includes("when it says the credentials were NOT read, the store's usernames were not, and its secrets may not have been"));
+    assert.ok(para.includes('say that it is masked, that those still need a reader, and which of the two its first line says was NOT read, if either was'));
+  },
+  [NAME]: (t, { guide = GUIDE } = {}) => {
+    // The masker masks the engagement's name wherever it stands as a word, with its parts joined any way, so the skill
+    // and the guide name no example engagement but the one not to use.
+    const step = paragraphWith(sectionOf(t, 'finding'), 'Ask which engagement the finding belongs to');
+    const item = paragraphWith(guide, 'asks which engagement the finding belongs to');
+    for (const [where, text] of [['the skill', step], ['the user guide', item]]) {
+      assert.ok(text.includes('so not a common word such as `general`'), `${where} suggests a common word, or none`);
+      assert.ok(text.includes(MASKING), `${where} does not say how the engagement's name is masked`);
+      const names = [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]).filter((n) => /^[A-Za-z0-9_-]+$/.test(n));
+      assert.deepEqual(names.filter((n) => !['general', '_unfiled'].includes(n)), [], `${where} names another engagement`);
+    }
+    assert.ok(item.includes(ITEM4), 'the user guide no longer says when the masker could not read the store');
+    reset();
+    assert.equal(maskFinding('acme bank, acme-bank, acme_bank, acme.bank, acmebank', { engagement: 'acme-bank' }),
+      '<engagement>, <engagement>, <engagement>, <engagement>, <engagement>', 'the masker does not mask what the texts say it does');
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -224,6 +294,25 @@ const NEGATIVES = [
     (t) => t.replace(/^(allowed-tools: .*)$/m, '$1, Edit(clients/*/findings/*.md)')],
   ['the finding section loses the closing sentence', 'the finding section asks for the engagement, prints the masker verbatim, and sends nothing',
     (t) => t.replace('Send the text above to the person who issued your licence.', 'Send the text above.')],
+  // ARC-09-C243: each of these breaks the file in one way, and the matching check has to notice.
+  ['status says finding again', STATUS, (t) => t.replace('report it as a failed check', 'report it as a finding')],
+  ['status brings the findings back in the plural', STATUS,
+    (t) => t.replace('with the cause it names.', 'with the cause it names, and file it with the findings.')],
+  ['the fallback line is not relayed', STATUS, (t) => t.replace(/ The one other `1`[^.]*\.\n/, '\n')],
+  ['the fallback is given another exit code', STATUS, (t) => t.replace('The one other `1` is', 'The one other `3` is')],
+  ['a failed check is given another exit code', STATUS, (t) => t.replace('`1` means a check failed', '`2` means a check failed')],
+  ['the masker can know', SAFE, (t) => t.replace('The masker cannot know', 'The masker can know')],
+  ['the reader clause becomes safe to send', SAFE,
+    (t) => t.replace('say that it is masked,\nthat those still need a reader, and which', 'say that it is\nsafe to send, and which')],
+  ['the plain-word credential is dropped', SAFE, (t) => t.replace('a credential written in plain words', 'a password')],
+  ['the store half is dropped', SAFE,
+    (t) => t.replace(/When its first line says the instance store was NOT\nread, the instance names were not masked by value either; when/, 'When')],
+  ['the which-of-the-two clause is dropped', SAFE,
+    (t) => t.replace(', and which of the two its first line says was NOT read, if either was', '')],
+  ['the sentence is negated', SAFE, (t) => t.replace('were not masked by value either', 'were masked by value anyway')],
+  ['the example is general again', NAME, (t) => t.replace('so not a common\n   word such as `general`', 'such as\n   `general`')],
+  ['the skill suggests another name', NAME,
+    (t) => t.replace('so not a common\n   word such as `general`.', 'such as `issues`, so not a common\n   word such as `general`.')],
 ];
 
 for (const [title, checkName, breakIt] of NEGATIVES) {
@@ -232,5 +321,41 @@ for (const [title, checkName, breakIt] of NEGATIVES) {
     assert.notEqual(broken, doc, 'the fixture-negative did not change the file');
     assert.throws(() => CHECKS[checkName](broken), assert.AssertionError,
       `"${checkName}" passed a file that ${title}`);
+  });
+}
+
+// ARC-09-C243 — `status --help` and the template's Exit paragraph say what the skill says: a failed check, and the
+// doctor's own failure, which prints one Mode line and no panel. They are not the skill, so they are checked here and
+// not in CHECKS, whose titles name the skill's file.
+const HELPS = 'status --help and the status template give both exit-1 cases, and never say finding';
+const checkHelps = ({ help = HELP, template = TEMPLATE } = {}) => {
+  const exit = paragraphWith(template, '**Exit code.**');
+  for (const [where, text] of [['status --help', flat(help)], ['the status template', exit]]) {
+    assert.doesNotMatch(text, /\bfindings?\b/i, `${where} calls a failed check a finding`);
+    assert.ok(/the one line printed is a Mode line that says `?doctor unavailable`?/.test(text), `${where} leaves out the doctor's own failure`);
+    assert.ok(/1`? when one did: the panel is printed either way/.test(text), `${where} leaves out the failed check`);
+  }
+};
+test(`ARC-09-C243 — ${HELPS}`, () => { checkHelps(); });
+
+// The negatives that break an input other than the skill file: the guide, the help text, the template, FIXED_REVIEW.
+const OTHER = [
+  ['FIXED_REVIEW gains a class the skill does not name', (o) => CHECKS[SAFE](doc, o), { fixed: [...FIXED_REVIEW, 'hostnames inside screenshots'] }],
+  ['the guide drops the masking clause', (o) => CHECKS[NAME](doc, o),
+    { guide: GUIDE.replace(`: the engagement's name is\n   masked ${MASKING};`, ';') }],
+  ['the guide drops item 4\'s caveat', (o) => CHECKS[NAME](doc, o),
+    { guide: GUIDE.replace(' Its first line says when it\n   could not read your instance store or its credentials: then it may not have masked them.', '') }],
+  ['the guide suggests another name', (o) => CHECKS[NAME](doc, o),
+    { guide: GUIDE.replace('so not a common word such as `general`', 'such as `issues`, so not a common word such as `general`') }],
+  ['--help calls a failed check a finding again', checkHelps, { help: HELP.replace('so a 1 is not a', 'so a 1 is a finding, not a') }],
+  ['--help drops the doctor\'s own failure', checkHelps, { help: HELP.split('\n').slice(0, -2).join('\n') }],
+  ['the template calls a failed check a finding again', checkHelps,
+    { template: TEMPLATE.replace('so a `1` is not a failure', 'so a `1` is a finding, not a failure') }],
+];
+for (const [title, run, input] of OTHER) {
+  test(`negative — ${title}`, () => {
+    const original = { guide: GUIDE, help: HELP, template: TEMPLATE };
+    for (const [k, v] of Object.entries(input)) if (k !== 'fixed') assert.notEqual(v, original[k], `the negative did not change the ${k}`);
+    assert.throws(() => run(input), assert.AssertionError, `a check passed where ${title}`);
   });
 }
