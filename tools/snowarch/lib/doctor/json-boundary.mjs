@@ -39,6 +39,13 @@ const INSTANCE_HOST_ALL = new RegExp(INSTANCE_HOST.source, `${INSTANCE_HOST.flag
 // (mask-values.mjs PRODUCT_STEMS, moved from here).
 const DOCTOR_WORDS = new Set(['node', 'proxy']);
 
+// ARC-09-C242 — an address names the organisation in its domain, far more often than not. The redactor keeps a domain on purpose, for a
+// log that stays on the machine; what travels does not, and the server's username mask (`j***@clientco.com`) keeps it: on develop that
+// stood in the JSON unless the store's stem began it. The domain goes whole, always and whatever the store's stems are, and the local
+// part becomes what the server's mask leaves, its first character and `***`. A package (`@scope/name`, `name@1.2.3`) and a bare `a@b`
+// have no such shape: a domain has a dot and ends in letters.
+const ADDRESS = /\b([A-Za-z0-9])[A-Za-z0-9._%+*-]*@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}\b/g;
+
 /**
  * ARC-09-C221 — the store's own hosts and stems, for maskForJson: the non-credential tier (mask-values.mjs), read
  * with the server's precedence, `SNOW_STORE` first. A custom-domain instance, or a host written bare, is not
@@ -51,6 +58,7 @@ export function storeMaskValues(root, env = process.env) {
 
 export const LABEL_MASK = '<label>';
 export const HOST_MASK = '<host>';
+export const DOMAIN_MASK = '<domain>';
 export const HOME_MASK = '~';
 
 /**
@@ -178,7 +186,8 @@ export function maskForJson(report, { labels = labelsIn(report), home = '', host
   // boundary, so `./snowarch` and `corpus` stay.
   const jsonStems = usableStems(stems).filter((s) => s.length > 3 && !DOCTOR_WORDS.has(s.toLowerCase()));
   const maskString = (s) => {
-    let out = s.replace(INSTANCE_HOST_ALL, HOST_MASK);
+    let out = s.replace(ADDRESS, (m, first) => `${first}***@${DOMAIN_MASK}`);
+    out = out.replace(INSTANCE_HOST_ALL, HOST_MASK);
     for (const re of storeHosts) out = out.replace(re, HOST_MASK);
     out = maskStemWords(out, jsonStems, () => HOST_MASK);
     for (const re of homes) out = out.replace(re, HOME_MASK);
