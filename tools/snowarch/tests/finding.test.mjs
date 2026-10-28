@@ -233,12 +233,18 @@ test('ARC-09-C221 — a credential written in plain words is masked, and the pla
   }
 });
 
-test('ARC-09-C221 — a short or product-word engagement name or alias is warned about', async () => {
+test('ARC-09-C221 — a short or product-word engagement name or alias is warned about, by its place and never by its value', async () => {
   const { aliasWarnings } = await finding();
-  const warnings = aliasWarnings({ engagement: 'acme-bank', aliases: ['ABH', 'Incident', 'Acme Bank Holdings'] });
-  assert.ok(warnings.some((w) => w.includes('ABH')), 'a 3-letter alias is not warned about');
-  assert.ok(warnings.some((w) => w.includes('Incident')), 'a product word is not warned about');
-  assert.ok(!warnings.some((w) => w.includes('Acme Bank Holdings')), 'a full company name was warned about');
+  // The printed copy goes to the person who issued the licence, so a warning names the engagement name or the alias by
+  // its place (alias 1 is the first name in aliases.txt), as the architect's review of 2026-10-28 asked.
+  const warnings = aliasWarnings({ engagement: 'acb', aliases: ['ABH', 'Incident', 'Acme Bank Holdings'] });
+  assert.deepEqual(warnings, [
+    'warning: the engagement name is 3 letters long, so it is masked wherever those letters stand alone',
+    'warning: alias 1 in aliases.txt is 3 letters long, so it is masked wherever those letters stand alone',
+    'warning: alias 2 in aliases.txt is a product word, so every use of that word is masked, wherever it means the product']);
+  assert.deepEqual(aliasWarnings({ engagement: 'incident' }),
+    ['warning: the engagement name is a product word, so every use of that word is masked, wherever it means the product']);
+  // A full company name is warned about by neither rule.
   assert.deepEqual(aliasWarnings({ engagement: 'acme-bank', aliases: ['Acme Bank Holdings'] }), []);
 });
 
@@ -453,16 +459,94 @@ test('ARC-09-C242 — a store host is masked whole in a note: a bare name, an IP
     storeUrls: ['https://snow', 'https://itsm'] }), '<engagement> and <user-1>');
 });
 
-test('ARC-09-C242 — the finding warns about a store stem the reader should check, and counts only the stems it uses', async () => {
+// The architect's review of 2026-10-28, one BLOCK: the warnings are printed in the copy the user sends to the person who issued the
+// licence, and they named the client's store name, an alias or the engagement. A warning names no value now, and it describes the
+// masking's own breadth, every instance in the store (his ruling), so it names no engagement either.
+const SHORT_NAME = 'warning: one store name is 3 letters long, so every word that begins with it is masked';
+const PRODUCT_NAME = 'warning: a store name is a product word, so every word that begins with it is masked';
+const PUBLIC_NAME = 'warning: a store name is a government\'s, a sector\'s or a state\'s label: ';
+const word = (value) => new RegExp(`\\b${value}\\b`, 'i');
+/** Which of the values a printed copy holds, as words. */
+const printed = (out, values) => values.filter((v) => word(v).test(out));
+
+test('ARC-09-C242 — the finding warns about a store name the reader should check, and prints no store name and no alias', async () => {
   const { renderFinding } = await finding();
-  for (const [url, warning] of [['https://servicedesk.bbc.co.uk', /"bbc", 3 letters long, so every word that begins with it is masked/],
-    ['https://itsm.act.gov.au', /"act", a government's, a sector's or a state's label/],
-    ['https://itsm.acme', /"itsm", a product word/]]) {
+  // The detector can fail: the text the head printed before this review held the name, and it is found.
+  assert.deepEqual(printed('warning: the instance store gives the name "ibm", 3 letters long, so every word that begins with it is masked', ['ibm']), ['ibm']);
+  for (const [host, warning, value] of [
+    ['servicedesk.bbc.co.uk', SHORT_NAME, 'bbc'],
+    ['itsm.act.gov.au', PUBLIC_NAME, 'act'],
+    ['itsm.acme', PRODUCT_NAME, 'itsm']]) {
     reset();
-    const out = renderFinding('x', { storeUrls: [url] }, { storeRead: true, credentialsRead: true });
-    assert.ok(out.split('\n').some((l) => l.startsWith('warning: ') && warning.test(l)), `${url}: ${out}`);
+    const out = renderFinding('The list view was slow.', { engagement: 'contoso', aliases: ['Contoso Holdings'], storeUrls: [`https://${host}`] },
+      { storeRead: true, credentialsRead: true });
+    assert.ok(out.split('\n').some((l) => l.startsWith(warning)), `${host}: no warning\n${out}`);
+    assert.deepEqual(printed(out, [value, 'contoso', 'Contoso Holdings']), [], `${host}: a value was printed\n${out}`);
   }
+  // A line for each name, however many hosts carry it, and a name the masker does not use is not counted.
+  reset();
+  const two = renderFinding('x', { storeUrls: ['https://abc.service-now.com', 'https://itsm.abc.com', 'https://xyz.service-now.com'] },
+    { storeRead: true, credentialsRead: true });
+  assert.equal(two.split('\n').filter((l) => l === SHORT_NAME).length, 2, two);
   reset();
   const product = renderFinding('x', { storeUrls: ['https://servicedesk.servicenow.example'] }, { storeRead: true, credentialsRead: true });
   assert.match(product.split('\n')[0], /^instance names masked by value: 1 \(store read\)/, 'a stem the masker does not use was counted');
+});
+
+/** A store of several instances, as `storeFile` writes one: [label, url] pairs, mode 0600. */
+function storeOf(t, pairs) {
+  const path = join(tempDir('c242-store-', t), 'instances.json');
+  const instances = Object.fromEntries(pairs.map(([label, url]) => [label, { url, environment: 'prod',
+    auth: { method: 'basic', username: 'svc_snowarch', password: PW },
+    preset: 'read-only', flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false }]));
+  writeFileSync(path, `${JSON.stringify({ version: 1, defaultInstance: pairs[0][0], instances }, null, 2)}\n`);
+  chmodSync(path, 0o600);
+  return path;
+}
+
+/** A checkout-shaped root with `engagement`'s findings folder and a note in it. */
+function checkoutFor(t, engagement, note) {
+  const root = tempDir('c242-root-', t);
+  mkdirSync(join(root, 'clients', engagement, 'findings'), { recursive: true });
+  writeFileSync(join(root, 'clients', engagement, 'findings', '2026-10-28-note.md'), `${note}\n`);
+  return root;
+}
+
+test('ARC-09-C242 — the script end to end: a finding under any engagement prints no store name, and warns about the store\'s short one', async (t) => {
+  const { main } = await finding();
+  // One store, two engagements: beta-corp's instance has a long name and the other's a name of 3 letters.
+  const store = storeOf(t, [['beta-corp-prod', 'https://betacorp.service-now.com'], ['zqx-prod', 'https://zqx.service-now.com']]);
+  const run = async (engagement) => {
+    let out = '';
+    const code = await main([`clients/${engagement}/findings/2026-10-28-note.md`], { root: checkoutFor(t, engagement, 'The list view on the instance was slow.'),
+      env: { SNOW_STORE: store }, credentialReader: async () => ({ read: false, usernames: [] }), out: { write: (s) => { out += s; } } });
+    assert.equal(code, 0, out);
+    return out;
+  };
+  for (const engagement of ['beta-corp', 'zqx']) {
+    const out = await run(engagement);
+    assert.deepEqual(printed(out, ['zqx', 'betacorp', 'beta-corp']), [], `a name was printed under ${engagement}:\n${out}`);
+    // The warning describes the masking, which reads every instance, so both engagements get it.
+    assert.ok(out.split('\n').includes(SHORT_NAME), `no warning under ${engagement}:\n${out}`);
+  }
+});
+
+test('ARC-09-C242 — a store host with a dot is masked whole, on a domain no list knows', async () => {
+  const { maskFinding } = await finding();
+  // `.br` is on no list here, so the host's own step is the only one that sees `zentrix.sp.gov.br` whole: without it the
+  // stem `sp` masks the middle of it and `zentrix` is left (the C242 review, 2026-10-28).
+  reset();
+  const out = maskFinding('zentrix.sp.gov.br is slow; ping zentrix.sp.gov.br. then zentrix.sp.gov.br:8443',
+    { engagement: 'contoso', storeUrls: ['https://zentrix.sp.gov.br'] });
+  assert.deepEqual(survivors(out, ['zentrix']), [], out);
+  assert.equal(out, '<instance-url-1> is slow; ping <instance-url-1>. then <instance-url-1>:8443');
+});
+
+test('ARC-09-C242 — a label that is a public one masks every sibling instance\'s name in a finding, not the words it begins', async () => {
+  const { maskFinding } = await finding();
+  reset();
+  const out = maskFinding('actprod, actuat, act01qa and ACTSBX failed; moduat2, modpreprod, MODSIT and mod3dr too; the action, active and module flows stay',
+    { engagement: 'contoso', storeUrls: ['https://itsm.act.gov.au', 'https://servicedesk.mod.uk'] });
+  assert.deepEqual(survivors(out, ['actprod', 'actuat', 'act01qa', 'actsbx', 'moduat2', 'modpreprod', 'modsit', 'mod3dr']), [], out);
+  assert.ok(out.endsWith('the action, active and module flows stay'), `a word the label only begins was masked: ${out}`);
 });
