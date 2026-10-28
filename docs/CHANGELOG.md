@@ -93,7 +93,8 @@ seconds on the CI machines.**
   that is not one of the product's own words. A name is masked on its own, with an environment and digits after it
   (`acmebankdev`), and with an uppercase letter or a digit after it (`AcmeBank`, `acme2`). A lowercase continuation is
   not a boundary: `corpus` is left alone under the name `corp`, and `acmebank` under `acme`. The store's URLs are read
-  for this, never its credentials (ARC-09-C221, ARC-09-C242).
+  for this, never its credentials. The domain of an address is masked whole, as `<domain>`, whatever the store holds, so
+  a username reads `j***@<domain>`; the JSON had kept it (ARC-09-C221, ARC-09-C242).
 - The install page says that Git for Windows 2.54 and 2.55's `… is not a commit!` line during the clone is harmless,
   and links to the troubleshooting paragraph that explains it (ARC-09-C224).
 - The bootstrap now fetches the whole ServiceNow documentation, all 56 areas, instead of only the areas the specialists
