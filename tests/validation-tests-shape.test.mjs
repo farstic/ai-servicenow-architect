@@ -205,6 +205,20 @@ const CHECKS = {
       assert.ok(t.includes(s), `missing verbatim:\n${s}`);
     }
   },
+
+  // ARC-09-C243 — T-37 gained a fourth turn, and its fail signal for an extra question after turn 3 was reworded to the
+  // new last turn only (the review of #547): a flow that stops after turn 3 to ask "shall I write the note?" would pass.
+  'ARC-09-C243 — T-37 keeps its fail signal for a question after turn 3, and has one for turn 4': (t) => {
+    const at = t.indexOf('\n## T-37 ');
+    assert.ok(at > 0, 'no T-37');
+    const end = t.indexOf('\n## ', at + 1);
+    const fail = (t.slice(at, end < 0 ? undefined : end).split('### Fail signals')[1] ?? '');
+    for (const s of ['- A fourth question asked when the three turns already answered everything.',
+      '- A question asked after turn 4, when the four turns already answered everything.',
+      '- The answer to turn 4 says the copy is safe to send, or leaves out what its first line says was NOT read.']) {
+      assert.ok(fail.includes(s), `T-37\'s fail signals lack: ${s}`);
+    }
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -273,6 +287,10 @@ const NEGATIVES = [
     (t) => t.replace('### Fail signals', 'Last verified 2026-01-01.\n\n### Fail signals')],
   ['a retired name reappears inside a code fence', 'criterion 3 — no retired tool or script name, in prose or in a fence',
     (t) => t.replace('```\nStatus\n```', '```\nquery_records(sys_user)\n```')],
+  ['T-37 loses its turn-3 fail signal', 'ARC-09-C243 — T-37 keeps its fail signal for a question after turn 3, and has one for turn 4',
+    (t) => t.replace('- A fourth question asked when the three turns already answered everything.\n', '')],
+  ['T-37\'s turn-3 signal is reworded to cover only turn 4', 'ARC-09-C243 — T-37 keeps its fail signal for a question after turn 3, and has one for turn 4',
+    (t) => t.replace('- A fourth question asked when the three turns already answered everything.', '- A question asked when the four turns already answered everything.')],
   ['a test is added without updating the header count', 'the stated test count is the number of tests',
     (t) => `${t}\n## T-26 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];

@@ -237,7 +237,10 @@ const CHECKS = {
     // catch prints when the doctor itself failed: that one is exit 1 too (status.mjs).
     const s = flat(sectionOf(t, 'status'));
     assert.ok(s.includes('`1` means a check failed, and the panel on the screen says which — report it as a failed check, never as "the command failed"'));
-    assert.ok(s.includes("The one other `1` is the command's own fallback, a Mode line that says `doctor unavailable`: relay that line as it is"));
+    assert.ok(s.includes("A `1` is also the command's own fallback, a Mode line that says `doctor unavailable`: relay that line as it is, with the cause it names."));
+    // The CLI's catch-all (cli.mjs, ARC-09-C209) also exits 1, with one `error: status: …` line and neither a panel nor a Mode line.
+    assert.ok(s.includes('A `1` with neither a panel nor that line is the command itself failing, usually one `error: status: …` line: relay it, and say the mode is unverified.'));
+    assert.doesNotMatch(s, /\bthe one other\b/i, '§ status says there are only two kinds of exit 1');
     assert.doesNotMatch(s, /\bfindings?\b/i, '§ status says "finding", which § finding defines as the note flow');
   },
   [SAFE]: (t, { fixed = FIXED_REVIEW } = {}) => {
@@ -298,8 +301,12 @@ const NEGATIVES = [
   ['status says finding again', STATUS, (t) => t.replace('report it as a failed check', 'report it as a finding')],
   ['status brings the findings back in the plural', STATUS,
     (t) => t.replace('with the cause it names.', 'with the cause it names, and file it with the findings.')],
-  ['the fallback line is not relayed', STATUS, (t) => t.replace(/ The one other `1`[^.]*\.\n/, '\n')],
-  ['the fallback is given another exit code', STATUS, (t) => t.replace('The one other `1` is', 'The one other `3` is')],
+  ['the fallback line is not relayed', STATUS,
+    (t) => t.replace("A `1` is also the command's own fallback, a Mode line that says `doctor unavailable`: relay that\n   line as it is, with the cause it names. ", '')],
+  ['the fallback is given another exit code', STATUS, (t) => t.replace('A `1` is also the command', 'A `3` is also the command')],
+  ['the command failing is not named', STATUS,
+    (t) => t.replace(/ A `1` with neither a panel nor that line is the command\n   itself failing[^\n]*/, '')],
+  ['the step claims exclusivity again', STATUS, (t) => t.replace('A `1` is also the command', 'The one other `1` is the command')],
   ['a failed check is given another exit code', STATUS, (t) => t.replace('`1` means a check failed', '`2` means a check failed')],
   ['the masker can know', SAFE, (t) => t.replace('The masker cannot know', 'The masker can know')],
   ['the reader clause becomes safe to send', SAFE,
@@ -334,6 +341,7 @@ const checkHelps = ({ help = HELP, template = TEMPLATE } = {}) => {
     assert.doesNotMatch(text, /\bfindings?\b/i, `${where} calls a failed check a finding`);
     assert.ok(/the one line printed is a Mode line that says `?doctor unavailable`?/.test(text), `${where} leaves out the doctor's own failure`);
     assert.ok(/1`? when one did: the panel is printed either way/.test(text), `${where} leaves out the failed check`);
+    assert.ok(/Any other `?1`? is the command itself failing, and what it printed says why/.test(text), `${where} leaves out the command failing`);
   }
 };
 test(`ARC-09-C243 — ${HELPS}`, () => { checkHelps(); });
@@ -348,7 +356,9 @@ const OTHER = [
   ['the guide suggests another name', (o) => CHECKS[NAME](doc, o),
     { guide: GUIDE.replace('so not a common word such as `general`', 'such as `issues`, so not a common word such as `general`') }],
   ['--help calls a failed check a finding again', checkHelps, { help: HELP.replace('so a 1 is not a', 'so a 1 is a finding, not a') }],
-  ['--help drops the doctor\'s own failure', checkHelps, { help: HELP.split('\n').slice(0, -2).join('\n') }],
+  ['--help drops the doctor\'s own failure', checkHelps, { help: HELP.split('\n').slice(0, -3).join('\n') }],
+  ['--help drops the command failing', checkHelps, { help: HELP.replace(/ Any other 1 is the command itself failing[^\n]*\n?[^\n]*/, '') }],
+  ['the template drops the command failing', checkHelps, { template: TEMPLATE.replace(/ Any other `1` is the command itself failing[^\n]*/, '') }],
   ['the template calls a failed check a finding again', checkHelps,
     { template: TEMPLATE.replace('so a `1` is not a failure', 'so a `1` is a finding, not a failure') }],
 ];
