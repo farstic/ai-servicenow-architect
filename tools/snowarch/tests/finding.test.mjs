@@ -375,3 +375,94 @@ test('ARC-09-C221 — the script refuses a path outside the findings folder and 
   assert.ok(!out.includes(PW), 'a refused file was printed');
   assert.match(out, /clients\/<engagement>\/findings/);
 });
+
+// ── ARC-09-C242 — a store stem names the organisation, and a store host is masked whole ──────────────────────────────
+//
+// The regression hunt (wf_9be5c51c-184): a store host under a country's second level (servicedesk.<org>.co.uk) gave
+// the stem `co`, which masked every word that begins with it, `Could` and `configure` among them, and left the
+// organisation's own name unmasked. A finding keeps masking every word that begins with the stem, because AcmeUtils
+// and svc_acmeintegration are the client's (the C242 review, 2026-10-25). The exception is a government's, a sector's
+// or a state's label: `act` begins action, and `mod` begins module.
+
+test('ARC-09-C242 — a store host gives its organisation\'s stem, past a public suffix; an address gives none', async () => {
+  const { stemOf } = await maskValues();
+  for (const [host, stem] of [['servicedesk.acme.co.uk', 'acme'], ['acme.co.uk', 'acme'], ['itsm.acme.com.au', 'acme'],
+    ['servicedesk.ox.ac.uk', 'ox'], ['servicedesk.hmrc.gov.uk', 'hmrc'], ['itsm.cmtedd.act.gov.au', 'cmtedd'],
+    ['servicedesk.iot.in.gov', 'iot'], ['servicedesk.met.police.uk', 'met'], ['servicedesk.prits.pr.gov', 'prits'],
+    ['servicedesk.acme.co.uk.', 'acme'], ['10.42.17.8', ''], ['[2001:db8::1]', ''],
+    // a sector, a government or a state with only the service's label in front of it is the organisation
+    ['servicedesk.mod.uk', 'mod'], ['itsm.gov.pl', 'gov'], ['itsm.act.gov.au', 'act'], ['itsm.in.gov', 'in'],
+    ['servicenow.police.uk', 'police'],
+    // a sector's label under another country is an organisation's own domain; ed.gov and va.gov are not states
+    ['servicedesk.police.be', 'police'], ['servicedesk.nic.br', 'nic'], ['itsm.ed.gov', 'ed'], ['yourit.va.gov', 'va'],
+    // unchanged
+    ['acmebank.service-now.com', 'acmebank'], ['servicedesk.acmebank.com', 'acmebank'], ['acme.co', 'acme'],
+    ['snow.corp.local', 'corp'], ['snow', 'snow']]) {
+    assert.equal(stemOf(host), stem, host);
+  }
+});
+
+test('ARC-09-C242 — a finding from a .co.uk or .com.au store keeps the words of the hunt, and masks the organisation', async () => {
+  const { maskFinding } = await finding();
+  const note = 'Could not configure the connection; the commit is on github.com, in the acme instance, acmedev and AcmeUtils.';
+  for (const url of ['https://servicedesk.acme.co.uk', 'https://itsm.acme.com.au']) {
+    reset();
+    const out = maskFinding(note, { engagement: 'acme-bank', storeUrls: [url] });
+    assert.ok(out.includes('Could not configure the connection; the commit is on github.com'), `${url}: ${out}`);
+    assert.deepEqual(survivors(out, ['acme']), [], `${url}: the organisation's name survived: ${out}`);
+  }
+});
+
+test('ARC-09-C242 — a finding still masks every word that begins with the stem: the client\'s own identifiers', async () => {
+  const { maskFinding } = await finding();
+  // The privacy review's ten tokens (c242-leaks-1), which v1's narrowed stem let through.
+  const tokens = ['AcmeUtils', 'ACMEUtils', 'AcmeAjaxUtils', 'ACMEMID01', 'AcmeCorp', 'acmegroup', 'svc_acmeintegration',
+    'u_acmehr_location', 'ACMELT0042', 'Acmes'];
+  reset();
+  const out = maskFinding(tokens.join(' '), { engagement: 'contoso', storeUrls: ['https://acme.service-now.com'] });
+  assert.deepEqual(survivors(out, ['acme']), [], `a client identifier survived: ${out}`);
+});
+
+test('ARC-09-C242 — a government\'s, a sector\'s or a state\'s label is masked as a word and a sibling, not as a prefix', async () => {
+  const { maskFinding } = await finding();
+  for (const [url, note, gone, kept] of [
+    ['https://itsm.act.gov.au', 'ACT raised it; act on it; actdev and ACT-ITSM-PROD; the action and active flows.', ['act on', 'actdev', 'act-'], 'the action and active flows'],
+    ['https://servicedesk.mod.uk', 'the MOD team, moddev; the model and module', ['mod team', 'moddev'], 'the model and module'],
+    ['https://ibm.service-now.com', 'IBMUtils and ibmmid01; the ibm instance', ['ibm'], '']]) {
+    reset();
+    const out = maskFinding(note, { engagement: 'contoso', storeUrls: [url] });
+    assert.deepEqual(survivors(out, gone), [], `${url}: ${out}`);
+    if (kept) assert.ok(out.includes(kept), `${url}: a word the label only begins was masked: ${out}`);
+  }
+});
+
+test('ARC-09-C242 — a store host is masked whole in a note: a bare name, an IPv6 address, a trailing dot', async () => {
+  const { maskFinding } = await finding();
+  for (const [url, note, gone] of [
+    ['https://[fd00:42::17]', 'ping [FD00:42::17] fails; [fd00:42::17]:443 refused', ['fd00:42::17']],
+    ['https://snow', 'cannot reach snow:8443; DNS:snow.acmecorp.com; run ./snowarch doctor and snow_core_capabilities_read', ['snow:', 'acmecorp']],
+    ['https://snow.', 'cannot reach snow:8443', ['snow:']]]) {
+    reset();
+    const out = maskFinding(note, { storeUrls: [url] });
+    assert.deepEqual(survivors(out, gone), [], `${url}: ${out}`);
+    if (url === 'https://snow') assert.ok(out.includes('./snowarch doctor and snow_core_capabilities_read'), `a product word was masked: ${out}`);
+  }
+  // A name that holds a bare store host as a part is masked whole first (the C242 review, round 2).
+  reset();
+  assert.equal(maskFinding('Snow Acme Holdings and itsm.acmebankuk', { aliases: ['Snow Acme Holdings'], usernames: ['itsm.acmebankuk'],
+    storeUrls: ['https://snow', 'https://itsm'] }), '<engagement> and <user-1>');
+});
+
+test('ARC-09-C242 — the finding warns about a store stem the reader should check, and counts only the stems it uses', async () => {
+  const { renderFinding } = await finding();
+  for (const [url, warning] of [['https://servicedesk.bbc.co.uk', /"bbc", 3 letters long, so every word that begins with it is masked/],
+    ['https://itsm.act.gov.au', /"act", a government's, a sector's or a state's label/],
+    ['https://itsm.acme', /"itsm", a product word/]]) {
+    reset();
+    const out = renderFinding('x', { storeUrls: [url] }, { storeRead: true, credentialsRead: true });
+    assert.ok(out.split('\n').some((l) => l.startsWith('warning: ') && warning.test(l)), `${url}: ${out}`);
+  }
+  reset();
+  const product = renderFinding('x', { storeUrls: ['https://servicedesk.servicenow.example'] }, { storeRead: true, credentialsRead: true });
+  assert.match(product.split('\n')[0], /^instance names masked by value: 1 \(store read\)/, 'a stem the masker does not use was counted');
+});
