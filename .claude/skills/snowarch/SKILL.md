@@ -54,8 +54,9 @@ Instances are the store's own records; nothing was probed.
 
 3. **The exit code is the doctor's verdict, not the command's health.** `1` means a check failed,
    and the panel on the screen says which — report it as a failed check, never as "the command failed".
-   The one other `1` is the command's own fallback, a Mode line that says `doctor unavailable`: relay
-   that line as it is, with the cause it names.
+   A `1` is also the command's own fallback, a Mode line that says `doctor unavailable`: relay that
+   line as it is, with the cause it names. A `1` with neither a panel nor that line is the command
+   itself failing, usually one `error: status: …` line: relay it, and say the mode is unverified.
 4. **If it did not run at all** — no Node, or the launcher is not installed — say so and name the
    cause you actually observed, no other:
    `Mode: unverified — ./snowarch status did not run (<cause>); run ./bootstrap.sh (Windows: bootstrap.cmd)`.
