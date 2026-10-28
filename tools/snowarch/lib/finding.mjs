@@ -53,7 +53,7 @@ export function maskFinding(text, { engagement = '', aliases = [], labels = [], 
     if (!seen.has(k)) seen.set(k, [...seen.keys()].filter((x) => x.startsWith(`${kind}\u0000`)).length + 1);
     return `<${kind}-${seen.get(k)}>`;
   };
-  // A trailing dot is dropped, as stemOf drops it: `https://snow.` names the host a note writes as `snow`.
+  // A trailing dot is dropped, as stemOf drops it: a store URL whose host ends in a dot names the host a note writes without it.
   const storeHosts = storeUrls.map((u) => { try { return new URL(u).hostname.toLowerCase().replace(/\.$/, ''); } catch { return null; } }).filter(Boolean);
   const stems = storeHosts.map(stemOf).filter(Boolean);
   const byLength = [...storeHosts].sort((a, b) => b.length - a.length);
