@@ -110,7 +110,8 @@ export const STEM_ANY = '[a-z0-9]*';
  * acmebankdev and acmebank01test but not a longer word it begins. A finding uses it for a stem that is a government's, a
  * sector's or a state's label, which begins too many ordinary words (`act` begins action, `mod` module, `in` instance),
  * and warns about it. Every other stem keeps STEM_ANY there: a finding is the user's own note, read before it is sent,
- * and a client's name that begins a word in it (AcmeUtils, svc_acmeintegration) is what it must not carry.
+ * and a client's name that begins a word in it (AcmeUtils, svc_acmeintegration) is what it must not carry. The doctor's
+ * JSON takes the same suffix, and a token boundary besides (maskStemWords).
  */
 export const STEM_SIBLING = `[0-9]*(?:${['dev', 'test', 'prod', 'pdi', 'uat', 'qa', 'stg', 'stage', 'staging', 'sbx',
   'sandbox', 'train', 'training', 'demo', 'preprod', 'prd', 'tst', 'nonprod', 'np', 'sit', 'perf', 'int', 'dr', 'poc',
@@ -141,6 +142,27 @@ export function byValueEntries({ engagement = '', aliases = [], labels = [], ste
 export const hostSource = (host) => (host.includes('.') && !host.startsWith('[')
   ? `(?<![\\w.-])${escape(host)}(?![\\w-]|\\.[A-Za-z0-9])`
   : `(?<![\\w.-])${escape(host)}(?![\\w-])`);
+
+/**
+ * ARC-09-C242 — the store's stems in the doctor's JSON, by the architect's ruling of 2026-10-28. A stem masks its whole
+ * word, the run of letters and digits it starts, when what follows the stem in that word is
+ *   - nothing, or a sibling instance's suffix (STEM_SIBLING): acmebank, acmebankdev, acmebank01test;
+ *   - or begins at a token boundary, an uppercase letter or a digit: AcmeBank, ACMEMID01, acmeUtils, acme2, acme2foo.
+ * A lowercase continuation is not a boundary, so `./snowarch` and `corpus` stay readable under the stems `snow` and
+ * `corp`. The cost is that `acmebank` stays under the stem `acme`, where a finding masks it: the client-confidentiality
+ * rule outranks readability, and that is the line the architect drew. A `-`, `_` or `.` ends the word, so acme-prod,
+ * acme_core and acme.getManager are whole names. The stem matches in any case; the boundary is read as written.
+ * The caller passes the stems it uses, and `to(word)` names what replaces a word.
+ */
+export function maskStemWords(text, stems, to) {
+  const sibling = new RegExp(`^${STEM_SIBLING}$`, 'i');
+  let out = text;
+  for (const s of [...stems].sort((a, b) => b.length - a.length)) {
+    out = out.replace(new RegExp(`(?<![A-Za-z0-9])${escape(s)}([A-Za-z0-9]*)`, 'gi'),
+      (word, rest) => (rest === '' || sibling.test(rest) || /^[A-Z0-9]/.test(rest) ? to(word) : word));
+  }
+  return out;
+}
 
 /** Replace every by-value match; `to(kind, match)` names what replaces it. */
 export function maskByValue(text, entries, to) {
