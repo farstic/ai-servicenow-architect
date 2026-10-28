@@ -78,7 +78,13 @@ test('C87 (b) — the policy: Sonnet 5.5 by default, the clone\'s own settings, 
   const { cli } = POSIX;
   assert.deepEqual(t07.allowed.filter((a) => a.startsWith('Bash')), [`Bash(${cli}:*)`, `Bash(${cli} doctor:*)`]);
   assert.ok(policyFor('T-13').tools.includes('Write'));
-  for (const id of ['T-01', 'T-07', 'T-13', 'T-25']) {
+  // ARC-09-C243 — T-38 prints the status panel and may run the doctor, and nothing else of the launcher: a Bash grant for
+  // those two commands, never for the whole CLI, and no Write.
+  const t38 = policyFor('T-38');
+  assert.ok(t38.tools.includes('Bash'), 'T-38 runs the status command');
+  assert.deepEqual(t38.allowed.filter((a) => a.startsWith('Bash')), [`Bash(${cli} status:*)`, `Bash(${cli} doctor:*)`]);
+  assert.ok(!t38.tools.includes('Write'), 'T-38 writes nothing');
+  for (const id of ['T-01', 'T-07', 'T-13', 'T-25', 'T-38']) {
     const p = policyFor(id);
     assert.deepEqual(p.tools.filter((x) => ['Agent', 'Task', 'WebFetch', 'WebSearch', 'Edit'].includes(x)), [], `${id} has no sub-agent, web or edit tool`);
     // Every allowed pattern names a tool that exists: permission is never granted for a tool the session lacks.
