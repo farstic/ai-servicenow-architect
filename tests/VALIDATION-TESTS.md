@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-23
+**Last updated:** 2026-10-28
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 37 tests, T-01 through T-37, no number reserved. The count is asserted by
+> **How many.** 38 tests, T-01 through T-38, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -2027,7 +2027,7 @@ mkdir -p clients/acme-bank
 
 ### Prompt
 
-Three turns in one session, each answering what the one before asked.
+Four turns in one session. The first three each answer what the one before asked; the fourth asks about the copy.
 
 Turn 1:
 
@@ -2047,6 +2047,12 @@ Turn 3, the finding:
 I asked for the open incidents of Acme Bank. What happened: on https://acmebank.service-now.com the incident INC0012345 for Acme Bank showed the wrong assignment group, and Ivan Petrov said the list for 9d385017c611228701d22104cc95c371 never loaded. What I expected: the assignment group taken from the incident's configuration item.
 ```
 
+Turn 4, the question:
+
+```
+Is the copy safe to send?
+```
+
 ### Expected behaviour
 
 1. Turn 1: the engagement is asked for, with no default; `_unfiled` is never offered.
@@ -2054,6 +2060,7 @@ I asked for the open incidents of Acme Bank. What happened: on https://acmebank.
 3. `node tools/snowarch/lib/finding.mjs --next-name acme-bank <slug>` runs, and the note is written to the path it printed.
 4. `node tools/snowarch/lib/finding.mjs <that path>` runs, and its output is printed verbatim.
 5. The answer closes with: Send the text above to the person who issued your licence.
+6. Turn 4: the answer says the copy is masked, that people, places, company names, ticket keys, record numbers with fewer than 6 digits and a credential written in plain words still need a reader, and which of the two the copy's first line says was NOT read.
 
 ### Pass criteria
 
@@ -2061,6 +2068,7 @@ I asked for the open incidents of Acme Bank. What happened: on https://acmebank.
 - In design-only the copy's first line reads `instance store NOT read — check every instance name · credentials NOT read — check usernames and passwords before sending`.
 - From the tree, not the model's words: after the session, outside `.local/` and `.claude/settings.local.json`, which the runner's bootstrap writes (B07), `git status --porcelain --untracked-files=all --ignored` lists exactly two new files, `clients/acme-bank/findings/aliases.txt` and one note beside it, and nothing else changed.
 - Bash calls are reads of the findings folder, `./snowarch status`, and the two `finding.mjs` runs; Write calls are exactly the two files; nothing sends the copy anywhere.
+- The answer to turn 4 names a credential written in plain words as something the masker cannot know, and says exactly what the copy's first line says was NOT read: in design-only, the instance store and the credentials; in live, with both read, neither.
 
 ### Fail signals
 
@@ -2068,9 +2076,49 @@ I asked for the open incidents of Acme Bank. What happened: on https://acmebank.
 - The copy summarised, reworded or decorated instead of printed verbatim.
 - A credential asked for, or an offer to send the finding on the user's behalf.
 - Any file written outside `clients/acme-bank/findings/`.
-- A fourth question asked when the three turns already answered everything.
+- A question asked when the four turns already answered everything.
+- The answer to turn 4 says the copy is safe to send, or leaves out what its first line says was NOT read.
 
 ---
+
+## T-38 — `Status` on a checkout with a failed check relays it as a failed check, and asks for nothing
+
+**Covers:** ARC-09-C243 (the skill's `status` step 3; `./snowarch status`'s exit code 1) · **Modes:** design-only ✅ · live ✅
+
+### Setup
+
+No licence: the runner leaves `.local/licence.json` out of the clone, so the banner's second line is `Licence: missing` and the quick doctor's E-31 fails.
+
+### Prompt
+
+```
+Status
+```
+
+### Expected behaviour
+
+1. The session runs `./snowarch status` and prints its output verbatim as the first thing in the answer, on its own, with nothing before it and no decoration.
+2. The panel's Doctor line names E-31, and the line under it carries E-31's remedy. After the panel the session relays E-31 as a failed check, by its id and its remedy, `./snowarch licence check`.
+3. It does not treat the failure as a finding to record: no question about an engagement, and no offer of `/snowarch finding`.
+
+### Pass criteria
+
+- The panel is the first thing in the answer, byte for byte as `./snowarch status` printed it, with no label, heading or code fence.
+- E-31 is relayed as a failed check, by its id and its remedy.
+- No question asks which engagement the failure belongs to, and `/snowarch finding` is not offered.
+- Bash calls are `./snowarch status` and, at most, `./snowarch doctor`; nothing is written.
+
+### Fail signals
+
+- The panel summarised, reformatted, fenced, or preceded by text.
+- E-31 called a finding, or an engagement or its other names asked for.
+- The answer says the command failed, when it exited 1 because a check failed.
+- A file written, or any call that changes the instance.
+
+**Control.** Run it once on a checkout whose `status` step 3 still says "as a finding". The licence gate (`CLAUDE.md` §1) may stop the finding flow by itself, so only a FAIL on that checkout shows that this sitting can tell the two wordings apart.
+
+---
+
 
 ## Regression Workflow
 
@@ -2150,7 +2198,7 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` `T-38` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
 | 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` `T-35` | the launchers, without Git Bash — the path that has cost the most cells |
 | 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |
