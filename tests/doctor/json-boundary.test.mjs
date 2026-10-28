@@ -380,3 +380,68 @@ test('ARC-09-C221 — every maskForJson call passes the store\'s values', async 
   assert.deepEqual(calls.filter((c) => c.endsWith('MISSING')), [], 'a call site masks without the store\'s values');
   assert.deepEqual(loose, [], 'maskForJson is imported under another name or passed on as a value');
 });
+
+// ── ARC-09-C242 — a store stem masks whole names in the doctor's JSON, and names at a token boundary ───────────────────
+//
+// The regression hunt (wf_9be5c51c-184): a stem matched every word it begins, so a store host whose stem is `snow` or
+// `corp` turned `./snowarch` and `corpus` into `<host>`, in `doctor --json` and in the lines U7 prints from it. A stem
+// masks its whole word now when what follows it is nothing, a sibling instance's environment word with digits, or a
+// token boundary, which the architect ruled on 2026-10-28: an uppercase letter or a digit (`-`, `_` and `.` end the word,
+// so they are whole names already). A lowercase continuation is not a boundary. The client-confidentiality rule outranks
+// readability, and the one cost is asserted below, so it is documented behaviour rather than a discovery.
+
+test('ARC-09-C242 — the hunt\'s control: a store stem that begins a product word leaves the word as it is', () => {
+  const words = ['run ./snowarch doctor', 'the corpus is sparse', 'run ./bootstrap.sh', '.local/bootstrap-state.json is absent'];
+  for (const stem of ['snow', 'corp', 'boot']) {
+    assert.deepEqual(maskForJson({ server: { instances: [] }, v: words }, { hosts: [], stems: [stem] }).v, words, `stem ${stem}`);
+  }
+});
+
+test('ARC-09-C242 — a store stem masks its whole name and a sibling instance\'s in the doctor\'s JSON', () => {
+  const names = ['corp', 'CORP', 'corpdev', 'corp-test', 'CORPUAT2', 'corp2dev', 'corp01prd'];
+  assert.deepEqual(maskForJson({ server: { instances: [] }, v: names }, { hosts: [], stems: ['corp'] }).v,
+    [HOST_MASK, HOST_MASK, HOST_MASK, `${HOST_MASK}-test`, HOST_MASK, HOST_MASK, HOST_MASK]);
+});
+
+test('ARC-09-C242 — the doctor\'s own words survive a store\'s values: node, proxy, and the snow_ tools beside a bare host', () => {
+  const printed = ['install Node.js 20+', 'run node scripts/build-dist.mjs', 'set HTTPS_PROXY', 'call snow_core_capabilities_read first'];
+  assert.deepEqual(maskForJson({ server: { instances: [] }, v: printed }, { hosts: ['snow'], stems: ['node', 'proxy'] }).v, printed,
+    'a word the doctor prints was masked as a store value');
+});
+
+/** What the doctor's JSON makes of `v`, for a store whose host has these stems. */
+const stemWords = (stems, v) => maskForJson({ server: { instances: [] }, v }, { hosts: [], stems }).v;
+
+test('ARC-09-C242 — `AcmeBank-snowarch` is masked: an uppercase letter after the stem is a boundary', () => {
+  assert.deepEqual(stemWords(['acme'], ['AcmeBank-snowarch', '/work/AcmeBank-snowarch/clients']),
+    [`${HOST_MASK}-snowarch`, `/work/${HOST_MASK}-snowarch/clients`]);
+});
+
+test('ARC-09-C242 — `acme2` is masked: a digit after the stem is a boundary', () => {
+  assert.deepEqual(stemWords(['acme'], ['acme2', 'acme2foo', 'the acme2 instance']), [HOST_MASK, HOST_MASK, `the ${HOST_MASK} instance`]);
+});
+
+test('ARC-09-C242 — `corpus` stays: a lowercase continuation is not a boundary', () => {
+  assert.deepEqual(stemWords(['corp'], ['corpus', 'the corpus is sparse', 'a corporate policy']), ['corpus', 'the corpus is sparse', 'a corporate policy']);
+});
+
+test('ARC-09-C242 — `./snowarch` stays: a lowercase continuation is not a boundary', async () => {
+  // `snow` is a product word, so the doctor's JSON drops it before the rule: both the product's own call and the rule
+  // itself, asked directly with the stem, leave the word alone.
+  assert.deepEqual(stemWords(['snow'], ['./snowarch', 'run ./snowarch doctor']), ['./snowarch', 'run ./snowarch doctor']);
+  const { maskStemWords } = await import('../../tools/snowarch/lib/mask-values.mjs');
+  const text = 'run ./snowarch doctor; snowarch-write; snowdrift';
+  assert.equal(maskStemWords(text, ['snow'], () => HOST_MASK), text);
+});
+
+test('ARC-09-C242 — a camel-case, all-capitals or separated word that begins with the stem is masked whole', () => {
+  assert.deepEqual(stemWords(['acme'], ['acmeUtils', 'ACMEMID01', 'ACMEBANK', 'Acme2dev', 'acme.getManager', 'acme_core', 'acme-prod']),
+    [HOST_MASK, HOST_MASK, HOST_MASK, HOST_MASK, `${HOST_MASK}.getManager`, `${HOST_MASK}_core`, `${HOST_MASK}-prod`]);
+});
+
+test('ARC-09-C242 — the accepted cost: a lowercase word that only begins with the name is not masked in the JSON', () => {
+  // The architect's ruling of 2026-10-28: a lowercase continuation is not a boundary, so `acmebank` and `acmeutils`
+  // under the stem `acme` stay in the doctor's JSON, as `corpus` stays under `corp`. A finding masks them
+  // (tools/snowarch/tests/finding.test.mjs). Changing this is a decision, not a fix.
+  assert.deepEqual(stemWords(['acme'], ['acmebank', 'acmeutils']), ['acmebank', 'acmeutils']);
+});
