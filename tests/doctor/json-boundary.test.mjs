@@ -337,15 +337,46 @@ test('ARC-09-C221 — the store\'s values are read SNOW_STORE first, and never a
 });
 
 test('ARC-09-C221 — every maskForJson call passes the store\'s values', async () => {
-  const { readFileSync: read } = await import('node:fs');
+  const { readdirSync, readFileSync: read } = await import('node:fs');
   const { fileURLToPath } = await import('node:url');
+  const { default: ts } = await import('typescript');
   const lib = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'tools', 'snowarch', 'lib');
+  // ARC-09-C242 — every module under lib, not two named ones (the regression hunt), read by the compiler
+  // tests/lib/temp-sites.mjs reads with, so a comment, a string, a regex or a template is never mistaken for code. A
+  // call's arguments must hold storeMaskValues(…); the function is imported, statically or with await import(), under
+  // its own name only, and never passed on as a value.
+  const files = readdirSync(lib, { recursive: true }).map((p) => String(p).replace(/\\/g, '/')).filter((p) => p.endsWith('.mjs')).sort();
   const calls = [];
-  for (const f of ['doctor/index.mjs', 'commands/status.mjs']) {
-    read(join(lib, f), 'utf8').split('\n').forEach((line, i) => {
-      if (/maskForJson\(/.test(line) && !/^\s*(\/\/|\*)/.test(line)) calls.push(`${f}:${i + 1}: ${/storeMaskValues\(/.test(line) ? 'ok' : 'MISSING'}`);
-    });
+  const loose = [];
+  for (const f of files) {
+    const source = ts.createSourceFile(f, read(join(lib, f), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+    const at = (node) => `${f}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1}`;
+    const calls_ = (node, name) => {
+      let found = false;
+      const look = (n) => {
+        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === name) found = true;
+        else ts.forEachChild(n, look);
+      };
+      look(node);
+      return found;
+    };
+    const visit = (node) => {
+      if (ts.isIdentifier(node) && node.text === 'maskForJson') {
+        const p = node.parent;
+        if (ts.isCallExpression(p) && p.expression === node) {
+          calls.push(`${at(node)}: ${p.arguments.some((a) => calls_(a, 'storeMaskValues')) ? 'ok' : 'MISSING'}`);
+        } else if ((ts.isFunctionDeclaration(p) && p.name === node)
+          || ((ts.isImportSpecifier(p) || ts.isBindingElement(p) || ts.isExportSpecifier(p)) && !p.propertyName)) {
+          // the definition, or an import or a re-export under its own name
+        } else {
+          loose.push(at(node));
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
   }
   assert.equal(calls.length, 3, `expected the 3 known call sites: ${calls.join(' | ')}`);
   assert.deepEqual(calls.filter((c) => c.endsWith('MISSING')), [], 'a call site masks without the store\'s values');
+  assert.deepEqual(loose, [], 'maskForJson is imported under another name or passed on as a value');
 });
