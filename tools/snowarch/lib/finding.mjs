@@ -151,17 +151,23 @@ const PRODUCT_WORDS = new Set([...ENV_WORDS, 'incident', 'problem', 'change', 'r
   'service', 'desk', 'portal', 'workspace', 'itsm', 'csm', 'hrsd', 'itom', 'cmdb', 'now', 'servicenow', 'snowarch',
   'admin', 'user', 'group', 'flow', 'catalog', 'report']);
 
-/** A warning for each engagement name or alias of 3 letters or fewer, or one that is a product word. */
+/**
+ * A warning for the engagement name, or an alias, of 3 letters or fewer, or one that is a product word. The printed copy goes to the
+ * person who issued the licence, so a warning names the place (the engagement name; alias 1 is the first name in aliases.txt)
+ * and never the value (the architect's review of 2026-10-28).
+ */
 export function aliasWarnings({ engagement = '', aliases = [] } = {}) {
   const out = [];
-  for (const name of [engagement, ...aliases].filter(Boolean)) {
+  const warn = (name, place) => {
     const letters = name.replace(/[^A-Za-z]/g, '');
     if (PRODUCT_WORDS.has(name.trim().toLowerCase())) {
-      out.push(`warning: "${name}" is a product word, so every "${name}" is masked, wherever it means the product`);
+      out.push(`warning: ${place} is a product word, so every use of that word is masked, wherever it means the product`);
     } else if (letters.length <= 3) {
-      out.push(`warning: "${name}" is ${letters.length} letters long, so it is masked wherever those letters stand alone`);
+      out.push(`warning: ${place} is ${letters.length} letters long, so it is masked wherever those letters stand alone`);
     }
-  }
+  };
+  if (engagement) warn(engagement, 'the engagement name');
+  aliases.forEach((alias, i) => { if (alias) warn(alias, `alias ${i + 1} in aliases.txt`); });
   return out;
 }
 
@@ -171,17 +177,19 @@ const stemsOf = (storeUrls = []) => usableStems(storeUrls.map((u) => {
 }));
 
 /**
- * ARC-09-C242 — a warning for a store stem the reader should know about, as for an alias. A government's, a sector's or a
- * state's label is masked as a word and in a sibling instance's name, not where it begins a longer word; a stem of 3
- * letters or fewer, or one that is a product word, masks every word that begins with it.
+ * ARC-09-C242 — a warning for a store stem the reader should know about, as for an alias, and as for an alias it names the
+ * shape and never the name: the copy is sent to the person who issued the licence, and the name is the client's (the architect's
+ * review of 2026-10-28). It describes the masking's own breadth, every instance in the store, so it names no engagement either. A
+ * government's, a sector's or a state's label is masked as a word and in a sibling instance's name, not where it begins a longer
+ * word; a stem of 3 letters or fewer, or one that is a product word, masks every word that begins with it.
  */
 export function stemWarnings(storeUrls = []) {
   return [...new Set(stemsOf(storeUrls))].flatMap((s) => {
     if (isPublicLabel(s)) {
-      return [`warning: the instance store gives the name "${s}", a government's, a sector's or a state's label: it is masked as a word and in a sibling instance's name, such as ${s}dev, but not where it begins a longer word, so check those before sending`];
+      return ['warning: a store name is a government\'s, a sector\'s or a state\'s label: it is masked as a word and in a sibling instance\'s name, such as that name followed by dev, but not where it begins a longer word, so check those before sending'];
     }
-    if (s.length <= 3) return [`warning: the instance store gives the name "${s}", ${s.length} letters long, so every word that begins with it is masked`];
-    return PRODUCT_WORDS.has(s) ? [`warning: the instance store gives the name "${s}", a product word, so every word that begins with it is masked`] : [];
+    if (s.length <= 3) return [`warning: one store name is ${s.length} letters long, so every word that begins with it is masked`];
+    return PRODUCT_WORDS.has(s) ? ['warning: a store name is a product word, so every word that begins with it is masked'] : [];
   });
 }
 
