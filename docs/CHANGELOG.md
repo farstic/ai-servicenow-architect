@@ -99,8 +99,9 @@ seconds on the CI machines.**
   delta-xanadu-australia, healthcare-life-sciences and release-notes, which the skills now cite, join it, and
   now-platform, which none cites, leaves it (ARC-09-C250).
 - `./snowarch status --help`, the status template and the Status skill now say what an exit code of 1 means: a check
-  failed, which the skill reports as a failed check and no longer as a finding; or the doctor itself failed, when the
-  one line printed is a Mode line that says `doctor unavailable`, which the skill relays as it is (ARC-09-C243).
+  failed, which the skill reports as a failed check and no longer as a finding; the doctor itself failed, when the
+  one line printed is a Mode line that says `doctor unavailable`, which the skill relays as it is; or the command
+  itself failed, which the skill relays with what it printed, saying the mode is unverified (ARC-09-C243).
 
 ### Added
 
