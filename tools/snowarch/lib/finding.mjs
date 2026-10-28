@@ -14,7 +14,8 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { redact } from './redact.mjs';
-import { byValueEntries, ENV_WORDS, maskByValue, stemOf, storeHostValues } from './mask-values.mjs';
+import { byValueEntries, ENV_WORDS, hostSource, isPublicLabel, maskByValue, STEM_ANY, STEM_SIBLING, stemOf,
+  storeHostValues, usableStems } from './mask-values.mjs';
 import { FINDING_PATH } from './finding-path.mjs';
 
 const ENGINE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -52,8 +53,11 @@ export function maskFinding(text, { engagement = '', aliases = [], labels = [], 
     if (!seen.has(k)) seen.set(k, [...seen.keys()].filter((x) => x.startsWith(`${kind}\u0000`)).length + 1);
     return `<${kind}-${seen.get(k)}>`;
   };
-  const storeHosts = storeUrls.map((u) => { try { return new URL(u).hostname.toLowerCase(); } catch { return null; } }).filter(Boolean);
-  const stems = storeHosts.map(stemOf);
+  // A trailing dot is dropped, as stemOf drops it: `https://snow.` names the host a note writes as `snow`.
+  const storeHosts = storeUrls.map((u) => { try { return new URL(u).hostname.toLowerCase().replace(/\.$/, ''); } catch { return null; } }).filter(Boolean);
+  const stems = storeHosts.map(stemOf).filter(Boolean);
+  const byLength = [...storeHosts].sort((a, b) => b.length - a.length);
+  const dotted = (h) => h.includes('.') && !h.startsWith('[');
   let out = preMask(text);
 
   // 1. Secrets first: they can contain anything, including shapes the later rules would split.
@@ -80,8 +84,10 @@ export function maskFinding(text, { engagement = '', aliases = [], labels = [], 
   // 4. Home paths (json-boundary's HOME_PATH shape) and the OneDrive folder that names the organisation.
   out = out.replace(/(?:[A-Za-z]:)?[\\/](?:Users|home)[\\/][^\\/\s"'`,;:]*/g, '~');
   out = out.replace(/OneDrive - [^\\/\n]+/g, 'OneDrive - <org>');
-  // 5. Network names: IPv4 addresses, hosts on the TLD list, ServiceNow hosts written bare.
+  // 5. Network names: IPv4 addresses; the store's own hosts with a dot, whole, on a domain the TLD list may not know
+  //    (ARC-09-C242); hosts on the TLD list; ServiceNow hosts written bare.
   out = out.replace(/(?<![\d.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\/\d{1,2})?(?!\d|\.\d)/g, '<ip>');
+  for (const h of byLength.filter(dotted)) out = out.replace(new RegExp(hostSource(h), 'gi'), (m) => tag('instance-url', m));
   out = out.replace(new RegExp(`(?<![\\w.@-])(?:[a-z0-9-]+\\.)+(?:${TLDS})(?![\\w-]|\\.[A-Za-z])`, 'gi'), (h) => {
     if (KEEP_HOST.test(h)) return h;
     return (SN_HOST.test(h) || storeHosts.includes(h.toLowerCase())) ? tag('instance-url', h) : '<host>';
@@ -95,8 +101,15 @@ export function maskFinding(text, { engagement = '', aliases = [], labels = [], 
   out = out.replace(/(?<![\w.-])v?\d+\.\d+\.\d+(?:-(?:dev|rc\.\d+|alpha\.\d+|beta\.\d+))?(?![\w.-])/g, hold);
   out = out.replace(/(?<![\w-])--[a-z][a-z0-9-]*/g, hold);
   // 8. Names by value, longest first, case-insensitive and separator-flexible (mask-values.mjs, shared with the doctor).
-  out = maskByValue(out, byValueEntries({ engagement, aliases, labels, stems, usernames }),
-    (kind, m) => (kind === 'engagement' ? '<engagement>' : tag(kind, m)));
+  //    A stem masks every word it begins; one that is a government's, a sector's or a state's label, its whole name and a
+  //    sibling's (mask-values.mjs isPublicLabel).
+  out = maskByValue(out, byValueEntries({ engagement, aliases, labels, stems, usernames },
+    { stemSuffix: (s) => (isPublicLabel(s) ? STEM_SIBLING : STEM_ANY) }),
+  (kind, m) => (kind === 'engagement' ? '<engagement>' : tag(kind, m)));
+  //    Then the store's own hosts with no dot, a bare name or an IPv6 address, whole (ARC-09-C242). After the names, so
+  //    a name that holds one as a part (`itsm.acmebankuk`, `Snow Acme Holdings`) is masked whole first; and after
+  //    step 5, so `snow.acmecorp.com` has been masked as a host.
+  for (const h of byLength.filter((x) => !dotted(x))) out = out.replace(new RegExp(hostSource(h), 'gi'), (m) => tag('instance-url', m));
   // 9. A custom scope's vendor prefix names the customer whatever the folder is called; x_snc_ is ServiceNow's own.
   out = out.replace(/(?<![A-Za-z0-9])x_(?!snc_)(?!<)[a-z0-9]+_/g, 'x_<vendor>_');
   // 10. Record numbers: any admin-set prefix of 2 to 10 letters and 6 or more digits; lower case only with a non-hex
@@ -152,6 +165,26 @@ export function aliasWarnings({ engagement = '', aliases = [] } = {}) {
   return out;
 }
 
+/** The store stems this masker uses, from its URLs: what the header counts and the warnings name (ARC-09-C242). */
+const stemsOf = (storeUrls = []) => usableStems(storeUrls.map((u) => {
+  try { return stemOf(new URL(u).hostname); } catch { return ''; }
+}));
+
+/**
+ * ARC-09-C242 — a warning for a store stem the reader should know about, as for an alias. A government's, a sector's or a
+ * state's label is masked as a word and in a sibling instance's name, not where it begins a longer word; a stem of 3
+ * letters or fewer, or one that is a product word, masks every word that begins with it.
+ */
+export function stemWarnings(storeUrls = []) {
+  return [...new Set(stemsOf(storeUrls))].flatMap((s) => {
+    if (isPublicLabel(s)) {
+      return [`warning: the instance store gives the name "${s}", a government's, a sector's or a state's label: it is masked as a word and in a sibling instance's name, such as ${s}dev, but not where it begins a longer word, so check those before sending`];
+    }
+    if (s.length <= 3) return [`warning: the instance store gives the name "${s}", ${s.length} letters long, so every word that begins with it is masked`];
+    return PRODUCT_WORDS.has(s) ? [`warning: the instance store gives the name "${s}", a product word, so every word that begins with it is masked`] : [];
+  });
+}
+
 /**
  * The whole output: what ran, the warnings, the masked text, and what the reader must still check. The two tiers are
  * reported apart: the store's names can be read where its credentials cannot (a checkout without its dependencies, a
@@ -161,14 +194,15 @@ export function renderFinding(text, values = {}, { storeRead = false, credential
   const masked = maskFinding(text, values);
   const instanceNames = new Set([
     ...(values.labels ?? []).filter((l) => !ENV_WORDS.has(l)),
-    ...(values.storeUrls ?? []).flatMap((u) => { try { const h = new URL(u).hostname.toLowerCase(); return [h, stemOf(h)]; } catch { return []; } }),
+    ...(values.storeUrls ?? []).flatMap((u) => { try { return [new URL(u).hostname.toLowerCase()]; } catch { return []; } }),
+    ...stemsOf(values.storeUrls),
   ]);
   const head = [storeRead
     ? `instance names masked by value: ${instanceNames.size} (store read)`
     : 'instance store NOT read — check every instance name',
   credentialsRead ? 'credentials read' : CREDENTIALS_NOT_READ].join(' · ');
   const review = [...(credentialsRead ? [] : [CREDENTIALS_NOT_READ]), ...reviewList(masked), ...FIXED_REVIEW];
-  return [head, ...aliasWarnings(values), '', masked.trimEnd(), '', 'Read before sending:',
+  return [head, ...aliasWarnings(values), ...stemWarnings(values.storeUrls), '', masked.trimEnd(), '', 'Read before sending:',
     ...review.map((r) => `- ${r}`), ''].join('\n');
 }
 
