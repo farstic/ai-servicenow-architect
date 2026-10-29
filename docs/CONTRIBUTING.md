@@ -1282,7 +1282,8 @@ not the problem; a hard-coded `mcp__servicenow__` is.
 It is loaded into every session, so its length is a running cost paid on every turn, and its wording
 is behaviour rather than description. ARC-02-S08 took it from 425 lines to 125 against a cap of 200
 and 20,000 bytes, enforced by `tests/claude-md.test.mjs`. ARC-09-C250 raised the byte cap to 20,400 on the
-owner's decision (2026-10-24), for two additions that remove nothing.
+owner's decision (2026-10-24), for two additions that remove nothing. ARC-09-C256 raised it to 20,600 on the
+owner's decision (2026-10-29), for the grounding rule's twelve-page budget, which rewrites three lines and adds none.
 
 | # | Section | Budget |
 |---|---|---|
