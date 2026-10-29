@@ -38,6 +38,9 @@ export const WIRING = Object.freeze([
   'tools/snowarch/hooks/session-start.mjs',
   // ARC-09-C231 — the citation hook's script, which E-08 looks for once the entry registers it.
   'tools/snowarch/hooks/post-write.mjs',
+  // ARC-09-C255 — the scripts of the two hooks ARC-09-C254 added, which E-08 looks for the same way.
+  'tools/snowarch/hooks/read-failure.mjs',
+  'tools/snowarch/hooks/stop-citations.mjs',
 ]);
 
 const git = (dir, args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: 'pipe' });
