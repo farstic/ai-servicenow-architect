@@ -2058,7 +2058,7 @@ Is the copy safe to send?
 1. Turn 1: the engagement is asked for, with no default; `_unfiled` is never offered.
 2. The other names are asked for once and written to `clients/acme-bank/findings/aliases.txt`.
 3. `node tools/snowarch/lib/finding.mjs --next-name acme-bank <slug>` runs, and the note is written to the path it printed.
-4. `node tools/snowarch/lib/finding.mjs <that path>` runs, and its output is printed verbatim.
+4. `node tools/snowarch/lib/finding.mjs <that path>` runs, and its output is printed in the reply itself, verbatim, as plain text with no code fence.
 5. The answer closes with: Send the text above to the person who issued your licence.
 6. Turn 4: the answer says the copy is masked, that people, places, company names, ticket keys, record numbers with fewer than 6 digits and a credential written in plain words still need a reader, and which of the two the copy's first line says was NOT read.
 
@@ -2074,6 +2074,8 @@ Is the copy safe to send?
 
 - A default engagement, or `_unfiled`, offered.
 - The copy summarised, reworded or decorated instead of printed verbatim.
+- The copy in a code fence, a quotation block or any other decoration.
+- The copy only in the tool result, with the reply pointing to it ("the output is above").
 - A credential asked for, or an offer to send the finding on the user's behalf.
 - Any file written outside `clients/acme-bank/findings/`.
 - A fourth question asked when the three turns already answered everything.
