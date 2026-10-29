@@ -1,8 +1,91 @@
 #!/usr/bin/env node
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
-// ARC-09-C254 — THE RED COMMIT'S STUB: it says nothing, so every case that expects a block fails on its own assertion.
-// The next commit replaces it.
-export async function report() {
-  return { code: 0, stderr: '', stdout: '' };
+// ARC-09-C254 — the Stop hook. The corpus's own links name a page at a path the corpus does not have, and a reply that
+// copies one cites a page that is not there. When the reply ends, the paths it cites are looked up; one that does not
+// exist, and that the resolver knows the page for, sends the turn on once with `decision: "block"` and a reason that asks
+// for ONE line starting "Correction:". Not the answer again: asked to correct a citation "in the answer", a model wrote
+// the whole answer out again and named the dead path in it, which for an Envelope is minutes.
+//
+// THREE PROMISES, after post-write.mjs's.
+//
+//   IT ASKS ONCE. `stop_hook_active` is true when Claude Code is already continuing because a Stop hook asked, and then
+//   this says nothing; Claude Code ends a run of consecutive blocks by itself (after eight, since 2.1.143), and this is
+//   a cap of one. It is also true after ANY Stop hook continued the turn, so another one that goes first makes this skip:
+//   it fails open.
+//
+//   IT NEVER FAILS A TURN ON ITS OWN ACCOUNT. Any exception exits 0 with nothing on stderr. A citation the gate cannot read
+//   (a second brace group) is skipped with its line, and the other lines are still read.
+//
+//   IT IS FAST. It runs at the end of every turn. A reply without `markdown/` in it exits having imported nothing; one
+//   that cites reads the corpus tree once (lib/docs/resolve.mjs) and nothing else.
+//
+// It says nothing for a citation that cannot be resolved, or that is alive (a real page this install did not check out
+// is alive: ARC-09-C239). `decision: "block"` is the form every Claude Code version has; the quieter
+// `hookSpecificOutput.additionalContext` on a Stop hook came with 2.1.163. The root comes from this file's own location,
+// for the reason session-start.mjs gives.
+import { readFileSync, realpathSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+/** A path with its links resolved, or as given when it cannot be. */
+const real = (p) => { try { return realpathSync.native(p); } catch { return resolve(p); } };
+
+/** What the model is asked, word for word: two paths for each citation, and fixed words. */
+function asking(pairs) {
+  const list = pairs.map(([cited, page]) => `${cited} -> ${page}`).join('; ');
+  return pairs.length === 1
+    ? `Your reply cites a corpus page at a path that does not exist: ${list}. `
+      + 'Add one line that starts "Correction:" and gives the right path. Do not repeat the answer, and do not write the wrong path again.'
+    : `Your reply cites ${pairs.length} corpus pages at paths that do not exist: ${list}. `
+      + 'Add one line that starts "Correction:" and gives the right path for each. Do not repeat the answer, and do not write the wrong paths again.';
+}
+
+/**
+ * What the hook says for one Stop input: `{ code, stderr, stdout }`, always code 0.
+ * - A reply citing a path that does not exist, with a page the resolver knows: one line of JSON, `decision: "block"`.
+ * - Anything else, and always when `stop_hook_active`: nothing.
+ */
+export async function report(input, { root = ROOT } = {}) {
+  const none = { code: 0, stderr: '', stdout: '' };
+  if (input?.stop_hook_active) return none;
+  const message = input?.last_assistant_message;
+  if (typeof message !== 'string' || !message.includes('markdown/')) return none;
+  const { extract } = await import('../lib/docs/citations.mjs');
+  const cited = new Set();
+  for (const line of message.split('\n')) {
+    if (!line.includes('markdown/')) continue;
+    try {
+      for (const c of extract(line).citations) cited.add(c.path);
+    } catch { /* a malformed group on this line: the other lines are still read */ }
+  }
+  if (cited.size === 0) return none;
+  const { CORPUS_DIR } = await import('../lib/docs/sync.mjs');
+  const { loadIndex, resolve: resolvePage } = await import('../lib/docs/resolve.mjs');
+  const index = loadIndex(join(root, CORPUS_DIR));
+  if (!index) return none;
+  const pairs = [];
+  for (const path of cited) {
+    if (index.has(path)) continue;
+    const page = resolvePage(path, index);
+    if (page) pairs.push([path, page.path]);
+  }
+  if (pairs.length === 0) return none;
+  return { code: 0, stderr: '', stdout: `${JSON.stringify({ decision: 'block', reason: asking(pairs) })}\n` };
+}
+
+const samePath = (a, b) => real(a) === real(b);
+const isMain = process.argv[1] && samePath(process.argv[1], fileURLToPath(import.meta.url));
+if (isMain) {
+  let out = { code: 0, stderr: '', stdout: '' };
+  try {
+    out = await report(JSON.parse(readFileSync(0, 'utf8')));
+  } catch {
+    // Its own failure is never the model's business: no block, and nothing on stderr.
+    out = { code: 0, stderr: '', stdout: '' };
+  }
+  if (out.stdout) process.stdout.write(out.stdout);
+  process.exitCode = out.code;
 }
