@@ -232,8 +232,9 @@ user to send. The note stays on this machine; this skill sends nothing.
 
 1. **Ask which engagement the finding belongs to.** Offer no default. A finding about the product rather than a
    client goes under a name the user chooses that the note will not use as a word: the masker masks the engagement's
-   name on its own and with its parts joined by a space, a hyphen, an underscore, a dot or nothing, so not a common
-   word such as `general`. Never `_unfiled`: it holds design artefacts only.
+   name on its own and with its parts joined by a space, a hyphen, an underscore, a dot or nothing, and, when the
+   name has four letters or more, any word that begins with it, so not a common word such as `general`. Never
+   `_unfiled`: it holds design artefacts only.
 2. **The first time for an engagement, ask once for its other names**: its legal name, abbreviations and brands.
    Keep them in `clients/<engagement>/findings/aliases.txt`, one per line, `#` for a comment. "None" is an answer.
 3. **Compose the note in the user's words**: what was asked, what happened, what was expected, the `Engine:` line

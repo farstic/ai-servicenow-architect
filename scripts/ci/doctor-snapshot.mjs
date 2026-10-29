@@ -47,6 +47,22 @@ export const snapshotPath = (platform, root = ROOT) =>
   join(root, 'tests/fixtures/doctor', `snapshot-${platform}.json`);
 
 /**
+ * ARC-09-C253 — A CHECK THAT ASKS ORIGIN MAY GET NO ANSWER, and that is a fact about the network, not about the install.
+ * E-28 (release currency) lists origin's tags with a 15 s budget. On e7664b67 one unanswered `ls-remote` turned a green PR red:
+ * `bootstrap (windows-latest, node 24)` failed this compare with `E-28: status ok → warn`, `summary.ok 29 → 28` and
+ * `summary.warn 0 → 1`, and the job's own report said "origin did not answer within 15 s". The architect's ruling of 2026-10-29:
+ * keep the network path, which only this job exercises on each OS, and name such an E-28 as NOT COMPARABLE.
+ *
+ * The check says so itself. Its catch (host.mjs) returns a warn whose data is `{ remote, refreshed: false }` and names no release;
+ * every other E-28 warn names the tag that is available. That shape, in E-28 and in no other check, is what is excused: the diff
+ * does not count it, in its row or in the summary, and `notices` says it was not compared. Anything else that changes in E-28
+ * (an available release, a crash, a skip) is still a difference.
+ */
+export const NETWORK_CHECKS = Object.freeze(['E-28']);
+const gotNoAnswer = (c) => NETWORK_CHECKS.includes(c.id) && c.status === 'warn'
+  && c.data !== null && typeof c.data === 'object' && c.data.refreshed === false && !('latestTag' in c.data);
+
+/**
  * The report, reduced to its invariants.
  *
  * Exported and pure so `tests/doctor/snapshot.test.mjs` can prove the stripping on fixtures rather
@@ -55,6 +71,7 @@ export const snapshotPath = (platform, root = ROOT) =>
 export function normalise(report) {
   if (!report || typeof report !== 'object') throw new Error('not a report');
   if (!Array.isArray(report.checks)) throw new Error('the report has no checks[]');
+  const silent = report.checks.filter(gotNoAnswer).map((c) => c.id);
   return {
     schema: report.schema,
     mode: report.mode,
@@ -66,6 +83,8 @@ export function normalise(report) {
       skip: report.summary?.skip, fixable: report.summary?.fixable,
     },
     checks: report.checks.map((c) => ({ id: c.id, status: c.status, fixable: c.fixable === true })),
+    // Only when there is one, so a normal run keeps the shape every snapshot has.
+    ...(silent.length ? { notComparable: silent } : {}),
   };
 }
 
@@ -135,8 +154,10 @@ export function diff(expected, actual) {
   const lines = [];
   const before = new Map(expected.checks.map((c) => [c.id, c]));
   const after = new Map(actual.checks.map((c) => [c.id, c]));
+  const skipped = new Set(actual.notComparable ?? []);
   for (const id of idsOf(expected)) {
     if (!after.has(id)) { lines.push(`${id}: in the snapshot, MISSING from this run`); continue; }
+    if (skipped.has(id)) continue; // not compared (ARC-09-C253): it answers with what the snapshot holds
     const [b, a] = [before.get(id), after.get(id)];
     if (b.status !== a.status) lines.push(`${id}: status ${b.status} → ${a.status}`);
     if (b.fixable !== a.fixable) lines.push(`${id}: fixable ${b.fixable} → ${a.fixable}`);
@@ -148,12 +169,33 @@ export function diff(expected, actual) {
     }
   }
   if (expected.mode !== actual.mode) lines.push(`mode: ${expected.mode} → ${actual.mode}`);
+  // A check that is not compared answers with the status the snapshot holds, so its tally moves there: the run's own count says
+  // `warn` for it, and the snapshot's says `ok`, which is the difference this must not report twice.
+  const summary = { ...actual.summary };
+  const repairs = (c) => c.fixable && (c.status === 'fail' || c.status === 'warn');
+  for (const id of skipped) {
+    const [b, a] = [before.get(id), after.get(id)];
+    if (!b || !a) continue;
+    summary[a.status] -= 1; summary[b.status] += 1;
+    if (repairs(a)) summary.fixable -= 1;
+    if (repairs(b)) summary.fixable += 1;
+  }
   for (const k of ['ok', 'warn', 'fail', 'skip', 'fixable']) {
-    if (expected.summary[k] !== actual.summary[k]) {
-      lines.push(`summary.${k}: ${expected.summary[k]} → ${actual.summary[k]}`);
+    if (expected.summary[k] !== summary[k]) {
+      lines.push(`summary.${k}: ${expected.summary[k]} → ${summary[k]}`);
     }
   }
   return lines;
+}
+
+/** What the compare did NOT compare, one line each, for the reader of the log (ARC-09-C253). Empty for a run that compared everything. */
+export function notices(expected, actual) {
+  const before = new Map(expected.checks.map((c) => [c.id, c]));
+  return (actual.notComparable ?? []).map((id) => {
+    const a = actual.checks.find((c) => c.id === id);
+    const b = before.get(id);
+    return `${id}: not compared — origin did not answer; this run says ${a?.status}${b ? `, the snapshot holds ${b.status}` : ''}`;
+  });
 }
 
 // ── the CLI ──────────────────────────────────────────────────────────────────────────────────
@@ -192,6 +234,11 @@ if (isMain) {
   const body = `${JSON.stringify(actual, null, 2)}\n`;
 
   if (flag('--write')) {
+    // REFUSE A RUN THAT DID NOT GET AN ANSWER (ARC-09-C253): a snapshot taken from it would hold `warn` for a check that is `ok`.
+    if (actual.notComparable?.length) {
+      die(`${actual.notComparable.join(', ')} got no answer from origin in this run — a snapshot is not taken from it. `
+        + 'Nothing was written. Re-run the doctor when the network answers.');
+    }
     // REFUSE A STALE CAPTURE. See `wouldDrop`: the recipe's own default input used to be a committed
     // file older than three of the checks it would have removed.
     if (existsSync(expectedPath)) {
@@ -225,6 +272,7 @@ if (isMain) {
     } else {
       const expected = JSON.parse(readFileSync(expectedPath, 'utf8'));
       const lines = diff(expected, actual);
+      const notes = notices(expected, actual);
       if (lines.length) {
         writeSync(2, `doctor-snapshot: ${platform} differs from ${expectedPath}\n`);
         for (const l of lines) writeSync(2, `  ${l}\n`);
@@ -233,6 +281,7 @@ if (isMain) {
         writeSync(1, `doctor-snapshot: ${platform} matches (${actual.checks.length} checks, `
           + `${actual.summary.ok} ok, ${actual.summary.warn} warn, ${actual.summary.fail} fail)\n`);
       }
+      for (const n of notes) writeSync(lines.length ? 2 : 1, `doctor-snapshot: ${n}\n`);
     }
   }
 
@@ -245,6 +294,8 @@ if (isMain) {
       report.modeLine ?? '(no mode line)',
       '```',
       '',
+      // What the compare did not look at, before the log is opened (ARC-09-C253).
+      ...(actual.notComparable?.length ? [`**not compared:** \`${actual.notComparable.join('`, `')}\` — origin did not answer`, ''] : []),
     ].join('\n'));
   }
 

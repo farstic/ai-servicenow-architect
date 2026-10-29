@@ -54,6 +54,8 @@ const CLASS_OF = {
   'a credential written in plain words that no rule recognises': 'a credential written in plain words that no rule recognises',
 };
 const MASKING = 'on its own and with its parts joined by a space, a hyphen, an underscore, a dot or nothing';
+// ARC-09-C251 (the architect's ruling of 2026-10-29): a name of four letters or more also masks the words it begins
+const PREFIX = 'and, when the name has four letters or more, any word that begins with it';
 const ITEM4 = 'Its first line says when it could not read your instance store or its credentials: then it may not have masked them.';
 
 const STATUS = 'status reports exit 1 as a failed check or its own fallback, and never says finding';
@@ -265,6 +267,7 @@ const CHECKS = {
     for (const [where, text] of [['the skill', step], ['the user guide', item]]) {
       assert.ok(text.includes('so not a common word such as `general`'), `${where} suggests a common word, or none`);
       assert.ok(text.includes(MASKING), `${where} does not say how the engagement's name is masked`);
+      assert.ok(text.includes(PREFIX), `${where} does not say that a name of four letters or more masks the words it begins`);
       const names = [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]).filter((n) => /^[A-Za-z0-9_-]+$/.test(n));
       assert.deepEqual(names.filter((n) => !['general', '_unfiled'].includes(n)), [], `${where} names another engagement`);
     }
@@ -272,6 +275,11 @@ const CHECKS = {
     reset();
     assert.equal(maskFinding('acme bank, acme-bank, acme_bank, acme.bank, acmebank', { engagement: 'acme-bank' }),
       '<engagement>, <engagement>, <engagement>, <engagement>, <engagement>', 'the masker does not mask what the texts say it does');
+    // and what the PREFIX clause says: four letters or more masks the words the name begins, three letters or fewer only the name
+    reset();
+    assert.equal(maskFinding('AcmeBankMID01, acmebank01 and acmebankdev', { engagement: 'acme-bank' }), '<engagement>, <engagement> and <engagement>');
+    reset();
+    assert.equal(maskFinding('abcdef and abc', { engagement: 'abc' }), 'abcdef and <engagement>');
   },
 
   [COPY]: (t) => {
@@ -329,9 +337,11 @@ const NEGATIVES = [
   ['the which-of-the-two clause is dropped', SAFE,
     (t) => t.replace(', and which of the two its first line says was NOT read, if either was', '')],
   ['the sentence is negated', SAFE, (t) => t.replace('were not masked by value either', 'were masked by value anyway')],
-  ['the example is general again', NAME, (t) => t.replace('so not a common\n   word such as `general`', 'such as\n   `general`')],
+  ['the example is general again', NAME, (t) => t.replace(/so not a common\s+word such as `general`/, 'such as `general`')],
   ['the skill suggests another name', NAME,
-    (t) => t.replace('so not a common\n   word such as `general`.', 'such as `issues`, so not a common\n   word such as `general`.')],
+    (t) => t.replace(/so not a common\s+word such as `general`\./, 'such as `issues`, so not a common word such as `general`.')],
+  // ARC-09-C251: the sentence that a name of four letters or more masks the words it begins, in the skill and in the guide
+  ['the skill drops the four-letter clause', NAME, (t) => t.replace(/,\s+and,\s+when\s+the\s+name\s+has\s+four\s+letters\s+or\s+more,\s+any\s+word\s+that\s+begins\s+with\s+it/, '')],
   // ARC-09-C252 (a): each way the copy can slide back out of the reply
   ['step 5 drops "in your reply"', COPY, (t) => t.replace('**Print its output verbatim in your reply**', '**Print its output verbatim**')],
   ['step 5 allows a code fence', COPY, (t) => t.replace(/as plain\s+text, with no code fence/, 'in a code fence')],
@@ -367,7 +377,10 @@ test(`ARC-09-C243 — ${HELPS}`, () => { checkHelps(); });
 const OTHER = [
   ['FIXED_REVIEW gains a class the skill does not name', (o) => CHECKS[SAFE](doc, o), { fixed: [...FIXED_REVIEW, 'hostnames inside screenshots'] }],
   ['the guide drops the masking clause', (o) => CHECKS[NAME](doc, o),
-    { guide: GUIDE.replace(`: the engagement's name is\n   masked ${MASKING};`, ';') }],
+    { guide: GUIDE.replace(/: the engagement's name is\s+masked [^;]*;/, ';') }],
+  // ARC-09-C251: the guide says, as the skill does, that a name of four letters or more masks the words it begins
+  ['the guide drops the four-letter clause', (o) => CHECKS[NAME](doc, o),
+    { guide: GUIDE.replace(/,\s+and,\s+when\s+the\s+name\s+has\s+four\s+letters\s+or\s+more,\s+any\s+word\s+that\s+begins\s+with\s+it/, '') }],
   ['the guide drops item 4\'s caveat', (o) => CHECKS[NAME](doc, o),
     { guide: GUIDE.replace(' Its first line says when it\n   could not read your instance store or its credentials: then it may not have masked them.', '') }],
   ['the guide suggests another name', (o) => CHECKS[NAME](doc, o),
