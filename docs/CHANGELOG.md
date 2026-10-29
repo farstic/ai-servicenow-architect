@@ -117,6 +117,11 @@ seconds on the CI machines.**
 - `/snowarch finding` now prints the masked copy in its reply itself, as plain text with no code fence. It used to come out
   fenced after a sentence of prose in some sessions, and in others it was left in the tool result with only a pointer to it
   in the reply; the copy is what you send, so it is in the reply, as the masker printed it (ARC-09-C252).
+- The Architect's default budget for grounding an Envelope is twelve corpus pages, not eight, and while pages remain
+  in it, the Architect opens a construct's page before it calls the construct unverified. A Grep line finds a page; a
+  Read of the page is what grounds a claim. When one request fires several gateways, each Envelope has twelve pages of
+  its own, not shared with another. The budget and the co-fire rule read the same in CLAUDE.md and in the six gateways
+  (ARC-09-C256).
 
 ### Added
 
