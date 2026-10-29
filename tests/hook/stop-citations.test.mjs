@@ -214,8 +214,22 @@ test('ARC-09-C254 — only what the finder prints is its copy: a header with no 
   const lines = copy.split('\n');
   const header = lines[0];
   assert.deepEqual(await report(stopping(`${header}\n\n${NOTE(DEAD)}\n${SEND}`), { root }), block(ONE(DEAD, REAL)), 'a header alone');
-  assert.deepEqual(await report(stopping(`${NOTE(DEAD)}\n\nRead before sending:\n- people: names of colleagues\n${SEND}`), { root }), block(ONE(DEAD, REAL)),
-    'a review list alone');
+  assert.deepEqual(await report(stopping(`Read before sending:\n- ${DEAD} is in the note\n${SEND}`), { root }), block(ONE(DEAD, REAL)),
+    'a review list alone, with the path in one of its items');
+});
+
+test('ARC-09-C254 — a copy with Windows line endings, or indented, is still the copy', async (t) => {
+  const root = project(t);
+  const copy = copyOf(NOTE(DEAD));
+  assert.deepEqual(await report(stopping(`${SAVED}\r\n\r\n${copy.replace(/\n/g, '\r\n')}\r\n${SEND}`), { root }), SILENT, 'Windows line endings');
+  assert.deepEqual(await report(stopping(`${SAVED}\n\n${copy.split('\n').map((l) => (l ? `    ${l}` : l)).join('\n')}\n${SEND}`), { root }), SILENT, 'indented');
+});
+
+test('ARC-09-C254 — the review list is part of the copy: an item that names a path is not checked either', async (t) => {
+  const root = project(t);
+  const copy = copyOf(NOTE(DEAD));
+  const withItem = `${copy.trimEnd()}\n- check ${DEAD} against the page the user saw\n`;
+  assert.deepEqual(await report(stopping(`${withItem}\n${SEND}`), { root }), SILENT);
 });
 
 test('ARC-09-C254 — the page is carried wherever it stands: the real page inside the copy, the dead path outside it, is not sent back', async (t) => {

@@ -63,19 +63,29 @@ export async function report(input, { root = ROOT, load } = {}) {
   const message = input?.last_assistant_message;
   if (typeof message !== 'string' || !message.includes('markdown/')) return none;
   const { extract } = await import('../lib/docs/citations.mjs');
-  const cited = new Set();
-  for (const line of message.split('\n')) {
-    if (!line.includes('markdown/')) continue;
+  const lines = message.split('\n');
+  const where = new Map();                                    // each cited path, in the order it first appears, and the lines it stands on
+  lines.forEach((line, i) => {
+    if (!line.includes('markdown/')) return;
     try {
-      for (const c of extract(line).citations) cited.add(c.path);
+      for (const c of extract(line).citations) {
+        if (!where.has(c.path)) where.set(c.path, []);
+        where.get(c.path).push(i);
+      }
     } catch { /* a malformed group on this line: the other lines are still read */ }
-  }
-  if (cited.size === 0) return none;
+  });
+  if (where.size === 0) return none;
   const { CORPUS_DIR } = await import('../lib/docs/sync.mjs');
   const corpus = join(root, CORPUS_DIR);
   // A page on disk is alive, and a design answer cites pages it has just read: the corpus tree is read only for a path that is not.
-  const absent = [...cited].filter((path) => !existsSync(join(corpus, ...path.split('/'))));
+  const absent = [...where.keys()].filter((path) => !existsSync(join(corpus, ...path.split('/'))));
   if (absent.length === 0) return none;
+  // A finding records a path as the user saw it, and C231 does not check findings: a path that stands only inside the finder's
+  // printed copy is not checked either, and a dead path written outside the copy still is.
+  const { copyLines } = await import('../lib/finding-copy.mjs');
+  const inCopy = copyLines(lines);
+  const checked = absent.filter((path) => where.get(path).some((i) => !inCopy.has(i)));
+  if (checked.length === 0) return none;
   const { loadIndex, resolve: resolvePage } = await import('../lib/docs/resolve.mjs');
   const index = (load ?? loadIndex)(corpus);
   if (!index) return none;
@@ -84,7 +94,7 @@ export async function report(input, { root = ROOT, load } = {}) {
   // read as slashes, so the real page spelled the Windows way counts.
   const carried = message.replaceAll('\\', '/');
   const pairs = [];
-  for (const path of absent) {
+  for (const path of checked) {
     if (index.has(path)) continue;
     const page = resolvePage(path, index);
     if (page && !carried.includes(page.path)) pairs.push([path, page.path]);
