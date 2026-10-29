@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { report } from '../../tools/snowarch/hooks/stop-citations.mjs';
+import { renderFinding } from '../../tools/snowarch/lib/finding.mjs';
 import { loadIndex } from '../../tools/snowarch/lib/docs/resolve.mjs';
 import { CORPUS_DIR, syncCorpus } from '../../tools/snowarch/lib/docs/sync.mjs';
 import { UNCITED, buildUpstream, makeWorkspace } from '../helpers/docs-fixture.mjs';
@@ -156,6 +157,85 @@ test('ARC-09-C254 — a folder, a placeholder and a bare area are no page', asyn
   for (const message of ['See markdown/alpha/deep/ for the folder.', 'Cite the path used: markdown/... in the end.', 'The area markdown/alpha.']) {
     assert.deepEqual(await report(stopping(message), { root }), SILENT, message);
   }
+});
+
+// ---- a finding records a path as the user saw it ----
+// C231 does not check what `/snowarch finding` writes, because a finding records a path as the user saw it, and the most natural
+// finding to report is a dead citation. The finder prints its masked copy for the user to send as it is (ARC-09-C252), so the hook must
+// not push a "Correction:" line after it. The paths inside the finder's printed copy are not checked. The copy is found by its own
+// structure, from its header line to the end of its "Read before sending:" list, not by reading the transcript: the hook has the reply,
+// a transcript may not exist (a session that keeps none), and the structure is the finder's own output, run here through the real
+// `renderFinding` so that a change to it breaks this file and not a user's turn.
+const NOTE = (path) => `The Architect cited ${path} in a design note, and the page is not there.`;
+const SEND = 'Send the text above to the person who issued your licence.';
+const HEADERS = [
+  ['store read, credentials read', { storeRead: true, credentialsRead: true }],
+  ['store read, credentials not read', { storeRead: true, credentialsRead: false }],
+  ['store not read, credentials read', { storeRead: false, credentialsRead: true }],
+  ['neither read', { storeRead: false, credentialsRead: false }],
+];
+const copyOf = (note, flags = HEADERS[3][1]) => renderFinding(note, { engagement: 'acme-bank', aliases: [], labels: [], storeUrls: [], usernames: [] }, flags);
+const SAVED = 'The note is saved at clients/acme-bank/findings/2026-10-29-dead-citation.md.';
+
+test('ARC-09-C254 — a finding\'s printed copy that quotes a dead path is left alone, in each of the finder\'s four headers, and costs no lookup', async (t) => {
+  const root = project(t);
+  let reads = 0;
+  const load = (corpus) => { reads += 1; return loadIndex(corpus); };
+  for (const [why, flags] of HEADERS) {
+    const copy = copyOf(NOTE(DEAD), flags);
+    assert.ok(copy.includes(DEAD), `${why}: the finder's own copy does not quote the path, so this test would prove nothing`);
+    assert.deepEqual(await report(stopping(`${SAVED}\n\n${copy}\n${SEND}`), { root, load }), SILENT, why);
+    assert.deepEqual(await report(stopping(`${SAVED}\n\n\`\`\`\n${copy}\`\`\`\n${SEND}`), { root, load }), SILENT, `${why}, in a code fence`);
+  }
+  assert.equal(reads, 0, 'a path that stands only inside the copy needs no look at the corpus');
+});
+
+test('ARC-09-C254 — the same dead path in an ordinary reply still sends it back', async (t) => {
+  const root = project(t);
+  assert.deepEqual(await report(stopping(NOTE(DEAD)), { root }), block(ONE(DEAD, REAL)));
+  assert.deepEqual(await report(stopping(`${SAVED}\n\n${NOTE(DEAD)}\n${SEND}`), { root }), block(ONE(DEAD, REAL)), 'the same words, with no copy of the finder\'s in the reply');
+});
+
+test('ARC-09-C254 — in a finding turn, a dead path written outside the copy is still sent back, and only that one', async (t) => {
+  const root = project(t);
+  const other = 'markdown/australia/alpha/page-one.md';
+  const copy = copyOf(NOTE(DEAD));
+  for (const [why, message, expected] of [
+    ['before the copy', `The Architect also cited ${DEAD} earlier.\n\n${copy}\n${SEND}`, block(ONE(DEAD, REAL))],
+    ['after the copy, with a blank line', `${copy}\nSee also ${DEAD}.`, block(ONE(DEAD, REAL))],
+    ['on the line right after the copy\'s last item', `${copy.trimEnd()}\nSee also ${DEAD}.`, block(ONE(DEAD, REAL))],
+    ['another dead path outside, the quoted one inside', `Also ${other}.\n\n${copy}\n${SEND}`, block(ONE(other, 'markdown/alpha/page-one.md'))],
+  ]) assert.deepEqual(await report(stopping(message), { root }), expected, why);
+});
+
+test('ARC-09-C254 — only what the finder prints is its copy: a header with no review list, and a review list with no header, are not', async (t) => {
+  const root = project(t);
+  const copy = copyOf(NOTE(DEAD));
+  const lines = copy.split('\n');
+  const header = lines[0];
+  assert.deepEqual(await report(stopping(`${header}\n\n${NOTE(DEAD)}\n${SEND}`), { root }), block(ONE(DEAD, REAL)), 'a header alone');
+  assert.deepEqual(await report(stopping(`Read before sending:\n- ${DEAD} is in the note\n${SEND}`), { root }), block(ONE(DEAD, REAL)),
+    'a review list alone, with the path in one of its items');
+});
+
+test('ARC-09-C254 — a copy with Windows line endings, or indented, is still the copy', async (t) => {
+  const root = project(t);
+  const copy = copyOf(NOTE(DEAD));
+  assert.deepEqual(await report(stopping(`${SAVED}\r\n\r\n${copy.replace(/\n/g, '\r\n')}\r\n${SEND}`), { root }), SILENT, 'Windows line endings');
+  assert.deepEqual(await report(stopping(`${SAVED}\n\n${copy.split('\n').map((l) => (l ? `    ${l}` : l)).join('\n')}\n${SEND}`), { root }), SILENT, 'indented');
+});
+
+test('ARC-09-C254 — the review list is part of the copy: an item that names a path is not checked either', async (t) => {
+  const root = project(t);
+  const copy = copyOf(NOTE(DEAD));
+  const withItem = `${copy.trimEnd()}\n- check ${DEAD} against the page the user saw\n`;
+  assert.deepEqual(await report(stopping(`${withItem}\n${SEND}`), { root }), SILENT);
+});
+
+test('ARC-09-C254 — the page is carried wherever it stands: the real page inside the copy, the dead path outside it, is not sent back', async (t) => {
+  const root = project(t);
+  const copy = copyOf(`The page is at ${REAL}.`);
+  assert.deepEqual(await report(stopping(`A claim (citation: ${DEAD}).\n\n${copy}\n${SEND}`), { root }), SILENT);
 });
 
 // The hook runs at the end of every turn, and a design answer cites pages it has just read. A page on disk is alive, so the
