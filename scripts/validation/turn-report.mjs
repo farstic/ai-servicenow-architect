@@ -11,7 +11,11 @@
 // bare file name in three of nine answers, which a checker has to be able to tell apart from a page
 // that does not exist.
 //
-//   node scripts/validation/turn-report.mjs <stream.jsonl> <checkout>
+// A skill run by its slash command (`/snowarch status`) is expanded by the CLI before the model's first step, so the stream
+// holds no Skill call and no Read of its file. The turn's prompt says it ran, so a run that is given the prompt reports it
+// as `slash command`; without that, the line read `skills: none` for a turn that followed the skill (ARC-09-C243).
+//
+//   node scripts/validation/turn-report.mjs <stream.jsonl> <checkout> [<prompt.txt>]
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -48,7 +52,7 @@ function walk(dir, out = []) {
   return out;
 }
 
-export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, 'vendor', 'ServiceNowDocs') } = {}) {
+export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, 'vendor', 'ServiceNowDocs'), prompt = '' } = {}) {
   const evs = events(streamText);
   const skills = [];
   const reads = new Set();
@@ -69,6 +73,11 @@ export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, '
       if ((b.name === 'Grep' || b.name === 'Glob') && JSON.stringify(input).includes('ServiceNowDocs')) searches += 1;
     }
   }
+
+  // A skill the CLI ran from the prompt's slash command: no tool call in the stream shows it, the prompt does. Only a command
+  // that starts the prompt, whole, and names a skill this checkout has.
+  const slash = /^\/([a-z0-9][a-z0-9-]*)(?:\s|$)/.exec(String(prompt).trim());
+  if (slash && existsSync(join(repoRoot, '.claude', 'skills', slash[1], 'SKILL.md'))) addSkill(slash[1], 'slash command');
 
   // The answer: the result event when there is one, else what the assistant said.
   const result = [...evs].reverse().find((e) => e?.type === 'result' && typeof e.result === 'string');
@@ -139,7 +148,8 @@ export function formatReport(r) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [stream, repoRoot] = process.argv.slice(2);
-  if (!stream || !repoRoot) { console.error('usage: turn-report.mjs <stream.jsonl> <checkout>'); process.exit(2); }
-  console.log(formatReport(reportTurn(readFileSync(stream, 'utf8'), { repoRoot })));
+  const [stream, repoRoot, promptFile] = process.argv.slice(2);
+  if (!stream || !repoRoot) { console.error('usage: turn-report.mjs <stream.jsonl> <checkout> [<prompt.txt>]'); process.exit(2); }
+  const prompt = promptFile && existsSync(promptFile) ? readFileSync(promptFile, 'utf8') : '';
+  console.log(formatReport(reportTurn(readFileSync(stream, 'utf8'), { repoRoot, prompt })));
 }

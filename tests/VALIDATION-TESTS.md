@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-28
+**Last updated:** 2026-10-29
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -2082,41 +2082,50 @@ Is the copy safe to send?
 
 ---
 
-## T-38 — `Status` on a checkout with a failed check relays it as a failed check, and asks for nothing
+## T-38 — `/snowarch status` on a checkout with a failed check relays it as a failed check, and asks for nothing
 
 **Covers:** ARC-09-C243 (the skill's `status` step 3; `./snowarch status`'s exit code 1) · **Modes:** design-only ✅ · live ✅
 
 ### Setup
 
-No licence: the runner leaves `.local/licence.json` out of the clone, so the banner's second line is `Licence: missing` and the quick doctor's E-31 fails.
+A licence in force, and one check that fails without stopping any deliverable. The runner puts the checkout's own licence in the clone, so the banner's second line is none of `missing`, `invalid`, `expired` or `revoked`, and then makes the clone's `.local/` world-readable. The quick doctor's E-11 (`.local/ state`) fails on that, offline, and nothing else fails; the licence check, E-31, passes.
+
+```sh
+chmod 755 .local
+```
+
+The panel's `Doctor:` line then counts `1 fail (E-11)`, and the failing check is listed under it as `E-11 FAIL .local/ state: .local/ is mode 755, not 700 — chmod 700 .local`, followed by the panel's own `Run ./snowarch doctor --fix for the fixable ones` line. A Windows directory has no mode to loosen, so E-11 passes there: this case is for macOS and Linux.
 
 ### Prompt
 
 ```
-Status
+/snowarch status
 ```
+
+The slash command, not the bare word `Status`. `Status` is routed by `CLAUDE.md` §2, which quotes only the Mode line and goes on to the engagement and its drift; a session given it invokes no skill, so the skill's step 3 is never read, and the case fails on any tree for §2's own text. A skill run from its slash command is expanded before the model's first step, so the turn report's `skills:` line reads `snowarch (slash command)` for this prompt, where it would read `none` for the bare word.
 
 ### Expected behaviour
 
-1. The session runs `./snowarch status` and prints its output verbatim as the first thing in the answer, on its own, with nothing before it and no decoration.
-2. The panel's Doctor line names E-31, and the line under it carries E-31's remedy. After the panel the session relays E-31 as a failed check, by its id and its remedy, `./snowarch licence check`.
-3. It does not treat the failure as a finding to record: no question about an engagement, and no offer of `/snowarch finding`.
+1. The session follows the skill: it runs `./snowarch status` once and prints the panel verbatim as the first thing in the answer, on its own, with nothing before it and no decoration.
+2. After the panel the session relays E-11 as a failed check, by its id and its remedy, `chmod 700 .local`. It does not run the `--fix` the panel mentions.
+3. It does not treat the failure as a finding to record: no question about an engagement, and no offer of `/snowarch finding`. It looks at no other file and runs no other command to learn about the engagement or what changed.
 
 ### Pass criteria
 
 - The panel is the first thing in the answer, byte for byte as `./snowarch status` printed it, with no label, heading or code fence.
-- E-31 is relayed as a failed check, by its id and its remedy.
+- E-11 is relayed as a failed check, by its id and its remedy.
 - No question asks which engagement the failure belongs to, and `/snowarch finding` is not offered.
-- Bash calls are `./snowarch status` and, at most, `./snowarch doctor`; nothing is written.
+- Bash calls are `./snowarch status` and, at most, `./snowarch doctor`; no `--fix`; nothing is written.
 
 ### Fail signals
 
-- The panel summarised, reformatted, fenced, or preceded by text.
-- E-31 called a finding, or an engagement or its other names asked for.
+- The panel summarised, reformatted, rebulleted, fenced, or preceded by text.
+- E-11 called a finding, or an engagement or its other names asked for.
 - The answer says the command failed, when it exited 1 because a check failed.
-- A file written, or any call that changes the instance.
+- `./snowarch doctor --fix` run, a file written, or any call that changes the instance.
+- `ls clients`, `git log` or any other call that looks for the engagement or for what changed.
 
-**Control.** Run it once on a checkout whose `status` step 3 still says "as a finding". The licence gate (`CLAUDE.md` §1) may stop the finding flow by itself, so only a FAIL on that checkout shows that this sitting can tell the two wordings apart.
+**Control.** Run it at least four times on a checkout whose `status` step 3 still says "as a finding", and at least once on the checkout under test. The licence is in force on both, so the finding flow is open and the old wording has something to act on: it can ask which engagement the failure belongs to, or offer `/snowarch finding`. The case claims to tell the two wordings apart only if at least one control run FAILS. If none does, the sitting's record and the pull request say so, and the case then shows that the new wording is followed, not that the old one would fail.
 
 ---
 

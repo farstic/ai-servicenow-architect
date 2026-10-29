@@ -107,7 +107,7 @@ for T in $SEL; do
       RC=$?
       SID=$(node -e "const L=require('fs').readFileSync('$OUT','utf8').trim().split('\n');for(const l of L.reverse()){try{const j=JSON.parse(l);if(j.session_id){console.log(j.session_id);break}}catch{}}")
       echo "$T run$R turn$((i+1)): exit=$RC tool_use=$(grep -c '\"type\":\"tool_use\"' "$OUT") mcp=$(grep -c '\"name\":\"mcp__servicenow' "$OUT") tools=[$TOOLS] session=$(echo "$SID" | cut -c1-8) stderr=$(head -c 70 "$OUT.err" | tr '\n' ' ')"
-      node "$ROOT/scripts/validation/turn-report.mjs" "$OUT" "$C" | sed 's/^/    /'
+      node "$ROOT/scripts/validation/turn-report.mjs" "$OUT" "$C" "$RUN/prompt.txt" | sed 's/^/    /'
       i=$((i+1))
     done
     R=$((R+1))
