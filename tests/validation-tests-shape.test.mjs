@@ -3,11 +3,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import { historyStartsAt, isHistory } from './helpers/changelog-history.mjs';
+import { contextFor, greenTree } from './doctor/helpers/tree.mjs';
 import { FROZEN_HEADING } from '../scripts/lib/release/changelog.mjs';
+import { engineRepoChecks } from '../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
+import { idsFor } from '../tools/snowarch/lib/doctor/check-ids.mjs';
+import { failureLines } from '../tools/snowarch/lib/doctor/panel.mjs';
+import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -58,6 +63,23 @@ function testBlocks(text) {
   }
   return out;
 }
+
+/** One test's text, from its heading to the next test's, and its `###` sections by name. */
+function sectionsOf(text, id) {
+  const at = text.indexOf(`\n## ${id} `);
+  assert.ok(at > 0, `no ${id}`);
+  const end = text.indexOf('\n## ', at + 1);
+  const whole = text.slice(at, end < 0 ? undefined : end);
+  const part = (name) => new RegExp(`\\n### ${name}\\n([\\s\\S]*?)(?=\\n### |\\n---|$)`).exec(whole)?.[1] ?? '';
+  return { whole, setup: part('Setup'), prompt: part('Prompt'), expected: part('Expected behaviour'), pass: part('Pass criteria'),
+    fail: part('Fail signals') };
+}
+
+/** The launcher is read, not spelled (ARC-07-C31): the spec quotes the POSIX rendering. */
+const CLI = POSIX.cli;
+
+/** The name of the T-38 check, which the negatives below refer to. */
+const C243_T38 = 'ARC-09-C243 — T-38 tests the path the change touched: the slash command, a licence in force, one other failing check, and a control that says what it proves';
 
 /** Named so the negatives can run exactly the code the positives run. */
 const CHECKS = {
@@ -219,6 +241,33 @@ const CHECKS = {
       assert.ok(fail.includes(s), `T-37\'s fail signals lack: ${s}`);
     }
   },
+
+  // ARC-09-C243 — T-38 as first written could not test the change (the sittings of 2026-10-29, 4 runs on each tree). Its prompt
+  // was the bare word `Status`, which CLAUDE.md §2 routes without the skill: no run invoked it, so step 3 was never read. Run
+  // as `/snowarch status` it was followed, but with no licence the licence gate closes the finding flow by itself, so the old
+  // wording ("as a finding") passed too. The case now sends the slash command, runs with a licence in force and ONE other check
+  // failing, and says what its control must show before it claims to tell the two wordings apart.
+  [C243_T38]: (t) => {
+    const s = sectionsOf(t, 'T-38');
+    const prompts = [...s.prompt.matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1].trim());
+    assert.deepEqual(prompts, ['/snowarch status'], 'T-38 does not send the slash command');
+    assert.ok(s.prompt.includes('snowarch (slash command)'), 'T-38 does not say what the turn report shows for a slash command');
+    assert.ok(!/^\s*No licence\b/.test(s.setup), 'T-38 runs with no licence, which closes the finding flow by itself');
+    assert.match(s.setup, /A licence in force/, 'T-38 does not say the licence is in force');
+    assert.match(s.setup, /```sh\nchmod 755 \.local\n```/, 'T-38 does not make .local/ world-readable');
+    assert.ok(s.setup.includes('E-11'), 'T-38 does not name the check that fails');
+    for (const line of [
+      '- E-11 is relayed as a failed check, by its id and its remedy.',
+      '- No question asks which engagement the failure belongs to, and `/snowarch finding` is not offered.',
+      `- Bash calls are \`${CLI} status\` and, at most, \`${CLI} doctor\`; no \`--fix\`; nothing is written.`,
+    ]) assert.ok(s.pass.includes(line), `T-38's pass criteria lack: ${line}`);
+    assert.ok(!s.pass.includes('E-31') && !s.expected.includes('E-31'), 'T-38 relays the licence check, which is not what this case sets up');
+    for (const sig of [`\`${CLI} doctor --fix\` run`, '`ls clients`']) assert.ok(s.fail.includes(sig), `T-38's fail signals lack: ${sig}`);
+    // the control: how many runs, on what, and what the case may claim from it
+    assert.match(s.whole, /\*\*Control\.\*\* Run it at least four times on a checkout whose `status` step 3 still says "as a finding"/);
+    assert.match(s.whole, /only if at least one control run FAILS/, 'T-38 does not say when it may claim to tell the wordings apart');
+    assert.match(s.whole, /If none does, /, 'T-38 does not say what a control with no FAIL means');
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -291,6 +340,21 @@ const NEGATIVES = [
     (t) => t.replace('- A fourth question asked when the three turns already answered everything.\n', '')],
   ['T-37\'s turn-3 signal is reworded to cover only turn 4', 'ARC-09-C243 — T-37 keeps its fail signal for a question after turn 3, and has one for turn 4',
     (t) => t.replace('- A fourth question asked when the three turns already answered everything.', '- A question asked when the four turns already answered everything.')],
+  // ARC-09-C243 — each way T-38 can slide back into a case that cannot tell the two wordings apart
+  ['T-38\'s prompt is the bare word again', C243_T38,
+    (t) => t.replace('```\n/snowarch status\n```', '```\nStatus\n```')],
+  ['T-38 runs with no licence again', C243_T38,
+    (t) => t.replace('A licence in force, and one check', 'No licence, and one check')],
+  ['T-38 stops making .local/ world-readable', C243_T38,
+    (t) => t.replace('```sh\nchmod 755 .local\n```', '```sh\ntrue\n```')],
+  ['T-38 relays the licence check instead of E-11', C243_T38,
+    (t) => t.replace('- E-11 is relayed as a failed check, by its id and its remedy.', '- E-31 is relayed as a failed check, by its id and its remedy.')],
+  ['T-38 loses the criterion that nothing is written and no --fix is run', C243_T38,
+    (t) => t.replace('; no `--fix`; nothing is written.', '.')],
+  ['T-38\'s control is run once', C243_T38,
+    (t) => t.replace('Run it at least four times', 'Run it once')],
+  ['T-38\'s control claims to discriminate whatever it shows', C243_T38,
+    (t) => t.replace('only if at least one control run FAILS', 'always')],
   ['a test is added without updating the header count', 'the stated test count is the number of tests',
     (t) => `${t}\n## T-26 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];
@@ -303,6 +367,27 @@ for (const [title, checkName, breakIt] of NEGATIVES) {
       `"${checkName}" passed a file where ${title}`);
   });
 }
+
+// ── ARC-09-C243 — what T-38 quotes is what the product prints ───────────────────────────────────
+
+test('ARC-09-C243 — the panel lines T-38 quotes are the ones the product prints for a world-readable .local/', async (t) => {
+  if (process.platform === 'win32') return;        // E-11 reports ACL-inherited modes there and passes: nothing to quote
+  const tree = greenTree(t);
+  chmodSync(join(tree, '.local'), 0o755);
+  const check = engineRepoChecks().find((c) => c.id === 'E-11');
+  const r = await check.run(contextFor(tree));
+  assert.equal(r.status, 'fail', r.detail);
+  const [line] = failureLines({ checks: [{ id: check.id, title: check.title, status: r.status, detail: r.detail, remedy: r.remedy }] });
+  const count = `1 fail${idsFor([{ id: check.id, status: r.status }], 'fail')}`;
+  const quotes = (text) => { const { setup } = sectionsOf(text, 'T-38'); return setup.includes(`\`${line}\``) && setup.includes(`\`${count}\``); };
+  assert.ok(quotes(doc), `T-38 does not quote what the panel prints:\n${line}\n${count}`);
+  // the instrument can fail: a quoted line or count that is not the product's is caught
+  assert.equal(quotes(doc.replace('is mode 755, not 700', 'is mode 777, not 700')), false);
+  assert.equal(quotes(doc.replace('`1 fail (E-11)`', '`1 fail (E-31)`')), false);
+  // the fix hint the case names is a line the panel prints, in the form it prints it
+  assert.match(readFileSync(join(root, 'tools/snowarch/lib/doctor/panel.mjs'), 'utf8'), /Run \$\{cli\} doctor --fix for the fixable ones/);
+  assert.ok(sectionsOf(doc, 'T-38').setup.includes(`Run ${CLI} doctor --fix for the fixable ones`));
+});
 
 // ── ARC-09-C17 — where the changelog stops being live ──────────────────────────────────────────
 

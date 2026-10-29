@@ -196,6 +196,41 @@ test('C87 (c) — a turn with nothing to report says so, and never throws on a r
   assert.match(formatReport(r), /skills: none · corpus pages read: 0 · citations: 0/);
 });
 
+// ── a skill run by its slash command ────────────────────────────────────────────────────────────
+// ARC-09-C243 — `claude -p "/snowarch status"` has the CLI expand the skill before the model's first step, so the stream holds
+// no Skill call and no Read of the skill's file, and the report said `skills: none` for a turn that followed the skill. A
+// reviewer reads that line as "the skill was never read" (the sitting of 2026-10-29 read it that way for the bare `Status`
+// prompt, where it was true). The prompt is what says the skill ran, so the report is given the prompt.
+test('C243 — a turn whose prompt is a skill\'s slash command reports that skill; a prompt that is not one reports none', (t) => {
+  const dir = corpus(t);
+  mkdirSync(join(dir, '.claude', 'skills', 'snowarch'), { recursive: true });
+  writeFileSync(join(dir, '.claude', 'skills', 'snowarch', 'SKILL.md'), '---\nname: snowarch\n---\n');
+  const ran = stream([assistant(use('Bash', { command: `${POSIX.cli} status` })), { type: 'result', result: 'done' }]);
+  const skills = (prompt) => reportTurn(ran, { repoRoot: dir, prompt }).skills;
+  assert.deepEqual(skills('/snowarch status'), [{ name: 'snowarch', how: 'slash command' }]);
+  assert.deepEqual(skills('/snowarch'), [{ name: 'snowarch', how: 'slash command' }], 'a slash command with no argument');
+  assert.deepEqual(skills('  /snowarch status\n'), [{ name: 'snowarch', how: 'slash command' }], 'the prompt file ends in a newline');
+  assert.match(formatReport(reportTurn(ran, { repoRoot: dir, prompt: '/snowarch status' })), /^skills: snowarch \(slash command\) · /);
+  // each of these must report none: the detector is shown able to say no
+  assert.deepEqual(skills('Status'), [], 'a bare word is routed by CLAUDE.md, not by the skill');
+  assert.deepEqual(skills('/clear'), [], 'a slash command that is no skill of this checkout');
+  assert.deepEqual(skills('/snowarchx status'), [], 'a longer name is another command');
+  assert.deepEqual(skills('please run /snowarch status'), [], 'a slash command that is not the start of the prompt');
+  assert.deepEqual(skills(''), []);
+  assert.deepEqual(reportTurn(ran, { repoRoot: dir }).skills, [], 'no prompt given: nothing is claimed');
+  // a skill the model loaded itself is still reported as before, beside it
+  const both = reportTurn(stream([assistant(use('Skill', { skill: 'snowarch' }))]), { repoRoot: dir, prompt: '/snowarch status' });
+  assert.deepEqual(both.skills, [{ name: 'snowarch', how: 'Skill' }, { name: 'snowarch', how: 'slash command' }]);
+});
+
+test('C243 — the runner gives each turn\'s prompt file to the report, and the report takes it as its third argument', () => {
+  const code = read('scripts/validation/validation-run.sh').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  assert.match(code, /turn-report\.mjs" "\$OUT" "\$C" "\$RUN\/prompt\.txt"/, 'the report is not given the prompt');
+  // the prompt file is written before the session runs and the report runs after it, so it is this turn's prompt
+  assert.ok(code.indexOf('> "$RUN/prompt.txt"') < code.indexOf('turn-report.mjs'), 'the report reads a prompt that is not this turn\'s');
+  assert.match(read('scripts/validation/turn-report.mjs'), /usage: turn-report\.mjs <stream\.jsonl> <checkout> \[<prompt\.txt>\]/);
+});
+
 // ── the gateways ask for the full path ──────────────────────────────────────────────────────────
 
 test('C87 (c) — each gateway\'s citation format asks for the full path from markdown/, never a bare file name', () => {

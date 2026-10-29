@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
@@ -40,7 +40,7 @@ test('C106 - every case in the spec has a plan, and the kinds are the ones the c
   const { cases } = extract(t);
   const kinds = Object.fromEntries(cases.map((c) => [c.id, planSetup(c.setup).kind]));
   const expected = { 'T-06': 'prose', 'T-07': 'runner', 'T-13': 'prose', 'T-19': 'instance', 'T-22': 'instance', 'T-23': 'instance', 'T-25': 'files', 'T-26': 'files', 'T-28': 'prose', 'T-29': 'instance', 'T-31': 'no-licence', 'T-34': 'prose',
-    'T-35': 'prose', 'T-37': 'files', 'T-38': 'no-licence' };
+    'T-35': 'prose', 'T-37': 'files', 'T-38': 'files' };
   for (const [id, kind] of Object.entries(kinds)) {
     assert.equal(kind, expected[id] ?? 'none', `${id} is ${kind}`);
   }
@@ -270,4 +270,69 @@ test('ARC-11-C6 step 10 — the runner checks the licence before any session, an
   assert.ok(check < code.indexOf('for T in $SEL'), 'the licence is checked after the cases started');
   assert.match(code, /setup-plan\.mjs" licence "\$ROOT"\)?[^\n]*\|\|[^\n]*exit/, 'a checkout without a licence does not stop the run');
   assert.match(code, /setup-plan\.mjs" run "\$PROMPTS" "\$T" "\$C" "\$ROOT"/, 'a case is not handed the checkout\'s root');
+});
+
+// ── ARC-09-C243 — the one mode change a Setup may make: `.local/`, so a quick-doctor check fails with a licence in force ───
+// T-38 needs a check that fails and stops no deliverable, AND a licence in force: with no licence the licence gate closes the
+// finding flow by itself, and the old wording of the skill ("as a finding") then looks the same as the new one. E-11 fails a
+// `.local/` that is not mode 700, offline, in the quick doctor, and the licence check does not read that mode. The planner only
+// ever wrote under clients/, so the mode change is a second, narrower form: one mode, one directory, the owner keeping every right.
+test('C243 — a chmod of .local to a mode that leaves the owner every right is a file command; no other chmod is', () => {
+  for (const line of ['chmod 755 .local', 'chmod 750 .local', 'chmod 700 .local', 'chmod 775 .local']) {
+    const plan = planSetup(fence(line));
+    assert.equal(plan.kind, 'files', line);
+    assert.deepEqual(plan.commands.map((c) => [c.kind, c.prog]), [['file', 'chmod']], line);
+  }
+  for (const line of [
+    'chmod 755 clients', 'chmod 755 .local/licence.json', 'chmod 755 .local/', 'chmod 755 ./.local', 'chmod 755 .local/..', 'chmod 755 ..',
+    'chmod 755 /tmp', 'chmod 755 ~', 'chmod 755 $HOME', 'chmod 000 .local', 'chmod 400 .local', 'chmod 644 .local', 'chmod 7777 .local',
+    'chmod 75 .local', 'chmod 758 .local', 'chmod -R 755 .local', 'chmod u+rwx .local', 'chmod a+r .local', 'chmod 755', 'chmod .local',
+    'chmod 755 .local clients', 'chmod 755 .local; rm -rf clients', 'chmod 755 .local && touch x', 'chmod 755 .local > clients/x',
+    "chmod 755 '.local'", 'sudo chmod 755 .local', 'chown root .local', 'chgrp staff .local',
+  ]) {
+    const plan = planSetup(fence(line));
+    assert.equal(plan.kind, 'refused', `${line} was classed ${plan.kind}`);
+    assert.ok(plan.reason, line);
+    const r = runSetup(plan, '/nonexistent', { run: forbidden });
+    assert.deepEqual([r.ran, r.ok], [false, false], `a refused Setup stops the case: ${line}`);
+  }
+  // a chmod beside a clients/ command is one Setup of two commands; a refused one beside it refuses the whole Setup
+  assert.deepEqual(planSetup(fence('mkdir -p clients/a', 'chmod 755 .local')).commands.map((c) => c.prog), ['mkdir', 'chmod']);
+  assert.equal(planSetup(fence('mkdir -p clients/a', 'chmod 755 clients')).kind, 'refused');
+});
+
+test('C243 — T-38\'s Setup makes .local/ world-readable and leaves the licence in place; the next case starts from 700 again', async (t) => {
+  if (process.platform === 'win32') return;     // a Windows directory has no mode to assert: E-11 reports it ACL-inherited
+  const { placeLicence } = await import('../scripts/validation/setup-plan.mjs');
+  const { cases } = extract(t);
+  const plan = planSetup(cases.find((x) => x.id === 'T-38').setup);
+  const home = checkoutWithLicence(t);
+  const clone = tempDir('c243-clone-', t);
+  mkdirSync(join(clone, '.local'), { mode: 0o700 });                       // what the bootstrap leaves
+  chmodSync(join(clone, '.local'), 0o700);
+  assert.equal(placeLicence(plan, clone, home).ok, true);
+  const r = runSetup(plan, clone);
+  assert.equal(r.ok, true, r.line);
+  assert.equal(statSync(join(clone, '.local')).mode & 0o777, 0o755, 'T-38 did not loosen .local/');
+  assert.equal(existsSync(licenceIn(clone)), true, 'T-38 runs with a licence in force');
+  assert.equal(statSync(licenceIn(clone)).mode & 0o777, 0o600, 'the licence file keeps its own mode');
+  // the clone is shared by the cases of a run: the case after T-38, whatever its Setup, gets 700 back, with or without a licence
+  for (const next of [planSetup(fence('mkdir -p clients/a')), planSetup(NO_LICENCE), planSetup('')]) {
+    chmodSync(join(clone, '.local'), 0o755);
+    assert.equal(placeLicence(next, clone, home).ok, true);
+    assert.equal(statSync(join(clone, '.local')).mode & 0o777, 0o700, `.local/ stayed loose for a case after T-38 (${next.kind})`);
+  }
+  // a clone with no .local/ is the harness's gap and not the product's: the Setup fails, says so, and the case is not run
+  const bare = runSetup(plan, tempDir('c243-bare-clone-', t));
+  assert.equal(bare.ok, false);
+  assert.match(bare.line, /^Setup failed/);
+});
+
+test('C243 — the summary line says T-38 changes the mode of .local, and T-37\'s line is as it was', (t) => {
+  const { cases } = extract(t);
+  const line = (id) => summaryLine(id, planSetup(cases.find((c) => c.id === id).setup));
+  assert.equal(line('T-37'), 'T-37: Setup run - 1 command under clients/ (mkdir)');
+  assert.equal(line('T-38'), 'T-38: Setup run - 1 mode change of .local (chmod 755 .local)');
+  assert.equal(summaryLine('T-99', planSetup(fence('mkdir -p clients/a', 'chmod 755 .local'))),
+    'T-99: Setup run - 1 command under clients/ (mkdir) and 1 mode change of .local (chmod 755 .local)');
 });
