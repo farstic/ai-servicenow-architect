@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { report } from '../../tools/snowarch/hooks/stop-citations.mjs';
+import { loadIndex } from '../../tools/snowarch/lib/docs/resolve.mjs';
 import { CORPUS_DIR, syncCorpus } from '../../tools/snowarch/lib/docs/sync.mjs';
 import { UNCITED, buildUpstream, makeWorkspace } from '../helpers/docs-fixture.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -110,6 +111,19 @@ test('ARC-09-C254 — a folder, a placeholder and a bare area are no page', asyn
   for (const message of ['See markdown/alpha/deep/ for the folder.', 'Cite the path used: markdown/... in the end.', 'The area markdown/alpha.']) {
     assert.deepEqual(await report(stopping(message), { root }), SILENT, message);
   }
+});
+
+// The hook runs at the end of every turn, and a design answer cites pages it has just read. A page on disk is alive, so the
+// corpus tree (tens of milliseconds) is read only when a cited path is not on disk.
+test('ARC-09-C254 — the corpus tree is read only for a path that is not on disk', async (t) => {
+  const root = project(t);
+  let reads = 0;
+  const load = (corpus) => { reads += 1; return loadIndex(corpus); };
+  assert.deepEqual(await report(stopping('A (citation: markdown/alpha/page-one.md). B (citation: markdown/alpha/deep/folder/page-two.md).'),
+    { root, load }), SILENT);
+  assert.equal(reads, 0, 'every cited page is on disk, so there was nothing to look up');
+  assert.deepEqual(await report(stopping(`A (citation: markdown/alpha/page-one.md). B (citation: ${DEAD}).`), { root, load }), block(ONE(DEAD, REAL)));
+  assert.equal(reads, 1, 'a path that is not on disk is looked up, once');
 });
 
 test('ARC-09-C254 — a reply with no markdown/ in it is silence before anything is read', async (t) => {
