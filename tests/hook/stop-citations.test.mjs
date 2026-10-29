@@ -43,11 +43,12 @@ const stopping = (message, extra = {}) => ({ hook_event_name: 'Stop', stop_hook_
 const block = (reason) => ({ code: 0, stderr: '', stdout: `${JSON.stringify({ decision: 'block', reason })}\n` });
 const SILENT = Object.freeze({ code: 0, stderr: '', stdout: '' });
 
-/** What the model is asked, word for word: one line, "Correction:", neither the answer again nor the wrong path. */
+/** What the model is asked, word for word: one line, "Correction:", neither the answer again nor the wrong path, and no mention of this. */
+const ASK = ' Do not mention this notice.';
 const ONE = (cited, real) => `Your reply cites a corpus page at a path that does not exist: ${cited} -> ${real}. `
-  + 'Add one line that starts "Correction:" and gives the right path. Do not repeat the answer, and do not write the wrong path again.';
+  + `Add one line that starts "Correction:" and gives the right path. Do not repeat the answer, and do not write the wrong path again.${ASK}`;
 const MANY = (n, pairs) => `Your reply cites ${n} corpus pages at paths that do not exist: ${pairs.map(([a, b]) => `${a} -> ${b}`).join('; ')}. `
-  + 'Add one line that starts "Correction:" and gives the right path for each. Do not repeat the answer, and do not write the wrong paths again.';
+  + `Add one line that starts "Correction:" and gives the right path for each. Do not repeat the answer, and do not write the wrong paths again.${ASK}`;
 
 const DEAD = 'markdown/alpha/page-two.md';
 const REAL = 'markdown/alpha/deep/folder/page-two.md';
@@ -64,6 +65,22 @@ test('ARC-09-C254 — two dead paths are named in the order they first appear, e
   const message = `One (citation: ${DEAD}). Two (citation: markdown/australia/alpha/page-one.md). Three (citation: ${DEAD}).`;
   assert.deepEqual(await report(stopping(message), { root }),
     block(MANY(2, [[DEAD, REAL], ['markdown/australia/alpha/page-one.md', 'markdown/alpha/page-one.md']])));
+});
+
+// The user is to see the correction, never the mechanism: the line the model is asked for stays exactly as it was, and the reason
+// ends by asking that the notice itself stay out of the reply. The floor run had a model write "per the stop-hook feedback".
+test('ARC-09-C254 — the line asked for is the same words as before, and the reason ends by asking that the notice not be mentioned', async (t) => {
+  const root = project(t);
+  const reasonOf = async (message) => JSON.parse((await report(stopping(message), { root })).stdout).reason;
+  const one = await reasonOf(`A (citation: ${DEAD}).`);
+  assert.ok(one.includes('Add one line that starts "Correction:" and gives the right path. Do not repeat the answer, and do not write the wrong path again.'),
+    'the line asked for has changed');
+  assert.ok(one.endsWith('again. Do not mention this notice.'), 'the singular reason does not end with the request');
+  const many = await reasonOf(`A (citation: ${DEAD}). B (citation: markdown/australia/alpha/page-one.md).`);
+  assert.ok(many.includes('Add one line that starts "Correction:" and gives the right path for each. Do not repeat the answer, and do not write the wrong paths again.'),
+    'the line asked for in the plural has changed');
+  assert.ok(many.endsWith('again. Do not mention this notice.'), 'the plural reason does not end with the request');
+  for (const reason of [one, many]) assert.equal(reason.match(/Do not mention this notice\./g).length, 1, 'said once');
 });
 
 test('ARC-09-C254 — stop_hook_active is the cap: nothing is said, though the reply still cites a dead path', async (t) => {
