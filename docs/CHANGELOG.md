@@ -45,9 +45,10 @@ seconds on the CI machines.**
 - After `./snowarch upgrade` moved the checkout, the doctor lines it closed with were titled by the release you had
   installed, not the one you moved to: a check the new release added could print without its title, and one it renamed
   under its old one. The lines now print exactly the checks the new release's doctor reported in that run, with its
-  titles, and keep the instance names and commands this machine's doctor cache holds for the same run. The upgrade that
-  brings you this release is still run by the one you have installed, so the change shows from your next upgrade on
-  (ARC-09-C200).
+  titles. When no check fails and the doctor has written its cache for the run, they keep the instance names and
+  commands that cache holds; otherwise they are the doctor's masked `--json` text, with `<label>` and `<host>` in place
+  of those names, as are the bootstrap's closing lines after a failed check. The upgrade that brings you this release is
+  still run by the one you have installed, so the change shows from your next upgrade on (ARC-09-C200, ARC-09-C242).
 - `./snowarch upgrade` worked out the steps it would re-run with the release you had installed, so a new release that
   changed what a step depends on could re-run a step its plan never named. The plan is now the new release's own
   answer, asked once its files have passed the check against its signed manifest; when it cannot be asked, the plan
@@ -87,6 +88,13 @@ seconds on the CI machines.**
   differs from it only by case ("Normal"), once; a reference by its name, with its sys_id only on request; a date in the
   format and time zone of the ServiceNow user the server signs in as, with its difference from UTC noted once. Queries,
   filters and writes still use the stored value (ARC-09-C225).
+- `./snowarch doctor --json` and `./snowarch status --json` now also mask your own instances by what the instance store
+  holds: its hosts whole, with or without a scheme, and an organisation's or instance's name of four letters or more
+  that is not one of the product's own words. A name is masked on its own, with an environment and digits after it
+  (`acmebankdev`), and with an uppercase letter or a digit after it (`AcmeBank`, `acme2`). A lowercase continuation is
+  not a boundary: `corpus` is left alone under the name `corp`, and `acmebank` under `acme`. The store's URLs are read
+  for this, never its credentials. The domain of an address is masked whole, as `<domain>`, whatever the store holds, so
+  a username reads `j***@<domain>`; the JSON had kept it (ARC-09-C221, ARC-09-C242).
 - The install page says that Git for Windows 2.54 and 2.55's `… is not a commit!` line during the clone is harmless,
   and links to the troubleshooting paragraph that explains it (ARC-09-C224).
 - The bootstrap now fetches the whole ServiceNow documentation, all 56 areas, instead of only the areas the specialists

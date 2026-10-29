@@ -114,9 +114,11 @@ test('--json is the object and nothing else, masked username, no password', asyn
   const report = JSON.parse(text);
   const entry = report.server?.instances?.[0];
   assert.ok(entry, 'the report lists no instance — then it is not exercising the store');
-  // What it DOES carry: the shape, masked. `s***@corp.example.com` — enough to recognise which
-  // account it is, not enough to be one.
-  assert.match(entry.username, /^s\*\*\*@corp\.example\.com$/);
+  // What it DOES carry: the shape, masked. `s***@<domain>` — enough to recognise that it is an address and which letter
+  // it begins with, not enough to be one. The domain names the organisation, so it goes whole (ARC-09-C242, by the architect's
+  // ruling of 2026-10-28); this assertion read `s***@corp.example.com` and pinned the domain in the JSON.
+  assert.equal(entry.username, 's***@<domain>');
+  assert.ok(!text.includes('corp.example.com'), 'the username\'s domain is somewhere in the JSON');
   assert.ok(!JSON.stringify(report).includes(PASSWORD), 'the password is somewhere in the JSON');
 });
 
