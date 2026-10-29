@@ -363,6 +363,9 @@ test('ARC-09-C253 — any other change in E-28 still fails, and so does the same
     ['crashed', { id: 'E-28', status: 'fail', fixable: false, detail: 'check crashed' }],
     ['skipped', { id: 'E-28', status: 'skip', fixable: false, detail: '--no-network' }],
     ['the cached form of "available", which also has refreshed:false and names the tag', { id: 'E-28', status: 'warn', fixable: false, data: { latestTag: 'v9.1.0', refreshed: false } }],
+    // the no-answer data on a status that is not a warn is not the no-answer: the compare excuses a warn and nothing else
+    ['a fail that carries the no-answer data', { id: 'E-28', status: 'fail', fixable: false, data: { remote: 'origin', refreshed: false } }],
+    ['a skip that carries the no-answer data', { id: 'E-28', status: 'skip', fixable: false, data: { remote: 'origin', refreshed: false } }],
     ['a warn with data of another shape', { id: 'E-28', status: 'warn', fixable: false, data: { remote: 'origin' } }],
     ['a warn with no data', { id: 'E-28', status: 'warn', fixable: false }]]) {
     assert.notDeepEqual(diff(base, normalise(rawFrom(base, entry))), [], `E-28 ${name} passed the compare`);
@@ -404,6 +407,12 @@ test('ARC-09-C253 — the CLI passes a run whose E-28 got no answer and says so;
   assert.equal(ok.status, 0, `${ok.stdout}${ok.stderr}`);
   assert.match(ok.stdout, /matches/);
   assert.match(ok.stdout, /E-28: not compared/, 'a pass that did not look at E-28 did not say so');
+  // and the job summary, which a reader opens before the log, says it too
+  const summaryFile = join(a.root, 'summary.md');
+  const withSummary = spawnSync(process.execPath, [join(REAL_ROOT, 'scripts/ci/doctor-snapshot.mjs'), '--in', a.inPath, '--root', a.root, '--platform', 'linux', '--summary'],
+    { encoding: 'utf8', cwd: REAL_ROOT, env: { ...process.env, GITHUB_STEP_SUMMARY: summaryFile } });
+  assert.equal(withSummary.status, 0, `${withSummary.stdout}${withSummary.stderr}`);
+  assert.match(readFileSync(summaryFile, 'utf8'), /not compared.*E-28|E-28.*not compared/s, 'the job summary does not say E-28 was not compared');
   // the same run, taken as a snapshot, is refused: a snapshot is never written from a check that was not answered
   const w = runCli(['--in', a.inPath, '--write', '--root', a.root, '--platform', 'linux']);
   assert.notEqual(w.status, 0, `--write accepted a run in which E-28 was not answered: ${w.stdout}${w.stderr}`);
