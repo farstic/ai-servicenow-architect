@@ -28,6 +28,8 @@ const PAGES = [
   'markdown/epsilon/b/inner/dupe.md',
   'markdown/gamma/real-folder/moved.md',
   'markdown/delta/only-here.md',
+  'markdown/alpha/x/y/z/dup2.md',
+  'markdown/alpha/z/q/y/dup2.md',
 ];
 const index = indexOf(PAGES);
 
@@ -55,10 +57,13 @@ const CASES = [
     hit('area', 'markdown/alpha/deep/folder/page-two.md')],
   ['more folders than the page has, the file name occurs once in the area', 'markdown/alpha/a/b/c/page-one.md',
     hit('area', 'markdown/alpha/page-one.md')],
+  ['the file name occurs twice in one area: the order of the cited folders picks the page', 'markdown/alpha/z/y/dup2.md',
+    hit('folders', 'markdown/alpha/z/q/y/dup2.md')],
   // what it will not say
   ['two pages fit the cited folders', 'markdown/alpha/twin.md', null],
   ['the file name occurs twice and a cited folder is neither', 'markdown/alpha/zzz/twin.md', null],
   ['two pages of one name, and the cited folder is in neither area', 'markdown/zeta/a/dupe.md', null],
+  ['the file name occurs in two areas, and the cited folder is wrong in the cited one', 'markdown/alpha/wrong/shared.md', null],
   ['a file name that occurs once, in another area', 'markdown/gamma/only-here.md', null],
   ['a file name that occurs once, in another area, with a subfolder', 'markdown/gamma/sub/only-here.md', null],
   ['no page has that file name', 'markdown/alpha/no-such-page.md', null],
@@ -87,11 +92,12 @@ test('ARC-09-C254 — resolve reads the index and changes nothing in it', () => 
 });
 
 test('ARC-09-C254 — the index: pages by path and by file name, and nothing that is not a page', () => {
-  const ix = indexOf([...PAGES, 'markdown/alpha/diagram.png', 'markdown/alpha/README', 'legal/README.md', 'markdown/alpha/page-one.md']);
+  const ix = indexOf([...PAGES, 'markdown/alpha/diagram.png', 'markdown/alpha/README', 'legal/README.md', 'markdown/loose.md', 'markdown/alpha/page-one.md']);
   assert.equal(ix.size, PAGES.length, 'a duplicate, a picture, a folder name or a page outside markdown/ was counted');
   assert.equal(ix.has('markdown/alpha/page-one.md'), true);
   assert.equal(ix.has('markdown/alpha/diagram.png'), false);
   assert.equal(ix.has('legal/README.md'), false);
+  assert.equal(ix.has('markdown/loose.md'), false, 'a file directly under markdown/ has no area, so it is no page');
   assert.deepEqual([...ix.named('twin.md')].sort(), ['markdown/alpha/one/twin.md', 'markdown/alpha/two/twin.md']);
   assert.deepEqual(ix.named('page-one.md'), ['markdown/alpha/page-one.md'], 'a duplicate path is one page');
   assert.deepEqual(ix.named('no-such-page.md'), []);
