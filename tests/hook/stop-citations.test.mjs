@@ -88,6 +88,34 @@ test('ARC-09-C254 — beside an alive path and a path nothing can resolve, only 
   assert.deepEqual(await report(stopping(message), { root }), block(ONE(DEAD, REAL)));
 });
 
+// The floor run found it, on both Claude Code versions: a model that had followed the Read hook's note wrote "I found it at <real>.
+// My first read used <dead>, which does not exist", and was sent back for a line that said the same. A reply that names a dead path
+// only to say it does not exist, next to the page the resolver names, has nothing to correct: the right path is in it already.
+test('ARC-09-C254 — a reply that names the dead path beside the page itself is not sent back, whatever it says of the dead one', async (t) => {
+  const root = project(t);
+  for (const [why, message] of [
+    ["the floor run's sentence", `The first line of the page is "# Page two". The page is at ${REAL}; my first read used ${DEAD}, which does not exist.`],
+    ['the real page after the dead path', `My first read used ${DEAD}, which does not exist; the page is at ${REAL}.`],
+    ['the real page as a full path in backticks', `I found it at \`/work/repo/vendor/ServiceNowDocs/${REAL}\`, not at \`${DEAD}\`.`],
+    ['both cited, the dead one in a citation', `A claim (citation: ${DEAD}). The same page again (citation: ${REAL}).`],
+    ['the real page with Windows separators', `I found it at C:\\work\\repo\\vendor\\ServiceNowDocs\\markdown\\alpha\\deep\\folder\\page-two.md, not at ${DEAD}.`],
+  ]) assert.deepEqual(await report(stopping(message), { root }), SILENT, why);
+});
+
+test('ARC-09-C254 — a dead path that stands alone, or whose page is not in the reply, is sent back', async (t) => {
+  const root = project(t);
+  const other = 'markdown/australia/alpha/page-one.md';
+  for (const [why, message, expected] of [
+    ['alone', `A claim (citation: ${DEAD}).`, block(ONE(DEAD, REAL))],
+    ['said not to exist, and no page named', `My first read used ${DEAD}, which does not exist.`, block(ONE(DEAD, REAL))],
+    ['beside another page that is there', `A (citation: markdown/alpha/page-one.md). B (citation: ${DEAD}).`, block(ONE(DEAD, REAL))],
+    ['beside a path of the same file name that is not the page', `Another one is at markdown/delta/page-two.md. B (citation: ${DEAD}).`, block(ONE(DEAD, REAL))],
+    ['two dead paths, the page of the second in the reply', `A (citation: ${DEAD}). B (citation: ${other}). B is at markdown/alpha/page-one.md.`, block(ONE(DEAD, REAL))],
+    ['two dead paths, the page of the first in the reply', `A (citation: ${DEAD}). B (citation: ${other}). A is at ${REAL}.`, block(ONE(other, 'markdown/alpha/page-one.md'))],
+    ['two dead paths, neither page in the reply', `A (citation: ${DEAD}). B (citation: ${other}).`, block(MANY(2, [[DEAD, REAL], [other, 'markdown/alpha/page-one.md']]))],
+  ]) assert.deepEqual(await report(stopping(message), { root }), expected, why);
+});
+
 test('ARC-09-C254 — a citation is read as the gate reads one: any spelling, punctuation, a table cell, a brace group', async (t) => {
   const root = project(t);
   for (const [why, message] of [
