@@ -6,7 +6,8 @@
 // The note stays in `clients/<engagement>/findings/`, which git ignores; what leaves is this script's output, so the
 // masking is code with tests (tools/snowarch/tests/finding.test.mjs), never the model's care. The order and every rule
 // are the architect's privacy red-team's (2026-10-23), measured on its corpus before this file was written: 6 of 42
-// leak cases survive, each a class no pattern catches and each named in the output's "Read before sending" list.
+// leak cases survived, each a class no pattern catches and each named in the output's "Read before sending" list; ARC-09-C251
+// closed two, a MID host name and a ticket key that begin with a name the masker was given.
 //
 // READ-ONLY, and the only path control there is: the skill's grant is a Bash rule, which cannot constrain arguments, so
 // this script accepts nothing but a note under `clients/<engagement>/findings/` and refuses the rest with a sentence.
@@ -14,7 +15,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { redact } from './redact.mjs';
-import { byValueEntries, ENV_WORDS, hostSource, isPublicLabel, maskByValue, STEM_ANY, STEM_SIBLING, stemOf,
+import { byValueEntries, ENV_WORDS, hostSource, isPublicLabel, maskByValue, PRODUCT_STEMS, STEM_ANY, STEM_SIBLING, stemOf,
   storeHostValues, usableStems } from './mask-values.mjs';
 import { FINDING_PATH } from './finding-path.mjs';
 
@@ -104,7 +105,7 @@ export function maskFinding(text, { engagement = '', aliases = [], labels = [], 
   //    A stem masks every word it begins; one that is a government's, a sector's or a state's label, its whole name and a
   //    sibling's (mask-values.mjs isPublicLabel).
   out = maskByValue(out, byValueEntries({ engagement, aliases, labels, stems, usernames },
-    { stemSuffix: (s) => (isPublicLabel(s) ? STEM_SIBLING : STEM_ANY) }),
+    { stemSuffix: (s) => (isPublicLabel(s) ? STEM_SIBLING : STEM_ANY), nameSuffix }),
   (kind, m) => (kind === 'engagement' ? '<engagement>' : tag(kind, m)));
   //    Then the store's own hosts with no dot, a bare name or an IPv6 address, whole (ARC-09-C242). After the names, so
   //    a name that holds one as a part (`itsm.acmebankuk`, `Snow Acme Holdings`) is masked whole first; and after
@@ -152,6 +153,19 @@ const PRODUCT_WORDS = new Set([...ENV_WORDS, 'incident', 'problem', 'change', 'r
   'admin', 'user', 'group', 'flow', 'catalog', 'report']);
 
 /**
+ * ARC-09-C251, the architect's ruling of 2026-10-29: an engagement name or an alias of four letters or more masks every word it
+ * begins, as a store stem does (AcmeMID01, acme01 and acmedev under `acme`), because a client's name leaking inside a glued token
+ * is what the masker exists to stop. A shorter name stays whole-word, and so does one of the product's own words (`case`,
+ * `snow`), which would otherwise read `caseload` and `snowarch` as the client; aliasWarnings says so for both.
+ */
+export const NAME_PREFIX_MIN = 4;
+const nameSuffix = (name) => {
+  const word = name.trim().toLowerCase();
+  const letters = name.replace(/[^A-Za-z]/g, '').length;
+  return letters >= NAME_PREFIX_MIN && !PRODUCT_WORDS.has(word) && !PRODUCT_STEMS.has(word) ? STEM_ANY : '';
+};
+
+/**
  * A warning for the engagement name, or an alias, of 3 letters or fewer, or one that is a product word. The printed copy goes to the
  * person who issued the licence, so a warning names the place (the engagement name; alias 1 is the first name in aliases.txt)
  * and never the value (the architect's review of 2026-10-28).
@@ -184,13 +198,15 @@ const stemsOf = (storeUrls = []) => usableStems(storeUrls.map((u) => {
  * word; a stem of 3 letters or fewer, or one that is a product word, masks every word that begins with it.
  */
 export function stemWarnings(storeUrls = []) {
-  return [...new Set(stemsOf(storeUrls))].flatMap((s) => {
+  // One line per distinct warning: two stems of one class give the same sentence, and it is said once (ARC-09-C251).
+  const lines = [...new Set(stemsOf(storeUrls))].flatMap((s) => {
     if (isPublicLabel(s)) {
       return ['warning: a store name is a government\'s, a sector\'s or a state\'s label: it is masked as a word and in a sibling instance\'s name, such as that name followed by dev, but not where it begins a longer word, so check those before sending'];
     }
     if (s.length <= 3) return [`warning: one store name is ${s.length} letters long, so every word that begins with it is masked`];
     return PRODUCT_WORDS.has(s) ? ['warning: a store name is a product word, so every word that begins with it is masked'] : [];
   });
+  return [...new Set(lines)];
 }
 
 /**

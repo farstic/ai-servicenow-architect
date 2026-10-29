@@ -10,7 +10,8 @@
  * 10 more shapes from its second pass, and 21 product strings that must come through unchanged. Measured with its
  * reference masker before this file was written: 6 of 42 cases still leak, every one a class no pattern catches
  * (people, places, a company named only by an abbreviation it was not told, a username variant, a MID host name, a
- * ticket key), 0 of 21 controls damaged, and the masking idempotent. The six are asserted as residuals: each
+ * ticket key), 0 of 21 controls damaged, and the masking idempotent. ARC-09-C251 closed two of the six, the MID host
+ * name and the ticket key that begin with a name the masker was given; the four left are asserted as residuals: each
  * surviving token is either in the "Read before sending" list the output ends with, or a class that list names.
  *
  * Secret-shaped values are ASSEMBLED at run time, as tests/doctor/json-boundary.test.mjs does, so the repository's
@@ -98,9 +99,10 @@ const RESIDUALS = {
   L11: 'review', // people
   L13n: 'abbreviations', // the company named only by an abbreviation the store and aliases do not hold
   L18: 'review', // a username variant
-  L19: 'review', // a MID host name
+  // L19, a MID host name glued to the client's short name (ACMEMID01), left this table with ARC-09-C251: an alias of four letters
+  // or more now masks the words it begins (the architect's ruling of 2026-10-29), so the case is masked like the others.
   L29: 'places', // places and product brands
-  L31: 'review', // a ticket key in another system
+  // L31, a ticket key in another system that begins with the client's short name (ACMEITSM-4521), left this table with ARC-09-C251, as L19 did.
 };
 
 /** [id, text, values, tokens that must come through unchanged] */
@@ -461,7 +463,7 @@ test('ARC-09-C242 — a store host is masked whole in a note: a bare name, an IP
 
 // The architect's review of 2026-10-28, one BLOCK: the warnings are printed in the copy the user sends to the person who issued the
 // licence, and they named the client's store name, an alias or the engagement. A warning names no value now, and it describes the
-// masking's own breadth, every instance in the store (his ruling), so it names no engagement either.
+// masking's own breadth, every instance in the store (the architect's ruling), so it names no engagement either.
 const SHORT_NAME = 'warning: one store name is 3 letters long, so every word that begins with it is masked';
 const PRODUCT_NAME = 'warning: a store name is a product word, so every word that begins with it is masked';
 const PUBLIC_NAME = 'warning: a store name is a government\'s, a sector\'s or a state\'s label: ';
@@ -483,11 +485,12 @@ test('ARC-09-C242 — the finding warns about a store name the reader should che
     assert.ok(out.split('\n').some((l) => l.startsWith(warning)), `${host}: no warning\n${out}`);
     assert.deepEqual(printed(out, [value, 'contoso', 'Contoso Holdings']), [], `${host}: a value was printed\n${out}`);
   }
-  // A line for each name, however many hosts carry it, and a name the masker does not use is not counted.
+  // One line for the class, however many names or hosts carry it (it was a line for each name, the same sentence twice, until
+  // ARC-09-C251), and a name the masker does not use is not counted.
   reset();
   const two = renderFinding('x', { storeUrls: ['https://abc.service-now.com', 'https://itsm.abc.com', 'https://xyz.service-now.com'] },
     { storeRead: true, credentialsRead: true });
-  assert.equal(two.split('\n').filter((l) => l === SHORT_NAME).length, 2, two);
+  assert.equal(two.split('\n').filter((l) => l === SHORT_NAME).length, 1, two);
   reset();
   const product = renderFinding('x', { storeUrls: ['https://servicedesk.servicenow.example'] }, { storeRead: true, credentialsRead: true });
   assert.match(product.split('\n')[0], /^instance names masked by value: 1 \(store read\)/, 'a stem the masker does not use was counted');
