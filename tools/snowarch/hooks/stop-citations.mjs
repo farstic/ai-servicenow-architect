@@ -48,6 +48,7 @@ function asking(pairs) {
  * What the hook says for one Stop input: `{ code, stderr, stdout }`, always code 0.
  * - A reply citing a path that does not exist, with a page the resolver knows: one line of JSON, `decision: "block"`.
  * - Anything else, and always when `stop_hook_active`: nothing.
+ * `load` reads the corpus tree (lib/docs/resolve.mjs's `loadIndex` when it is not given); a test gives its own to count the reads.
  */
 export async function report(input, { root = ROOT, load } = {}) {
   const none = { code: 0, stderr: '', stdout: '' };
