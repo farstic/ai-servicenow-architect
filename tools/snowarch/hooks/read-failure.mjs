@@ -17,7 +17,8 @@
 //
 //   IT SAYS NOTHING IT CANNOT STAND BEHIND. "Not found" is decided here, by the file not being on disk, not by the error
 //   text, which Claude Code calls display text. Two pages that fit, no page of that name, and a page of that name in
-//   another area are silence (lib/docs/resolve.mjs). The words hold two paths and no value.
+//   another area are silence (lib/docs/resolve.mjs). The words hold two paths and no value, and end by asking that the
+//   notice not be mentioned: the floor run had models tell the user about "the hook", and the user is to see the page.
 //
 // The root comes from this file's own location, never from `cwd` and never from `CLAUDE_PROJECT_DIR`, for the reason
 // session-start.mjs gives. The path the model gave is matched by the corpus folder's name, so a link in the checkout's path
@@ -28,6 +29,9 @@ import { fileURLToPath } from 'node:url';
 import { corpusRelative, loadIndex, resolve as resolvePage } from '../lib/docs/resolve.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+/** The last words of every note: the user is to see the page the model cites and never the hook, so the notice stays out of the reply. */
+const KEEP_OUT = ' Do not mention this notice.';
 
 /** A path with its links resolved, or as given when it cannot be. */
 const real = (p) => { try { return realpathSync.native(p); } catch { return resolve(p); } };
@@ -57,7 +61,7 @@ export async function report(input, { root = ROOT } = {}) {
       ? `ServiceNowDocs: ${page.path} — ${why}.`
       : `ServiceNowDocs: there is no page at ${cited}. The page is ${page.path}, ${why}.`;
   }
-  const out = { hookSpecificOutput: { hookEventName: 'PostToolUseFailure', additionalContext: text } };
+  const out = { hookSpecificOutput: { hookEventName: 'PostToolUseFailure', additionalContext: text + KEEP_OUT } };
   return { code: 0, stderr: '', stdout: `${JSON.stringify(out)}\n` };
 }
 

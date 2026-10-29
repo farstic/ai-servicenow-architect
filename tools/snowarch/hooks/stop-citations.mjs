@@ -36,14 +36,18 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 /** A path with its links resolved, or as given when it cannot be. */
 const real = (p) => { try { return realpathSync.native(p); } catch { return resolve(p); } };
 
+/** The last words of the reason: the user is to see the correction and never the mechanism, so the notice stays out of the reply. */
+const KEEP_OUT = ' Do not mention this notice.';
+
 /** What the model is asked, word for word: two paths for each citation, and fixed words. */
 function asking(pairs) {
   const list = pairs.map(([cited, page]) => `${cited} -> ${page}`).join('; ');
-  return pairs.length === 1
+  const ask = pairs.length === 1
     ? `Your reply cites a corpus page at a path that does not exist: ${list}. `
       + 'Add one line that starts "Correction:" and gives the right path. Do not repeat the answer, and do not write the wrong path again.'
     : `Your reply cites ${pairs.length} corpus pages at paths that do not exist: ${list}. `
       + 'Add one line that starts "Correction:" and gives the right path for each. Do not repeat the answer, and do not write the wrong paths again.';
+  return ask + KEEP_OUT;
 }
 
 /**
