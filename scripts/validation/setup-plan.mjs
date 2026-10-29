@@ -10,7 +10,8 @@
 //   prose     numbered context for a person (T-06, T-13): nothing to run
 //   runner    the product's own design-mode install and doctor (T-07): the runner has already
 //             bootstrapped the clone in design mode, and the session runs the doctor itself
-//   files     shell that writes files under `clients/` (T-25): run, in the clone, before the case
+//   files     shell that writes files under `clients/` (T-25), or makes one mode change of the clone's own
+//             `.local/` (T-38): run, in the clone, before the case
 //   instance  commands that need an instance (T-19, T-22, T-23): NEVER run here; the session has no
 //             MCP server (`--strict-mcp-config`), so the case runs as its design-only dormant variant
 //   no-licence  a Setup that begins "No licence" (T-31): the case runs with no licence in force
@@ -28,6 +29,12 @@
 // a path outside `clients/`, a block that is not shell - is REFUSED, and a refused Setup stops its case:
 // state the case needed was not prepared, and running it anyway would put the harness's gap in the
 // product's column.
+//
+// ONE MODE CHANGE (ARC-09-C243). T-38 needs a check that fails and stops no deliverable, with a licence in force: with
+// none, the licence gate closes the finding flow by itself and the skill's old and new wording look the same. E-11 fails a
+// `.local/` that is not mode 700, offline, in the quick doctor, and the licence check does not read that mode. So the
+// planner also runs `chmod 7NN .local`: that directory only (the clone's own, gitignored, where the licence is placed), and
+// a mode that leaves the owner every right, so the runner can still clean up. No other chmod, no flag, no other target.
 //
 // Quoted text is data. A redirect symbol, a semicolon or a dollar inside SINGLE quotes is literal
 // (T-25 prints lines containing backticks), so single-quoted segments are removed before the syntax
@@ -48,6 +55,9 @@ const INSTANCE = /(?:snowarch|snow\w*)\s+instance\b|instances\.json|set-credenti
 const SHELL_LANGS = new Set(['', 'sh', 'bash', 'shell']);
 const WRITERS = new Set(['mkdir', 'touch', 'echo', 'printf']);
 const SAFE_PATH = /^clients\/[A-Za-z0-9_.\/-]+$/;
+// The one chmod (ARC-09-C243): three octal digits with a 7 in front, on exactly this directory.
+const CHMOD_MODE = /^7[0-7]{2}$/;
+const CHMOD_TARGET = '.local';
 // What the planner does not interpret. `>` is handled as a redirect; `\` is a joined continuation by now.
 const SYNTAX = /[;|&()<*?~{}!`$\\]/;
 // A case that runs with no licence in force says so first (T-31).
@@ -96,6 +106,12 @@ function classify(cmd) {
   if (bad) return { ...cmd, kind: 'refused', reason: `shell syntax the planner does not run (${bad}) in: ${cmd.text.slice(0, 60)}` };
   const tokens = withoutQuoted(cmd.text).split(/\s+/).filter(Boolean);
   const prog = tokens[0];
+  if (prog === 'chmod') {
+    if (tokens.length !== 3 || !CHMOD_MODE.test(tokens[1]) || tokens[2] !== CHMOD_TARGET) {
+      return { ...cmd, kind: 'refused', reason: `a chmod the planner does not run (only chmod 7NN ${CHMOD_TARGET}): ${cmd.text.slice(0, 60)}` };
+    }
+    return { ...cmd, kind: 'file', prog };
+  }
   if (!WRITERS.has(prog)) return { ...cmd, kind: 'refused', reason: `unclassified command: ${String(prog).slice(0, 40)}` };
   const targets = [];
   const args = [];
@@ -149,7 +165,12 @@ function describe(plan) {
     case 'no-licence': return 'Setup run - the licence is left out of the clone, so the banner reads Licence: missing';
     case 'files': {
       const files = plan.commands.filter((c) => c.kind === 'file');
-      return `Setup run - ${files.length} command${files.length === 1 ? '' : 's'} under clients/ (${[...new Set(files.map((c) => c.prog))].join(', ')})`;
+      const under = files.filter((c) => c.prog !== 'chmod');
+      const modes = files.filter((c) => c.prog === 'chmod');
+      const parts = [];
+      if (under.length) parts.push(`${under.length} command${under.length === 1 ? '' : 's'} under clients/ (${[...new Set(under.map((c) => c.prog))].join(', ')})`);
+      if (modes.length) parts.push(`${modes.length} mode change${modes.length === 1 ? '' : 's'} of ${CHMOD_TARGET} (${modes.map((c) => c.text).join('; ')})`);
+      return `Setup run - ${parts.join(' and ')}`;
     }
     default: return `Setup REFUSED - ${plan.reason}; the case is not run`;
   }
@@ -183,12 +204,18 @@ const noLicenceAt = (root) => `no licence at ${licenceOf(root)}: from 2.0.13 a s
  */
 export function placeLicence(plan, clone, root) {
   const target = licenceOf(clone);
+  // THE CLONE IS SHARED, and one Setup (T-38's) loosens `.local/` to make E-11 fail: every case starts from the mode the
+  // bootstrap leaves, so what one case set up is not in the next one's panel (ARC-09-C243). There is no mode to set on Windows.
+  const local = join(clone, '.local');
+  const resetMode = () => { if (process.platform !== 'win32' && existsSync(local)) chmodSync(local, 0o700); };
   if (plan.kind === 'no-licence') {
     rmSync(target, { force: true });
+    resetMode();
     return { ok: true, line: 'the licence is left out of the clone' };
   }
   if (!existsSync(licenceOf(root))) return { ok: false, line: noLicenceAt(root) };
-  mkdirSync(join(clone, '.local'), { recursive: true, mode: 0o700 });
+  mkdirSync(local, { recursive: true, mode: 0o700 });
+  resetMode();
   copyFileSync(licenceOf(root), target);
   if (process.platform !== 'win32') chmodSync(target, 0o600);
   return { ok: true, line: 'the checkout\'s licence is in the clone' };

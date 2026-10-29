@@ -44,8 +44,10 @@ export const USAGE = (where) => [
   '  The one-screen panel: mode, engine, docs, roster, capabilities, instances and the quick',
   '  doctor. `--json` prints the doctor report itself, exactly as `doctor --quick --json` does.',
   '',
-  '  Exit: 0 when no check failed, 1 when one did. A 1 is a finding about the checkout, not a',
-  '  failure to render — the panel is printed either way.',
+  '  Exit: 0 when no check failed, 1 when one did: the panel is printed either way, so a 1 is not a',
+  '  failure to render. It is also 1 when the doctor itself failed; then the one line printed is a',
+  '  Mode line that says doctor unavailable. Any other 1 is the command itself failing, and what it',
+  '  printed says why.',
 ].join('\n');
 
 /**

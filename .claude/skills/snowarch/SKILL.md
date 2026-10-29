@@ -53,7 +53,10 @@ Instances are the store's own records; nothing was probed.
 ```
 
 3. **The exit code is the doctor's verdict, not the command's health.** `1` means a check failed,
-   and the panel on the screen says which — report it as a finding, never as "the command failed".
+   and the panel on the screen says which — report it as a failed check, never as "the command failed".
+   A `1` is also the command's own fallback, a Mode line that says `doctor unavailable`: relay that
+   line as it is, with the cause it names. A `1` with neither a panel nor that line is the command
+   itself failing, usually one `error: status: …` line: relay it, and say the mode is unverified.
 4. **If it did not run at all** — no Node, or the launcher is not installed — say so and name the
    cause you actually observed, no other:
    `Mode: unverified — ./snowarch status did not run (<cause>); run ./bootstrap.sh (Windows: bootstrap.cmd)`.
@@ -228,7 +231,9 @@ Records something the engine got wrong as a note in the engagement's own folder,
 user to send. The note stays on this machine; this skill sends nothing.
 
 1. **Ask which engagement the finding belongs to.** Offer no default. A finding about the product rather than a
-   client goes under a name the user chooses, such as `general`. Never `_unfiled`: it holds design artefacts only.
+   client goes under a name the user chooses that the note will not use as a word: the masker masks the engagement's
+   name on its own and with its parts joined by a space, a hyphen, an underscore, a dot or nothing, so not a common
+   word such as `general`. Never `_unfiled`: it holds design artefacts only.
 2. **The first time for an engagement, ask once for its other names**: its legal name, abbreviations and brands.
    Keep them in `clients/<engagement>/findings/aliases.txt`, one per line, `#` for a comment. "None" is an answer.
 3. **Compose the note in the user's words**: what was asked, what happened, what was expected, the `Engine:` line
@@ -241,5 +246,8 @@ user to send. The note stays on this machine; this skill sends nothing.
 6. Close with: Send the text above to the person who issued your licence.
 
 The masker cannot know people's names, places, company names or abbreviations it was not given, ticket keys in
-other systems, or record numbers with fewer than 6 digits; its "Read before sending" list says so every time. Asked
-whether the copy is safe to send, say that it is masked, and that those still need a reader.
+other systems, record numbers with fewer than 6 digits, or a credential written in plain words that no rule
+recognises; its "Read before sending" list says so every time. When its first line says the instance store was NOT
+read, the instance names were not masked by value either; when it says the credentials were NOT read, the store's
+usernames were not, and its secrets may not have been. Asked whether the copy is safe to send, say that it is masked,
+that those still need a reader, and which of the two its first line says was NOT read, if either was.

@@ -36,6 +36,10 @@ const EXTRA = {
   // ARC-09-C221 — the note and aliases.txt are written, the masker and the status read are run. Write is allowed for
   // any path here, so T-37's pass criteria read the tree diff, not the model's words, for "nothing else was written".
   'T-37': { tools: ['Bash', 'Write'], allowed: ['Write', 'Bash(node tools/snowarch/lib/finding.mjs *)', `Bash(${CLI} status:*)`] },
+  // ARC-09-C243 — T-38 prints the status panel and may run the doctor for the remedy it names: Bash for those two commands
+  // and no other, and no Write. A permission rule is a prefix and cannot leave out `doctor --fix`; the case's own pass
+  // criteria say that one is not run, and the reviewer reads the transcript for it.
+  'T-38': { tools: ['Bash'], allowed: [`Bash(${CLI} status:*)`, `Bash(${CLI} doctor:*)`] },
 };
 
 /** The tool set and the permissions for one case. */
