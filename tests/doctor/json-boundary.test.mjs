@@ -452,3 +452,19 @@ test('ARC-09-C242 — an address is masked wherever it stands in the JSON, and a
   assert.deepEqual(maskForJson({ server: { instances: [] }, v }).v, ['contact j***@<domain> or j***@<domain>.', 'mail <a***@<domain>>',
     'https://s***@<domain>/path', 'npm i -g @servicenow/sdk', 'sdk@4.1.0 and pkg@1.2.3-rc.1', 'the @ sign, a@b and x@y.1', 's***']);
 });
+
+// ── ARC-09-C251 — the follow-ups of the C242 review, ruled by the architect on 2026-10-29 ─────────────────────────────────
+
+test('ARC-09-C251 — a stem inside a longer word stays in the doctor\'s JSON: only a word the stem begins is masked', () => {
+  // The review's mutant dropped the left boundary of maskStemWords and no test turned red. `nacme` and `xacmey` are not the
+  // stem's words; `acme` and `Acme01` are.
+  assert.deepEqual(stemWords(['acme'], ['nacme', 'xacmey', 'Macme01', 'the nacmeUtils', 'acme and nacme', 'Acme01']),
+    ['nacme', 'xacmey', 'Macme01', 'the nacmeUtils', `${HOST_MASK} and nacme`, HOST_MASK]);
+});
+
+test('ARC-09-C251 — a git remote is masked as an address: ruled to stay, so a change is a decision', () => {
+  // `git@github.com:org/repo` becomes `g***@<domain>:org/repo`. It is harmless, and an exemption is one more special case in
+  // a rule that has none (the architect's ruling of 2026-10-29, item 3).
+  assert.deepEqual(maskForJson({ server: { instances: [] }, v: ['git@github.com:org/repo', 'git clone git@github.com:org/repo.git'] }).v,
+    ['g***@<domain>:org/repo', 'git clone g***@<domain>:org/repo.git']);
+});
