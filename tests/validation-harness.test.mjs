@@ -271,7 +271,8 @@ test('C254 — text written before the last tool result is narration, not the an
   const dir = corpus(t);
   const final = `Done (citation: ${REAL}).`;
   const r = reportTurn(stream([
-    assistant(text(`I will try ${DEAD} first.`), use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult(),
+    assistant(text(`I will try ${DEAD} first.`), use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult('t1'),
+    assistant(text(`That did not work; ${DEAD} again.`), use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult('t2'),
     assistant(text(final)),
     { type: 'result', result: final },
   ]), { repoRoot: dir });
@@ -290,6 +291,16 @@ test('C254 — a sub-agent\'s text is not the main thread\'s, wherever it falls 
     { type: 'result', result: final },
   ]), { repoRoot: dir });
   assert.deepEqual(statusOf(r), { [REAL]: 'ok' });
+  // a sub-agent's late tool result is not the main thread's last, so it does not cut the reply from its correction
+  const correction = `Correction: the page is ${REAL}.`;
+  const late = reportTurn(stream([
+    assistant(use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult(),
+    assistant(text(`A claim (citation: ${DEAD}).`)), hookFeedback('Your reply cites a corpus page at a path that does not exist.'),
+    assistant(text(correction)),
+    { type: 'user', parent_tool_use_id: 'toolu_task', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'late' }] } },
+    { type: 'result', result: correction },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(late), { [DEAD]: 'missing', [REAL]: 'ok' });
 });
 
 test('C254 — a stream with no result row has the answer as it always had: all the assistant text', (t) => {
