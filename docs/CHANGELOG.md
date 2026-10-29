@@ -114,6 +114,11 @@ seconds on the CI machines.**
   failed, which the skill reports as a failed check and no longer as a finding; the doctor itself failed, when the
   one line printed is a Mode line that says `doctor unavailable`, which the skill relays as it is; or the command
   itself failed, which the skill relays with what it printed, saying the mode is unverified (ARC-09-C243).
+- The Architect's default budget for grounding an Envelope is twelve corpus pages, not eight, and while pages remain
+  in it, the Architect opens a construct's page before it calls the construct unverified. A Grep line finds a page; a
+  Read of the page is what grounds a claim. When one request fires several gateways, each Envelope has twelve pages of
+  its own, not shared with another. The budget and the co-fire rule read the same in CLAUDE.md and in the six gateways
+  (ARC-09-C256).
 
 ### Added
 
