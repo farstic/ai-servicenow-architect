@@ -84,7 +84,11 @@ test('C87 (b) — the policy: Sonnet 5.5 by default, the clone\'s own settings, 
   assert.ok(t38.tools.includes('Bash'), 'T-38 runs the status command');
   assert.deepEqual(t38.allowed.filter((a) => a.startsWith('Bash')), [`Bash(${cli} status:*)`, `Bash(${cli} doctor:*)`]);
   assert.ok(!t38.tools.includes('Write'), 'T-38 writes nothing');
-  for (const id of ['T-01', 'T-07', 'T-13', 'T-25', 'T-38']) {
+  // ARC-09-C254 — T-46 is T-37 with a finding that quotes a dead path: the same finder run, the same note written, so the same tools and
+  // the same grants. The seven reading cases (T-39 to T-45) read the corpus and write nothing: the base set and no more.
+  assert.deepEqual(policyFor('T-46'), policyFor('T-37'), 'T-46 runs the finding flow that T-37 runs');
+  for (const id of ['T-39', 'T-40', 'T-41', 'T-42', 'T-43', 'T-44', 'T-45']) assert.deepEqual(policyFor(id), base, `${id} reads the corpus and nothing else`);
+  for (const id of ['T-01', 'T-07', 'T-13', 'T-25', 'T-37', 'T-38', 'T-46']) {
     const p = policyFor(id);
     assert.deepEqual(p.tools.filter((x) => ['Agent', 'Task', 'WebFetch', 'WebSearch', 'Edit'].includes(x)), [], `${id} has no sub-agent, web or edit tool`);
     // Every allowed pattern names a tool that exists: permission is never granted for a tool the session lacks.
