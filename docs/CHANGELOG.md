@@ -95,6 +95,10 @@ seconds on the CI machines.**
   not a boundary: `corpus` is left alone under the name `corp`, and `acmebank` under `acme`. The store's URLs are read
   for this, never its credentials. The domain of an address is masked whole, as `<domain>`, whatever the store holds, so
   a username reads `j***@<domain>`; the JSON had kept it (ARC-09-C221, ARC-09-C242).
+- `/snowarch finding` now masks any word that begins with the engagement's name, or with an alias, when the name has four
+  letters or more: with the name `acme`, `AcmeMID01`, `acme01` and `acmedev` are masked, as the words a store's name begins
+  already were. A name of three letters or fewer, and one of the product's own words, is still masked only where it stands
+  alone. Two store names of one kind give one warning line, not the same line twice (ARC-09-C251).
 - The install page says that Git for Windows 2.54 and 2.55's `… is not a commit!` line during the clone is harmless,
   and links to the troubleshooting paragraph that explains it (ARC-09-C224).
 - The bootstrap now fetches the whole ServiceNow documentation, all 56 areas, instead of only the areas the specialists
