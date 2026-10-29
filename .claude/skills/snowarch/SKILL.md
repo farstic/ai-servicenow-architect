@@ -241,8 +241,9 @@ user to send. The note stays on this machine; this skill sends nothing.
 4. Run `node tools/snowarch/lib/finding.mjs --next-name <engagement> <slug>` for a free path, and **write the note
    there** with the Write tool. Claude Code's own permission flow governs the write; this skill grants no write and
    promises no prompt.
-5. Run `node tools/snowarch/lib/finding.mjs <that path>`. **Print its output verbatim**: what ran, the warnings,
-   the masked text and the "Read before sending" list. Nothing goes in place of it.
+5. Run `node tools/snowarch/lib/finding.mjs <that path>`. **Print its output verbatim in your reply**: the tool result
+   is not what the user reads. Give what ran, the warnings, the masked text and the "Read before sending" list as plain
+   text, with no code fence, no quotation and no "the output is above". Nothing goes in place of it.
 6. Close with: Send the text above to the person who issued your licence.
 
 The masker cannot know people's names, places, company names or abbreviations it was not given, ticket keys in

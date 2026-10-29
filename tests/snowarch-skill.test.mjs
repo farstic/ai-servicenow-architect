@@ -334,9 +334,9 @@ const NEGATIVES = [
     (t) => t.replace('so not a common\n   word such as `general`.', 'such as `issues`, so not a common\n   word such as `general`.')],
   // ARC-09-C252 (a): each way the copy can slide back out of the reply
   ['step 5 drops "in your reply"', COPY, (t) => t.replace('**Print its output verbatim in your reply**', '**Print its output verbatim**')],
-  ['step 5 allows a code fence', COPY, (t) => t.replace('as plain text, with no code fence', 'in a code fence')],
+  ['step 5 allows a code fence', COPY, (t) => t.replace(/as plain\s+text, with no code fence/, 'in a code fence')],
   ['step 5 lets the reply point to the output', COPY, (t) => t.replace(' and no "the output is above"', '')],
-  ['step 5 loses the reason', COPY, (t) => t.replace(': the tool result is not what the user reads', '')],
+  ['step 5 loses the reason', COPY, (t) => t.replace(/: the tool result\s+is not what the user reads/, '')],
 ];
 
 for (const [title, checkName, breakIt] of NEGATIVES) {
