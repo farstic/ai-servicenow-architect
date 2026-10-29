@@ -262,7 +262,10 @@ const CHECKS = {
       `- Bash calls are \`${CLI} status\` and, at most, \`${CLI} doctor\`; no \`--fix\`; nothing is written.`,
     ]) assert.ok(s.pass.includes(line), `T-38's pass criteria lack: ${line}`);
     assert.ok(!s.pass.includes('E-31') && !s.expected.includes('E-31'), 'T-38 relays the licence check, which is not what this case sets up');
-    for (const sig of [`\`${CLI} doctor --fix\` run`, '`ls clients`']) assert.ok(s.fail.includes(sig), `T-38's fail signals lack: ${sig}`);
+    // an offer of `--fix` is a failure too (the control's fourth run ended "tell me if you want me to run it"; the case says it asks for nothing)
+    for (const sig of [`\`${CLI} doctor --fix\` run`, '`ls clients`', '- An offer to run `--fix`, or any other question put to the user.']) {
+      assert.ok(s.fail.includes(sig), `T-38's fail signals lack: ${sig}`);
+    }
     // the control: how many runs, on what, and what the case may claim from it
     assert.match(s.whole, /\*\*Control\.\*\* Run it at least four times on a checkout whose `status` step 3 still says "as a finding"/);
     assert.match(s.whole, /only if at least one control run FAILS/, 'T-38 does not say when it may claim to tell the wordings apart');
@@ -351,6 +354,8 @@ const NEGATIVES = [
     (t) => t.replace('- E-11 is relayed as a failed check, by its id and its remedy.', '- E-31 is relayed as a failed check, by its id and its remedy.')],
   ['T-38 loses the criterion that nothing is written and no --fix is run', C243_T38,
     (t) => t.replace('; no `--fix`; nothing is written.', '.')],
+  ['T-38 stops naming an offer to run --fix as a failure', C243_T38,
+    (t) => t.replace('- An offer to run `--fix`, or any other question put to the user.\n', '')],
   ['T-38\'s control is run once', C243_T38,
     (t) => t.replace('Run it at least four times', 'Run it once')],
   ['T-38\'s control claims to discriminate whatever it shows', C243_T38,

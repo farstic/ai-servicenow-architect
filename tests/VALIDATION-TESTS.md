@@ -2123,6 +2123,7 @@ The slash command, not the bare word `Status`. `Status` is routed by `CLAUDE.md`
 - E-11 called a finding, or an engagement or its other names asked for.
 - The answer says the command failed, when it exited 1 because a check failed.
 - `./snowarch doctor --fix` run, a file written, or any call that changes the instance.
+- An offer to run `--fix`, or any other question put to the user.
 - `ls clients`, `git log` or any other call that looks for the engagement or for what changed.
 
 **Control.** Run it at least four times on a checkout whose `status` step 3 still says "as a finding", and at least once on the checkout under test. The licence is in force on both, so the finding flow is open and the old wording has something to act on: it can ask which engagement the failure belongs to, or offer `/snowarch finding`. The case claims to tell the two wordings apart only if at least one control run FAILS. If none does, the sitting's record and the pull request say so, and the case then shows that the new wording is followed, not that the old one would fail.
