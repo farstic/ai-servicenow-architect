@@ -19,7 +19,10 @@ import { join } from 'node:path';
 import { diff, EXPECTED_FAIL_ON_RUNNERS, normalise, PLATFORMS, snapshotPath, WINDOWS_DIFFERS,
   wouldDrop }
   from '../../scripts/ci/doctor-snapshot.mjs';
+import * as compare from '../../scripts/ci/doctor-snapshot.mjs';
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
+import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
+import { TIMED_OUT } from '../../tools/snowarch/lib/probe-net.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
 
@@ -287,4 +290,130 @@ test('C33: a report that drops nothing is written without the flag', (t) => {
   assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
   assert.match(`${r.stdout}${r.stderr}`, /wrote .*snapshot-linux\.json/);
   assert.equal(readFileSync(target, 'utf8'), before, 'a complete report changed the snapshot');
+});
+
+// ── ARC-09-C253 — a check that asks origin may get no answer, and the compare does not call that a difference ───────────────
+// On e7664b67 `bootstrap (windows-latest, node 24)` failed this compare with `E-28: status ok → warn`, `summary.ok 29 → 28` and
+// `summary.warn 0 → 1`, and the job's own report said "origin did not answer within 15 s". E-28 lists origin's tags; one unanswered
+// `ls-remote` on a hosted runner turned a green PR red, and merge-gated needs every cell. The architect's ruling of 2026-10-29: keep
+// the network path (only this job exercises it on each OS), and name an E-28 that got no answer as NOT COMPARABLE, with a test for both
+// sides: an `ok` to `warn` that is that no-answer passes, and any other change in E-28 still fails.
+
+const E28 = hostChecks().find((c) => c.id === 'E-28');
+const realClock = () => Date.now();
+const lsRemote = (tags) => tags.map((tag) => `0000000000000000000000000000000000000000\trefs/tags/${tag}`).join('\n');
+
+/** E-28 as the doctor reports it, run for real against a git that answers each command it is given: its result under its id. */
+async function e28Entry(t, { fail = null, tags = [], localTag = null } = {}) {
+  const exec = (_cmd, args) => {
+    if (args.includes('ls-remote')) {
+      if (fail) throw Object.assign(new Error('git failed'), fail);
+      return lsRemote(tags);
+    }
+    if (args.includes('describe')) return localTag ? `${localTag}\n` : '';
+    if (args.includes('rev-parse')) return 'abc1234\n';
+    return '';
+  };
+  const r = await E28.run({ root: tempDir('snowarch-c253-', t), flags: { noNetwork: false }, now: realClock, exec });
+  return { id: 'E-28', fixable: false, ...r };
+}
+
+/** A full report shaped like the platform's snapshot, with `entry` in place of its check of that id and the summary tallied again. */
+function rawFrom(snapshot, entry) {
+  const checks = snapshot.checks.map((c) => (c.id === entry.id ? entry : { ...c, detail: 'a detail' }));
+  const summary = { ok: 0, warn: 0, fail: 0, skip: 0, fixable: 0 };
+  // `fixable` counts the FINDINGS that can be repaired, not the rows that could be (summariseMerged)
+  for (const c of checks) { summary[c.status] += 1; if (c.fixable === true && (c.status === 'fail' || c.status === 'warn')) summary.fixable += 1; }
+  return { schema: snapshot.schema, mode: snapshot.mode, summary, checks };
+}
+
+const NO_ANSWER = [
+  ['a timeout', { code: TIMED_OUT, signal: 'SIGTERM', status: null, stderr: '' }],
+  ['a name that does not resolve', { status: 128, stderr: 'fatal: unable to access the remote: Could not resolve host\n' }],
+  ['a refusal git words in its own way', { status: 128, stderr: 'warning: something first\nerror: something nothing names\n' }],
+];
+
+test('ARC-09-C253 — E-28 with no answer from origin is not a difference, and the compare says it was not compared', async (t) => {
+  const base = load('linux');
+  assert.equal(base.checks.find((c) => c.id === 'E-28').status, 'ok', 'the premise: the snapshot holds E-28 ok');
+  // the control: E-28 answered, and ok, is the snapshot
+  const answered = await e28Entry(t, { tags: ['v9.0.0'] });
+  assert.equal(answered.status, 'ok', answered.detail);
+  assert.deepEqual(diff(base, normalise(rawFrom(base, answered))), []);
+  for (const [name, fail] of NO_ANSWER) {
+    const silent = await e28Entry(t, { fail });
+    assert.equal(silent.status, 'warn', `${name}: ${silent.detail}`);
+    const n = normalise(rawFrom(base, silent));
+    assert.deepEqual(diff(base, n), [], `${name}: E-28 with no answer was called a difference (${silent.detail})`);
+    const notes = compare.notices(base, n);
+    assert.equal(notes.length, 1, `${name}: the compare did not say what it did not compare`);
+    assert.match(notes[0], /^E-28: not compared/);
+    assert.match(notes[0], /origin did not answer/);
+  }
+});
+
+test('ARC-09-C253 — any other change in E-28 still fails, and so does the same shape in another check', async (t) => {
+  const base = load('linux');
+  // a release that is available: a warn that names its tag, so it is a finding about the install and not about the network
+  const available = await e28Entry(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
+  assert.equal(available.status, 'warn', available.detail);
+  assert.deepEqual(diff(base, normalise(rawFrom(base, available))), ['E-28: status ok → warn', 'summary.ok: 29 → 28', 'summary.warn: 0 → 1']);
+  assert.deepEqual(compare.notices(base, normalise(rawFrom(base, available))), [], 'a run that compared E-28 said it did not');
+  for (const [name, entry] of [
+    ['crashed', { id: 'E-28', status: 'fail', fixable: false, detail: 'check crashed' }],
+    ['skipped', { id: 'E-28', status: 'skip', fixable: false, detail: '--no-network' }],
+    ['the cached form of "available", which also has refreshed:false and names the tag', { id: 'E-28', status: 'warn', fixable: false, data: { latestTag: 'v9.1.0', refreshed: false } }],
+    ['a warn with data of another shape', { id: 'E-28', status: 'warn', fixable: false, data: { remote: 'origin' } }],
+    ['a warn with no data', { id: 'E-28', status: 'warn', fixable: false }]]) {
+    assert.notDeepEqual(diff(base, normalise(rawFrom(base, entry))), [], `E-28 ${name} passed the compare`);
+  }
+  // only E-28 is excused: the no-answer shape on another check is a difference, named by its id
+  const silent = await e28Entry(t, { fail: NO_ANSWER[0][1] });
+  const first = base.checks[0].id;
+  const raw = rawFrom(base, { id: first, status: 'warn', fixable: false, data: silent.data });
+  const lines = diff(base, normalise(raw));
+  assert.ok(lines.some((l) => l.startsWith(`${first}: status`)), `${first} with the no-answer shape was excused: ${lines}`);
+});
+
+test('ARC-09-C253 — the no-answer shape is the one E-28 gives for every way origin fails to answer, and for no other warn', async (t) => {
+  // Tied to the check itself, not to a copy of its data in this file: if E-28's warn for an unanswered origin stops carrying the
+  // shape the compare reads, or a warn that names a tag starts to, this fails.
+  const unanswered = (entry) => compare.normalise(rawFrom(load('linux'), entry)).notComparable?.includes('E-28') === true;
+  for (const [name, fail] of NO_ANSWER) assert.equal(unanswered(await e28Entry(t, { fail })), true, name);
+  assert.equal(unanswered(await e28Entry(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' })), false, 'an available release');
+  assert.equal(unanswered(await e28Entry(t, { tags: ['v9.0.0'] })), false, 'an answer that is ok');
+  assert.equal(unanswered(await e28Entry(t, { tags: [] })), false, 'an origin that advertises no release');
+});
+
+/** A temp root holding the real linux snapshot, and a report to compare with it. */
+function compareTree(t, raw) {
+  const root = tempDir('snowarch-c253-cli-', t);
+  mkdirSync(join(root, 'tests/fixtures/doctor'), { recursive: true });
+  const target = join(root, 'tests/fixtures/doctor/snapshot-linux.json');
+  writeFileSync(target, readFileSync(snapshotPath('linux', REAL_ROOT)));
+  const inPath = join(root, 'doctor.json');
+  writeFileSync(inPath, JSON.stringify(raw));
+  return { root, inPath, target, before: readFileSync(target, 'utf8') };
+}
+
+test('ARC-09-C253 — the CLI passes a run whose E-28 got no answer and says so; it fails the available release; --write refuses the first', async (t) => {
+  const base = load('linux');
+  const silent = await e28Entry(t, { fail: NO_ANSWER[0][1] });
+  const a = compareTree(t, rawFrom(base, silent));
+  const ok = runCli(['--in', a.inPath, '--root', a.root, '--platform', 'linux']);
+  assert.equal(ok.status, 0, `${ok.stdout}${ok.stderr}`);
+  assert.match(ok.stdout, /matches/);
+  assert.match(ok.stdout, /E-28: not compared/, 'a pass that did not look at E-28 did not say so');
+  // the same run, taken as a snapshot, is refused: a snapshot is never written from a check that was not answered
+  const w = runCli(['--in', a.inPath, '--write', '--root', a.root, '--platform', 'linux']);
+  assert.notEqual(w.status, 0, `--write accepted a run in which E-28 was not answered: ${w.stdout}${w.stderr}`);
+  assert.match(`${w.stdout}${w.stderr}`, /E-28/);
+  assert.match(`${w.stdout}${w.stderr}`, /Nothing was written/);
+  assert.equal(readFileSync(a.target, 'utf8'), a.before, 'the snapshot was written from an unanswered run');
+  // an available release is a real difference
+  const available = await e28Entry(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
+  const b = compareTree(t, rawFrom(base, available));
+  const bad = runCli(['--in', b.inPath, '--root', b.root, '--platform', 'linux']);
+  assert.equal(bad.status, 1, `${bad.stdout}${bad.stderr}`);
+  assert.match(bad.stderr, /E-28: status ok → warn/);
 });
