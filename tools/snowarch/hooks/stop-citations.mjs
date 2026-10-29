@@ -18,13 +18,14 @@
 //   (a second brace group) is skipped with its line, and the other lines are still read.
 //
 //   IT IS FAST. It runs at the end of every turn. A reply without `markdown/` in it exits having imported nothing; one
-//   that cites reads the corpus tree once (lib/docs/resolve.mjs) and nothing else.
+//   whose citations are all on disk looks at the disk and nothing else; one that cites a path that is not reads the corpus
+//   tree once (lib/docs/resolve.mjs).
 //
 // It says nothing for a citation that cannot be resolved, or that is alive (a real page this install did not check out
 // is alive: ARC-09-C239). `decision: "block"` is the form every Claude Code version has; the quieter
 // `hookSpecificOutput.additionalContext` on a Stop hook came with 2.1.163. The root comes from this file's own location,
 // for the reason session-start.mjs gives.
-import { readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,7 +49,7 @@ function asking(pairs) {
  * - A reply citing a path that does not exist, with a page the resolver knows: one line of JSON, `decision: "block"`.
  * - Anything else, and always when `stop_hook_active`: nothing.
  */
-export async function report(input, { root = ROOT } = {}) {
+export async function report(input, { root = ROOT, load } = {}) {
   const none = { code: 0, stderr: '', stdout: '' };
   if (input?.stop_hook_active) return none;
   const message = input?.last_assistant_message;
@@ -63,11 +64,15 @@ export async function report(input, { root = ROOT } = {}) {
   }
   if (cited.size === 0) return none;
   const { CORPUS_DIR } = await import('../lib/docs/sync.mjs');
+  const corpus = join(root, CORPUS_DIR);
+  // A page on disk is alive, and a design answer cites pages it has just read: the corpus tree is read only for a path that is not.
+  const absent = [...cited].filter((path) => !existsSync(join(corpus, ...path.split('/'))));
+  if (absent.length === 0) return none;
   const { loadIndex, resolve: resolvePage } = await import('../lib/docs/resolve.mjs');
-  const index = loadIndex(join(root, CORPUS_DIR));
+  const index = (load ?? loadIndex)(corpus);
   if (!index) return none;
   const pairs = [];
-  for (const path of cited) {
+  for (const path of absent) {
     if (index.has(path)) continue;
     const page = resolvePage(path, index);
     if (page) pairs.push([path, page.path]);
