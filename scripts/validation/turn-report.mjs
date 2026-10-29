@@ -42,6 +42,18 @@ function events(streamText) {
 
 const blocks = (e) => (e?.type === 'assistant' && Array.isArray(e.message?.content) ? e.message.content : []);
 
+/**
+ * What the main thread wrote after its last tool result: the reply, and the line after it when a Stop hook sent the turn
+ * on for a correction (ARC-09-C254). The stream's `result` row is only the last message, so it is the correction alone then.
+ * Text written before a tool call is narration, and a sub-agent's text (`parent_tool_use_id`) is not the main thread's.
+ */
+function finalText(evs) {
+  const main = evs.filter((e) => !e?.parent_tool_use_id);
+  const last = main.findLastIndex((e) => e?.type === 'user' && Array.isArray(e.message?.content)
+    && e.message.content.some((c) => c?.type === 'tool_result'));
+  return main.slice(last + 1).flatMap(blocks).filter((b) => b?.type === 'text').map((b) => b.text).join('\n');
+}
+
 /** `markdown/...` for a path that names a corpus page by any of its spellings, else null. */
 function corpusRelative(p) {
   const norm = String(p ?? '').replace(/\\/g, '/');
@@ -84,9 +96,10 @@ export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, '
   const slash = /^\/([a-z0-9][a-z0-9-]*)(?:\s|$)/.exec(String(prompt).trim());
   if (slash && existsSync(join(repoRoot, '.claude', 'skills', slash[1], 'SKILL.md'))) addSkill(slash[1], 'slash command');
 
-  // The answer: the result event when there is one, else what the assistant said.
+  // The answer: what the model wrote after its last tool result when there is a result event (the result row alone is the last
+  // message, which is a correction line when a Stop hook asked for one), else all that the assistant said.
   const result = [...evs].reverse().find((e) => e?.type === 'result' && typeof e.result === 'string');
-  const answer = result ? result.result
+  const answer = result ? (finalText(evs) || result.result)
     : evs.flatMap(blocks).filter((b) => b?.type === 'text').map((b) => b.text).join('\n');
 
   // The finder's output: the tool result of a Bash call that ran finding.mjs and printed the review list (the --next-name run prints a path

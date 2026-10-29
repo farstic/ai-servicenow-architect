@@ -22,7 +22,7 @@
 // The root comes from this file's own location, never from `cwd` and never from `CLAUDE_PROJECT_DIR`, for
 // session-start.mjs's reason: inside a session that variable is the SESSION's project.
 import { readFileSync, realpathSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FINDING_PATH } from '../lib/finding-path.mjs';
 
@@ -77,18 +77,13 @@ export async function report(input, { root = ROOT } = {}) {
 }
 
 /**
- * ARC-09-C239 — what to say of each real page this install did not check out, by the mode the product reads (the
- * recorded one, else the shape on disk: `modeOf`). On a sparse corpus the citation stands; on the whole corpus a page
- * not on disk is a switch that did not finish, which the doctor names.
+ * ARC-09-C239 — what to say of each real page this install did not check out. The wording is lib/docs/not-on-disk.mjs's
+ * (ARC-09-C254), which the Read hook uses as well.
  */
 async function notCheckedOut(root, outside) {
   if (outside.length === 0) return [];
-  const { CORPUS_DIR, MODE } = await import('../lib/docs/sync.mjs');
-  const { modeOf, recordedMode, sparseOf } = await import('../lib/docs/shape.mjs');
-  const { spellings } = await import('../lib/text.mjs');
-  const why = modeOf(recordedMode(root), sparseOf(join(root, CORPUS_DIR))) === MODE.sparse
-    ? 'a real page, not installed on this sparse corpus'
-    : `not on disk in this install's corpus — run ${spellings().cli} doctor`;
+  const { whyNotOnDisk } = await import('../lib/docs/not-on-disk.mjs');
+  const why = await whyNotOnDisk(root);
   return outside.map((d) => `${d.path} (line ${d.line}) — ${why}`);
 }
 

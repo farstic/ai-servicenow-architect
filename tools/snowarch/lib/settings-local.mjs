@@ -24,15 +24,21 @@ export const NOT_IGNORED =
   + 'so Claude Code applies its approvals)';
 
 /**
- * ARC-09-C239 — the citation hook's loader, run by `node -e` in exec form. It reads the project path inside Node, so no
- * shell has to quote it, and it is a no-op when the script is not there, as after a move to a release that has no such
+ * ARC-09-C239 — the loader of the citation hook, run by `node -e` in exec form. It reads the project path inside Node, so
+ * no shell has to quote it, and it is a no-op when the script is not there, as after a move to a release that has no such
  * script: that release does not know this entry, so only the entry itself can be the remedy. One mechanism covers that
  * and every other failure of its own: an import that rejects, a script absent, half-written or broken, exits 0 with
  * nothing printed, post-write.mjs's first promise. `process.argv[1]` is set to the script, so its isMain guard holds.
+ * ARC-09-C254 — the same text for each hook script of ours, but for its name.
  */
-export const POST_WRITE_LOADER = "try{const f=require('path').join(process.env.CLAUDE_PROJECT_DIR||'',"
-  + "'tools/snowarch/hooks/post-write.mjs');process.argv[1]=f;"
+const loaderOf = (script) => "try{const f=require('path').join(process.env.CLAUDE_PROJECT_DIR||'',"
+  + `'tools/snowarch/hooks/${script}');process.argv[1]=f;`
   + "import(require('url').pathToFileURL(f).href).catch(()=>{process.exitCode=0})}catch{}";
+
+export const POST_WRITE_LOADER = loaderOf('post-write.mjs');
+/** ARC-09-C254 — the PostToolUseFailure hook for Read's loader, and the Stop hook's. */
+export const READ_FAILURE_LOADER = loaderOf('read-failure.mjs');
+export const STOP_CITATIONS_LOADER = loaderOf('stop-citations.mjs');
 
 /** Our hooks, S-05 variant B: they live in the LOCAL file, and only when Node can run them. */
 export const hookEntry = () => ({
@@ -57,6 +63,27 @@ export const hookEntry = () => ({
       timeout: 10,
     }],
   }],
+  // ARC-09-C254 — a Read of a corpus page that is not there is told which page was meant: the corpus's own links give a
+  // path with a leading australia/ or without a subfolder. PostToolUseFailure, so a Read that succeeds never starts it.
+  PostToolUseFailure: [{
+    matcher: 'Read',
+    hooks: [{
+      type: 'command',
+      command: 'node',
+      args: ['-e', READ_FAILURE_LOADER],
+      timeout: 10,
+    }],
+  }],
+  // ARC-09-C254 — a reply that cites a path the corpus does not have, where the page is known, is sent back once for one
+  // line. Every turn ends in a Stop, so the script exits before importing anything when the reply cites no corpus path.
+  Stop: [{
+    hooks: [{
+      type: 'command',
+      command: 'node',
+      args: ['-e', STOP_CITATIONS_LOADER],
+      timeout: 10,
+    }],
+  }],
 });
 
 /**
@@ -74,11 +101,23 @@ export const isOurSessionStartHook = (hook) => OUR_SESSION_START.test(String(hoo
  * ARC-09-C239 — read across `command` and `args`, because the exec-form loader names the script in its argument.
  */
 const OUR_POST_WRITE = /(?:^|[\s"'/\\])tools[/\\]snowarch[/\\](?:[^\s"']*[/\\])?post-write\.mjs(?:$|[\s"'])/;
-export const isOurPostWriteHook = (hook) => OUR_POST_WRITE.test(
+const namesOurScript = (re) => (hook) => re.test(
   [hook?.command, ...(Array.isArray(hook?.args) ? hook.args : [])].map((part) => String(part ?? '')).join(' '));
+export const isOurPostWriteHook = namesOurScript(OUR_POST_WRITE);
+
+/** ARC-09-C254 — which PostToolUseFailure hook is ours, and which Stop hook: by the same rule. */
+export const isOurReadFailureHook = namesOurScript(
+  /(?:^|[\s"'/\\])tools[/\\]snowarch[/\\](?:[^\s"']*[/\\])?read-failure\.mjs(?:$|[\s"'])/);
+export const isOurStopHook = namesOurScript(
+  /(?:^|[\s"'/\\])tools[/\\]snowarch[/\\](?:[^\s"']*[/\\])?stop-citations\.mjs(?:$|[\s"'])/);
 
 /** Which hook of each event is ours. */
-const OURS = Object.freeze({ SessionStart: isOurSessionStartHook, PostToolUse: isOurPostWriteHook });
+const OURS = Object.freeze({
+  SessionStart: isOurSessionStartHook,
+  PostToolUse: isOurPostWriteHook,
+  PostToolUseFailure: isOurReadFailureHook,
+  Stop: isOurStopHook,
+});
 
 /** An event's groups with our hook taken out of each; a group that held only ours is dropped. */
 function withoutOurs(groups, isOurs) {

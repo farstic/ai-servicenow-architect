@@ -84,7 +84,11 @@ test('C87 (b) — the policy: Sonnet 5.5 by default, the clone\'s own settings, 
   assert.ok(t38.tools.includes('Bash'), 'T-38 runs the status command');
   assert.deepEqual(t38.allowed.filter((a) => a.startsWith('Bash')), [`Bash(${cli} status:*)`, `Bash(${cli} doctor:*)`]);
   assert.ok(!t38.tools.includes('Write'), 'T-38 writes nothing');
-  for (const id of ['T-01', 'T-07', 'T-13', 'T-25', 'T-38']) {
+  // ARC-09-C254 — T-46 is T-37 with a finding that quotes a dead path: the same finder run, the same note written, so the same tools and
+  // the same grants. The seven reading cases (T-39 to T-45) read the corpus and write nothing: the base set and no more.
+  assert.deepEqual(policyFor('T-46'), policyFor('T-37'), 'T-46 runs the finding flow that T-37 runs');
+  for (const id of ['T-39', 'T-40', 'T-41', 'T-42', 'T-43', 'T-44', 'T-45']) assert.deepEqual(policyFor(id), base, `${id} reads the corpus and nothing else`);
+  for (const id of ['T-01', 'T-07', 'T-13', 'T-25', 'T-37', 'T-38', 'T-46']) {
     const p = policyFor(id);
     assert.deepEqual(p.tools.filter((x) => ['Agent', 'Task', 'WebFetch', 'WebSearch', 'Edit'].includes(x)), [], `${id} has no sub-agent, web or edit tool`);
     // Every allowed pattern names a tool that exists: permission is never granted for a tool the session lacks.
@@ -229,6 +233,91 @@ test('C243 — the runner gives each turn\'s prompt file to the report, and the 
   // the prompt file is written before the session runs and the report runs after it, so it is this turn's prompt
   assert.ok(code.indexOf('> "$RUN/prompt.txt"') < code.indexOf('turn-report.mjs'), 'the report reads a prompt that is not this turn\'s');
   assert.match(read('scripts/validation/turn-report.mjs'), /usage: turn-report\.mjs <stream\.jsonl> <checkout> \[<prompt\.txt>\]/);
+});
+
+// ── a Stop hook sent the turn on ────────────────────────────────────────────────────────────────
+// ARC-09-C254 — when the Stop hook asks for a correction line, the `result` row of the stream is that line and nothing else: it
+// is the last message. Every reader that took `result.result` for the answer then graded the correction. The answer is what the
+// model wrote after its last tool result, the reply and the line after it; text written before a tool call is narration, and a
+// sub-agent's text is not the main thread's.
+const toolResult = (id = 't1') => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] } });
+const hookFeedback = (s) => ({ type: 'user', message: { content: [{ type: 'text', text: `Stop hook feedback:\n${s}` }] } });
+const DEAD = 'markdown/it-service-management/real-page.md';
+const REAL = 'markdown/it-service-management/incident/real-page.md';
+const statusOf = (r) => Object.fromEntries(r.citations.map((c) => [c.cited, c.status]));
+
+test('C254 — the answer is all the text after the last tool result: the reply, and the correction a Stop hook asked for', (t) => {
+  const dir = corpus(t);
+  const correction = `Correction: the page is ${REAL}.`;
+  const r = reportTurn(stream([
+    assistant(use('Read', { file_path: 'vendor/ServiceNowDocs/markdown/it-service-management/incident/real-page.md' })), toolResult(),
+    assistant(text(`A claim (citation: ${DEAD}).`)),
+    hookFeedback('Your reply cites a corpus page at a path that does not exist.'),
+    assistant(text(correction)),
+    { type: 'result', result: correction },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [DEAD]: 'missing', [REAL]: 'ok' }, 'the reply before the correction is part of the answer');
+  assert.match(formatReport(r), /citations: 2 \(ok 1 · bare 0 · ambiguous 0 · missing 1\)/);
+});
+
+test('C254 — the same when the hook gave its feedback as context, with nothing between the two messages', (t) => {
+  const dir = corpus(t);
+  const correction = `Correction: the page is ${REAL}.`;
+  const r = reportTurn(stream([
+    assistant(use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult(),
+    assistant(text(`A claim (citation: ${DEAD}).`)), assistant(text(correction)),
+    { type: 'result', result: correction },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [DEAD]: 'missing', [REAL]: 'ok' });
+});
+
+test('C254 — text written before the last tool result is narration, not the answer', (t) => {
+  const dir = corpus(t);
+  const final = `Done (citation: ${REAL}).`;
+  const r = reportTurn(stream([
+    assistant(text(`I will try ${DEAD} first.`), use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult('t1'),
+    assistant(text(`That did not work; ${DEAD} again.`), use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult('t2'),
+    assistant(text(final)),
+    { type: 'result', result: final },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [REAL]: 'ok' });
+});
+
+test('C254 — a sub-agent\'s text is not the main thread\'s, wherever it falls in the stream', (t) => {
+  const dir = corpus(t);
+  const final = `Final (citation: ${REAL}).`;
+  const sub = (...content) => ({ type: 'assistant', parent_tool_use_id: 'toolu_task', message: { content } });
+  const r = reportTurn(stream([
+    assistant(use('Task', { prompt: 'x' })),
+    sub(text(`The sub-agent says ${DEAD}.`)), toolResult('toolu_task'),
+    assistant(text(final)),
+    sub(text(`A sub-agent that reports late: ${DEAD}.`)),
+    { type: 'result', result: final },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [REAL]: 'ok' });
+  // a sub-agent's late tool result is not the main thread's last, so it does not cut the reply from its correction
+  const correction = `Correction: the page is ${REAL}.`;
+  const late = reportTurn(stream([
+    assistant(use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult(),
+    assistant(text(`A claim (citation: ${DEAD}).`)), hookFeedback('Your reply cites a corpus page at a path that does not exist.'),
+    assistant(text(correction)),
+    { type: 'user', parent_tool_use_id: 'toolu_task', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'late' }] } },
+    { type: 'result', result: correction },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(late), { [DEAD]: 'missing', [REAL]: 'ok' });
+});
+
+test('C254 — a stream with no result row has the answer as it always had: all the assistant text', (t) => {
+  const dir = corpus(t);
+  const r = reportTurn(stream([assistant(text(`One (citation: ${DEAD}).`)), assistant(text(`Two (citation: ${REAL}).`))]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [DEAD]: 'missing', [REAL]: 'ok' });
+});
+
+test('C254 — a result row with no text blocks before it is still the answer', (t) => {
+  const dir = corpus(t);
+  const r = reportTurn(stream([assistant(use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), { type: 'result', result: `It is (citation: ${REAL}).` }]),
+    { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [REAL]: 'ok' });
 });
 
 // ── the finding flow's copy: in the reply, as the finder printed it, and not in a fence ─────────────────────────────────────

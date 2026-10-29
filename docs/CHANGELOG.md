@@ -130,6 +130,15 @@ seconds on the CI machines.**
   sys_ids, record numbers, e-mail addresses, IP addresses and home folders become placeholders, and so do credentials in
   their usual forms, your instance's stored username and password, and the client names you gave it. The copy ends with
   what no rule can catch, for you to check before sending (ARC-09-C221).
+- A page of the documentation that a link gives with a path the documentation does not have is found for the Architect.
+  In seven links of ten the path carries a leading `australia/` or leaves out a folder, so a Read of it failed and a
+  citation copied from it was dead. After a Read of such a page fails, the Architect is told which page was meant. A reply
+  that cites a path the documentation does not have, where the page is known and the reply does not already name it, is
+  sent back once for one line that starts "Correction:", and the Architect does not write the answer again. Both notices
+  ask the Architect not to mention them, so the reply shows the page and the correction and not the hook. The copy that
+  `/snowarch finding` prints is not checked, because a finding records a path as you saw it. Nothing is said when it would
+  be a guess: two pages fit, no page has that file name, or the only page of that name is in another area. The bootstrap
+  writes the two hooks into `.claude/settings.local.json` beside the citation check (ARC-09-C254).
 
 ## 2.2.4 — 2026-10-23
 
