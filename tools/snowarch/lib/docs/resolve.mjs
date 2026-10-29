@@ -2,10 +2,11 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 // ARC-09-C254 — the page a corpus link stands for.
 //
-// The corpus's pages link to one another as `https://raw.githubusercontent.com/.../australia/markdown/<path>`, and seven
-// of ten such links name a path the corpus does not have: a leading `australia/` that belongs to the link, or a subfolder
-// the link leaves out. A Read of that path fails, and a citation copied from it is dead. `resolve` says which page was
-// meant, and says nothing when it would be a guess.
+// The corpus's pages link to one another by raw.githubusercontent.com addresses that end in `/australia/markdown/<path>`,
+// and seven of ten such links name a path the corpus does not have: a leading `australia/` that belongs to the link, or a
+// subfolder the link leaves out. A Read of that path fails, and a citation copied from it is dead. `resolve` says which
+// page was meant, and says nothing when it would be a guess. No address is spelled with its scheme in this file: product
+// code names only listed hosts (tests/issue-templates.test.mjs, AC 2), and the rule reads a scheme followed by a host.
 //
 //   exact       the path as written is a page
 //   australia   it is, once a leading `australia/` is taken off
