@@ -10,7 +10,8 @@
  * 10 more shapes from its second pass, and 21 product strings that must come through unchanged. Measured with its
  * reference masker before this file was written: 6 of 42 cases still leak, every one a class no pattern catches
  * (people, places, a company named only by an abbreviation it was not told, a username variant, a MID host name, a
- * ticket key), 0 of 21 controls damaged, and the masking idempotent. The six are asserted as residuals: each
+ * ticket key), 0 of 21 controls damaged, and the masking idempotent. ARC-09-C251 closed two of the six, the MID host
+ * name and the ticket key that begin with a name the masker was given; the four left are asserted as residuals: each
  * surviving token is either in the "Read before sending" list the output ends with, or a class that list names.
  *
  * Secret-shaped values are ASSEMBLED at run time, as tests/doctor/json-boundary.test.mjs does, so the repository's
@@ -98,9 +99,10 @@ const RESIDUALS = {
   L11: 'review', // people
   L13n: 'abbreviations', // the company named only by an abbreviation the store and aliases do not hold
   L18: 'review', // a username variant
-  L19: 'review', // a MID host name
+  // L19, a MID host name glued to the client's short name (ACMEMID01), left this table with ARC-09-C251: an alias of four letters
+  // or more now masks the words it begins (the architect's ruling of 2026-10-29), so the case is masked like the others.
   L29: 'places', // places and product brands
-  L31: 'review', // a ticket key in another system
+  // L31, a ticket key in another system that begins with the client's short name (ACMEITSM-4521), left this table with ARC-09-C251, as L19 did.
 };
 
 /** [id, text, values, tokens that must come through unchanged] */
@@ -461,7 +463,7 @@ test('ARC-09-C242 — a store host is masked whole in a note: a bare name, an IP
 
 // The architect's review of 2026-10-28, one BLOCK: the warnings are printed in the copy the user sends to the person who issued the
 // licence, and they named the client's store name, an alias or the engagement. A warning names no value now, and it describes the
-// masking's own breadth, every instance in the store (his ruling), so it names no engagement either.
+// masking's own breadth, every instance in the store (the architect's ruling), so it names no engagement either.
 const SHORT_NAME = 'warning: one store name is 3 letters long, so every word that begins with it is masked';
 const PRODUCT_NAME = 'warning: a store name is a product word, so every word that begins with it is masked';
 const PUBLIC_NAME = 'warning: a store name is a government\'s, a sector\'s or a state\'s label: ';
@@ -483,11 +485,12 @@ test('ARC-09-C242 — the finding warns about a store name the reader should che
     assert.ok(out.split('\n').some((l) => l.startsWith(warning)), `${host}: no warning\n${out}`);
     assert.deepEqual(printed(out, [value, 'contoso', 'Contoso Holdings']), [], `${host}: a value was printed\n${out}`);
   }
-  // A line for each name, however many hosts carry it, and a name the masker does not use is not counted.
+  // One line for the class, however many names or hosts carry it (it was a line for each name, the same sentence twice, until
+  // ARC-09-C251), and a name the masker does not use is not counted.
   reset();
   const two = renderFinding('x', { storeUrls: ['https://abc.service-now.com', 'https://itsm.abc.com', 'https://xyz.service-now.com'] },
     { storeRead: true, credentialsRead: true });
-  assert.equal(two.split('\n').filter((l) => l === SHORT_NAME).length, 2, two);
+  assert.equal(two.split('\n').filter((l) => l === SHORT_NAME).length, 1, two);
   reset();
   const product = renderFinding('x', { storeUrls: ['https://servicedesk.servicenow.example'] }, { storeRead: true, credentialsRead: true });
   assert.match(product.split('\n')[0], /^instance names masked by value: 1 \(store read\)/, 'a stem the masker does not use was counted');
@@ -549,4 +552,67 @@ test('ARC-09-C242 — a label that is a public one masks every sibling instance\
     { engagement: 'contoso', storeUrls: ['https://itsm.act.gov.au', 'https://servicedesk.mod.uk'] });
   assert.deepEqual(survivors(out, ['actprod', 'actuat', 'act01qa', 'actsbx', 'moduat2', 'modpreprod', 'modsit', 'mod3dr']), [], out);
   assert.ok(out.endsWith('the action, active and module flows stay'), `a word the label only begins was masked: ${out}`);
+});
+
+// ── ARC-09-C251 — the follow-ups of the C242 review, as the architect ruled them on 2026-10-29 ──────────────────────────
+
+test('ARC-09-C251 — an engagement name of four letters or more masks every word that begins with it', async () => {
+  const { maskFinding } = await finding();
+  reset();
+  // The ruling's three under the engagement `acme`: the client's name glued to a capital and a digit, to a digit, and to an
+  // environment word. A name leaking inside a glued token is what the masker exists to stop.
+  assert.equal(maskFinding('AcmeMID01, acme01 and acmedev; then ACMELT0042, Acmes and acmebank', { engagement: 'acme' }),
+    '<engagement>, <engagement> and <engagement>; then <engagement>, <engagement> and <engagement>');
+  // The name's parts joined any way still count, and the glue follows the last part.
+  reset();
+  assert.equal(maskFinding('AcmeBankMID01 acme_bank01 acme bankdev acme.bank-prod', { engagement: 'acme-bank' }),
+    '<engagement> <engagement> <engagement> <engagement>-prod');
+  // A word the name only ends or holds is not the name's.
+  reset();
+  assert.equal(maskFinding('nacme and the macme01 word', { engagement: 'acme' }), 'nacme and the macme01 word');
+});
+
+test('ARC-09-C251 — an alias of four letters or more does the same, and one of three letters or fewer stays whole-word', async () => {
+  const { maskFinding } = await finding();
+  reset();
+  assert.equal(maskFinding('GlobexMID01 and globex2 and Globex', { engagement: 'contoso', aliases: ['Globex'] }),
+    '<engagement> and <engagement> and <engagement>');
+  // Four letters is the least: `abcd` masks `abcdef`, `abc` masks only `abc`.
+  reset();
+  assert.equal(maskFinding('abcdef and abc and abcxyz', { engagement: 'contoso', aliases: ['abcd'] }), '<engagement> and abc and abcxyz');
+  reset();
+  assert.equal(maskFinding('abcdef and abc and ABC-1 and abc01', { engagement: 'contoso', aliases: ['abc'] }),
+    'abcdef and <engagement> and <engagement>-1 and abc01');
+  // The engagement name follows the same rule: three letters whole-word, four letters or more as a prefix.
+  reset();
+  assert.equal(maskFinding('xyzzy and xyz', { engagement: 'xyz' }), 'xyzzy and <engagement>');
+  reset();
+  assert.equal(maskFinding('xyzzy and xyz', { engagement: 'xyzz' }), '<engagement> and xyz');
+});
+
+test('ARC-09-C251 — a name that is one of the product\'s words stays whole-word: the product\'s own words are not the client\'s', async () => {
+  const { maskFinding } = await finding();
+  // `case` and `snow` have four letters, and masking every word they begin would read `cases`, `caseload` and `snowarch`
+  // as the client. They keep the whole-word rule and the warning about it (aliasWarnings).
+  reset();
+  assert.equal(maskFinding('case and cases and caseload', { engagement: 'case' }), '<engagement> and cases and caseload');
+  reset();
+  assert.equal(maskFinding('snowarch and snow', { engagement: 'snow' }), 'snowarch and <engagement>');
+});
+
+test('ARC-09-C251 — two store names of one class give one warning line, and two classes give two', async () => {
+  const { stemWarnings } = await finding();
+  const url = (stem) => `https://${stem}.service-now.com`;
+  const short = 'warning: one store name is 3 letters long, so every word that begins with it is masked';
+  const product = 'warning: a store name is a product word, so every word that begins with it is masked';
+  assert.deepEqual(stemWarnings([url('abc'), url('xyz')]), [short]);
+  assert.deepEqual(stemWarnings([url('abc'), url('abc'), url('xyz'), url('incident')]), [short, product]);
+  assert.deepEqual(stemWarnings([url('acmebank')]), []);
+});
+
+test('ARC-09-C251 — a stem inside a longer word stays: the left boundary of maskStemWords is pinned', async () => {
+  const { maskStemWords } = await maskValues();
+  // The review's mutant dropped the lookbehind, and no test turned red. A stem that is only the end or the middle of a word
+  // names nobody: `nacme`, `xacmey` and `Macme01` stay, and a stem that begins a word is still masked.
+  assert.equal(maskStemWords('nacme, xacmey, Macme01, acme and nacme', ['acme'], () => '<x>'), 'nacme, xacmey, Macme01, <x> and nacme');
 });

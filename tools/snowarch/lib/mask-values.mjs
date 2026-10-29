@@ -119,15 +119,16 @@ export const STEM_SIBLING = `[0-9]*(?:${['dev', 'test', 'prod', 'pdi', 'uat', 'q
 
 /**
  * The by-value entries, longest first: `[kind, source]` with `source` a regex source. A store stem matches with
- * `stemSuffix(stem)` after it. Environment words are never names, and a stem that is one of the product's words is never
- * one.
+ * `stemSuffix(stem)` after it, and an engagement name or alias with `nameSuffix(name)` (ARC-09-C251: none unless the caller
+ * says so, which is the doctor's case, and finding.mjs's for a name of four letters or more). Environment words are never
+ * names, and a stem that is one of the product's words is never one.
  */
 export function byValueEntries({ engagement = '', aliases = [], labels = [], stems = [], usernames = [] } = {},
-  { stemSuffix = () => STEM_ANY } = {}) {
+  { stemSuffix = () => STEM_ANY, nameSuffix = () => '' } = {}) {
   // Sorted by the VALUE's length, as the red-team's measured masker sorts, so the longer name wins where two overlap.
   // A stem counts STEM_ANY's length whichever suffix it is given, so overlaps resolve as before C242.
   return [
-    ...[engagement, ...aliases].filter((v) => v && v !== '_unfiled').map((v) => ['engagement', v.length, flexible(v)]),
+    ...[engagement, ...aliases].filter((v) => v && v !== '_unfiled').map((v) => ['engagement', v.length, `${flexible(v)}${nameSuffix(v)}`]),
     ...labels.filter((l) => !ENV_WORDS.has(l)).map((l) => ['instance', l.length, flexible(l)]),
     ...usableStems(stems).map((s) => ['instance', escape(s).length + STEM_ANY.length, `${escape(s)}${stemSuffix(s)}`]),
     ...usernames.map((u) => ['user', u.length, flexible(u)]),
