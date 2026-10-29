@@ -35,7 +35,7 @@ test('ARC-09-C112 — the grounding rule is one sentence, in the same words in C
   for (const r of rules) assert.equal(r.count, 1, `${r.file}: the grounding rule appears ${r.count} time(s), not once`);
   const first = rules[0].words;
   for (const r of rules) assert.equal(r.words, first, `${r.file}: the grounding rule differs from CLAUDE.md's`);
-  assert.match(first, /eight by default; past that, say which construct is still unverified/, 'the budget and its declaration');
+  assert.match(first, /twelve by default; while pages remain, open a construct's page before you call it unverified; past that, say which construct is still unverified/, 'the budget and its declaration');
   assert.match(first, /only when the user has enabled Ultracode or max effort for the session, said so in the answer; never otherwise/,
     'the parallel-reader exception and its bound');
   for (const f of SITES) {
@@ -64,7 +64,7 @@ test('ARC-09-C114 — under the opt-in: the plan is declared, and round 2 runs o
 });
 
 test('ARC-09-C112 — a copy that drifts is found', () => {
-  const drifted = (f) => (f.includes('hrsd-specialist') ? real(f).replace('eight by default', 'six by default') : real(f));
+  const drifted = (f) => (f.includes('hrsd-specialist') ? real(f).replace('twelve by default', 'six by default') : real(f));
   const rules = groundingRules(drifted);
   const differ = rules.filter((r) => r.words !== rules[0].words).map((r) => r.file);
   assert.deepEqual(differ, ['.claude/skills/hrsd-specialist/SKILL.md'], 'a drifted copy was not found, or another copy was taken for it');

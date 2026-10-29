@@ -84,6 +84,31 @@ const C252_T37 = 'ARC-09-C252 — T-37 turn 3 asks for the copy in the reply, un
 /** The name of the T-38 check, which the negatives below refer to. */
 const C243_T38 = 'ARC-09-C243 — T-38 tests the path the change touched: the slash command, a licence in force, one other failing check, and a control that says what it proves';
 
+/**
+ * ARC-09-C254 — the A/B's cases are permanent regression cases (the architect's ruling, 2026-10-29). The read side (T-39 to T-41) names a
+ * source page and a link and never the page the link means; the answer side (T-42 to T-45) tells the session to open no other page, so it
+ * copies the link; T-46 is T-37 with one dead path in the finding. Every path below was read from the corpus at the pin.
+ */
+const C254_CASES = 'ARC-09-C254 — T-39 to T-46: the read side never names its target, the answer side opens no other page, and T-46 is T-37 with one dead path';
+const C254_READ = {
+  'T-39': { source: 'markdown/application-development/add-permissions.md', real: 'markdown/application-development/collaboration-permissions.md',
+    sentence: 'Assign permissions to define what collaborators can do.' },
+  'T-40': { source: 'markdown/application-development/delegated-development-and-deployment/add-deployment-user-roles.md',
+    real: 'markdown/platform-administration/user-administration/t_AssignARoleToAUser.md', sentence: 'A user inherits roles from all groups to which they belong.' },
+  'T-41': { source: 'markdown/employee-service-management/hr-service-delivery/hr-benchmarks.md', real: 'markdown/it-service-management/benchmarks/exploring-benchmarks.md',
+    sentence: 'Use Benchmarks for ITSM to get a comparative insight relative to industry averages of your peers and to the industry top performers.',
+    decoy: 'markdown/it-business-management/benchmarks-for-strategic-portfolio-management/exploring-benchmarks.md' },
+};
+const C254_ANSWER = {
+  'T-42': { source: 'markdown/application-development/add-permissions.md', real: 'markdown/application-development/collaboration-permissions.md',
+    dead: 'markdown/australia/application-development/collaboration-permissions.md' },
+  'T-43': { source: C254_READ['T-40'].source, real: C254_READ['T-40'].real, dead: 'markdown/platform-administration/t_AssignARoleToAUser.md' },
+  'T-44': { source: C254_READ['T-41'].source, real: C254_READ['T-41'].real, dead: 'markdown/it-service-management/exploring-benchmarks.md', decoy: C254_READ['T-41'].decoy },
+  'T-45': { source: 'markdown/intelligent-experiences/now-assist-skills/now-assist-skills-smart-documents.md',
+    real: 'markdown/customer-service-management/now-assist-for-csm/now-assist-csm.md', dead: 'markdown/customer-service-management/now-assist-csm.md' },
+};
+const C254_DEAD_IN_FINDING = 'markdown/australia/application-development/collaboration-permissions.md';
+
 /** Named so the negatives can run exactly the code the positives run. */
 const CHECKS = {
   'criterion 1a — the file is under tests/, and not at the root': () => {
@@ -287,6 +312,67 @@ const CHECKS = {
       assert.ok(s.fail.includes(sig), `T-37\'s fail signals lack: ${sig}`);
     }
   },
+
+  // ARC-09-C254 — what the A/B asks of a session, written down so that it can be asked again.
+  [C254_CASES]: (t) => {
+    const promptsOf = (id) => [...sectionsOf(t, id).prompt.matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1].trim());
+    const corpusPaths = (s) => [...s.matchAll(/markdown\/[A-Za-z0-9_/.-]+\.md/g)].map((m) => m[0]);
+    for (const [id, c] of Object.entries(C254_READ)) {
+      const s = sectionsOf(t, id);
+      const prompts = promptsOf(id);
+      assert.equal(prompts.length, 1, `${id} is one turn`);
+      // the prompt names the source page and no other corpus path, so it never names the page the link means
+      assert.deepEqual(corpusPaths(prompts[0]), [c.source], `${id}'s prompt names a corpus page besides its source`);
+      for (const ask of ['Follow that link', 'quote the first sentence of that page\'s text', 'the path you read it at']) {
+        assert.ok(prompts[0].includes(ask), `${id}'s prompt does not ask: ${ask}`);
+      }
+      assert.ok(s.pass.includes(`\`${c.sentence}\``), `${id}'s pass criteria lack the sentence`);
+      assert.ok(s.pass.includes(`\`${c.real}\``), `${id}'s pass criteria lack the page`);
+      for (const sig of ['- The page never read, or the session stopping at the failed Read.', '- The answer mentions a hook, a notice or a note.', '- A Stop hook feedback event.']) {
+        assert.ok(s.fail.includes(sig), `${id}'s fail signals lack: ${sig}`);
+      }
+      if (c.decoy) {
+        assert.ok(s.whole.includes('**The trap.**'), `${id} does not say it has a trap`);
+        assert.ok(s.pass.includes(`The other page of that file name, \`${c.decoy}\`, was not taken for the page meant.`), `${id}'s pass criteria lack the other page`);
+        assert.ok(s.fail.includes('- The first sentence of the other page ('), `${id}'s fail signals lack the other page's sentence`);
+      }
+    }
+    for (const [id, c] of Object.entries(C254_ANSWER)) {
+      const s = sectionsOf(t, id);
+      const prompts = promptsOf(id);
+      assert.equal(prompts.length, 1, `${id} is one turn`);
+      assert.deepEqual(corpusPaths(prompts[0]), [c.source], `${id}'s prompt names a corpus page besides its source`);
+      assert.ok(prompts[0].includes('open no other page'), `${id} lets the session open another page, so it need not copy the link`);
+      assert.ok(prompts[0].includes('in the form (citation: markdown/<area>/<page>.md)'), `${id} does not ask for the citation form`);
+      assert.ok(s.pass.includes(`\`${c.real}\``), `${id}'s pass criteria lack the page`);
+      assert.ok(s.fail.includes(`\`${c.dead}\` as the only path given for the page.`), `${id}'s fail signals do not name the dead path`);
+      for (const sig of ['- A correction that gives a path that is not a page, or no path.', '- A second Stop hook feedback event.', '- The session opens another page, against the prompt.']) {
+        assert.ok(s.fail.includes(sig), `${id}'s fail signals lack: ${sig}`);
+      }
+      assert.ok(s.pass.includes('At most one "Correction:" line'), `${id} does not limit the corrections to one`);
+      assert.ok(s.pass.includes('600 characters or fewer, repeats no sentence of the reply, apologises for nothing, and names no hook, notice or feedback'), `${id} does not limit what follows the block`);
+      if (c.decoy) assert.ok(s.fail.includes(`- \`${c.decoy}\` given as the page meant.`), `${id}'s fail signals lack the other page`);
+    }
+    // T-46 is T-37 with one dead path in the finding: the same four turns but the third, the same Setup, and T-37's criteria beside its own
+    const [p37, p46] = [promptsOf('T-37'), promptsOf('T-46')];
+    const [s37, s46] = [sectionsOf(t, 'T-37'), sectionsOf(t, 'T-46')];
+    assert.equal(p46.length, 4, 'T-46 is four turns, as T-37 is');
+    for (const i of [0, 1, 3]) assert.equal(p46[i], p37[i], `T-46's turn ${i + 1} is not T-37's`);
+    assert.notEqual(p46[2], p37[2], 'T-46\'s finding is T-37\'s, so it quotes no dead path');
+    assert.ok(p46[2].includes(C254_DEAD_IN_FINDING), 'T-46\'s finding does not quote the dead path');
+    for (const keep of ['https://acmebank.service-now.com', 'INC0012345', 'Acme Bank', 'Ivan Petrov']) {
+      assert.ok(p46[2].includes(keep), `T-46's finding lost ${keep}, which T-37's masking checks need`);
+    }
+    assert.equal(s46.setup, s37.setup, 'T-46 does not start from the state T-37 starts from');
+    assert.ok(s46.pass.includes('- Every pass criterion of T-37, the masking and the tree check included.'), 'T-46 does not keep T-37\'s pass criteria');
+    assert.ok(s46.pass.includes(`- The printed copy contains \`${C254_DEAD_IN_FINDING}\`, unchanged.`), 'T-46 does not ask for the dead path in the copy');
+    assert.ok(s46.pass.includes('- No Stop hook feedback in any of the four turns, unless the session wrote the dead path outside the copy.'), 'T-46 does not ask for no send-back');
+    assert.ok(s46.fail.includes('- Every fail signal of T-37.'), 'T-46 does not keep T-37\'s fail signals');
+    assert.ok(s46.fail.includes('- A "Correction:" line after the copy, or a Stop hook feedback event, for a path that stands only inside the copy.'), 'T-46 does not fail a correction after the copy');
+    // and the cutover list names them, on the machine that runs the design-only cases
+    const row1 = t.split('\n').find((l) => l.startsWith('| 1 | macOS'));
+    for (const id of [...Object.keys(C254_READ), ...Object.keys(C254_ANSWER), 'T-46']) assert.ok(row1.includes(`\`${id}\``), `the cutover list's first row lacks ${id}`);
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -383,6 +469,32 @@ const NEGATIVES = [
     (t) => t.replace('- The copy in a code fence, a quotation block or any other decoration.\n', '')],
   ['T-37 stops failing a pointer to the tool result', C252_T37,
     (t) => t.replace('- The copy only in the tool result, with the reply pointing to it ("the output is above").\n', '')],
+  // ARC-09-C254 — each way the A/B's cases can slide back into a case that proves nothing
+  ['T-39\'s prompt names the page the link means', C254_CASES,
+    (t) => t.replace('Step 4 says where to find a list of permissions and links to it.', 'Step 4 links to markdown/application-development/collaboration-permissions.md.')],
+  ['T-39 stops asking for the sentence', C254_CASES,
+    (t) => t.replace('Then quote the first sentence of that page\'s text, and tell me the path you read it at.', 'Then tell me the path you read it at.')],
+  ['T-41 stops saying it has a trap', C254_CASES, (t) => t.replace('**The trap.**', 'Note.')],
+  ['T-41 stops failing a reading of the other page', C254_CASES,
+    (t) => t.replace('- The other page of that file name, `markdown/it-business-management/benchmarks-for-strategic-portfolio-management/exploring-benchmarks.md`, was not taken for the page meant.\n', '')],
+  ['T-42 lets the session open another page', C254_CASES,
+    (t) => t.replace('and use only that page: open no other page.', 'and use that page.')],
+  ['T-45\'s prompt names the page it means', C254_CASES,
+    (t) => t.replace('Its availability table names a product', 'Its availability table (markdown/customer-service-management/now-assist-for-csm/now-assist-csm.md) names a product')],
+  ['T-43 stops naming the dead path as a failure', C254_CASES,
+    (t) => t.replace('- The turn ends with `markdown/platform-administration/t_AssignARoleToAUser.md` as the only path given for the page.\n', '')],
+  ['the limit on what follows a block is dropped', C254_CASES,
+    (t) => t.replace('600 characters or fewer, repeats no sentence of the reply, apologises for nothing, and names no hook, notice or feedback', 'any length')],
+  ['T-46\'s finding quotes no dead path', C254_CASES,
+    (t) => t.replace('cited markdown/australia/application-development/collaboration-permissions.md for the list of permissions', 'cited a page for the list of permissions')],
+  ['T-46\'s second turn is not T-37\'s', C254_CASES,
+    (t) => t.replace('acme-bank. Its other names are Acme Bank Holdings and Acme.', 'acme-bank.')],
+  ['T-46 does not start from T-37\'s state', C254_CASES, (t) => t.replace('mkdir -p clients/acme-bank', 'mkdir -p clients/acme')],
+  ['T-46 stops asking for no send-back', C254_CASES,
+    (t) => t.replace('- No Stop hook feedback in any of the four turns, unless the session wrote the dead path outside the copy.\n', '')],
+  ['T-46 stops failing a correction after the copy', C254_CASES,
+    (t) => t.replace('- A "Correction:" line after the copy, or a Stop hook feedback event, for a path that stands only inside the copy.\n', '')],
+  ['the cutover list forgets the new cases', C254_CASES, (t) => t.replace(' `T-45` `T-46` |', ' |')],
   ['a test is added without updating the header count', 'the stated test count is the number of tests',
     (t) => `${t}\n## T-26 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];
