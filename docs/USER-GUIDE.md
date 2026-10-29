@@ -110,7 +110,8 @@ contradicts the documentation), type `/snowarch finding` and describe it. The en
 
 1. asks which engagement the finding belongs to; a finding about the product itself can go under a name of your
    choice that your note will not use as a word, so not a common word such as `general`: the engagement's name is
-   masked on its own and with its parts joined by a space, a hyphen, an underscore, a dot or nothing;
+   masked on its own and with its parts joined by a space, a hyphen, an underscore, a dot or nothing, and, when the
+   name has four letters or more, any word that begins with it;
 2. the first time, asks for the client's other names (legal name, abbreviations, brands) and keeps them in
    `clients/<engagement>/findings/aliases.txt`;
 3. writes your note to `clients/<engagement>/findings/`, which stays on your machine, because git ignores
