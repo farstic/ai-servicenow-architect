@@ -1954,6 +1954,13 @@ Three files, in this order, and the tests will tell you if you stop after the fi
    statuses. If a check really has been retired, say so: `--allow-dropping-checks`. If Windows
    answers differently, add the id to `WINDOWS_DIFFERS` in `scripts/ci/doctor-snapshot.mjs` **with
    the reason** — an undocumented difference fails the test that compares the platforms.
+
+   **An E-28 that got no answer is not compared** (ARC-09-C253). E-28 lists origin's tags with a 15 s budget, and one
+   unanswered `ls-remote` on a hosted runner used to turn the compare red on a green change (`E-28: status ok → warn`,
+   `summary.ok 29 → 28`, `summary.warn 0 → 1`). Its warn for an origin that did not answer carries `data.refreshed: false` and
+   names no release; the compare leaves that one check, and only E-28, out of the diff and of the summary, and prints
+   `E-28: not compared`. An available release, a crash or a skip is still a difference, and `--write` refuses a run in which E-28
+   was not answered.
 3. **The mapping table.** `docs/ARCHITECTURE.md`'s generated appendix maps every legacy check to
    its replacement; `npm run gen` refreshes it and `npm run gen:check` proves it.
 
