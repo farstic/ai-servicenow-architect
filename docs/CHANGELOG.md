@@ -114,6 +114,9 @@ seconds on the CI machines.**
   failed, which the skill reports as a failed check and no longer as a finding; the doctor itself failed, when the
   one line printed is a Mode line that says `doctor unavailable`, which the skill relays as it is; or the command
   itself failed, which the skill relays with what it printed, saying the mode is unverified (ARC-09-C243).
+- `/snowarch finding` now prints the masked copy in its reply itself, as plain text with no code fence. It used to come out
+  fenced after a sentence of prose in some sessions, and in others it was left in the tool result with only a pointer to it
+  in the reply; the copy is what you send, so it is in the reply, as the masker printed it (ARC-09-C252).
 
 ### Added
 
@@ -125,10 +128,11 @@ seconds on the CI machines.**
 - A page of the documentation that a link gives with a path the documentation does not have is found for the Architect.
   In seven links of ten the path carries a leading `australia/` or leaves out a folder, so a Read of it failed and a
   citation copied from it was dead. After a Read of such a page fails, the Architect is told which page was meant. A reply
-  that cites a path the documentation does not have, where the page is known, is sent back once for one line that starts
-  "Correction:", and the Architect does not write the answer again. Nothing is said when it would be a guess: two pages
-  fit, no page has that file name, or the only page of that name is in another area. The bootstrap writes the two hooks
-  into `.claude/settings.local.json` beside the citation check (ARC-09-C254).
+  that cites a path the documentation does not have, where the page is known and the reply does not already name it, is
+  sent back once for one line that starts "Correction:", and the Architect does not write the answer again. Both notices
+  ask the Architect not to mention them, so the reply shows the page and the correction and not the hook. Nothing is said
+  when it would be a guess: two pages fit, no page has that file name, or the only page of that name is in another area.
+  The bootstrap writes the two hooks into `.claude/settings.local.json` beside the citation check (ARC-09-C254).
 - `./snowarch doctor` reads those two hooks as it reads the citation check: an entry missing from
   `.claude/settings.local.json`, or written wrong, is a warning that `./snowarch doctor --fix` repairs, and a hook script
   gone from the checkout is a failure that names the file to check out (ARC-09-C255).

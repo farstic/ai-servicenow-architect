@@ -78,6 +78,9 @@ function sectionsOf(text, id) {
 /** The launcher is read, not spelled (ARC-07-C31): the spec quotes the POSIX rendering. */
 const CLI = POSIX.cli;
 
+/** The name of the C252 (a) check on T-37, which its negatives refer to. */
+const C252_T37 = 'ARC-09-C252 — T-37 turn 3 asks for the copy in the reply, unfenced, and fails a fence and a pointer to the tool result';
+
 /** The name of the T-38 check, which the negatives below refer to. */
 const C243_T38 = 'ARC-09-C243 — T-38 tests the path the change touched: the slash command, a licence in force, one other failing check, and a control that says what it proves';
 
@@ -271,6 +274,19 @@ const CHECKS = {
     assert.match(s.whole, /only if at least one control run FAILS/, 'T-38 does not say when it may claim to tell the wordings apart');
     assert.match(s.whole, /If none does, /, 'T-38 does not say what a control with no FAIL means');
   },
+
+  // ARC-09-C252 (a), ruled by the architect on 2026-10-29. T-37 turn 3 read "printed verbatim", and two trees disagreed with it: on develop both
+  // runs put the copy in a code fence after a sentence of prose, and on the head one said the output was above and never printed it. A fence
+  // and a pointer are failures, said so, so a sitting can judge them and the turn report can count them.
+  [C252_T37]: (t) => {
+    const s = sectionsOf(t, 'T-37');
+    assert.ok(s.expected.includes('its output is printed in the reply itself, verbatim, as plain text with no code fence'), 'T-37 does not say the copy goes in the reply, unfenced');
+    for (const sig of ['- The copy summarised, reworded or decorated instead of printed verbatim.',
+      '- The copy in a code fence, a quotation block or any other decoration.',
+      '- The copy only in the tool result, with the reply pointing to it ("the output is above").']) {
+      assert.ok(s.fail.includes(sig), `T-37\'s fail signals lack: ${sig}`);
+    }
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -360,6 +376,13 @@ const NEGATIVES = [
     (t) => t.replace('Run it at least four times', 'Run it once')],
   ['T-38\'s control claims to discriminate whatever it shows', C243_T38,
     (t) => t.replace('only if at least one control run FAILS', 'always')],
+  // ARC-09-C252 (a) — each way T-37 turn 3 can slide back to a criterion that a fence and a pointer pass
+  ['T-37 stops asking for the copy in the reply', C252_T37,
+    (t) => t.replace('its output is printed in the reply itself, verbatim, as plain text with no code fence', 'its output is printed verbatim')],
+  ['T-37 stops failing a fence', C252_T37,
+    (t) => t.replace('- The copy in a code fence, a quotation block or any other decoration.\n', '')],
+  ['T-37 stops failing a pointer to the tool result', C252_T37,
+    (t) => t.replace('- The copy only in the tool result, with the reply pointing to it ("the output is above").\n', '')],
   ['a test is added without updating the header count', 'the stated test count is the number of tests',
     (t) => `${t}\n## T-26 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];

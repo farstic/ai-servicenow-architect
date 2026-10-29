@@ -22,7 +22,9 @@
 //   tree once (lib/docs/resolve.mjs).
 //
 // It says nothing for a citation that cannot be resolved, or that is alive (a real page this install did not check out
-// is alive: ARC-09-C239). `decision: "block"` is the form every Claude Code version has; the quieter
+// is alive: ARC-09-C239), and nothing for a dead path whose page the reply already carries: the floor run found a model that
+// followed the Read hook's note and then wrote where it had looked first and that the path does not exist, next to the right
+// page, and a line that said the same again was no correction. `decision: "block"` is the form every Claude Code version has; the quieter
 // `hookSpecificOutput.additionalContext` on a Stop hook came with 2.1.163. The root comes from this file's own location,
 // for the reason session-start.mjs gives.
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
@@ -34,19 +36,24 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 /** A path with its links resolved, or as given when it cannot be. */
 const real = (p) => { try { return realpathSync.native(p); } catch { return resolve(p); } };
 
+/** The last words of the reason: the user is to see the correction and never the mechanism, so the notice stays out of the reply. */
+const KEEP_OUT = ' Do not mention this notice.';
+
 /** What the model is asked, word for word: two paths for each citation, and fixed words. */
 function asking(pairs) {
   const list = pairs.map(([cited, page]) => `${cited} -> ${page}`).join('; ');
-  return pairs.length === 1
+  const ask = pairs.length === 1
     ? `Your reply cites a corpus page at a path that does not exist: ${list}. `
       + 'Add one line that starts "Correction:" and gives the right path. Do not repeat the answer, and do not write the wrong path again.'
     : `Your reply cites ${pairs.length} corpus pages at paths that do not exist: ${list}. `
       + 'Add one line that starts "Correction:" and gives the right path for each. Do not repeat the answer, and do not write the wrong paths again.';
+  return ask + KEEP_OUT;
 }
 
 /**
  * What the hook says for one Stop input: `{ code, stderr, stdout }`, always code 0.
- * - A reply citing a path that does not exist, with a page the resolver knows: one line of JSON, `decision: "block"`.
+ * - A reply citing a path that does not exist, with a page the resolver knows that the reply does not carry: one line of JSON,
+ *   `decision: "block"`, naming only the paths whose page is missing from the reply.
  * - Anything else, and always when `stop_hook_active`: nothing.
  * `load` reads the corpus tree (lib/docs/resolve.mjs's `loadIndex` when it is not given); a test gives its own to count the reads.
  */
@@ -72,11 +79,15 @@ export async function report(input, { root = ROOT, load } = {}) {
   const { loadIndex, resolve: resolvePage } = await import('../lib/docs/resolve.mjs');
   const index = (load ?? loadIndex)(corpus);
   if (!index) return none;
+  // A reply that already carries the page the resolver names has nothing to correct, whatever it says of the dead path: a model that
+  // followed the Read hook's note writes "I found it at <real>; my first read used <dead>, which does not exist". Separators are
+  // read as slashes, so the real page spelled the Windows way counts.
+  const carried = message.replaceAll('\\', '/');
   const pairs = [];
   for (const path of absent) {
     if (index.has(path)) continue;
     const page = resolvePage(path, index);
-    if (page) pairs.push([path, page.path]);
+    if (page && !carried.includes(page.path)) pairs.push([path, page.path]);
   }
   if (pairs.length === 0) return none;
   return { code: 0, stderr: '', stdout: `${JSON.stringify({ decision: 'block', reason: asking(pairs) })}\n` };

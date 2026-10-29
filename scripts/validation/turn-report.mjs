@@ -15,6 +15,11 @@
 // holds no Skill call and no Read of its file. The turn's prompt says it ran, so a run that is given the prompt reports it
 // as `slash command`; without that, the line read `skills: none` for a turn that followed the skill (ARC-09-C243).
 //
+// THE FINDING COPY (ARC-09-C252 (a)). `/snowarch finding` ends by running tools/snowarch/lib/finding.mjs on the note, and its output is
+// what the user sends. A turn that ran it is reported as: in the reply as printed, in the reply but in a code fence, or not in the reply
+// as printed (only in the tool result, or changed). T-37 turn 3 was judged by eye until a sitting found the copy fenced on one tree and
+// pointed to ("its output is above") on another; counted, a before and an after are numbers.
+//
 //   node scripts/validation/turn-report.mjs <stream.jsonl> <checkout> [<prompt.txt>]
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -97,6 +102,29 @@ export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, '
   const answer = result ? (finalText(evs) || result.result)
     : evs.flatMap(blocks).filter((b) => b?.type === 'text').map((b) => b.text).join('\n');
 
+  // The finder's output: the tool result of a Bash call that ran finding.mjs and printed the review list (the --next-name run prints a path
+  // and none, so it is no copy). Whether the reply holds it as printed, and whether inside a code fence (an odd number of fence lines before it).
+  const finderIds = new Set();
+  let finderOutput = null;
+  for (const e of evs) {
+    for (const b of blocks(e)) {
+      const command = String(b?.input?.command ?? '');
+      if (b?.type === 'tool_use' && b.name === 'Bash' && /lib\/finding\.mjs/.test(command)) finderIds.add(b.id);
+    }
+    if (e?.type === 'user' && Array.isArray(e.message?.content)) {
+      for (const c of e.message.content) {
+        if (c?.type !== 'tool_result' || !finderIds.has(c.tool_use_id)) continue;
+        const out = typeof c.content === 'string' ? c.content : (Array.isArray(c.content) ? c.content.map((x) => x?.text ?? '').join('\n') : '');
+        if (/Read before sending:/.test(out)) finderOutput = out.trim();
+      }
+    }
+  }
+  let findingCopy = null;
+  if (finderOutput) {
+    const at = answer.indexOf(finderOutput);
+    findingCopy = { verbatim: at >= 0, fenced: at >= 0 && (answer.slice(0, at).match(/^[ \t]*```/gm) ?? []).length % 2 === 1 };
+  }
+
   let repoNames = null;
   const repoBase = () => {
     if (!repoNames) {
@@ -143,7 +171,7 @@ export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, '
       else citations.push({ cited, status: 'missing', resolved: null });
     }
   }
-  return { skills, corpusReads: [...reads], corpusSearches: searches, citations };
+  return { skills, corpusReads: [...reads], corpusSearches: searches, citations, findingCopy };
 }
 
 export function formatReport(r) {
@@ -151,7 +179,9 @@ export function formatReport(r) {
   const head = `skills: ${r.skills.length ? r.skills.map((s) => `${s.name} (${s.how})`).join(', ') : 'none'}`
     + ` · corpus pages read: ${r.corpusReads.length}${r.corpusSearches ? ` (+${r.corpusSearches} searches)` : ''}`
     + ` · citations: ${r.citations.length}`
-    + (r.citations.length ? ` (ok ${n('ok')} · bare ${n('bare')} · ambiguous ${n('ambiguous')} · missing ${n('missing')})` : '');
+    + (r.citations.length ? ` (ok ${n('ok')} · bare ${n('bare')} · ambiguous ${n('ambiguous')} · missing ${n('missing')})` : '')
+    + (r.findingCopy ? ` · finding copy: ${!r.findingCopy.verbatim ? 'NOT in the reply as printed (only in the tool result, or changed)'
+      : r.findingCopy.fenced ? 'in the reply, but in a code fence' : 'in the reply, verbatim, unfenced'}` : '');
   const detail = r.citations.filter((c) => c.status !== 'ok').map((c) => {
     if (c.status === 'missing') return `  MISSING ${c.cited}`;
     if (c.status === 'bare') return `  BARE ${c.cited} -> ${c.resolved}`;

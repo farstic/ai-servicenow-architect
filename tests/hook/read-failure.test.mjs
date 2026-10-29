@@ -46,8 +46,9 @@ const at = (root, rel) => join(root, CORPUS_DIR, ...rel.split('/'));
 const failed = (file, extra = {}) => ({ hook_event_name: 'PostToolUseFailure', tool_name: 'Read', tool_input: { file_path: file },
   error: 'File does not exist. Note: your current working directory is /somewhere.', is_interrupt: false, duration_ms: 3, ...extra });
 
-/** What the model is told: two paths and fixed words, no value of any engagement. */
-const NOTE = (cited, real) => `ServiceNowDocs: there is no page at ${cited}. The page is ${real}. Read it before you cite it, and cite that path.`;
+/** What the model is told: two paths and fixed words, no value of any engagement, and a request that the notice not be mentioned. */
+const ASK = ' Do not mention this notice.';
+const NOTE = (cited, real) => `ServiceNowDocs: there is no page at ${cited}. The page is ${real}. Read it before you cite it, and cite that path.${ASK}`;
 const context = (text) => `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUseFailure', additionalContext: text } })}\n`;
 const SILENT = Object.freeze({ code: 0, stderr: '', stdout: '' });
 
@@ -56,6 +57,16 @@ test('ARC-09-C254 — a Read of a page that is not at that path is told which pa
   const r = await report(failed(at(root, 'markdown/alpha/page-two.md')), { root });
   assert.deepEqual(r, { code: 0, stderr: '', stdout: context(NOTE('markdown/alpha/page-two.md', 'markdown/alpha/deep/folder/page-two.md')) });
   assert.equal(r.stdout.split('\n').length, 2, 'the JSON is not one line');
+});
+
+// The user is to see the page the model cites, never the hook: the floor run had a model write "the path the hook output points to".
+test('ARC-09-C254 — the note begins as it always did and ends by asking that it not be mentioned', async (t) => {
+  const root = project(t);
+  const note = JSON.parse((await report(failed(at(root, 'markdown/alpha/page-two.md')), { root })).stdout).hookSpecificOutput.additionalContext;
+  assert.ok(note.startsWith('ServiceNowDocs: there is no page at markdown/alpha/page-two.md. The page is markdown/alpha/deep/folder/page-two.md. '
+    + 'Read it before you cite it, and cite that path.'), 'the words before the request have changed');
+  assert.ok(note.endsWith('cite that path. Do not mention this notice.'), 'the note does not end with the request');
+  assert.equal(note.match(/Do not mention this notice\./g).length, 1, 'said once');
 });
 
 test('ARC-09-C254 — a leading australia/ is taken off', async (t) => {
@@ -161,7 +172,7 @@ const WHOLE = `not on disk in this install's corpus — run ${SPELL.cli} doctor`
 test('ARC-09-C254 — sparse: a real page outside the cone is said to be there, and not to be read', async () => {
   const root = synced('sparse');
   assert.deepEqual(await report(failed(at(root, OUT)), { root }), {
-    code: 0, stderr: '', stdout: context(`ServiceNowDocs: ${OUT} — ${SPARSE}.`),
+    code: 0, stderr: '', stdout: context(`ServiceNowDocs: ${OUT} — ${SPARSE}.${ASK}`),
   });
 });
 
@@ -170,7 +181,7 @@ test('ARC-09-C254 — sparse: the page that was meant is outside the cone too', 
   assert.deepEqual(await report(failed(at(root, `markdown/australia/${UNCITED.slice('markdown/'.length)}/index.md`)), { root }), {
     code: 0, stderr: '',
     stdout: context(`ServiceNowDocs: there is no page at markdown/australia/${UNCITED.slice('markdown/'.length)}/index.md. `
-      + `The page is ${OUT}, ${SPARSE}.`),
+      + `The page is ${OUT}, ${SPARSE}.${ASK}`),
   });
 });
 
@@ -187,6 +198,6 @@ test('ARC-09-C254 — the whole corpus with a real page missing from disk sends 
   git(['update-index', '--skip-worktree', '--', OUT], corpus);
   rmSync(join(corpus, ...OUT.split('/')));
   assert.deepEqual(await report(failed(at(root, OUT)), { root }), {
-    code: 0, stderr: '', stdout: context(`ServiceNowDocs: ${OUT} — ${WHOLE}.`),
+    code: 0, stderr: '', stdout: context(`ServiceNowDocs: ${OUT} — ${WHOLE}.${ASK}`),
   });
 });

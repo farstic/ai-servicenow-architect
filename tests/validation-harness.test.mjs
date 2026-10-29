@@ -316,6 +316,50 @@ test('C254 — a result row with no text blocks before it is still the answer', 
   assert.deepEqual(statusOf(r), { [REAL]: 'ok' });
 });
 
+// ── the finding flow's copy: in the reply, as the finder printed it, and not in a fence ─────────────────────────────────────
+// ARC-09-C252 (a), ruled by the architect on 2026-10-29. T-37 turn 3 asks for the copy "verbatim", and a reviewer judged it by eye: on
+// develop both runs put it in a code fence after a sentence of prose, and on the head one said its output was above and never printed it.
+// The report counts it, so a before and an after are numbers and not impressions.
+const COPY_OUT = ['instance store NOT read — check every instance name · credentials NOT read — check usernames and passwords before sending', '',
+  '<engagement> showed the wrong group on <instance-url-1>.', '', 'Read before sending:', '- people: names of colleagues, users and customers'].join('\n');
+const FINDER = 'node tools/snowarch/lib/finding.mjs clients/acme-bank/findings/2026-10-29-wrong-group.md';
+const ran = (id, command, out) => [
+  { type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] } },
+  { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: out }] } },
+];
+const copyOf = (events, reply) => reportTurn(stream([...events, assistant(text(reply)), { type: 'result', result: reply }]), { repoRoot: root }).findingCopy;
+
+test('C252 (a) — the report says whether the finder\'s output is in the reply as printed, and whether it is in a code fence', () => {
+  const events = ran('t1', FINDER, COPY_OUT);
+  const send = 'Send the text above to the person who issued your licence.';
+  assert.deepEqual(copyOf(events, `${COPY_OUT}\n\n${send}`), { verbatim: true, fenced: false });
+  assert.deepEqual(copyOf(events, `The note is saved at clients/acme-bank/findings/x.md.\n\n${COPY_OUT}\n\n${send}`), { verbatim: true, fenced: false },
+    'a sentence before the copy is not a fence');
+  assert.deepEqual(copyOf(events, `The note is saved.\n\n\`\`\`\n${COPY_OUT}\n\`\`\`\n\n${send}`), { verbatim: true, fenced: true });
+  assert.deepEqual(copyOf(events, `\`\`\`text\n${COPY_OUT}\n\`\`\`\n${send}`), { verbatim: true, fenced: true }, 'a fence with a language');
+  assert.deepEqual(copyOf(events, `A fenced example first:\n\`\`\`\nx\n\`\`\`\n\n${COPY_OUT}\n${send}`), { verbatim: true, fenced: false },
+    'a fence that is closed before the copy does not hold it');
+  assert.deepEqual(copyOf(events, 'The masker ran; its output is above.\n\n' + send), { verbatim: false, fenced: false });
+  assert.deepEqual(copyOf(events, `${COPY_OUT.split('\n').slice(0, 3).join('\n')}\n\n${send}`), { verbatim: false, fenced: false }, 'a part of it is not the copy');
+  assert.deepEqual(copyOf(events, COPY_OUT.split('\n').map((l) => `> ${l}`).join('\n')), { verbatim: false, fenced: false }, 'a quotation block is not verbatim');
+});
+
+test('C252 (a) — a turn with no finder run, or only the one that names the note, has no finding copy to report', () => {
+  assert.equal(copyOf(ran('t2', `${POSIX.cli} status`, 'Mode: design-only'), 'Mode: design-only'), null);
+  assert.equal(copyOf(ran('t3', 'node tools/snowarch/lib/finding.mjs --next-name acme-bank wrong-group', 'clients/acme-bank/findings/2026-10-29-wrong-group.md'),
+    'I will write the note there.'), null);
+  // a finder run whose output has no review list is not a copy (a refusal prints one sentence)
+  assert.equal(copyOf(ran('t4', 'node tools/snowarch/lib/finding.mjs /etc/passwd', 'refused: not a note under clients/<engagement>/findings/'), 'refused'), null);
+  const line = formatReport(reportTurn(stream([...ran('t5', FINDER, COPY_OUT), assistant(text(COPY_OUT)), { type: 'result', result: COPY_OUT }]), { repoRoot: root }));
+  assert.match(line, /^skills: none · corpus pages read: 0 · citations: 0 · finding copy: in the reply, verbatim, unfenced$/);
+  const fenced = formatReport(reportTurn(stream([...ran('t6', FINDER, COPY_OUT), assistant(text(`\`\`\`\n${COPY_OUT}\n\`\`\``)), { type: 'result', result: `\`\`\`\n${COPY_OUT}\n\`\`\`` }]), { repoRoot: root }));
+  assert.match(fenced, / · finding copy: in the reply, but in a code fence$/);
+  const gone = formatReport(reportTurn(stream([...ran('t7', FINDER, COPY_OUT), assistant(text('Its output is above.')), { type: 'result', result: 'Its output is above.' }]), { repoRoot: root }));
+  assert.match(gone, / · finding copy: NOT in the reply as printed \(only in the tool result, or changed\)$/);
+  // a turn that ran no finder keeps the line it always had
+  assert.match(formatReport(reportTurn('', { repoRoot: root })), /^skills: none · corpus pages read: 0 · citations: 0$/);
+});
+
 // ── the gateways ask for the full path ──────────────────────────────────────────────────────────
 
 test('C87 (c) — each gateway\'s citation format asks for the full path from markdown/, never a bare file name', () => {

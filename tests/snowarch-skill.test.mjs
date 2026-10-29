@@ -61,6 +61,9 @@ const ITEM4 = 'Its first line says when it could not read your instance store or
 const STATUS = 'status reports exit 1 as a failed check or its own fallback, and never says finding';
 const SAFE = 'the safe-to-send answer names what the masker cannot know, every class FIXED_REVIEW holds, and what was NOT read';
 const NAME = 'a common word is named only as the engagement not to use, and the masking it avoids is the masker\'s';
+// ARC-09-C252 (a), ruled by the architect on 2026-10-29: T-37 turn 3 found the copy fenced after a sentence of prose (develop, 0 of 2) and, once,
+// not printed at all ('its output is above'). The copy is what the user sends, so it goes in the reply itself.
+const COPY = 'the finding flow prints the masker\'s output in the reply itself, as plain text with no code fence';
 
 const frontmatterOf = (text) => {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(text);
@@ -278,6 +281,15 @@ const CHECKS = {
     reset();
     assert.equal(maskFinding('abcdef and abc', { engagement: 'abc' }), 'abcdef and <engagement>');
   },
+
+  [COPY]: (t) => {
+    const step = flat(sectionOf(t, 'finding')).match(/ 5\. Run `node tools\/snowarch\/lib\/finding\.mjs <that path>`\..*?(?= 6\. )/)?.[0] ?? '';
+    assert.ok(step, 'step 5 of the finding flow is gone');
+    for (const phrase of ['**Print its output verbatim in your reply**', 'the tool result is not what the user reads',
+      'as plain text, with no code fence', 'and no "the output is above"', 'Nothing goes in place of it.']) {
+      assert.ok(step.includes(phrase), `step 5 of the finding flow lacks: ${phrase}`);
+    }
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -330,6 +342,11 @@ const NEGATIVES = [
     (t) => t.replace(/so not a common\s+word such as `general`\./, 'such as `issues`, so not a common word such as `general`.')],
   // ARC-09-C251: the sentence that a name of four letters or more masks the words it begins, in the skill and in the guide
   ['the skill drops the four-letter clause', NAME, (t) => t.replace(/,\s+and,\s+when\s+the\s+name\s+has\s+four\s+letters\s+or\s+more,\s+any\s+word\s+that\s+begins\s+with\s+it/, '')],
+  // ARC-09-C252 (a): each way the copy can slide back out of the reply
+  ['step 5 drops "in your reply"', COPY, (t) => t.replace('**Print its output verbatim in your reply**', '**Print its output verbatim**')],
+  ['step 5 allows a code fence', COPY, (t) => t.replace(/as plain\s+text, with no code fence/, 'in a code fence')],
+  ['step 5 lets the reply point to the output', COPY, (t) => t.replace(' and no "the output is above"', '')],
+  ['step 5 loses the reason', COPY, (t) => t.replace(/: the tool result\s+is not what the user reads/, '')],
 ];
 
 for (const [title, checkName, breakIt] of NEGATIVES) {
