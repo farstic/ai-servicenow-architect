@@ -123,6 +123,18 @@ for (const h of HOOKS) {
   });
 }
 
+test('ARC-09-C255 — E-08 names every missing hook script, the citation hook\'s too, each with its checkout', async (t) => {
+  const root = copyTree(t, greenTree(t));
+  const scripts = ['tools/snowarch/hooks/post-write.mjs', ...HOOKS.map((h) => h.script)];
+  for (const s of scripts) rmSync(join(root, s));
+  const r = await run('E-08', root);
+  assert.equal(r.status, 'fail');
+  for (const s of scripts) {
+    assert.ok(r.detail.includes(`${s} is not on disk`), `E-08 does not name ${s}: ${r.detail}`);
+    assert.ok((r.remedy ?? '').includes(`git checkout -- ${s}`), `E-08 does not cure ${s}: ${r.remedy}`);
+  }
+});
+
 test('ARC-09-C255 — with every hook present the E-10 line is the one it always was', async (t) => {
   const root = copyTree(t, greenTree(t));
   const r = await run('E-10', root);
