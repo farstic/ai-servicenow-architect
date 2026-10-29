@@ -57,7 +57,8 @@ Copy-Item -Recurse ..\snowarch-2.2.0\clients .
 The licence, the instance store and the audit trail of instance writes (`audit.jsonl`, and the three older files it
 rotates into) carry over, and the new install continues the trail. The carried `.claude/settings.local.json` keeps your
 permissions, environment and hooks, SessionStart hooks of your own included; the bootstrap rewrites only its own
-two hooks, the session banner and the citation check, which follow the new folder. An
+hooks, the session banner, the citation check, the note on a Read of a page that is not there and the correction after a
+reply that cites one, which follow the new folder. An
 install that ran design-only (no instance) leaves out `--mode live`. With the carried store, `--mode live` keeps its
 default instance and does not run the wizard. Other folders of your own that git ignores (`deliverables/`, `memory/`,
 `reports/`) are copied the same way if you have them. Do not copy the rest of `.local/`: it describes the old folder,
