@@ -129,6 +129,9 @@ seconds on the CI machines.**
   "Correction:", and the Architect does not write the answer again. Nothing is said when it would be a guess: two pages
   fit, no page has that file name, or the only page of that name is in another area. The bootstrap writes the two hooks
   into `.claude/settings.local.json` beside the citation check (ARC-09-C254).
+- `./snowarch doctor` reads those two hooks as it reads the citation check: an entry missing from
+  `.claude/settings.local.json`, or written wrong, is a warning that `./snowarch doctor --fix` repairs, and a hook script
+  gone from the checkout is a failure that names the file to check out (ARC-09-C255).
 
 ## 2.2.4 — 2026-10-23
 
