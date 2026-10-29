@@ -1223,7 +1223,9 @@ account name on every platform. A home directory reads `~` — the run's own hom
 from `bin/snowarch.mjs`, because nothing under `lib/` may read the home itself) and the four generic
 shapes by pattern —
 and what follows it survives: the depth of the checkout, a space in the path, the drive letter — the
-part a maintainer uses, none of it naming anybody.
+part a maintainer uses, none of it naming anybody. An address's domain is the fourth, for the same reason: the server
+masks a username to `j***@clientco.com`, and the domain names the organisation, so it reads `<domain>` whatever the
+store holds (ARC-09-C242).
 
 **One report, one Mode line** (ARC-08-S05). The sections print in a fixed order — prereqs, repo,
 docs, roster, contract, legacy, host, server — and the last line is always the Mode line, because
