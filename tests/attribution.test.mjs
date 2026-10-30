@@ -52,10 +52,10 @@ test('the install figures are attributed to a measurement, not asserted from now
   // Every number in the install sentences carries where it came from. ARC-09-C244 made the whole corpus the
   // default and measured it on all three platforms in one `docs-real.yml` run: the tree you read against the tree
   // plus `.git` the disk loses, both attributed to that measurement.
-  assert.match(readme, /about 495 MB on disk/);
+  assert.match(readme, /about 490 MB on disk/);
   assert.match(readme, /293 MB on Linux and macOS/);
   assert.match(readme, /51,665 files/);
-  assert.match(readme, /measured\s+2026-10-24\s+by\s+`docs-real\.yml`/);
+  assert.match(readme, /measured\s+2026-10-30\s+by\s+`docs-real\.yml`/);
 });
 
 test('NOTICE claims only what the checkout enforces', () => {
@@ -99,7 +99,7 @@ test('the ARC-06 anchors are consumed, not left behind', () => {
   assert.equal(/<!-- ARC-06(-S13)?: move to docs\/INSTALL\.md/.test(readme), false,
     'a move-me anchor survived the move');
   const install = read('docs/INSTALL.md');
-  assert.match(install, /495 MB/);
+  assert.match(install, /490 MB/);
   assert.match(install, /--instance-file/, 'the Operators paragraph did not arrive');
   assert.match(install, /mode live/, 'the live-mode sentence did not arrive');
 });

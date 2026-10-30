@@ -266,16 +266,18 @@ was built, the doctor reports what was configured — never a password, never an
 
 ### What the corpus costs
 
-**The documentation costs about 495 MB on disk and about 25–42 seconds to fetch** — the whole corpus, all
+**The documentation costs about 490 MB on disk and about 24–45 seconds to fetch** — the whole corpus, all
 56 areas and 51,665 files, in a blobless checkout. Two measurements, because they count different things:
-the **working tree** is 293 MB on Linux and macOS and 299 MB on Windows, and **tree plus `.git`** is 493
-MB Ubuntu / 500 MB macOS / 499 MB Windows (25.0 s Ubuntu · 31.7 s macOS · 42.4 s Windows, measured
-2026-10-24 by `docs-real.yml`). The first is what you read, the second is what the disk loses. An install
+the **working tree** is 293 MB on Linux and macOS and 299 MB on Windows, and **tree plus `.git`** is 484
+MB Ubuntu / 491 MB macOS / 489 MB Windows (24.0 s Ubuntu · 38.3 s macOS · 44.6 s Windows, measured
+2026-10-30 by `docs-real.yml`). The first is what you read, the second is what the disk loses. An install
 made before 2.2.5, which fetched only the areas the specialists cite, moves to the whole corpus once, on
-its upgrade to 2.2.5: about 150 MB more on disk, and 7 to 14 seconds on the CI machines. `--docs sparse`
-keeps only the cited areas (about 372 MB on disk) and exists for CI; the Architect cannot read the other
-areas then. Every release re-measures all three platforms and attaches the same table as
+its upgrade to 2.2.5: about 150 MB more on disk, measured from a default 2.2.4 install (20 areas).
+`--docs sparse` keeps only the cited areas (about 365 MB on disk) and exists for CI; the Architect cannot
+read the other areas then. Every release re-measures all three platforms and attaches the same table as
 `install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases), the first one pending.
+Sizes here are decimal megabytes (10^6 bytes), as `./snowarch docs status` prints them; the bootstrap's
+`[docs]` line and `install-metrics.md` count 2^20-byte ones, so a 293 MB tree shows there as about 279.
 
 ### Upgrading
 

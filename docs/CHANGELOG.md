@@ -12,10 +12,12 @@ All notable changes to this project are documented in this file. Everything hand
 **A patch release: the whole ServiceNow documentation is on disk by default, `/snowarch finding` lets you report what
 the Architect got wrong, the Architect grounds an Envelope on twelve pages instead of eight, and, when a link's address
 is not a page, it is told which page the link means, where the documentation has that page.** Every install made before
-2.2.5 moves to the whole documentation, all 56 areas, once, on its upgrade: about 150 MB more on disk, 7 to 14 seconds
-on the CI machines, and a move that is interrupted is finished by the next run; `--docs sparse` keeps only the cited
-areas, for CI. `/snowarch finding` writes a note in the engagement's own folder, which stays on your machine, and prints
-a masked copy in the reply for the person who issued your licence. While its twelve pages last, the Architect opens a
+2.2.5 moves to the whole documentation, all 56 areas, once, on its upgrade: a default 2.2.4 install (20 areas) takes
+about 150 MB more on disk and about half a minute of work after you confirm the plan (measured on an Apple-silicon Mac
+in design-only mode; the time depends on your network), and an install that already had every area only changes its
+documentation pin. A move that is interrupted is finished by the next run; `--docs sparse` keeps only the cited areas,
+for CI. `/snowarch finding` writes a note in the engagement's own folder, which stays on your machine, and prints a
+masked copy in the reply for the person who issued your licence. While its twelve pages last, the Architect opens a
 construct's page before it calls the construct unverified. A link in the documentation often names a page that is not at
 that path; after a Read of such a page fails, the Architect is told which page was meant when the documentation has it,
 and a reply that cites such a path, where the documentation has the page under another path, gets one line with the
@@ -121,10 +123,12 @@ before it moves anything, and plans from the release it moves to.
   and links to the troubleshooting paragraph that explains it (ARC-09-C224).
 - The bootstrap now fetches the whole ServiceNow documentation, all 56 areas, instead of only the areas the specialists
   cite, so the Architect can read the pages it needs in every area, Virtual Agent, Security Operations and Field Service
-  among them. An install made before 2.2.5 moves to the whole corpus once, on its upgrade to 2.2.5: about 150 MB more on
-  disk; the move took 7 to 14 seconds on the CI machines (macOS, Linux and Windows), and a move that is interrupted is
-  finished by the next run. `--docs sparse` keeps only the cited areas, for CI; the doctor then warns that the Architect
-  cannot read the others (ARC-09-C244).
+  among them. An install made before 2.2.5 moves to the whole corpus once, on its upgrade to 2.2.5. For a default 2.2.4
+  install (20 areas) that is about 150 MB more on disk; the move took 7 to 14 seconds on the CI machines (macOS, Linux
+  and Windows) and about half a minute, once the plan was confirmed, on an Apple-silicon Mac in design-only mode, and
+  the time depends on the network. An install that already had every area only changes its documentation pin, and a move
+  that is interrupted is finished by the next run. `--docs sparse` keeps only the cited areas, for CI; the doctor then
+  warns that the Architect cannot read the others (ARC-09-C244).
 - `--docs sparse` holds 24 areas instead of 20: acct-lifecycle-events, customer-relationship-management,
   delta-xanadu-australia, healthcare-life-sciences and release-notes, which the skills now cite, join it, and
   now-platform, which none cites, leaves it (ARC-09-C250).
