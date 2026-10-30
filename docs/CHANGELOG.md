@@ -9,20 +9,22 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A patch release: the whole ServiceNow documentation is on disk by default, `/snowarch finding` lets you report what the
-Architect got wrong, the Architect grounds an Envelope on twelve pages instead of eight, and it is told which page a link
-means when the link's address is not a page.** Every install made before 2.2.5 moves to the whole documentation, all 56
-areas, once, on its upgrade: about 150 MB more on disk, 7 to 14 seconds on the CI machines, and a move that is interrupted
-is finished by the next run; `--docs sparse` keeps only the cited areas, for CI. `/snowarch finding` writes a note in the
-engagement's own folder, which stays on your machine, and prints a masked copy in the reply, as plain text, for the person
-who issued your licence. The Architect opens a construct's page before it calls the construct unverified. A link in the
-documentation often names a page that is not at that path; after a Read of such a page fails, the Architect is told which
-page was meant, and a reply that cites a path the documentation does not have gets one correction line. The doctor checks
-both hooks that do this. Smaller fixes: the HR Service Delivery gateway no longer gives employees the HR agent role; the
-ITSM gateway names a finished task SLA's stage the way an instance holds it; a switch of instance holds through the
-capabilities read; `instance add` takes a host typed without `https://` and never quotes a password back; `doctor --json`
-masks every instance address; and `upgrade` names a file of your own in a managed folder before it moves anything, and
-plans from the release it moves to.
+**A patch release: the whole ServiceNow documentation is on disk by default, `/snowarch finding` lets you report what
+the Architect got wrong, the Architect grounds an Envelope on twelve pages instead of eight, and it is told which page a
+link means when the link's address is not a page.** Every install made before 2.2.5 moves to the whole documentation,
+all 56 areas, once, on its upgrade: about 150 MB more on disk, 7 to 14 seconds on the CI machines, and a move that is
+interrupted is finished by the next run; `--docs sparse` keeps only the cited areas, for CI. `/snowarch finding` writes
+a note in the engagement's own folder, which stays on your machine, and prints a masked copy in the reply for the person
+who issued your licence. While its twelve pages last, the Architect opens a construct's page before it calls the
+construct unverified. A link in the documentation often names a page that is not at that path; after a Read of such a
+page fails, the Architect is told which page was meant when the documentation has it, and a reply that cites such a
+path, where the documentation has the page under another path, gets one line with the right path. The doctor checks both
+hooks that do this. Smaller fixes: the HR Service Delivery gateway no longer gives employees the HR agent role; the ITSM
+gateway names a finished task SLA's stage the way an instance holds it; a switch of instance holds through the
+capabilities read; `instance add` takes a host typed without `https://` and never quotes a password back;
+`doctor --json` masks every instance address; a file the Architect writes under `clients/` is checked for dead citations
+before you see it; and, from your next upgrade on, `upgrade` names a file of your own in a managed folder before it
+moves anything, and plans from the release it moves to.
 
 ### Fixed
 
