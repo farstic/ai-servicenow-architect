@@ -283,9 +283,9 @@ made before 2.2.5, which fetched only the areas the specialists cite, moves to t
 its upgrade to 2.2.5: about 150 MB more on disk, measured from a default 2.2.4 install (20 areas).
 `--docs sparse` keeps only the cited areas (about 365 MB on disk) and exists for CI; the Architect cannot
 read the other areas then. Every release re-measures all three platforms and attaches the same table as
-`install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases), the first one pending.
-Sizes here are decimal megabytes (10^6 bytes), as `./snowarch docs status` prints them; the bootstrap's
-`[docs]` line and `install-metrics.md` count 2^20-byte ones, so a 293 MB tree shows there as about 279.
+`install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases). Sizes here are decimal
+megabytes (10^6 bytes), as `./snowarch docs status` prints them; the bootstrap's `[docs]` line and
+`install-metrics.md` count 2^20-byte ones, so a 293 MB tree shows there as about 279.
 
 ### Upgrading
 
