@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   CORPUS_DIR, EXIT, RETRY_WAITS_MS, SyncError, blockingSleep, inspect, retryLine, retryPlan,
-  stopSuffix, syncCorpus, transientReason,
+  stopSuffix, switchMarker, syncCorpus, transientReason,
 } from '../tools/snowarch/lib/docs/sync.mjs';
 import { buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
@@ -342,4 +342,77 @@ test('AC 4 — a partial corpus is finished, not re-cloned: `re-run` has to be t
   // which is exactly what a re-run of the raw recipe fails on ("already exists and is not empty").
   assert.ok(!said.some((l) => l.includes('clone')), `it cloned: ${said.join(' | ')}`);
   assert.ok(said.some((l) => l.includes('checkout')), 'it never checked out');
+});
+
+// ARC-09-C244 — the switch an upgrade makes once fetches every out-of-cone blob in `sparse-checkout disable`, and a
+// widening `sparse-checkout set` fetches too: both reach the network, so both are retried on the same schedule as the
+// clone, the fetch and the checkout (the architect's ruling 1, 2026-10-24). Before this, one curl 56 failed B02 and
+// stopped U6.
+test('ARC-09-C244 — the switch\'s sparse-checkout disable is retried like a fetch', posixOnly, () => {
+  const w = makeWorkspace({ scratch, pin: upstream.pin, upstreamUrl });
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  const bin = join(scratch, 'fake-bin-disable');
+  const fake = fakeGit(bin, { verb: 'disable', fail: 2,
+    stderr: 'error: RPC failed; curl 56 Recv failure: Connection reset by peer' });
+  const saved = process.env.PATH;
+  const slept = [];
+  const said = [];
+  let r = null;
+  try {
+    process.env.PATH = `${bin}:${saved}`;
+    r = syncCorpus({ ...w, mode: 'full', log: (m) => said.push(m), sleep: (ms) => slept.push(ms) });
+  } finally {
+    process.env.PATH = saved;
+  }
+  assert.equal(r.completeness.ok, true, 'the switch did not complete');
+  assert.equal(fake.read(), 2, 'the fake git did not fail exactly twice');
+  assert.deepEqual(slept, [3000, 9000]);
+  assert.deepEqual(said.filter((l) => l.includes('corpus: transient')), [
+    '[docs] corpus: transient (curl 56) during sparse disable, attempt 2 of 3 in 3 s',
+    '[docs] corpus: transient (curl 56) during sparse disable, attempt 3 of 3 in 9 s',
+  ]);
+});
+
+test('ARC-09-C244 — a widening sparse-checkout set is retried too', posixOnly, () => {
+  const w = makeWorkspace({ scratch, pin: upstream.pin, upstreamUrl });
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  git(['sparse-checkout', 'set', '--cone', 'markdown/alpha'], join(w.root, 'vendor/ServiceNowDocs'));
+  assert.ok(!existsSync(join(w.root, 'vendor/ServiceNowDocs', 'markdown', 'beta', 'index.md')),
+    'the narrowing did not take');
+  const bin = join(scratch, 'fake-bin-set');
+  const fake = fakeGit(bin, { verb: 'set', fail: 1,
+    stderr: 'error: RPC failed; curl 18 transfer closed with outstanding read data remaining' });
+  const saved = process.env.PATH;
+  const said = [];
+  let r = null;
+  try {
+    process.env.PATH = `${bin}:${saved}`;
+    r = syncCorpus({ ...w, mode: 'sparse', log: (m) => said.push(m), sleep: () => {} });
+  } finally {
+    process.env.PATH = saved;
+  }
+  assert.equal(r.completeness.ok, true, 'the widening did not complete');
+  assert.equal(fake.read(), 1);
+  assert.deepEqual(said.filter((l) => l.includes('corpus: transient')),
+    ['[docs] corpus: transient (curl 18) during sparse set, attempt 2 of 3 in 3 s']);
+});
+
+test('ARC-09-C244 — a switch whose disable gives up keeps its marker, and the next run finishes it', posixOnly, () => {
+  const w = makeWorkspace({ scratch, pin: upstream.pin, upstreamUrl });
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  const corpus = join(w.root, CORPUS_DIR);
+  const bin = join(scratch, 'fake-bin-disable-exhaust');
+  fakeGit(bin, { verb: 'disable', fail: 99,
+    stderr: 'error: RPC failed; curl 56 Recv failure: Connection reset by peer' });
+  const saved = process.env.PATH;
+  let err = null;
+  try {
+    process.env.PATH = `${bin}:${saved}`;
+    syncCorpus({ ...w, mode: 'full', log: silent, sleep: () => {} });
+  } catch (e) { err = e; } finally { process.env.PATH = saved; }
+  assert.ok(err instanceof SyncError && err.code === EXIT.git, `expected the git exit, got ${err}`);
+  assert.ok(existsSync(switchMarker(corpus)), 'the switch did not mark itself before the disable');
+  const r = syncCorpus({ ...w, mode: 'full', log: silent });
+  assert.equal(r.completeness.ok, true);
+  assert.equal(existsSync(switchMarker(corpus)), false, 'the marker outlived the finished switch');
 });

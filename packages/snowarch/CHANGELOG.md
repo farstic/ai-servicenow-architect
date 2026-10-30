@@ -3,11 +3,91 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
-## Unreleased (2.2.1-dev)
+## Unreleased
+
+**The corpus map ships with every release (ARC-09-C250).** `vendor/docs-map.md` joins the release coverage beside
+`vendor/docs-areas.txt`, so a distribution carries it and its signed manifest covers it. The map is made from the whole
+corpus at the pin: an install that is sparse by choice still reads every area's row, and the session banner's
+`Docs on disk:` line sets those rows against the areas the install has.
+
+**`normalizeInstanceUrl` never quotes credentials back (ARC-09-C240).** A URL with a username and a password that
+`new URL` could not parse — a `#`, `?` or `/` in the password, or a port out of range — was refused as `URL_INVALID`
+with the input quoted, password included. Any `@` is now `URL_HAS_CREDENTIALS`, checked before anything else, so no
+refusal quotes an `@`. An http(s) scheme typed wrong (`https//`, `https:/`, `https:`) is `URL_INVALID`, quoted as
+typed, and never checked as `https://https…`. A parsed host that is not letters, digits, dots and hyphens, or a
+bracketed IPv6 literal, is `URL_INVALID` before any path check, so a host in quotes or backticks stays refused.
+
+**`snow_core_capabilities_read` keeps the instance a session switched to (ARC-09-C245).** It reloads the store before
+it answers (ARC-07-C3), and the reload put the session on the store's default instance: after `snow_core_instance_switch`,
+the read that comes before every write moved the session back with nothing said, and the next call went to the default.
+It and `snow_core_instances_reload` now keep the session on its instance. When that instance no longer loads, the answer
+carries `instanceChanged: { from, to, reason }`; the reason is "no longer in the store", or the loader's own code and
+message. A new server process, as a resumed session starts, is on the store's default instance and says so.
+
+**The `display_value` description states the owner's rendering rule (ARC-09-C225).** It told the model to show a field
+as 'Label (value)' wherever the two differ, naming choices, references and dates. It now says: "A choice whose label
+hides its code (negative codes too) shows as 'Label (value)' ("Resolved (6)"); a label that already carries the value
+("3 - Moderate"), or differs from it only by case ("Normal"), shows once; a reference shows by name, its sys_id only on
+request; a date shows as its label, with its difference from UTC noted once, not beside each date. A date's label is in
+the format and time zone of the ServiceNow user the server signs in as; its stored value is UTC." The stored value stays
+the only value in any query, filter or write; the request and its answer are unchanged.
+
+**`snow_cat_active_slas_index` asks for the Task SLAs In Progress or Paused (ARC-09-C229).** Its query was
+`stage!=complete^has_breached=false`. No row holds `complete` (PN-25), so the stage half excluded nothing, and the
+breach half left out breached SLAs that are still running. The query is now `stageINin_progress,paused`, breached or
+not, with a caller's `query` in front, joined with `^`; each record's `has_breached` says whether it breached. The
+description says to find a breach by `has_breached`, and that where `com.snc.sla.compatibility.breach` is set to true a
+breached SLA's stage is Breached, which the list leaves out.
+
+**`instance add` offers `https://<host>` for a host typed without a scheme (ARC-09-C223).** `normalizeInstanceUrl`
+refused `acme.service-now.com` as `URL_INVALID` ("not a URL"), and a host with a port, or with credentials in front, as
+`URL_NOT_HTTPS`, because `new URL` read the text before the first `:` as a scheme. An input with no scheme that is not a
+bare word is now checked as `https://<input>` through the same checks, in their order: one that passes is a proposal in
+the bare word's shape (`proposed: true`), and one that fails gets that check's own code and sentence; nonsense is still
+`URL_INVALID`, quoted back as typed. Under `--yes`, where nobody is asked, the wizard now prints `Using <url>, proposed
+from what you entered.` for a bare word and a bare host alike.
 
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
+
+## 2.2.4 — 2026-10-23
+
+**`snow_core_records_query` and `snow_core_record_read` take `display_value`, `'false'` (the default) or `'all'`
+(ARC-09-C205).** With `'all'` the request adds `sysparm_display_value=all`, and each field comes back as the instance
+sends it: its stored value beside its label, `{ display_value, value }`, with `link` on a reference. Without it, or with
+`'false'`, the request is unchanged, byte for byte. `'true'` is refused before any request, with its reason, and so is
+any other value.
+
+## 2.2.3 — 2026-10-21
+
+**A store error names its key path in backticks (ARC-09-C211).** `STORE_SCHEMA_INVALID` named the path bare,
+`instances.pdi Unrecognized key(s) …`, and the engine's doctor printed it as a masked name. It now names the path in
+backticks, as in `` `instances.pdi` ``, which the doctor prints as written; an issue at the store's root names no
+path.
+
+## 2.2.1 — 2026-10-20
+
+**A refusal by the instance's own rules has its own code, `INSTANCE_REFUSED` (ARC-09-C182).** A 403 that a data policy
+or a business rule returns says so, and its remedy is to correct the record rather than to change roles.
+
+**A create reads its table's data policies before it writes (ARC-09-C183).** A field a policy requires that the call
+would not send is refused there, naming the policy; a policy with a condition names the field as possibly required,
+and the write goes ahead.
+
+**The resolve tools store `resolved_at` in the instance's format, in UTC (ARC-09-C184).** They sent an ISO string,
+which the instance stored as the date alone, at midnight.
+
+**A read with `fields` names the requested fields the instance left out (ARC-09-C178).**
+
+**The query guard accepts every documented GlideSystem `…Ago` function, the `…Start`, `…End` and `…Local` forms
+included (ARC-09-C172).** Any other `javascript:` expression is still refused, and the refusal says to compute the
+value and send it literally.
+
+**The signed manifest covers what a release ships, 455 files (ARC-09-C185a).** COVERAGE grows to the governance,
+templates, the scripts the Architect runs and the user documentation; `packages/contract/lint/tests/` is excluded.
+
+Still 399 tools, 163 of them mutating; 75 error codes (one added).
 
 ## 2.2.0 — 2026-10-17
 

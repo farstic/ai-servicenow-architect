@@ -30,8 +30,10 @@ import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { STAGED } from '../scripts/lib/release/writers.mjs';
 import { writeGitattributes } from './helpers/gitattributes.mjs';
 import { gatePlan, makeGateRunner } from '../scripts/lib/release/gates.mjs';
-import { manifestFromArchive, signManifest } from '../tools/snowarch/lib/licence/manifest.mjs';
+import { COVERAGE, manifestFromArchive, signManifest } from '../tools/snowarch/lib/licence/manifest.mjs';
 import { keyPair, listRepo, productKeys } from '../tools/snowarch/tests/helpers/licence.mjs';
+import { stage } from '../scripts/lib/distribution.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -87,9 +89,9 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
   // working tree has to hold something git can describe, or `git status` in the outer repository
   // fails with "not a git repository" and every question about cleanliness goes unanswered.
   mkdirSync(join(root, 'vendor/ServiceNowDocs'), { recursive: true });
-  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(join(root, 'vendor/ServiceNowDocs'), args), join(root, 'vendor/ServiceNowDocs'), ['-q', '-b', 'main']);
 
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
   git(root, ['add', '.gitattributes', 'package.json', 'package-lock.json', 'packages', 'tools',
@@ -794,7 +796,7 @@ function withRemote(t, state) {
   // any`. It passed locally, where this machine's git resolves it, and failed on all twelve
   // `test` and `release-dryrun` cells — a fixture that depended on the machine it ran on, which is
   // ARC-08-S05's lesson arriving a third time.
-  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare], { stdio: 'pipe' });
+  initFixtureRepo((args) => execFileSync('git', args, { stdio: 'pipe' }), bare, ['-q', '--bare', '-b', 'main']);
   git(root, ['remote', 'add', 'origin', bare]);
   if (state !== 'no-upstream') {
     git(root, ['push', '-q', 'origin', 'main']);
@@ -1170,12 +1172,17 @@ test('ARC-09-C71 — every `release()` call in this file pins a platform', async
 const manifestKey = keyPair();
 const MANIFEST_KEYS = productKeys(manifestKey, keyPair());
 
+// ARC-09-C185b — these cases are about the gate THIS repository's tree answers to, which from 2.2.1 on is an rc's alone
+// (a final is pushed beside its staged distribution, in the section after this one). So they cut an rc.
+const RC = '9.1.0-rc.1';
+const prerelease = (version) => (version.includes('-') ? ['--allow-prerelease'] : []);
+
 /** An empty licences repository, and a way to publish files on its main branch. */
 function licences(t) {
   const url = listRepo(t, null);
   const publish = (files) => {
     const work = tempDir('snowarch-licences-work-', t);
-    git(work, ['init', '-q', '-b', 'main']);
+    initFixtureRepo((args) => git(work, args), work, ['-q', '-b', 'main']);
     for (const [rel, text] of Object.entries(files)) write(work, rel, text);
     git(work, ['add', '-A']);
     git(work, ['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'publish']);
@@ -1184,65 +1191,65 @@ function licences(t) {
   return { url, publish };
 }
 
-/** A 9.1.0 release commit, merged as `--tag-only` expects, whose config names `url` for the manifests. */
-async function releaseCommit(t, url) {
+/** A release commit for `version`, merged as `--tag-only` expects, whose config names `url` for the manifests. */
+async function releaseCommit(t, url, version = RC) {
   const root = fixture(t, { version: '9.1.0-dev' });
   write(root, 'engine.config.json', `${JSON.stringify({ ...CONFIG, licence: { manifests: { repo: url, ref: 'main', dir: 'releases' } } }, null, 2)}\n`);
   git(root, ['commit', '-qam', 'the licences repository']);
-  const cut = await run(root, ['9.1.0', '--yes', '--offline', '--no-install']);
+  const cut = await run(root, [version, '--yes', '--offline', '--no-install', ...prerelease(version)]);
   assert.equal(cut.code, 0, cut.err);
   return root;
 }
 
-const signed = (root, over = {}) => `${JSON.stringify(signManifest({ ...manifestFromArchive(root, 'v9.1.0'), ...over },
-  manifestKey.privateKey), null, 2)}\n`;
+const signed = (root, over = {}, tag = `v${RC}`) => `${JSON.stringify(signManifest({ ...manifestFromArchive(root, tag),
+  ...over }, manifestKey.privateKey), null, 2)}\n`;
 const pushed = (calls) => calls.filter((c) => c.startsWith('git push'));
 
 test('ARC-11-C7 — --tag-only on a 2.1+ release tags, says to sign before pushing, and pushes nothing', async (t) => {
   const { url } = licences(t);
   const root = await releaseCommit(t, url);
-  git(root, ['tag', '-d', 'v9.1.0']);
-  const r = await run(root, ['9.1.0', '--tag-only', '--offline'], { keys: MANIFEST_KEYS });
+  git(root, ['tag', '-d', `v${RC}`]);
+  const r = await run(root, [RC, '--tag-only', '--offline', '--allow-prerelease'], { keys: MANIFEST_KEYS });
   assert.equal(r.code, 0, r.err);
-  assert.equal(git(root, ['tag', '-l', 'v9.1.0']).trim(), 'v9.1.0');
-  assert.match(r.out, /Before it is pushed, sign its manifest with \S+ licence sign-release v9\.1\.0/);
+  assert.equal(git(root, ['tag', '-l', `v${RC}`]).trim(), `v${RC}`);
+  assert.match(r.out, /Before it is pushed, sign its manifest with \S+ licence sign-release v9\.1\.0-rc\.1/);
   assert.deepEqual(pushed(r.calls), []);
 });
 
 test('ARC-11-C7 — --tag-only --push refuses a 2.1+ tag with no manifest published, and pushes nothing', async (t) => {
   const { url } = licences(t);
   const root = await releaseCommit(t, url);
-  const r = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  const r = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease'], { keys: MANIFEST_KEYS });
   assert.equal(r.code, 2, r.out);
-  assert.match(r.err, /release: v9\.1\.0 has no verified signed manifest \(release manifest: none is published for v9\.1\.0\) — nothing was pushed/);
+  assert.match(r.err, /release: v9\.1\.0-rc\.1 has no verified signed manifest \(release manifest: none is published for v9\.1\.0-rc\.1\) — nothing was pushed/);
   assert.deepEqual(pushed(r.calls), []);
 });
 
 test('ARC-11-C7 — --tag-only --push pushes a 2.1+ tag once its signed manifest is published and is the tag\'s own', async (t) => {
   const repo = licences(t);
   const root = await releaseCommit(t, repo.url);
-  repo.publish({ 'releases/v9.1.0.json': signed(root) });
-  const r = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  repo.publish({ [`releases/v${RC}.json`]: signed(root) });
+  const r = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease'], { keys: MANIFEST_KEYS });
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /v9\.1\.0 is already tagged, at HEAD/);
-  assert.match(r.out, /release manifest: v9\.1\.0 is signed, and it is the record of this tag's tree \(\d+ files\)/);
-  assert.deepEqual(pushed(r.calls), ['git push origin v9.1.0']);
+  assert.match(r.out, /v9\.1\.0-rc\.1 is already tagged, at HEAD/);
+  assert.match(r.out, /release manifest: v9\.1\.0-rc\.1 is signed, and it is the record of this tag's tree \(\d+ files\)/);
+  assert.deepEqual(pushed(r.calls), [`git push origin v${RC}`]);
 });
 
 test('ARC-11-C7 — a published manifest with one hash altered, for another commit, or signed by another key, is refused', async (t) => {
   const repo = licences(t);
   const root = await releaseCommit(t, repo.url);
-  const own = manifestFromArchive(root, 'v9.1.0');
-  repo.publish({ 'releases/v9.1.0.json': signed(root, { files: { ...own.files, 'CLAUDE.md': '0'.repeat(64) } }) });
-  const altered = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  const own = manifestFromArchive(root, `v${RC}`);
+  repo.publish({ [`releases/v${RC}.json`]: signed(root, { files: { ...own.files, 'CLAUDE.md': '0'.repeat(64) } }) });
+  const altered = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease'], { keys: MANIFEST_KEYS });
   assert.equal(altered.code, 2);
-  assert.match(altered.err, /1 file in the published manifest differs from v9\.1\.0's own, the first CLAUDE\.md/);
-  repo.publish({ 'releases/v9.1.0.json': signed(root, { commit: 'b'.repeat(40) }) });
-  const recut = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  assert.match(altered.err, /1 file in the published manifest differs from v9\.1\.0-rc\.1's own, the first CLAUDE\.md/);
+  repo.publish({ [`releases/v${RC}.json`]: signed(root, { commit: 'b'.repeat(40) }) });
+  const recut = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease'], { keys: MANIFEST_KEYS });
   assert.equal(recut.code, 2);
-  assert.match(recut.err, /the published manifest names bbbbbbb, and v9\.1\.0 here is [0-9a-f]{7}/);
-  repo.publish({ 'releases/v9.1.0.json': signed(root) });
-  const stranger = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: productKeys(keyPair(), keyPair()) });
+  assert.match(recut.err, /the published manifest names bbbbbbb, and v9\.1\.0-rc\.1 here is [0-9a-f]{7}/);
+  repo.publish({ [`releases/v${RC}.json`]: signed(root) });
+  const stranger = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease'], { keys: productKeys(keyPair(), keyPair()) });
   assert.equal(stranger.code, 2);
   assert.match(stranger.err, /does not verify \(not signed by a key this product ships\)/);
   assert.deepEqual([...pushed(altered.calls), ...pushed(recut.calls), ...pushed(stranger.calls)], []);
@@ -1252,9 +1259,9 @@ test('ARC-11-C7 — a tag that is already here at another commit than HEAD is re
   const { url } = licences(t);
   const root = await releaseCommit(t, url);
   git(root, ['commit', '-q', '--allow-empty', '-m', 'chore: after the tag']);
-  const r = await run(root, ['9.1.0', '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  const r = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease'], { keys: MANIFEST_KEYS });
   assert.equal(r.code, 2);
-  assert.match(r.err, /release: v9\.1\.0 is already a tag here, at [0-9a-f]{7}, and HEAD is [0-9a-f]{7} — nothing was changed/);
+  assert.match(r.err, /release: v9\.1\.0-rc\.1 is already a tag here, at [0-9a-f]{7}, and HEAD is [0-9a-f]{7} — nothing was changed/);
   assert.deepEqual(pushed(r.calls), []);
 });
 
@@ -1263,10 +1270,152 @@ test('ARC-11-C7 — the one-shot flow tags a 2.1+ release and does not push it, 
   const root = fixture(t, { version: '9.1.0-dev' });
   write(root, 'engine.config.json', `${JSON.stringify({ ...CONFIG, licence: { manifests: { repo: url, ref: 'main', dir: 'releases' } } }, null, 2)}\n`);
   git(root, ['commit', '-qam', 'the licences repository']);
-  const r = await run(root, ['9.1.0', '--yes', '--offline', '--no-install', '--push'], { keys: MANIFEST_KEYS });
+  const r = await run(root, [RC, '--yes', '--offline', '--no-install', '--push', '--allow-prerelease'], { keys: MANIFEST_KEYS });
   assert.equal(r.code, 2, r.out);
-  assert.equal(git(root, ['tag', '-l', 'v9.1.0']).trim(), 'v9.1.0');
-  assert.match(r.out, /tagged and not pushed\. Sign its manifest with \S+ licence sign-release v9\.1\.0/);
-  assert.match(r.err, /release: v9\.1\.0 is pushed only with its signed manifest published — nothing was pushed/);
+  assert.equal(git(root, ['tag', '-l', `v${RC}`]).trim(), `v${RC}`);
+  assert.match(r.out, /tagged and not pushed\. Sign its manifest with \S+ licence sign-release v9\.1\.0-rc\.1/);
+  assert.match(r.err, /release: v9\.1\.0-rc\.1 is pushed only with its signed manifest published — nothing was pushed/);
   assert.deepEqual(pushed(r.calls), []);
+});
+
+// ── ARC-09-C185b — a final from 2.2.1 on is pushed only beside its staged distribution, signed from there ──────────
+
+const FINAL = '9.1.0';
+const ident = ['-c', 'user.email=f@example.invalid', '-c', 'user.name=f'];
+
+/** The maintainer's clone of the distribution, with `tag` staged into it as `stage <clone> <tag> --tag` stages it. */
+function distribution(t, root, tag = `v${FINAL}`) {
+  const clone = join(tempDir('snowarch-distribution-', t), 'snowarch');
+  stage(root, clone, tag, { tag: true });
+  return clone;
+}
+
+test('ARC-09-C185b — distributedRelease: a final from 2.2.1 on, never an rc', async () => {
+  const { distributedRelease, DISTRIBUTION_FROM } = await import('../tools/snowarch/lib/licence/manifest.mjs');
+  assert.equal(DISTRIBUTION_FROM, '2.2.1');
+  for (const [tag, want] of [['v2.2.1', true], ['v2.2.2', true], ['v2.3.0', true], ['v2.10.0', true], ['v3.0.0', true],
+    ['v2.2.0', false], ['v2.1.9', false], ['v2.2.1-rc.1', false], ['v9.1.0-rc.1', false], ['2.2.1', false], [null, false]]) {
+    assert.equal(distributedRelease(tag), want, String(tag));
+  }
+});
+
+test('ARC-09-C185b — both passes that stop at a final\'s tag name the distribution\'s order, and push nothing', async (t) => {
+  const { url } = licences(t);
+  const root = await releaseCommit(t, url, FINAL);
+  git(root, ['tag', '-d', `v${FINAL}`]);
+  const r = await run(root, [FINAL, '--tag-only', '--offline'], { keys: MANIFEST_KEYS });
+  assert.equal(r.code, 0, r.err);
+  const oneShot = fixture(t, { version: '9.1.0-dev' });
+  write(oneShot, 'engine.config.json', `${JSON.stringify({ ...CONFIG, licence: { manifests: { repo: url, ref: 'main', dir: 'releases' } } }, null, 2)}\n`);
+  git(oneShot, ['commit', '-qam', 'the licences repository']);
+  const cut = await run(oneShot, [FINAL, '--yes', '--offline', '--no-install'], { keys: MANIFEST_KEYS });
+  assert.equal(cut.code, 0, cut.err);
+  assert.match(r.out, /Tagged v9\.1\.0\. Before it is pushed, stage it into your clone of farstic\/snowarch/);
+  assert.match(cut.out, /tagged and not pushed\. Before it is pushed, stage it into your clone of farstic\/snowarch/);
+  for (const out of [r.out, cut.out]) {
+    assert.match(out, /node scripts\/distribution\.mjs stage, then that clone's path, then v9\.1\.0 --tag, with --onto main once/);
+    assert.match(out, /Sign its manifest from that clone with \S+ licence sign-release v9\.1\.0,/);
+    assert.match(out, /Push that clone's main and v9\.1\.0\. Then run this again with --tag-only --push --distribution/);
+  }
+  assert.deepEqual([...pushed(r.calls), ...pushed(cut.calls)], []);
+});
+
+test('ARC-09-C185b — a final\'s --tag-only --push without --distribution is refused, its own manifest published or not', async (t) => {
+  const repo = licences(t);
+  const root = await releaseCommit(t, repo.url, FINAL);
+  // Signed HERE, as an rc is: exactly what a final from 2.2.1 no longer is.
+  repo.publish({ [`releases/v${FINAL}.json`]: signed(root, {}, `v${FINAL}`) });
+  const r = await run(root, [FINAL, '--tag-only', '--push', '--offline'], { keys: MANIFEST_KEYS });
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.err, /release: from 2\.2\.1 a final release is installed from farstic\/snowarch — give --distribution and the path of your clone of it, where v9\.1\.0 is staged and its manifest signed; nothing was pushed/);
+  assert.deepEqual(pushed(r.calls), []);
+});
+
+test('ARC-09-C185b — with --distribution, the tag is pushed once the clone holds it staged and its manifest is signed there', async (t) => {
+  const repo = licences(t);
+  const root = await releaseCommit(t, repo.url, FINAL);
+  const clone = distribution(t, root);
+  repo.publish({ [`releases/v${FINAL}.json`]: signed(clone, {}, `v${FINAL}`) });
+  const r = await run(root, [FINAL, '--tag-only', '--push', '--offline', '--distribution', clone], { keys: MANIFEST_KEYS });
+  assert.equal(r.code, 0, r.err);
+  const tree = git(clone, ['rev-parse', `v${FINAL}^{tree}`]).trim();
+  assert.ok(r.out.includes(`distribution: v${FINAL} in ${clone} is this tag staged (tree ${tree.slice(0, 7)})`), r.out);
+  assert.match(r.out, /release manifest: v9\.1\.0 is signed, and it is the record of this tag's tree \(\d+ files\)/);
+  assert.deepEqual(pushed(r.calls), [`git push origin v${FINAL}`]);
+});
+
+test('ARC-09-C185b — a manifest signed here, not from the clone, is refused beside the clone', async (t) => {
+  const repo = licences(t);
+  const root = await releaseCommit(t, repo.url, FINAL);
+  const clone = distribution(t, root);
+  repo.publish({ [`releases/v${FINAL}.json`]: signed(root, {}, `v${FINAL}`) });
+  const r = await run(root, [FINAL, '--tag-only', '--push', '--offline', '--distribution', clone], { keys: MANIFEST_KEYS });
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.err, /the published manifest names [0-9a-f]{7}, and v9\.1\.0 here is [0-9a-f]{7}\) — nothing was pushed\. Sign it from that clone with \S+ licence sign-release v9\.1\.0, publish it, and run --tag-only --push --distribution again\./);
+  assert.deepEqual(pushed(r.calls), []);
+});
+
+test('ARC-09-C185b — a clone whose tag is not this tag staged is refused, though its manifest is its own', async (t) => {
+  const repo = licences(t);
+  const root = await releaseCommit(t, repo.url, FINAL);
+  const clone = distribution(t, root);
+  // One file changed and the tag moved onto it, then signed from the clone: the manifest is that clone's own record,
+  // so only the tree check can refuse it.
+  write(clone, 'CLAUDE.md', 'not the release\n');
+  git(clone, [...ident, 'commit', '-qam', 'tampered']);
+  git(clone, [...ident, 'tag', '-f', '-a', '-m', 'tampered', `v${FINAL}`]);
+  repo.publish({ [`releases/v${FINAL}.json`]: signed(clone, {}, `v${FINAL}`) });
+  const tampered = await run(root, [FINAL, '--tag-only', '--push', '--offline', '--distribution', clone], { keys: MANIFEST_KEYS });
+  assert.equal(tampered.code, 2, tampered.out);
+  assert.match(tampered.err, /release: v9\.1\.0 in .+ is tree [0-9a-f]{7}, and v9\.1\.0 staged from here is [0-9a-f]{7} — nothing was pushed/);
+  const empty = join(tempDir('snowarch-distribution-', t), 'snowarch');
+  initFixtureRepo((args) => git(dirname(empty), args), empty, ['-q', '-b', 'main']);
+  const untagged = await run(root, [FINAL, '--tag-only', '--push', '--offline', '--distribution', empty], { keys: MANIFEST_KEYS });
+  assert.equal(untagged.code, 2, untagged.out);
+  assert.match(untagged.err, /release: .+ has no v9\.1\.0: stage it there with --tag — nothing was pushed/);
+  assert.deepEqual([...pushed(tampered.calls), ...pushed(untagged.calls)], []);
+});
+
+test('ARC-09-C185b — --distribution is refused for an rc, and outside --tag-only --push', async (t) => {
+  const repo = licences(t);
+  const root = await releaseCommit(t, repo.url);
+  repo.publish({ [`releases/v${RC}.json`]: signed(root) });
+  const rc = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease', '--distribution', root],
+    { keys: MANIFEST_KEYS });
+  assert.equal(rc.code, 2, rc.out);
+  assert.match(rc.err, /release: v9\.1\.0-rc\.1 is released from this repository alone — --distribution is for a final from 2\.2\.1 on; nothing was pushed/);
+  const unpushed = await run(root, [RC, '--tag-only', '--offline', '--allow-prerelease', '--distribution', root]);
+  assert.equal(unpushed.code, 2);
+  assert.match(unpushed.err, /release: --distribution goes with --tag-only --push/);
+  const bare = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease', '--distribution']);
+  assert.equal(bare.code, 2);
+  assert.match(bare.err, /release: --distribution needs the path of your clone of farstic\/snowarch/);
+  assert.deepEqual([...pushed(rc.calls), ...pushed(unpushed.calls), ...pushed(bare.calls)], []);
+});
+
+// ── ARC-09-C192 — the signer and the gate are one release: a manifest of another coverage is the wrong manifest ──────
+
+test('ARC-09-C192 — the release gate refuses a manifest signed with another coverage, on the rc path and beside a clone', async (t) => {
+  // A coverage narrower than this release's, which the fixture's files satisfy: a manifest signed with it is the record
+  // of its own files, so only a coverage check can refuse it.
+  const NARROW = { covers: ['CLAUDE.md', 'engine.config.json', 'package.json'], excludes: [], ignores: [...COVERAGE.ignores] };
+  const narrow = (dir, tag) => `${JSON.stringify(signManifest(manifestFromArchive(dir, tag, { coverage: NARROW }),
+    manifestKey.privateKey), null, 2)}\n`;
+  const said = /has no verified signed manifest \(it was signed with another coverage than this release's, covers first differing at [^)\s]+\) — nothing was pushed/;
+
+  const repo = licences(t);
+  const root = await releaseCommit(t, repo.url);
+  repo.publish({ [`releases/v${RC}.json`]: narrow(root, `v${RC}`) });
+  const rc = await run(root, [RC, '--tag-only', '--push', '--offline', '--allow-prerelease'], { keys: MANIFEST_KEYS });
+  assert.equal(rc.code, 2, rc.out);
+  assert.match(rc.err, said);
+
+  const distRepo = licences(t);
+  const final = await releaseCommit(t, distRepo.url, FINAL);
+  const clone = distribution(t, final);
+  distRepo.publish({ [`releases/v${FINAL}.json`]: narrow(clone, `v${FINAL}`) });
+  const dist = await run(final, [FINAL, '--tag-only', '--push', '--offline', '--distribution', clone], { keys: MANIFEST_KEYS });
+  assert.equal(dist.code, 2, dist.out);
+  assert.match(dist.err, said);
+  assert.deepEqual([...pushed(rc.calls), ...pushed(dist.calls)], []);
 });

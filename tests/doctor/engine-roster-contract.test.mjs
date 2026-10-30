@@ -86,7 +86,7 @@ test('E-17 fails when a skill directory is gone, and names the skill', async (t)
   assert.equal(r.status, 'fail');
   // Two findings, and the second is the one that NAMES it: the count alone could not, because the
   // expected names exist nowhere but the directory itself.
-  assert.match(r.detail, /roster\.skills \d+ ≠ \d+ found/);
+  assert.match(r.detail, /`roster\.skills` \d+ ≠ \d+ found/);
   assert.match(r.detail, /preloads "developer", which is not a skill/);
 });
 
@@ -124,7 +124,7 @@ test('E-18 quotes the lint\'s own rule id and message', async (t) => {
   writeFileSync(join(root, rel), text.replace(/^---\n/, '---\nversion: 9.9.9\n'));
   const r = await runById(roster, 'E-18', contextFor(root));
   assert.equal(r.status, 'fail');
-  assert.match(r.detail, /SK-04 \.claude\/skills\/developer\/SKILL\.md: move version under metadata\.version/);
+  assert.match(r.detail, /SK-04 \.claude\/skills\/developer\/SKILL\.md: move version under `metadata\.version`/);
 });
 
 // AC 2 (c).

@@ -17,8 +17,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { isEngineeringCheckout } from '../tools/snowarch/lib/engineering-checkout.mjs';
-import { exportTree, shippedFiles, stage, unlistedReferences } from '../scripts/lib/distribution.mjs';
+import { engineeringNames, exportTree, shippedFiles, stage, unlistedReferences } from '../scripts/lib/distribution.mjs';
 import { engineContractChecks } from '../tools/snowarch/lib/doctor/checks/engine-contract.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const REAL_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // A backtick, built here so the fixtures' cited paths are not citations of this file (L05 reads it too).
@@ -70,7 +71,7 @@ function plantedTree(t) {
     // The example's path lands outside the coverage, so a guard that read it as a link would report it.
     + 'Write an image as ' + BT + '![Figure N](../../../docs/figure-N.png)' + BT + ': an example in code, not a link.\n');
   put(root, 'docs/relative-guide.md', '# guide\n');
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   // A Windows runner's condition, on every OS: git converting text to CRLF on its way out. The export's claim is
   // "as HEAD has them", so it must not depend on this, as `stage` does not.
   git(root, ['config', 'core.autocrlf', 'true']);
@@ -170,7 +171,7 @@ function releaseTree(t) {
   put(root, '.gitattributes', '*.ps1 text eol=crlf\n');
   put(root, '.gitmodules', '[submodule "vendor/ServiceNowDocs"]\n\tpath = vendor/ServiceNowDocs\n');
   put(root, 'tests/not-shipped.test.mjs', '\n');
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['add', '-A']);
   git(root, ['update-index', '--add', '--cacheinfo', `160000,${PIN},vendor/ServiceNowDocs`]);
   assert.match(git(root, ['ls-files', '--stage', 'vendor/ServiceNowDocs']), new RegExp(`^160000 ${PIN} 0\t`));
@@ -231,4 +232,45 @@ test('stage puts the next release onto the clone\'s main, and refuses what would
   assert.throws(() => stage(root, fresh, 'v9.9.8', { coverage: SCOV, tag: true }),
     new RegExp(`pins the corpus at ${'b'.repeat(40)}, its tree at ${PIN}`));
   assert.throws(() => stage(root, fresh, 'main', { coverage: SCOV, tag: true }), /--tag needs an annotated tag/);
+});
+
+// ── ARC-09-C185c — no shipped file names the engineering repository (the owner's ruling, 2026-10-19) ────────────────
+// The engineering repository goes private, and its name must not be discoverable from an install: not its URL, not its
+// name. A shipped file links farstic/snowarch (what a user installs) and farstic/snowarch-licences (what the product
+// fetches), and no other farstic repository. The repository's name is built here, so this file is not a hit itself.
+const ENG = ['ai', 'servicenow', 'architect'].join('-');
+
+test('the guard finds a shipped file that names the engineering repository or links another farstic one', (t) => {
+  const root = tempDir('snowarch-names-', t);
+  put(root, 'docs/page.md', [
+    `Clone https://github.com/farstic/${ENG}.git and cd ${ENG}.`,
+    'History lives at https://github.com/farstic/some-old-repo, linked.',
+    'Install from https://github.com/farstic/snowarch.git; licences come from https://github.com/farstic/snowarch-licences.',
+    'An old name as text, farstic/some-old-repo, is history and not a link.',
+    '',
+  ].join('\n'));
+  put(root, 'tests/not-shipped.md', `${ENG}\n`);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
+  git(root, ['add', '-A']);
+  git(root, ['commit', '-q', '-m', 'fixture']);
+  const hits = engineeringNames(root, { coverage: { covers: ['docs/'], excludes: [], ignores: [] } });
+  assert.deepEqual(hits.map((h) => `${h.file}:${h.line}`), ['docs/page.md:1', 'docs/page.md:2']);
+});
+
+test('this tree: no shipped file names the engineering repository or links another farstic one', () => {
+  const hits = engineeringNames(REAL_ROOT);
+  assert.deepEqual(hits.map((h) => `${h.file}:${h.line}: ${h.text}`), []);
+});
+
+test('stage refuses a tag whose message names the engineering repository, and writes nothing', (t) => {
+  const root = releaseTree(t);
+  const named = join(tempDir('snowarch-stage-msg-', t), 'message');
+  writeFileSync(named, `snowarch v9.9.11\n\nfrom https://github.com/farstic/${ENG}\ndocs-pin: ${PIN}\n`);
+  execFileSync('git', ['-c', 'user.email=f@example.com', '-c', 'user.name=f', 'tag', '-a', '--no-sign',
+    '--cleanup=verbatim', '-F', named, 'v9.9.11'], { cwd: root, stdio: 'pipe' });
+  assert.match(execFileSync('git', ['-C', root, 'cat-file', '-p', 'v9.9.11'], { encoding: 'utf8' }), new RegExp(ENG));
+  const clone = join(tempDir('snowarch-stage-named-', t), 'clone');
+  assert.throws(() => stage(root, clone, 'v9.9.11', { coverage: SCOV, tag: true }),
+    /v9\.9\.11's message names the engineering repository/);
+  assert.equal(existsSync(clone), false, 'stage wrote a clone before it refused');
 });

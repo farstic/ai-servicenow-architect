@@ -20,6 +20,7 @@ import { FROZEN_HEADING } from '../scripts/lib/release/changelog.mjs';
 import { collect, directorySize, megabytes, seconds, table } from '../scripts/ci/install-metrics.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { composeBody, RELEASE_BODY_MAX } from '../scripts/ci/release-notes.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -39,9 +40,9 @@ function tagged(t, { contract = '{"schema":1,"tools":[]}', version = '2.0.0' } =
   write(root, 'engine.config.json', `${JSON.stringify(CONFIG, null, 2)}\n`);
   write(root, 'packages/snowarch/dist/contract.json', contract);
   mkdirSync(join(root, 'vendor/ServiceNowDocs'), { recursive: true });
-  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(join(root, 'vendor/ServiceNowDocs'), args), join(root, 'vendor/ServiceNowDocs'), ['-q', '-b', 'main']);
 
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
   assert.equal(git(root, ['config', 'user.name']).trim(), 'fixture', 'the fixture identity did not take');
@@ -407,7 +408,7 @@ test('C21: an oversized section keeps the GROUPS and truncates the prose', () =>
   assert.match(body, /the generated groups, which are what the release IS/);
   assert.match(body, /_trailer_/);
   assert.ok(body.startsWith('## 9.9.9'), 'the version heading was truncated away');
-  assert.match(body, /_Notes continue in \[docs\/CHANGELOG\.md § 9\.9\.9\]\(https:\/\/github\.com\/farstic\/ai-servicenow-architect\/blob\/v9\.9\.9\/docs\/CHANGELOG\.md\)\._/);
+  assert.match(body, /_Notes continue in \[docs\/CHANGELOG\.md § 9\.9\.9\]\(https:\/\/github\.com\/farstic\/snowarch\/blob\/v9\.9\.9\/docs\/CHANGELOG\.md\)\._/);
   assert.match(body, /\| os \| s \|/);
   assert.match(body, /E-00 is expected there/);
   // And the prose really was cut, or the fixture proves nothing.

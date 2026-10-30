@@ -36,7 +36,7 @@ MSG_CITATIONS='citations: not verified until Node 20+ is installed'
 
 . "$ROOT/tools/snowarch/launcher/docs-recipe.sh"
 
-MODE=design ; DOCS=sparse ; YES=0 ; RESET=0 ; SKIP_CLAUDE=0 ; NODE_ONLY=0
+MODE=design ; DOCS=full ; YES=0 ; RESET=0 ; SKIP_CLAUDE=0 ; NODE_ONLY=0
 ORIG=("$@")          # kept intact for the hand-over: Node parses its own flags
 
 say() { printf '%s\n' "$*" ; }
@@ -60,7 +60,7 @@ while [ $# -gt 0 ] ; do
     --yes) YES=1 ;; --reset) RESET=1 ;; --skip-claude-check) SKIP_CLAUDE=1 ;;
     --from|--instance-file) NODE_ONLY=1 ; shift ;;
     --from=*|--instance-file=*|--json) NODE_ONLY=1 ;;
-    --help|-h) say "usage: ./bootstrap.sh [--mode design|live] [--docs sparse|full|skip] [--yes] [--reset]" ; exit 0 ;;
+    --help|-h) say "usage: ./bootstrap.sh [--mode design|live] [--docs full|skip|sparse] [--yes] [--reset]" ; exit 0 ;;
   esac
   shift
 done
@@ -140,20 +140,20 @@ say "ok B00 node: note: Node.js not found — design-only only; live mode needs 
 step B00 preflight ok
 if [ "$YES" != 1 ] ; then
   DOCS_NOTE=''
-  # The area count belongs to a checkout that will happen; printing "skip (19 areas)" describes a
-  # corpus nobody is fetching.
-  [ "$DOCS" = skip ] || DOCS_NOTE=" ($(grep -c . "$ROOT/vendor/docs-areas.txt" 2>/dev/null || echo 0) areas)"
+  # ARC-09-C244 — a cited-area count belongs to sparse: the whole corpus has every area, and skip has none.
+  [ "$DOCS" != sparse ] || DOCS_NOTE=" ($(grep -c . "$ROOT/vendor/docs-areas.txt" 2>/dev/null || echo 0) areas)"
   say "Plan: Mode design-only (fixed — Node.js 20+ not found) · Docs $DOCS$DOCS_NOTE"
-  say "Enter = run · d = docs full · s = docs skip · q = quit"
+  say "Enter = run · s = docs skip · q = quit"
   read -r answer
-  case "$answer" in d|D) DOCS=full ;; s|S) DOCS=skip ;; q|Q) exit 0 ;; esac
+  case "$answer" in s|S) DOCS=skip ;; q|Q) exit 0 ;; esac
 fi
 
 write_state() {
   mkdir -p "$ROOT/.local" && chmod 700 "$ROOT/.local" 2>/dev/null
+  if [ "$DOCS" = sparse ] ; then OPT_IN=', "optIn": true' ; else OPT_IN='' ; fi   # ARC-09-C244: kept as asked
   cat > "$ROOT/.local/bootstrap-state.json" <<STATE
 { "version": 1, "product": "snowarch", "mode": "design-only",
-  "docs": { "mode": "$DOCS", "pin": "$(sed -n 's/.*"pin": *"\([0-9a-f]*\)".*/\1/p' "$ROOT/engine.config.json")" },
+  "docs": { "mode": "$DOCS", "pin": "$(sed -n 's/.*"pin": *"\([0-9a-f]*\)".*/\1/p' "$ROOT/engine.config.json")"$OPT_IN },
   "node": { "present": false, "version": null },
   "writer": "bash", "platform": "$PLAT",
   "registration": "project", "registrationReason": "default", "hooksDisabledByBootstrap": false,

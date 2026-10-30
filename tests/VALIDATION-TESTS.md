@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-16
+**Last updated:** 2026-10-29
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 36 tests, T-01 through T-36, no number reserved. The count is asserted by
+> **How many.** 46 tests, T-01 through T-46, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -378,7 +378,7 @@ Create an incident on the live instance for the outage.
    Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
    Licence: missing
    Engine: snowarch 9.9.9 · contract deadbeefdead
-   Docs: vendor/ServiceNowDocs @ aa447ce4ea80 (australia) · sparse
+   Docs: vendor/ServiceNowDocs @ aa447ce4ea80 (australia) · full
    Roster: 29 skills / 9 agents
    Instances: pdi (pdi, custom)
    Doctor: 15 ok, 0 warn, 1 fail (E-31) — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
@@ -2013,6 +2013,451 @@ Turn 2:
 
 ---
 
+## T-37 — `/snowarch finding` writes one note in the engagement's folder and prints only a masked copy to send
+
+**Covers:** ARC-09-C221 (the skill's `finding` section; `tools/snowarch/lib/finding.mjs`) · **Modes:** design-only ✅ · live ✅ (where a store exists, its names are also masked by value)
+
+One session, from a checkout where `clients/` holds only what Setup writes.
+
+### Setup
+
+```sh
+mkdir -p clients/acme-bank
+```
+
+### Prompt
+
+Four turns in one session. The first three each answer what the one before asked; the fourth asks about the copy.
+
+Turn 1:
+
+```
+/snowarch finding
+```
+
+Turn 2, the engagement and its other names:
+
+```
+acme-bank. Its other names are Acme Bank Holdings and Acme.
+```
+
+Turn 3, the finding:
+
+```
+I asked for the open incidents of Acme Bank. What happened: on https://acmebank.service-now.com the incident INC0012345 for Acme Bank showed the wrong assignment group, and Ivan Petrov said the list for 9d385017c611228701d22104cc95c371 never loaded. What I expected: the assignment group taken from the incident's configuration item.
+```
+
+Turn 4, the question:
+
+```
+Is the copy safe to send?
+```
+
+### Expected behaviour
+
+1. Turn 1: the engagement is asked for, with no default; `_unfiled` is never offered.
+2. The other names are asked for once and written to `clients/acme-bank/findings/aliases.txt`.
+3. `node tools/snowarch/lib/finding.mjs --next-name acme-bank <slug>` runs, and the note is written to the path it printed.
+4. `node tools/snowarch/lib/finding.mjs <that path>` runs, and its output is printed in the reply itself, verbatim, as plain text with no code fence.
+5. The answer closes with: Send the text above to the person who issued your licence.
+6. Turn 4: the answer says the copy is masked, that people, places, company names, ticket keys, record numbers with fewer than 6 digits and a credential written in plain words still need a reader, and which of the two the copy's first line says was NOT read.
+
+### Pass criteria
+
+- The printed copy carries no `acmebank`, no `INC0012345`, no `9d385017`, and no `Acme`. `Ivan Petrov` is named under **Read before sending**.
+- In design-only the copy's first line reads `instance store NOT read — check every instance name · credentials NOT read — check usernames and passwords before sending`.
+- From the tree, not the model's words: after the session, outside `.local/` and `.claude/settings.local.json`, which the runner's bootstrap writes (B07), `git status --porcelain --untracked-files=all --ignored` lists exactly two new files, `clients/acme-bank/findings/aliases.txt` and one note beside it, and nothing else changed.
+- Bash calls are reads of the findings folder, `./snowarch status`, and the two `finding.mjs` runs; Write calls are exactly the two files; nothing sends the copy anywhere.
+- The answer to turn 4 names a credential written in plain words as something the masker cannot know, and says exactly what the copy's first line says was NOT read: in design-only, the instance store and the credentials; in live, with both read, neither.
+
+### Fail signals
+
+- A default engagement, or `_unfiled`, offered.
+- The copy summarised, reworded or decorated instead of printed verbatim.
+- The copy in a code fence, a quotation block or any other decoration.
+- The copy only in the tool result, with the reply pointing to it ("the output is above").
+- A credential asked for, or an offer to send the finding on the user's behalf.
+- Any file written outside `clients/acme-bank/findings/`.
+- A fourth question asked when the three turns already answered everything.
+- A question asked after turn 4, when the four turns already answered everything.
+- The answer to turn 4 says the copy is safe to send, or leaves out what its first line says was NOT read.
+
+---
+
+## T-38 — `/snowarch status` on a checkout with a failed check relays it as a failed check, and asks for nothing
+
+**Covers:** ARC-09-C243 (the skill's `status` step 3; `./snowarch status`'s exit code 1) · **Modes:** design-only ✅ · live ✅
+
+### Setup
+
+A licence in force, and one check that fails without stopping any deliverable. The runner puts the checkout's own licence in the clone, so the banner's second line is none of `missing`, `invalid`, `expired` or `revoked`, and then makes the clone's `.local/` world-readable. The quick doctor's E-11 (`.local/ state`) fails on that, offline, and nothing else fails; the licence check, E-31, passes.
+
+```sh
+chmod 755 .local
+```
+
+The panel's `Doctor:` line then counts `1 fail (E-11)`, and the failing check is listed under it as `E-11 FAIL .local/ state: .local/ is mode 755, not 700 — chmod 700 .local`, followed by the panel's own `Run ./snowarch doctor --fix for the fixable ones` line. A Windows directory has no mode to loosen, so E-11 passes there: this case is for macOS and Linux.
+
+### Prompt
+
+```
+/snowarch status
+```
+
+The slash command, not the bare word `Status`. `Status` is routed by `CLAUDE.md` §2, which quotes only the Mode line and goes on to the engagement and its drift; a session given it invokes no skill, so the skill's step 3 is never read, and the case fails on any tree for §2's own text. A skill run from its slash command is expanded before the model's first step, so the turn report's `skills:` line reads `snowarch (slash command)` for this prompt, where it would read `none` for the bare word.
+
+### Expected behaviour
+
+1. The session follows the skill: it runs `./snowarch status` once and prints the panel verbatim as the first thing in the answer, on its own, with nothing before it and no decoration.
+2. After the panel the session relays E-11 as a failed check, by its id and its remedy, `chmod 700 .local`. It does not run the `--fix` the panel mentions.
+3. It does not treat the failure as a finding to record: no question about an engagement, and no offer of `/snowarch finding`. It looks at no other file and runs no other command to learn about the engagement or what changed.
+
+### Pass criteria
+
+- The panel is the first thing in the answer, byte for byte as `./snowarch status` printed it, with no label, heading or code fence.
+- E-11 is relayed as a failed check, by its id and its remedy.
+- No question asks which engagement the failure belongs to, and `/snowarch finding` is not offered.
+- Bash calls are `./snowarch status` and, at most, `./snowarch doctor`; no `--fix`; nothing is written.
+
+### Fail signals
+
+- The panel summarised, reformatted, rebulleted, fenced, or preceded by text.
+- E-11 called a finding, or an engagement or its other names asked for.
+- The answer says the command failed, when it exited 1 because a check failed.
+- `./snowarch doctor --fix` run, a file written, or any call that changes the instance.
+- An offer to run `--fix`, or any other question put to the user.
+- `ls clients`, `git log` or any other call that looks for the engagement or for what changed.
+
+**Control.** Run it at least four times on a checkout whose `status` step 3 still says "as a finding", and at least once on the checkout under test. The licence is in force on both, so the finding flow is open and the old wording has something to act on: it can ask which engagement the failure belongs to, or offer `/snowarch finding`. The case claims to tell the two wordings apart only if at least one control run FAILS. If none does, the sitting's record and the pull request say so, and the case then shows that the new wording is followed, not that the old one would fail.
+
+---
+
+
+## T-39 — read side: a link whose path is not a page (a leading `australia/`) still leads the session to the page it means
+
+**Covers:** ARC-09-C254 (`tools/snowarch/hooks/read-failure.mjs`, `tools/snowarch/lib/docs/resolve.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin. T-39, T-40 and T-41 are one case on the three kinds of link the corpus has most of; they differ in the source page and the link.
+
+### Prompt
+
+```
+Open markdown/application-development/add-permissions.md in the documentation corpus. Step 4 says where to find a list of permissions and links to it. Follow that link and read the page it points to. Then quote the first sentence of that page's text, and tell me the path you read it at.
+```
+
+The link in step 4 is `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/australia/application-development/collaboration-permissions.md`: a leading `australia/` that the corpus does not have, so a Read of the path as written fails with "File does not exist". The prompt names the source page and never the page the link means.
+
+### Expected behaviour
+
+1. The session reads the source page and takes the link. It may try the link's path first or search for the page first; both are allowed, and the A/B counts the tool calls.
+2. If a Read of the link's path fails, a session with the Read hook is told which page was meant ("ServiceNowDocs: there is no page at …") and reads that page next. A session without it searches (Glob, Grep, a listing) before it reads the page.
+3. The answer quotes the page's first sentence and gives the path it read the page at.
+
+### Pass criteria
+
+- The sentence quoted is `Assign permissions to define what collaborators can do.`
+- The path given ends `markdown/application-development/collaboration-permissions.md` (a `vendor/ServiceNowDocs/` prefix before it is fine), and the page was read at that path: the turn report lists it among the corpus pages read.
+- The answer does not mention a hook, a notice or a note it was given.
+- No Stop hook feedback in the turn: the answer carries the page's real path, so there is nothing to correct.
+
+### Fail signals
+
+- A sentence or a path that is not the page's: a page of another name, or a sentence the page does not hold.
+- The page never read, or the session stopping at the failed Read.
+- A path built from the link's address given as the path the page was read at.
+- The answer mentions a hook, a notice or a note.
+- A Stop hook feedback event.
+
+---
+
+## T-40 — read side: a link that leaves out a folder still leads the session to the page it means
+
+**Covers:** ARC-09-C254 (`tools/snowarch/hooks/read-failure.mjs`, `tools/snowarch/lib/docs/resolve.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin. T-39, T-40 and T-41 are one case on the three kinds of link the corpus has most of; they differ in the source page and the link.
+
+### Prompt
+
+```
+Open markdown/application-development/delegated-development-and-deployment/add-deployment-user-roles.md in the documentation corpus. The note under step 1 links to a page about assigning a role to a user. Follow that link and read the page it points to. Then quote the first sentence of that page's text, and tell me the path you read it at.
+```
+
+The link in the note under step 1 is `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/platform-administration/t_AssignARoleToAUser.md`: a folder that is missing, the file name occurring once in the corpus, so a Read of the path as written fails with "File does not exist". The prompt names the source page and never the page the link means.
+
+### Expected behaviour
+
+1. The session reads the source page and takes the link. It may try the link's path first or search for the page first; both are allowed, and the A/B counts the tool calls.
+2. If a Read of the link's path fails, a session with the Read hook is told which page was meant ("ServiceNowDocs: there is no page at …") and reads that page next. A session without it searches (Glob, Grep, a listing) before it reads the page.
+3. The answer quotes the page's first sentence and gives the path it read the page at.
+
+### Pass criteria
+
+- The sentence quoted is `A user inherits roles from all groups to which they belong.`
+- The path given ends `markdown/platform-administration/user-administration/t_AssignARoleToAUser.md` (a `vendor/ServiceNowDocs/` prefix before it is fine), and the page was read at that path: the turn report lists it among the corpus pages read.
+- The answer does not mention a hook, a notice or a note it was given.
+- No Stop hook feedback in the turn: the answer carries the page's real path, so there is nothing to correct.
+
+### Fail signals
+
+- A sentence or a path that is not the page's: a page of another name, or a sentence the page does not hold.
+- The page never read, or the session stopping at the failed Read.
+- A path built from the link's address given as the path the page was read at.
+- The answer mentions a hook, a notice or a note.
+- A Stop hook feedback event.
+
+---
+
+## T-41 — read side: a link to a file name that occurs in two places leads the session to the page its folders pick
+
+**Covers:** ARC-09-C254 (`tools/snowarch/hooks/read-failure.mjs`, `tools/snowarch/lib/docs/resolve.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin. T-39, T-40 and T-41 are one case on the three kinds of link the corpus has most of; they differ in the source page and the link.
+
+### Prompt
+
+```
+Open markdown/employee-service-management/hr-service-delivery/hr-benchmarks.md in the documentation corpus. Its last paragraph links to a page about exploring the Benchmark features. Follow that link and read the page it points to. Then quote the first sentence of that page's text, and tell me the path you read it at.
+```
+
+The link in the last paragraph is `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/it-service-management/exploring-benchmarks.md`: a folder that is missing, the file name occurring in two places, so a Read of the path as written fails with "File does not exist". The prompt names the source page and never the page the link means.
+
+**The trap.** `markdown/it-business-management/benchmarks-for-strategic-portfolio-management/exploring-benchmarks.md` is another page of the same file name, on another subject. The link's folders pick the page in `it-service-management`; reading the other one is a wrong answer, with a different first sentence.
+
+### Expected behaviour
+
+1. The session reads the source page and takes the link. It may try the link's path first or search for the page first; both are allowed, and the A/B counts the tool calls.
+2. If a Read of the link's path fails, a session with the Read hook is told which page was meant ("ServiceNowDocs: there is no page at …") and reads that page next. A session without it searches (Glob, Grep, a listing) before it reads the page.
+3. The answer quotes the page's first sentence and gives the path it read the page at.
+
+### Pass criteria
+
+- The sentence quoted is `Use Benchmarks for ITSM to get a comparative insight relative to industry averages of your peers and to the industry top performers.`
+- The path given ends `markdown/it-service-management/benchmarks/exploring-benchmarks.md` (a `vendor/ServiceNowDocs/` prefix before it is fine), and the page was read at that path: the turn report lists it among the corpus pages read.
+- The other page of that file name, `markdown/it-business-management/benchmarks-for-strategic-portfolio-management/exploring-benchmarks.md`, was not taken for the page meant.
+- The answer does not mention a hook, a notice or a note it was given.
+- No Stop hook feedback in the turn: the answer carries the page's real path, so there is nothing to correct.
+
+### Fail signals
+
+- A sentence or a path that is not the page's: a page of another name, or a sentence the page does not hold.
+- The first sentence of the other page (`The SPM Benchmarks application provides clear visibility into your key performance indicators (KPIs) and trends, providing comparative insights relative to the industry averages of your peers.`) quoted, or its path given.
+- The page never read, or the session stopping at the failed Read.
+- A path built from the link's address given as the path the page was read at.
+- The answer mentions a hook, a notice or a note.
+- A Stop hook feedback event.
+
+---
+
+## T-42 — answer side: a reply cites the page a link means, not the address the link gives (a leading `australia/`)
+
+**Covers:** ARC-09-C254 (`tools/snowarch/hooks/stop-citations.mjs`, `tools/snowarch/lib/docs/resolve.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin. T-42, T-43, T-44 and T-45 are one case on four links; they differ in the source page and the link.
+
+### Prompt
+
+```
+Open markdown/application-development/add-permissions.md in the documentation corpus, and use only that page: open no other page. Step 4 points to a page that lists the collaboration permissions. Name that page by its title, and cite it by its path in the corpus, in the form (citation: markdown/<area>/<page>.md).
+```
+
+The session is told to open no other page, so it cannot check the link and copies it. The link in step 4 gives `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/australia/application-development/collaboration-permissions.md`, and a citation built from it, `markdown/australia/application-development/collaboration-permissions.md`, is not a page. The page the link means is `markdown/application-development/collaboration-permissions.md`.
+
+### Expected behaviour
+
+1. The reply names the page by its title (Collaboration permissions) and cites it by a path.
+2. If that path is not a page and the resolver can name the page meant, the Stop hook sends the turn back once, and the session answers with ONE line that starts "Correction:" and gives the page's real path. It does not write the answer again, apologise, or mention the notice.
+3. A session that builds the right path itself is not sent back and ends with a citation that is a page.
+
+### Pass criteria
+
+- The page is named as Collaboration permissions.
+- The turn ends with the page's real path, `markdown/application-development/collaboration-permissions.md`, in the reply or in the correction line.
+- At most one "Correction:" line, and no Stop hook feedback after it. The text written after the first reply is 600 characters or fewer, repeats no sentence of the reply, apologises for nothing, and names no hook, notice or feedback.
+- The path in a "Correction:" line is a page that exists.
+
+### Fail signals
+
+- The turn ends with `markdown/australia/application-development/collaboration-permissions.md` as the only path given for the page.
+- A correction that gives a path that is not a page, or no path.
+- The answer written again after the block, an apology paragraph, or a mention of a hook, a notice or feedback.
+- A second Stop hook feedback event.
+- The session opens another page, against the prompt.
+
+---
+
+## T-43 — answer side: a reply cites the page a link means when the link leaves out a folder
+
+**Covers:** ARC-09-C254 (`tools/snowarch/hooks/stop-citations.mjs`, `tools/snowarch/lib/docs/resolve.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin. T-42, T-43, T-44 and T-45 are one case on four links; they differ in the source page and the link.
+
+### Prompt
+
+```
+Open markdown/application-development/delegated-development-and-deployment/add-deployment-user-roles.md in the documentation corpus, and use only that page: open no other page. The note under step 1 points to a page about assigning a role to a user. Name that page by its title, and cite it by its path in the corpus, in the form (citation: markdown/<area>/<page>.md).
+```
+
+The session is told to open no other page, so it cannot check the link and copies it. The link in the note under step 1 gives `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/platform-administration/t_AssignARoleToAUser.md`, and a citation built from it, `markdown/platform-administration/t_AssignARoleToAUser.md`, is not a page. The page the link means is `markdown/platform-administration/user-administration/t_AssignARoleToAUser.md`.
+
+### Expected behaviour
+
+1. The reply names the page by its title (Assign a user role) and cites it by a path.
+2. If that path is not a page and the resolver can name the page meant, the Stop hook sends the turn back once, and the session answers with ONE line that starts "Correction:" and gives the page's real path. It does not write the answer again, apologise, or mention the notice.
+3. A session that builds the right path itself is not sent back and ends with a citation that is a page.
+
+### Pass criteria
+
+- The page is named as Assign a user role.
+- The turn ends with the page's real path, `markdown/platform-administration/user-administration/t_AssignARoleToAUser.md`, in the reply or in the correction line.
+- At most one "Correction:" line, and no Stop hook feedback after it. The text written after the first reply is 600 characters or fewer, repeats no sentence of the reply, apologises for nothing, and names no hook, notice or feedback.
+- The path in a "Correction:" line is a page that exists.
+
+### Fail signals
+
+- The turn ends with `markdown/platform-administration/t_AssignARoleToAUser.md` as the only path given for the page.
+- A correction that gives a path that is not a page, or no path.
+- The answer written again after the block, an apology paragraph, or a mention of a hook, a notice or feedback.
+- A second Stop hook feedback event.
+- The session opens another page, against the prompt.
+
+---
+
+## T-44 — answer side: a reply cites the page its folders pick when the file name occurs in two places
+
+**Covers:** ARC-09-C254 (`tools/snowarch/hooks/stop-citations.mjs`, `tools/snowarch/lib/docs/resolve.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin. T-42, T-43, T-44 and T-45 are one case on four links; they differ in the source page and the link.
+
+### Prompt
+
+```
+Open markdown/employee-service-management/hr-service-delivery/hr-benchmarks.md in the documentation corpus, and use only that page: open no other page. Its last paragraph points to a page about exploring the Benchmark features. Name that page by its title, and cite it by its path in the corpus, in the form (citation: markdown/<area>/<page>.md).
+```
+
+The session is told to open no other page, so it cannot check the link and copies it. The link in the last paragraph gives `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/it-service-management/exploring-benchmarks.md`, and a citation built from it, `markdown/it-service-management/exploring-benchmarks.md`, is not a page. The page the link means is `markdown/it-service-management/benchmarks/exploring-benchmarks.md`. The other page of that file name, `markdown/it-business-management/benchmarks-for-strategic-portfolio-management/exploring-benchmarks.md`, is not it.
+
+### Expected behaviour
+
+1. The reply names the page by its title (Exploring Benchmarks) and cites it by a path.
+2. If that path is not a page and the resolver can name the page meant, the Stop hook sends the turn back once, and the session answers with ONE line that starts "Correction:" and gives the page's real path. It does not write the answer again, apologise, or mention the notice.
+3. A session that builds the right path itself is not sent back and ends with a citation that is a page.
+
+### Pass criteria
+
+- The page is named as Exploring Benchmarks.
+- The turn ends with the page's real path, `markdown/it-service-management/benchmarks/exploring-benchmarks.md`, in the reply or in the correction line.
+- At most one "Correction:" line, and no Stop hook feedback after it. The text written after the first reply is 600 characters or fewer, repeats no sentence of the reply, apologises for nothing, and names no hook, notice or feedback.
+- The path in a "Correction:" line is a page that exists.
+
+### Fail signals
+
+- The turn ends with `markdown/it-service-management/exploring-benchmarks.md` as the only path given for the page.
+- A correction that gives a path that is not a page, or no path.
+- `markdown/it-business-management/benchmarks-for-strategic-portfolio-management/exploring-benchmarks.md` given as the page meant.
+- The answer written again after the block, an apology paragraph, or a mention of a hook, a notice or feedback.
+- A second Stop hook feedback event.
+- The session opens another page, against the prompt.
+
+---
+
+## T-45 — answer side: a reply cites the page a recurring mistake means (the CSM product page without its folder)
+
+**Covers:** ARC-09-C254 (`tools/snowarch/hooks/stop-citations.mjs`, `tools/snowarch/lib/docs/resolve.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin. T-42, T-43, T-44 and T-45 are one case on four links; they differ in the source page and the link.
+
+### Prompt
+
+```
+Open markdown/intelligent-experiences/now-assist-skills/now-assist-skills-smart-documents.md in the documentation corpus, and use only that page: open no other page. Its availability table names a product for the Customer workflow and links that product's page. Name the product, and cite its page by its path in the corpus, in the form (citation: markdown/<area>/<page>.md).
+```
+
+The session is told to open no other page, so it cannot check the link and copies it. The link in the availability table gives `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/customer-service-management/now-assist-csm.md`, and a citation built from it, `markdown/customer-service-management/now-assist-csm.md`, is not a page. The page the link means is `markdown/customer-service-management/now-assist-for-csm/now-assist-csm.md`.
+
+### Expected behaviour
+
+1. The reply names the page by its title (ServiceNow Otto for Customer Service Management (CSM)) and cites it by a path.
+2. If that path is not a page and the resolver can name the page meant, the Stop hook sends the turn back once, and the session answers with ONE line that starts "Correction:" and gives the page's real path. It does not write the answer again, apologise, or mention the notice.
+3. A session that builds the right path itself is not sent back and ends with a citation that is a page.
+
+### Pass criteria
+
+- The page is named as ServiceNow Otto for Customer Service Management (CSM).
+- The turn ends with the page's real path, `markdown/customer-service-management/now-assist-for-csm/now-assist-csm.md`, in the reply or in the correction line.
+- At most one "Correction:" line, and no Stop hook feedback after it. The text written after the first reply is 600 characters or fewer, repeats no sentence of the reply, apologises for nothing, and names no hook, notice or feedback.
+- The path in a "Correction:" line is a page that exists.
+
+### Fail signals
+
+- The turn ends with `markdown/customer-service-management/now-assist-csm.md` as the only path given for the page.
+- A correction that gives a path that is not a page, or no path.
+- The answer written again after the block, an apology paragraph, or a mention of a hook, a notice or feedback.
+- A second Stop hook feedback event.
+- The session opens another page, against the prompt.
+
+---
+
+## T-46 — `/snowarch finding` about a dead citation prints the copy as it is, and the Stop hook leaves it alone
+
+**Covers:** ARC-09-C254 (the Stop hook does not check a finding's printed copy; `tools/snowarch/lib/finding-copy.mjs`) with T-37's finding flow · **Modes:** design-only ✅ · live ✅
+
+T-37 with one change: the finding in turn 3 quotes a dead path that the resolver can name. A finding records a path as the user saw it, and the most natural finding to report is a dead citation; the copy the finder prints is for the user to send as it is, so nothing is added after it. One session, from a checkout where `clients/` holds only what Setup writes.
+
+### Setup
+
+```sh
+mkdir -p clients/acme-bank
+```
+
+### Prompt
+
+Four turns in one session, as in T-37. Only turn 3 differs.
+
+Turn 1:
+
+```
+/snowarch finding
+```
+
+Turn 2, the engagement and its other names:
+
+```
+acme-bank. Its other names are Acme Bank Holdings and Acme.
+```
+
+Turn 3, the finding, which quotes a dead path:
+
+```
+I asked how a collaborator is given the permission to delete an application. What happened: on https://acmebank.service-now.com the incident INC0012345 for Acme Bank was about an answer that cited markdown/australia/application-development/collaboration-permissions.md for the list of permissions, and that page does not exist, so Ivan Petrov could not check it. What I expected: a citation to a page that exists.
+```
+
+Turn 4, the question:
+
+```
+Is the copy safe to send?
+```
+
+### Expected behaviour
+
+1. Everything T-37 expects of the four turns.
+2. The printed copy quotes the dead path as the user wrote it, `markdown/australia/application-development/collaboration-permissions.md`. Nothing follows the copy except the closing line, Send the text above to the person who issued your licence.
+3. No "Correction:" line appears in any turn, and the Stop hook sends no turn back: a path that stands only inside the finder's printed copy is a finding's record of what the user saw.
+4. If the session writes the dead path again outside the copy, in its own words, a send-back is allowed, and it is judged as in T-42.
+
+### Pass criteria
+
+- Every pass criterion of T-37, the masking and the tree check included.
+- The printed copy contains `markdown/australia/application-development/collaboration-permissions.md`, unchanged.
+- No Stop hook feedback in any of the four turns, unless the session wrote the dead path outside the copy.
+
+### Fail signals
+
+- Every fail signal of T-37.
+- A "Correction:" line after the copy, or a Stop hook feedback event, for a path that stands only inside the copy.
+- The dead path corrected, removed or reworded inside the copy.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -2091,7 +2536,7 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` `T-38` `T-39` `T-40` `T-41` `T-42` `T-43` `T-44` `T-45` `T-46` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
 | 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` `T-35` | the launchers, without Git Bash — the path that has cost the most cells |
 | 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |

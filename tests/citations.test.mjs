@@ -21,9 +21,6 @@ import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
  * cells, which is this row's own "62 expectations across 13 files" trap.
  */
 const SPELL = spellings();
-// `RegExp.escape` is not on Node 20, and the spelling contains `.` and `\\` — both of which mean
-// something else in a pattern. ARC-07-C31 rule 2: derive AND escape.
-const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_CORPUS = resolve(here, 'fixtures/docs-corpus');
@@ -49,8 +46,12 @@ test('criterion 2 — an absent corpus is `missing`, exit 3, and never says SKIP
     assert.equal(r.status, 'missing');
     const { text, code } = formatResult(r, SPELL);
     assert.equal(code, EXIT.missing);
-    assert.match(text,
-      new RegExp(`corpus missing — run ${esc(SPELL.bootstrap)} --docs`));
+    // The whole line, not a pattern: a template given to `new RegExp` keeps `\(` in its prose, which no product line
+    // carries, so the launcher audit could not resolve the site (ARC-07-C35b's "regex syntax in the sentence").
+    assert.equal(text, `corpus missing — run ${SPELL.bootstrap} (or ${SPELL.cli} docs sync)`);
+    // ARC-09-C244 — the remedy fetches what an install fetches by default, the whole corpus; `--docs sparse` is never
+    // offered.
+    assert.doesNotMatch(text, /--docs sparse/, 'the remedy offers the sparse corpus');
     assert.doesNotMatch(text, /SKIP/i, 'the word SKIP must appear nowhere — that was the old defect');
   });
 });

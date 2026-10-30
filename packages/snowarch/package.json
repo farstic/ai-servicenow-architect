@@ -1,6 +1,6 @@
 {
   "name": "@farstic/snowarch",
-  "version": "2.2.1-dev",
+  "version": "2.2.5-dev",
   "description": "ServiceNow MCP server and snowarch CLI — the live-instance half of AI ServiceNow Architect",
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
@@ -73,12 +73,12 @@
     "servicenow-sdk"
   ],
   "author": "Cvetomir Grigorov",
-  "homepage": "https://github.com/farstic/ai-servicenow-architect",
+  "homepage": "https://github.com/farstic/snowarch",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/farstic/ai-servicenow-architect.git"
+    "url": "git+https://github.com/farstic/snowarch.git"
   },
-  "bugs": "https://github.com/farstic/ai-servicenow-architect/issues",
+  "bugs": "https://github.com/farstic/snowarch/issues",
   "license": "BUSL-1.1",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",

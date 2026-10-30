@@ -140,9 +140,15 @@ export function manifestFromArchive(root, tag, { coverage = COVERAGE, run = spaw
  * Why `manifest` is not the record of `tag`'s own tree, or `null` when it is: the same commit, files and hashes as
  * `git archive <tag>` gives here. The release's push gate and `upgrade`'s U4 both ask it, before anything leaves or
  * moves.
+ *
+ * ARC-09-C192 — ON THE MANIFEST'S OWN COVERAGE, as the header says a tree is checked. With this release's COVERAGE in
+ * its place, a 2.2.0 install read 2.2.1's archive with 2.2.0's nine covers and found 72 files the 455-file manifest
+ * held and its own reading did not: every release that covers more than the install was refused, and so was every move
+ * back to one that covers less. `readManifest` has already checked the three lists before a manifest reaches here.
  */
 export function archiveDiffers(root, tag, manifest, { run } = {}) {
-  const local = manifestFromArchive(root, tag, run ? { run } : {});
+  const coverage = { covers: manifest.covers, excludes: manifest.excludes, ignores: manifest.ignores };
+  const local = manifestFromArchive(root, tag, { coverage, ...(run ? { run } : {}) });
   if (manifest.commit !== local.commit) {
     return `the published manifest names ${manifest.commit.slice(0, 7)}, and ${tag} here is ${local.commit.slice(0, 7)}`;
   }
@@ -173,6 +179,22 @@ export function signedRelease(tag) {
   const at = /^v(\d+)\.(\d+)\.(\d+)/.exec(String(tag ?? ''));
   if (!at) return false;
   const [from, here] = [MANIFESTS_FROM.split('.').map(Number), at.slice(1).map(Number)];
+  for (let i = 0; i < 3; i++) if (here[i] !== from[i]) return here[i] > from[i];
+  return true;
+}
+
+/**
+ * The first final release installed from farstic/snowarch (ARC-09-C185b): it is staged there, and its manifest is signed
+ * from that clone. An rc never is (the owner's rule: rc and dev stay in the engineering repository, farstic/snowarch
+ * carries finals, one commit each).
+ */
+export const DISTRIBUTION_FROM = '2.2.1';
+
+/** Is `tag` a FINAL release, `v<major>.<minor>.<patch>` with no prerelease, at or past DISTRIBUTION_FROM? */
+export function distributedRelease(tag) {
+  const at = /^v(\d+)\.(\d+)\.(\d+)$/.exec(String(tag ?? ''));
+  if (!at) return false;
+  const [from, here] = [DISTRIBUTION_FROM.split('.').map(Number), at.slice(1).map(Number)];
   for (let i = 0; i < 3; i++) if (here[i] !== from[i]) return here[i] > from[i];
   return true;
 }

@@ -7,11 +7,12 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  ALWAYS_DIRS, ATTRIBUTION, CORPUS_DIR, EXIT, MODE, SyncError, classifyGitFailure, coneArgs, inspect, maskProxy,
-  planRecipe, resolveMode, ROOT_FILES, syncCorpus,
+  ALWAYS_DIRS, ATTRIBUTION, CORPUS_DIR, EXIT, MODE, SyncError, checkCompleteness, classifyGitFailure, coneArgs, inspect,
+  maskProxy, switchMarker,
+  effectiveDocsMode, planRecipe, resolveMode, ROOT_FILES, syncCorpus,
 } from '../tools/snowarch/lib/docs/sync.mjs';
 // One fixture, shared with tests/docs-status.test.mjs — see tests/helpers/docs-fixture.mjs.
-import { AREAS, LONG_NAME, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
+import { AREAS, LONG_NAME, UNCITED, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
@@ -57,8 +58,10 @@ after(() => { rmSync(scratch, { recursive: true, force: true, maxRetries: 5, ret
 
 test('AC 1 — a fresh sync lands at the pin, sparse, complete, initialised', () => {
   const w = workspace();
-  const r = syncCorpus({ ...w, log: silent });
+  const r = syncCorpus({ ...w, mode: 'sparse', log: silent });
   const s = inspect(w.root, w.config, r.areas);
+  // ARC-09-C244 — the cone leaves out what nothing cites: the proof this checkout is the sparse one.
+  assert.ok(!existsSync(join(corpusOf(w), ...UNCITED.split('/'))), 'the cone brought an area nothing cites');
 
   assert.equal(s.head, upstream.pin, 'HEAD is not the pin');
   assert.equal(s.sparseOn, true);
@@ -78,29 +81,35 @@ test('AC 1 — a fresh sync lands at the pin, sparse, complete, initialised', ()
 /** A phase line: `[docs] <label> … N.N s`. One is printed per unit of work `syncCorpus` does. */
 const PHASE_LINE = / … \d+\.\d s$/;
 
-test('AC 2 — a second run changes nothing and says so', () => {
-  const w = workspace();
-  syncCorpus({ ...w, log: silent });
-  const lines = [];
-  const r = syncCorpus({ ...w, log: (l) => lines.push(l) });
+// ARC-09-C244 — in both modes. Full mode reported every run as a change, because the cone list it does not have
+// was counted against it, and nothing asserted the no-op there until the whole corpus became the default.
+for (const mode of ['sparse', 'full']) {
+  test(`AC 2 — a second run changes nothing and says so${mode === 'full' ? ', in full mode too' : ''}`, () => {
+    const w = workspace();
+    syncCorpus({ ...w, mode, log: silent });
+    const lines = [];
+    const r = syncCorpus({ ...w, mode, log: (l) => lines.push(l) });
 
-  // The substance is that NOTHING WAS DONE, and it is read off the log rather than off a clock
-  // (ARC-09-C24). `syncCorpus` prints one `[docs] <phase> … N s` line per clone, sparse-set, fetch
-  // and checkout it performs; zero of them IS the no-op. The story's "< 5 s" is a claim about the
-  // reference machine, measured there and reported in the PR — asserted here it measured
-  // contention, and it failed at 20.5 s in the full suite while passing alone, once S06 added two
-  // more git-spawning files to the same parallel run.
-  assert.equal(r.changed, false, 'the second run reported a change');
-  const phases = lines.filter((l) => PHASE_LINE.test(l));
-  assert.deepEqual(phases, [], `the second run did work: ${phases.join(' · ')}`);
-  // Two lines now: the up-to-date line, then the attribution — printed on EVERY successful sync,
-  // including a no-op one, because whose documentation this is does not depend on whether anything
-  // changed. Asserted as a pair so a third line cannot appear unnoticed.
-  assert.deepEqual(lines, [
-    `[docs] up to date (pin ${upstream.pin.slice(0, 7)}, sparse, ${AREAS.length} areas)`,
-    ATTRIBUTION,
-  ]);
-});
+    // The substance is that NOTHING WAS DONE, and it is read off the log rather than off a clock
+    // (ARC-09-C24). `syncCorpus` prints one `[docs] <phase> … N s` line per clone, sparse-set, fetch
+    // and checkout it performs; zero of them IS the no-op. The story's "< 5 s" is a claim about the
+    // reference machine, measured there and reported in the PR — asserted here it measured
+    // contention, and it failed at 20.5 s in the full suite while passing alone, once S06 added two
+    // more git-spawning files to the same parallel run.
+    assert.equal(r.changed, false, 'the second run reported a change');
+    const phases = lines.filter((l) => PHASE_LINE.test(l));
+    assert.deepEqual(phases, [], `the second run did work: ${phases.join(' · ')}`);
+    // Two lines now: the up-to-date line, then the attribution — printed on EVERY successful sync,
+    // including a no-op one, because whose documentation this is does not depend on whether anything
+    // changed. Asserted as a pair so a third line cannot appear unnoticed. The whole corpus counts the
+    // areas on disk, the one nothing cites included, not the cone's list (ARC-09-C244).
+    const areas = mode === 'full' ? AREAS.length + 1 : AREAS.length;
+    assert.deepEqual(lines, [
+      `[docs] up to date (pin ${upstream.pin.slice(0, 7)}, ${mode}, ${areas} areas)`,
+      ATTRIBUTION,
+    ]);
+  });
+}
 
 test('...and the no-work claim is not vacuous: a first run prints phase lines', () => {
   // The negative control for the case above. If `PHASE_LINE` stopped matching what `syncCorpus`
@@ -125,12 +134,12 @@ test('AC 3 — a checkout at the wrong commit is returned to the pin by hash', (
 
 test('AC 4 — a narrowed sparse set is restored and the files come back', () => {
   const w = workspace();
-  syncCorpus({ ...w, log: silent });
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
   const corpus = corpusOf(w);
   git(['sparse-checkout', 'set', '--cone', AREAS[0]], corpus);
   assert.ok(!existsSync(join(corpus, ...AREAS[1].split('/'))), 'the fixture did not narrow');
 
-  const r = syncCorpus({ ...w, log: silent });
+  const r = syncCorpus({ ...w, mode: 'sparse', log: silent });
   const s = inspect(w.root, w.config, r.areas);
   assert.deepEqual([...s.sparseList].sort(), [...coneArgs(AREAS)].sort());
   for (const a of AREAS) assert.ok(existsSync(join(corpus, ...a.split('/'))), `${a} did not come back`);
@@ -190,7 +199,7 @@ test('a pattern-mode sparse config is repaired to cone mode', () => {
   // ADR-0008's defect on git 2.34.1 stores --cone as a pattern. Simulated here by turning cone off,
   // because the reconcile has to cope with whatever the last git left behind.
   const w = workspace();
-  syncCorpus({ ...w, log: silent });
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
   const corpus = corpusOf(w);
   // `--worktree`, not a plain `config`: `sparse-checkout` turns on `extensions.worktreeConfig` and
   // stores cone mode in `config.worktree`, which OUTRANKS the repository config. Writing the plain
@@ -202,24 +211,204 @@ test('a pattern-mode sparse config is repaired to cone mode', () => {
   git(['config', '--worktree', 'core.sparseCheckoutCone', 'false'], corpus);
   assert.equal(inspect(w.root, w.config, AREAS).coneOn, false, 'the fixture did not leave cone mode');
 
-  const r = syncCorpus({ ...w, log: silent });
+  const r = syncCorpus({ ...w, mode: 'sparse', log: silent });
   assert.equal(inspect(w.root, w.config, r.areas).coneOn, true);
 });
 
-test('the .git of the submodule is a file after absorbgitdirs, and inspect copes', () => {
+for (const mode of ['sparse', 'full']) {
+  test(`the .git of the submodule is a file after absorbgitdirs, and inspect copes (${mode})`, () => {
+    const w = workspace();
+    syncCorpus({ ...w, mode, log: silent });
+    const dotGit = join(corpusOf(w), '.git');
+    // absorbgitdirs replaces the directory with a `gitdir:` pointer file. Both shapes must read as
+    // "there is a checkout here", or the next sync re-clones over a working corpus.
+    assert.ok(existsSync(dotGit));
+    const r = syncCorpus({ ...w, mode, log: silent });
+    assert.equal(r.changed, false);
+  });
+}
+
+// ARC-09-C244 — the switch an upgrade makes once: a sparse install made full reports the change, brings what the
+// cone left out, and is up to date on the next run.
+test('ARC-09-C244 — a sparse checkout made full says so once, then is up to date', () => {
   const w = workspace();
-  syncCorpus({ ...w, log: silent });
-  const dotGit = join(corpusOf(w), '.git');
-  // absorbgitdirs replaces the directory with a `gitdir:` pointer file. Both shapes must read as
-  // "there is a checkout here", or the next sync re-clones over a working corpus.
-  assert.ok(existsSync(dotGit));
-  const r = syncCorpus({ ...w, log: silent });
-  assert.equal(r.changed, false);
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  const uncited = join(corpusOf(w), ...UNCITED.split('/'), 'index.md');
+  assert.ok(!existsSync(uncited), 'the cone brought an area nothing cites');
+
+  const first = [];
+  const switched = syncCorpus({ ...w, mode: 'full', log: (l) => first.push(l) });
+  assert.equal(switched.changed, true, 'the switch reported no change');
+  assert.ok(first.some((l) => /sparse disable/.test(l)), `the switch left the cone on: ${first.join(' · ')}`);
+  assert.ok(existsSync(uncited), 'the switch did not bring the area nothing cites');
+
+  const second = [];
+  const again = syncCorpus({ ...w, mode: 'full', log: (l) => second.push(l) });
+  assert.equal(again.changed, false, 'the run after the switch reported a change');
+  assert.deepEqual(second.filter((l) => PHASE_LINE.test(l)), [], `the run after the switch did work: ${second.join(' · ')}`);
+});
+
+// ARC-09-C244 — the switch an upgrade makes, made robust (the architect's rulings 2 to 4, 2026-10-24): the pin first,
+// an interrupted switch finished, not refused, and the whole corpus complete only with nothing left skip-worktree.
+const phasesOf = (lines) => lines.filter((l) => PHASE_LINE.test(l)).map((l) => l.replace(/ … .*$/, ''));
+/** A sync refuses, as it always has: local changes, exit `dirty`. */
+const refusesDirty = (w, mode = 'full') => assert.throws(() => syncCorpus({ ...w, mode, log: silent }),
+  (e) => e instanceof SyncError && e.code === EXIT.dirty);
+
+test('ARC-09-C244 — the switch moves the pin first, then disables the cone', () => {
+  const w = workspace();
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  const moved = { ...w, config: { ...w.config, docs: { ...w.config.docs, pin: upstream.tip } } };
+  const lines = [];
+  const r = syncCorpus({ ...moved, mode: 'full', log: (l) => lines.push(l) });
+  assert.equal(r.completeness.ok, true);
+  const phases = phasesOf(lines);
+  const at = (label) => phases.findIndex((l) => l.startsWith(label));
+  assert.ok(at('[docs] checkout --detach') >= 0, `no checkout: ${phases.join(' · ')}`);
+  assert.ok(at('[docs] checkout --detach') < at('[docs] sparse disable'),
+    `the cone was disabled before the pin moved, which fetches the out-of-cone part twice: ${phases.join(' · ')}`);
+});
+
+/**
+ * What a killed `sparse-checkout disable` leaves: an out-of-cone file half-written, its skip-worktree bit gone. The bit
+ * is cleared here, not left to git: git 2.37+ clears it in memory for a file on disk, but whether `status` writes the
+ * index back depends on the clock, and with the bit still set the debris case is not what the test runs.
+ */
+const debrisOf = (w) => {
+  const dir = join(corpusOf(w), ...UNCITED.split('/'));
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'index.md'), '# unc');
+  git(['update-index', '--no-skip-worktree', '--', `${UNCITED}/index.md`], corpusOf(w));
+  assert.match(git(['ls-files', '-t', '--', `${UNCITED}/index.md`], corpusOf(w)), /^H /, 'the bit is still set');
+  return join(dir, 'index.md');
+};
+
+test('ARC-09-C244 — an interrupted switch, marked, is finished: its debris goes and the whole corpus lands', () => {
+  const w = workspace();
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  writeFileSync(switchMarker(corpusOf(w)), '');
+  const page = debrisOf(w);
+  const r = syncCorpus({ ...w, mode: 'full', log: silent });
+  assert.equal(r.completeness.ok, true);
+  // The pinned page as stored, then as git checks it out on this machine: `cat-file --filters` applies the conversion
+  // (`core.autocrlf`) the restore applies, so the restored bytes compare exactly on every OS, CRLF on Windows included.
+  const stored = `HEAD:${UNCITED}/index.md`;
+  assert.equal(git(['cat-file', '-p', stored], corpusOf(w)), `# ${UNCITED}\n`, 'precondition: the pinned page');
+  assert.equal(readFileSync(page, 'utf8'), git(['cat-file', '--filters', stored], corpusOf(w)),
+    'the debris is not the pinned page as git checks it out');
+  assert.equal(existsSync(switchMarker(corpusOf(w))), false, 'the marker outlived the switch');
+});
+
+test('ARC-09-C244 — without the marker, an out-of-cone change is refused exactly as before', () => {
+  const w = workspace();
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  debrisOf(w);
+  refusesDirty(w);
+});
+
+// The debris goes back under the marker in either mode, so either mode keeps every other refusal.
+for (const mode of ['sparse', 'full']) {
+  test(`ARC-09-C244 — with the marker, a change inside the cone is still refused (${mode})`, () => {
+    const w = workspace();
+    syncCorpus({ ...w, mode: 'sparse', log: silent });
+    writeFileSync(switchMarker(corpusOf(w)), '');
+    writeFileSync(join(corpusOf(w), ...AREAS[0].split('/'), 'index.md'), 'edited by a human\n');
+    refusesDirty(w, mode);
+  });
+
+  test(`ARC-09-C244 — with the marker, a new file outside the cone is still refused, and kept (${mode})`, () => {
+    const w = workspace();
+    syncCorpus({ ...w, mode: 'sparse', log: silent });
+    writeFileSync(switchMarker(corpusOf(w)), '');
+    const dir = join(corpusOf(w), ...UNCITED.split('/'));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'my-notes.md'), 'mine\n');
+    refusesDirty(w, mode);
+    assert.equal(readFileSync(join(dir, 'my-notes.md'), 'utf8'), 'mine\n', 'the sync touched a file nobody tracks');
+  });
+}
+
+test('ARC-09-C244 — a sparse run under the marker puts the debris back, keeps the cone, then drops the marker', () => {
+  const w = workspace();
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  writeFileSync(switchMarker(corpusOf(w)), '');
+  const page = debrisOf(w);
+  const lines = [];
+  const r = syncCorpus({ ...w, mode: 'sparse', log: (l) => lines.push(l) });
+  assert.equal(r.completeness.ok, true);
+  assert.equal(existsSync(page), false, 'the debris is still on disk');
+  assert.match(git(['ls-files', '-t', '--', `${UNCITED}/index.md`], corpusOf(w)), /^S /, 'the debris is not skip-worktree');
+  for (const a of AREAS) assert.ok(existsSync(join(corpusOf(w), ...a.split('/'))), `${a} is not on disk`);
+  assert.equal(git(['config', '--get', 'core.sparseCheckout'], corpusOf(w)).trim(), 'true', 'the cone is gone');
+  assert.equal(existsSync(switchMarker(corpusOf(w))), false, 'the marker outlived the sparse run');
+  assert.ok(lines.some((l) => l.includes('the switch to the whole corpus was interrupted')), lines.join(' · '));
+});
+
+test('ARC-09-C244 — under the marker, a sparse run sets the cone again after a disable killed past its index', () => {
+  const w = workspace();
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  const corpus = corpusOf(w);
+  // The state between the two halves of `disable`, measured on git 2.39.5: every file written and no skip-worktree
+  // bit left, the patterns file untouched, and the worktree config not yet turned off.
+  git(['sparse-checkout', 'disable'], corpus);
+  assert.ok(existsSync(join(corpus, ...UNCITED.split('/'))), 'the disable did not write the uncited area');
+  git(['config', '--worktree', 'core.sparseCheckout', 'true'], corpus);
+  git(['config', '--worktree', 'core.sparseCheckoutCone', 'true'], corpus);
+  assert.equal(git(['config', '--get', 'core.sparseCheckout'], corpus).trim(), 'true', 'the config is not sparse');
+  assert.equal(git(['config', '--get', 'core.sparseCheckoutCone'], corpus).trim(), 'true', 'the config is not cone');
+  writeFileSync(switchMarker(corpus), '');
+  const r = syncCorpus({ ...w, mode: 'sparse', log: silent });
+  assert.equal(r.completeness.ok, true);
+  assert.equal(r.changed, true, 'a run that set the cone again reported no change');
+  assert.equal(existsSync(join(corpus, ...UNCITED.split('/'))), false, 'the cone was not set again');
+  for (const a of AREAS) assert.ok(existsSync(join(corpus, ...a.split('/'))), `${a} is not on disk`);
+  assert.equal(git(['config', '--get', 'core.sparseCheckout'], corpus).trim(), 'true', 'the cone is gone');
+  assert.equal(existsSync(switchMarker(corpus)), false, 'the marker outlived the sparse run');
+});
+
+test('ARC-09-C244 — a marker left by a switch given up for sparse goes, so it cannot excuse a later edit', () => {
+  const w = workspace();
+  syncCorpus({ ...w, mode: 'sparse', log: silent });
+  writeFileSync(switchMarker(corpusOf(w)), '');
+  const r = syncCorpus({ ...w, mode: 'sparse', log: silent });
+  assert.equal(r.completeness.ok, true);
+  assert.equal(existsSync(switchMarker(corpusOf(w))), false, 'the marker outlived the sparse sync');
+  debrisOf(w);
+  refusesDirty(w);
+});
+
+test('ARC-09-C244 — the whole corpus is complete with nothing left skip-worktree, and a sync finishes it', () => {
+  const w = workspace();
+  syncCorpus({ ...w, mode: 'full', log: silent });
+  const corpus = corpusOf(w);
+  const page = `${UNCITED}/index.md`;
+  // A skip-worktree entry left with sparse checkout off, however it got there: the page is absent.
+  git(['update-index', '--skip-worktree', '--', page], corpus);
+  assert.match(git(['ls-files', '-t', '--', page], corpus), /^S /, 'the page is not skip-worktree');
+  rmSync(join(corpus, ...page.split('/')));
+  const left = checkCompleteness(w.root, CORPUS_DIR, AREAS, upstream.pin, { mode: 'full' });
+  assert.equal(left.ok, false, 'a skip-worktree entry left is not the whole corpus');
+  assert.equal(left.skipped, 1);
+  assert.equal(checkCompleteness(w.root, CORPUS_DIR, AREAS, upstream.pin).ok, true,
+    'and sparse completeness is unchanged');
+  const r = syncCorpus({ ...w, mode: 'full', log: silent });
+  assert.equal(r.completeness.ok, true);
+  assert.ok(existsSync(join(corpus, ...page.split('/'))), 'the sync did not finish the switch');
+});
+
+test('ARC-09-C244 — the whole corpus is complete only with every area of the pinned tree on disk', () => {
+  const w = workspace();
+  syncCorpus({ ...w, mode: 'full', log: silent });
+  rmSync(join(corpusOf(w), ...UNCITED.split('/')), { recursive: true });
+  const left = checkCompleteness(w.root, CORPUS_DIR, AREAS, upstream.pin, { mode: 'full' });
+  assert.equal(left.ok, false, 'an area of the pinned tree missing is not the whole corpus');
+  assert.deepEqual(left.treeAreasMissing, [UNCITED]);
 });
 
 test('resolveMode: explicit wins, state file is read, skip is refused both ways', () => {
   const w = workspace();
-  assert.equal(resolveMode(w.root), 'sparse');
+  // ARC-09-C244 — with nothing recorded, the whole corpus.
+  assert.equal(resolveMode(w.root), 'full');
   assert.equal(resolveMode(w.root, 'full'), 'full');
   assert.throws(() => resolveMode(w.root, 'skip'), /bootstrap flag/);
   assert.throws(() => resolveMode(w.root, 'nonsense'), /unknown mode/);
@@ -231,6 +420,27 @@ test('resolveMode: explicit wins, state file is read, skip is refused both ways'
   assert.throws(() => resolveMode(w.root), /skip means do not/);
   // An explicit mode still overrides a "skip" state file — that is the documented override.
   assert.equal(resolveMode(w.root, 'sparse'), 'sparse');
+});
+
+// ARC-09-C244 — the whole corpus is the default. A recorded sparse is kept only when `--docs sparse` wrote it,
+// which marks it `optIn: true`; without the marker it is the default an older release recorded, and the
+// install moves to the whole corpus once.
+test('ARC-09-C244 — the whole corpus is the default; a recorded sparse stays sparse only when opted in', () => {
+  assert.equal(effectiveDocsMode(null), 'full', 'nothing recorded');
+  assert.equal(effectiveDocsMode({ mode: 'full' }), 'full');
+  assert.equal(effectiveDocsMode({ mode: 'sparse' }), 'full', 'a sparse an older release recorded');
+  assert.equal(effectiveDocsMode({ mode: 'sparse', optIn: true }), 'sparse', 'a sparse --docs sparse recorded');
+  assert.equal(effectiveDocsMode({ mode: 'sparse', optIn: 'true' }), 'full', 'only the boolean is the marker');
+  assert.equal(effectiveDocsMode({ mode: 'skip' }), 'skip');
+
+  const w = workspace();
+  mkdirSync(join(w.root, '.local'), { recursive: true });
+  const record = (docs) => writeFileSync(join(w.root, '.local/bootstrap-state.json'), JSON.stringify({ docs }));
+  record({ mode: 'sparse' });
+  assert.equal(resolveMode(w.root), 'full', 'docs sync moves an unmarked sparse to the whole corpus');
+  record({ mode: 'sparse', optIn: true });
+  assert.equal(resolveMode(w.root), 'sparse', 'and keeps a marked one');
+  assert.equal(resolveMode(w.root, 'full'), 'full', 'an explicit mode still wins');
 });
 
 test('the recipe printed for an existing checkout is shorter than for a fresh one', () => {

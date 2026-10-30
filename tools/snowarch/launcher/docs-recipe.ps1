@@ -1,4 +1,4 @@
-# Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
+﻿# Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 # snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 # The corpus recipe for the Node-free Windows launcher (ARC-06-S11 dot-sources this file).
 #
@@ -15,7 +15,7 @@ function Invoke-DocsRecipeSparse {
     git -c core.longpaths=true clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs
     if ($LASTEXITCODE -ne 0) { throw "corpus: clone failed" }
   }
-  git -c core.longpaths=true -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/financial-services-operations markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform legal
+  git -c core.longpaths=true -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/acct-lifecycle-events markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-relationship-management markdown/customer-service-management markdown/delta-xanadu-australia markdown/employee-service-management markdown/financial-services-operations markdown/governance-risk-compliance markdown/healthcare-life-sciences markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/release-notes markdown/servicenow-platform legal
   if ($LASTEXITCODE -ne 0) { throw "corpus: sparse-checkout set failed" }
   git -c core.longpaths=true -C vendor/ServiceNowDocs fetch --depth 1 origin c10276e953456835cdbb1f3a60d58ae1980be353
   if ($LASTEXITCODE -ne 0) { throw "corpus: fetch failed" }

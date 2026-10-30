@@ -11,7 +11,7 @@ import { run as runB01, ensureLocalDir, committedFilesUnchanged } from '../lib/s
 import { run as runB07, writeConfig, CONFIG_FILE } from '../lib/steps/B07.mjs';
 import { run as runB03 } from '../lib/steps/B03.mjs';
 import {
-  INVALID_JSON, NOT_IGNORED, SETTINGS_LOCAL, applyToggles, computeSettings, hookEntry, isIgnored,
+  INVALID_JSON, NOT_IGNORED, POST_WRITE_LOADER, SETTINGS_LOCAL, applyToggles, computeSettings, hookEntry, isIgnored,
 } from '../lib/settings-local.mjs';
 import { cloudSyncProvider, cloudSyncWarning, isUnderCloudSyncFolder } from '../lib/cloud-sync.mjs';
 import { checkMcpJson, checkSettingsJson } from '../lib/registration.mjs';
@@ -20,6 +20,7 @@ import { keyPair, listRepo, manifestDoc, productKeys } from './helpers/licence.m
 import { readManifestCache } from '../lib/licence/manifest.mjs';
 import { readDefaultLabel, readDefaultSummary } from '../../../packages/snowarch/dist/store/label.js';
 import { makeCheckout } from './helpers/workspace.mjs';
+import { INPUTS } from '../lib/inputs.mjs';
 
 // Four levels up: tests → snowarch → tools → the repository root. The shared cloud-sync fixture
 // lives under the SERVER package, because that is where the list is authored; this module is
@@ -120,6 +121,96 @@ test('a registration that is not `project` is rejected whatever the mode says', 
     const next = computeSettings({}, { mode: 'live', nodePresent: true, registration, serverKey: KEY });
     assert.deepEqual(next.disabledMcpjsonServers, [KEY], registration);
     assert.equal(next.enabledMcpjsonServers, undefined, registration);
+  }
+});
+
+test('ARC-09-C192 — a settings.local.json carried from an older install ends with one SessionStart hook, the rest kept', async () => {
+  // MIGRATION's fresh install carries the user's `.claude/settings.local.json` into the new tree. As a 2.2.0 install
+  // leaves it: our hook (its command unchanged since 2.0) beside the user's own keys and hooks, and, for the stale case,
+  // a second entry naming the OLD folder by an absolute path.
+  const root = makeCheckout();
+  // Derived, not spelled: the hook's command is the same in 2.2.0 (measured at its tag), and a test that spelled the hook's
+  // path would be counted among the banner tests, which may not name the version-of-record file (ARC-09-C137).
+  const ours = hookEntry().SessionStart[0].hooks[0];
+  // ARC-09-C239 — 2.2.0's command is today's without the quotes around the project path.
+  const old = { ...ours, command: ours.command.replace(/"/g, '') };
+  const carried = {
+    permissions: { allow: ['Bash(git status:*)'] },
+    env: { NODE_EXTRA_CA_CERTS: '/etc/ssl/corporate.pem' },
+    disabledMcpjsonServers: [KEY],
+    hooks: {
+      SessionStart: [
+        { matcher: 'startup|resume', hooks: [old] },
+        { matcher: 'startup', hooks: [{ type: 'command', command: old.command.replace('${CLAUDE_PROJECT_DIR}', '/home/someone/snowarch-2.2.0') }] },
+      ],
+      PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine' }] }],
+    },
+  };
+  writeFileSync(join(root, SETTINGS_LOCAL), `${JSON.stringify(carried, null, 2)}\n`);
+  // Twice: the bootstrap, and the next one. Neither may add a second hook.
+  for (const run of [1, 2]) {
+    const r = await runB07(ctxFor(root));
+    assert.equal(r.status, 'ok', `run ${run}: ${r.detail}`);
+  }
+  const after = readJson(root, SETTINGS_LOCAL);
+  assert.deepEqual(after.hooks.SessionStart, hookEntry().SessionStart, 'the SessionStart hook is not exactly ours');
+  assert.equal(after.hooks.SessionStart.flatMap((e) => e.hooks).length, 1, 'more than one SessionStart hook');
+  assert.equal(after.hooks.SessionStart[0].hooks[0].command, ours.command, 'the hook does not follow the tree it is in');
+  assert.deepEqual([after.permissions, after.env, after.hooks.PreToolUse],
+    [carried.permissions, carried.env, carried.hooks.PreToolUse], 'a key of the user\'s was not kept');
+});
+
+// ARC-09-C193 — the SessionStart key holds the user's hooks too. `Object.assign(hooks, hookEntry())` replaced the
+// whole key, so a user's own SessionStart hook was lost at every bootstrap and upgrade, and with Node absent the
+// writer deleted every SessionStart hook, not only ours. Ours is any hook that runs session-start.mjs: the doctor's
+// E-08 reads it the same way, and C192's carried stale copy under another folder is ours too.
+const USER_HOOK = Object.freeze({ type: 'command', command: 'node /home/someone/my-own-banner.js', timeout: 5 });
+
+test('ARC-09-C193 — a user\'s own SessionStart hook beside ours is kept, and ours is there exactly once', () => {
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const mine = { matcher: 'startup', hooks: [USER_HOOK] };
+  const current = { hooks: { SessionStart: [mine, ...hookEntry().SessionStart] } };
+  assert.deepEqual(computeSettings(current, { ...opts, nodePresent: true }).hooks.SessionStart,
+    [mine, ...hookEntry().SessionStart], 'the user\'s hook was not kept, or ours is not there once');
+  // Node gone: ours leaves, the user's stays.
+  assert.deepEqual(computeSettings(current, { ...opts, nodePresent: false }).hooks.SessionStart, [mine],
+    'with Node absent the writer removed a hook that is not ours');
+  // One group holding both: the user's hook stays in its group, and ours is written once on its own.
+  const shared = { hooks: { SessionStart: [{ matcher: 'startup|resume',
+    hooks: [USER_HOOK, hookEntry().SessionStart[0].hooks[0]] }] } };
+  assert.deepEqual(computeSettings(shared, { ...opts, nodePresent: true }).hooks.SessionStart,
+    [{ matcher: 'startup|resume', hooks: [USER_HOOK] }, ...hookEntry().SessionStart]);
+});
+
+test('ARC-09-C193 — through B07, twice: the user\'s SessionStart hook survives every bootstrap', async () => {
+  const root = makeCheckout();
+  writeFileSync(join(root, SETTINGS_LOCAL),
+    `${JSON.stringify({ hooks: { SessionStart: [{ matcher: 'startup', hooks: [USER_HOOK] }] } }, null, 2)}\n`);
+  for (const run of [1, 2]) {
+    const r = await runB07(ctxFor(root));
+    assert.equal(r.status, 'ok', `run ${run}: ${r.detail}`);
+  }
+  const hooks = readJson(root, SETTINGS_LOCAL).hooks.SessionStart.flatMap((e) => e.hooks);
+  assert.deepEqual(hooks.filter((h) => h.command === USER_HOOK.command), [USER_HOOK], 'the user\'s hook was lost');
+  assert.equal(hooks.filter((h) => /session-start\.mjs/.test(h.command)).length, 1, 'ours is not there exactly once');
+});
+
+test('ARC-09-C193 — a user\'s own script called session-start.mjs is the user\'s: only our layout is ours', () => {
+  // Ours is a session-start.mjs inside a tools/snowarch/ folder, any folder before it, either separator: C192's copy
+  // from another install's folder is ours to replace, and a user's ~/scripts/session-start.mjs is theirs to keep. A
+  // folder whose name only ends in "tools" is not the tools folder.
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const theirs = [
+    { type: 'command', command: 'node /home/someone/scripts/session-start.mjs' },
+    { type: 'command', command: 'node /home/someone/mytools/snowarch/session-start.mjs' },
+  ];
+  const windowsCopyOfOurs = { type: 'command',
+    command: 'node C:\\Users\\someone\\snowarch-2.2.0\\tools\\snowarch\\hooks\\session-start.mjs' };
+  const current = { hooks: { SessionStart: [{ matcher: 'startup', hooks: [...theirs, windowsCopyOfOurs] }] } };
+  for (const nodePresent of [true, false]) {
+    const kept = computeSettings(current, { ...opts, nodePresent }).hooks.SessionStart.flatMap((g) => g.hooks);
+    assert.deepEqual(kept.filter((h) => theirs.includes(h)), theirs, `nodePresent ${nodePresent}: a user's script was removed`);
+    assert.equal(kept.includes(windowsCopyOfOurs), false, `nodePresent ${nodePresent}: a copy of ours, in Windows form, was kept`);
   }
 });
 
@@ -516,4 +607,49 @@ test('ARC-11-C7 — B01 fetches nothing on a development version, or with no lic
     assert.equal(r.data.manifest, undefined);
     assert.match(r.detail, /^\.local\/ \w+ \([^)]+\)$/);
   }
+});
+
+// ARC-09-C231 — the PostToolUse citation hook, written beside SessionStart by the same writer and under the same
+// rules: only when Node can run it, ours replaced wherever it was carried from, the user's own kept.
+// ARC-09-C239 — in exec form: node runs the loader, with no shell, and the loader finds the script itself.
+const POST_WRITE = Object.freeze({ matcher: 'Write|Edit', hooks: [Object.freeze({ type: 'command',
+  command: 'node', args: ['-e', POST_WRITE_LOADER], timeout: 10 })] });
+// The shell form ARC-09-C231 wrote before it, as a dev or rc install has it. SessionStart's quoted command is
+// asserted in tests/hook/hook-entry.test.mjs, which spells its path; this file may not (ARC-09-C137).
+const POST_WRITE_SHELL = 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/post-write.mjs';
+
+test('ARC-09-C231 — with Node present the citation hook is written beside SessionStart, and only once', () => {
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const once = computeSettings({}, { ...opts, nodePresent: true });
+  assert.deepEqual(once.hooks.PostToolUse, [POST_WRITE], 'the citation hook is not exactly ours');
+  assert.deepEqual(once.hooks.SessionStart, hookEntry().SessionStart, 'the SessionStart hook moved');
+  assert.deepEqual(computeSettings(once, { ...opts, nodePresent: true }).hooks.PostToolUse, [POST_WRITE],
+    'a second run added a second citation hook');
+});
+
+test('ARC-09-C231 — a user\'s own PostToolUse hook is kept, a carried copy of ours replaced, and ours leaves without Node', () => {
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const mine = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node /home/someone/my-own-check.js' }] };
+  const carried = { matcher: 'Write|Edit', hooks: [{ type: 'command',
+    command: POST_WRITE_SHELL.replace('${CLAUDE_PROJECT_DIR}', '/home/someone/snowarch-elsewhere') }] };
+  const current = { hooks: { PostToolUse: [mine, carried] } };
+  assert.deepEqual(computeSettings(current, { ...opts, nodePresent: true }).hooks.PostToolUse, [mine, POST_WRITE],
+    'the user\'s hook was not kept, or ours is not there exactly once');
+  assert.deepEqual(computeSettings(current, { ...opts, nodePresent: false }).hooks.PostToolUse, [mine],
+    'with Node absent the writer kept ours, or removed the user\'s');
+});
+
+test('ARC-09-C239 — an exec-form copy of ours is recognised as ours too, and replaced, not doubled', () => {
+  const opts = { mode: 'design-only', registration: 'project', serverKey: KEY };
+  const copy = { matcher: 'Write|Edit', hooks: [{ type: 'command', command: 'node',
+    args: ['-e', POST_WRITE_LOADER.replace('tools/snowarch/hooks/', 'tools/snowarch/old/')], timeout: 10 }] };
+  assert.deepEqual(computeSettings({ hooks: { PostToolUse: [copy] } }, { ...opts, nodePresent: true }).hooks.PostToolUse,
+    [POST_WRITE], 'a copy of ours was kept beside ours');
+});
+
+test('ARC-09-C231 — B07\'s inputs carry the hooks it writes, so a release that changes them re-runs B07 once', () => {
+  const texts = INPUTS.B07.resolve({ mode: 'design-only', node: { present: true },
+    state: { hooksDisabledByBootstrap: false, registration: 'project' } });
+  assert.ok(texts.some((text) => text.includes('tools/snowarch/hooks/post-write.mjs')),
+    `B07's inputs do not carry the citation hook: ${JSON.stringify(texts)}`);
 });

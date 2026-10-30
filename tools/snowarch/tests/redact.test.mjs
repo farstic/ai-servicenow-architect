@@ -67,6 +67,26 @@ test('(c) a filename is not a username — the over-redaction that made logs unr
   }
 });
 
+test('(c) ARC-09-C207 — git\'s `http.proxy` is a setting, not a username, and a first.last still is', () => {
+  // Measured: the upgrade's DNS and proxy remedies printed "git reads HTTPS_PROXY / h***.p***", in 2.2.1 and before,
+  // and E-28's reason for a remote it cannot reach is the same sentence.
+  const said = 'if you are behind a corporate proxy, git reads HTTPS_PROXY / http.proxy (docs/TROUBLESHOOTING.md)';
+  assert.equal(redact(said), said);
+  assert.equal(redact('handle john.smith alone'), 'handle j***.s*** alone');
+});
+
+test('(c) ARC-09-C208 — the package id an install command names is not a username', () => {
+  // Measured on the Windows cells of run 39418593899: B00's git remedy printed "winget install G***.G***". The four
+  // commands are the ones the engine's remedies print; flags may sit between the command and the id.
+  for (const s of ['winget install Git.Git', 'winget install drawio.drawio · winget install TheDocumentFoundation.LibreOffice',
+    'brew install --cask Draw.Io', 'apt install Some.Pkg', 'dnf install Some.Pkg', 'through cmd.exe: a %']) {
+    assert.equal(redact(s), s, s);
+  }
+  // Only after those commands: a name after another verb, or after a bare "install", is still a name.
+  assert.equal(redact('share it with john.smith today'), 'share it with j***.s*** today');
+  assert.equal(redact('please install john.smith'), 'please install j***.s***');
+});
+
 test('(c) the two username rules do not eat each other', () => {
   // The bug this pins: applied naively, the dotted-name rule chews the DOMAIN of an address the
   // email rule has already handled, and `c***@corp.example.com` becomes `c***@corp.e***.c***`.

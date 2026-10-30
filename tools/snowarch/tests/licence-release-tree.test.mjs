@@ -26,6 +26,7 @@ import { COVERAGE } from '../lib/licence/manifest.mjs';
 import { licensedEnv } from './helpers/licence-hook/index.mjs';
 import { useStateRoot } from './helpers/state-root.mjs';
 import { tempDir } from './helpers/temp.mjs';
+import { initFixtureRepo } from './helpers/fixture-git.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const VERSION = '0.0.0-rc.1';
@@ -66,7 +67,7 @@ function releaseBase() {
   }
   const pkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8'));
   writeFileSync(join(root, 'package.json'), `${JSON.stringify({ ...pkg, version: VERSION }, null, 2)}\n`);
-  git(root, ['init', '-q', '-b', 'main']);
+  initFixtureRepo((args) => git(root, args), root, ['-q', '-b', 'main']);
   git(root, [...by, 'add', '-A']);
   git(root, [...by, 'commit', '-qm', 'release']);
   git(root, [...by, 'tag', '-a', `v${VERSION}`, '-m', `v${VERSION}`]);

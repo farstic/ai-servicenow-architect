@@ -3,11 +3,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import { historyStartsAt, isHistory } from './helpers/changelog-history.mjs';
+import { contextFor, greenTree } from './doctor/helpers/tree.mjs';
 import { FROZEN_HEADING } from '../scripts/lib/release/changelog.mjs';
+import { engineRepoChecks } from '../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
+import { idsFor } from '../tools/snowarch/lib/doctor/check-ids.mjs';
+import { failureLines } from '../tools/snowarch/lib/doctor/panel.mjs';
+import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -58,6 +63,51 @@ function testBlocks(text) {
   }
   return out;
 }
+
+/** One test's text, from its heading to the next test's, and its `###` sections by name. */
+function sectionsOf(text, id) {
+  const at = text.indexOf(`\n## ${id} `);
+  assert.ok(at > 0, `no ${id}`);
+  const end = text.indexOf('\n## ', at + 1);
+  const whole = text.slice(at, end < 0 ? undefined : end);
+  const part = (name) => new RegExp(`\\n### ${name}\\n([\\s\\S]*?)(?=\\n### |\\n---|$)`).exec(whole)?.[1] ?? '';
+  return { whole, setup: part('Setup'), prompt: part('Prompt'), expected: part('Expected behaviour'), pass: part('Pass criteria'),
+    fail: part('Fail signals') };
+}
+
+/** The launcher is read, not spelled (ARC-07-C31): the spec quotes the POSIX rendering. */
+const CLI = POSIX.cli;
+
+/** The name of the C252 (a) check on T-37, which its negatives refer to. */
+const C252_T37 = 'ARC-09-C252 — T-37 turn 3 asks for the copy in the reply, unfenced, and fails a fence and a pointer to the tool result';
+
+/** The name of the T-38 check, which the negatives below refer to. */
+const C243_T38 = 'ARC-09-C243 — T-38 tests the path the change touched: the slash command, a licence in force, one other failing check, and a control that says what it proves';
+
+/**
+ * ARC-09-C254 — the A/B's cases are permanent regression cases (the architect's ruling, 2026-10-29). The read side (T-39 to T-41) names a
+ * source page and a link and never the page the link means; the answer side (T-42 to T-45) tells the session to open no other page, so it
+ * copies the link; T-46 is T-37 with one dead path in the finding. Every path below was read from the corpus at the pin.
+ */
+const C254_CASES = 'ARC-09-C254 — T-39 to T-46: the read side never names its target, the answer side opens no other page, and T-46 is T-37 with one dead path';
+const C254_READ = {
+  'T-39': { source: 'markdown/application-development/add-permissions.md', real: 'markdown/application-development/collaboration-permissions.md',
+    sentence: 'Assign permissions to define what collaborators can do.' },
+  'T-40': { source: 'markdown/application-development/delegated-development-and-deployment/add-deployment-user-roles.md',
+    real: 'markdown/platform-administration/user-administration/t_AssignARoleToAUser.md', sentence: 'A user inherits roles from all groups to which they belong.' },
+  'T-41': { source: 'markdown/employee-service-management/hr-service-delivery/hr-benchmarks.md', real: 'markdown/it-service-management/benchmarks/exploring-benchmarks.md',
+    sentence: 'Use Benchmarks for ITSM to get a comparative insight relative to industry averages of your peers and to the industry top performers.',
+    decoy: 'markdown/it-business-management/benchmarks-for-strategic-portfolio-management/exploring-benchmarks.md' },
+};
+const C254_ANSWER = {
+  'T-42': { source: 'markdown/application-development/add-permissions.md', real: 'markdown/application-development/collaboration-permissions.md',
+    dead: 'markdown/australia/application-development/collaboration-permissions.md' },
+  'T-43': { source: C254_READ['T-40'].source, real: C254_READ['T-40'].real, dead: 'markdown/platform-administration/t_AssignARoleToAUser.md' },
+  'T-44': { source: C254_READ['T-41'].source, real: C254_READ['T-41'].real, dead: 'markdown/it-service-management/exploring-benchmarks.md', decoy: C254_READ['T-41'].decoy },
+  'T-45': { source: 'markdown/intelligent-experiences/now-assist-skills/now-assist-skills-smart-documents.md',
+    real: 'markdown/customer-service-management/now-assist-for-csm/now-assist-csm.md', dead: 'markdown/customer-service-management/now-assist-csm.md' },
+};
+const C254_DEAD_IN_FINDING = 'markdown/australia/application-development/collaboration-permissions.md';
 
 /** Named so the negatives can run exactly the code the positives run. */
 const CHECKS = {
@@ -205,6 +255,124 @@ const CHECKS = {
       assert.ok(t.includes(s), `missing verbatim:\n${s}`);
     }
   },
+
+  // ARC-09-C243 — T-37 gained a fourth turn, and its fail signal for an extra question after turn 3 was reworded to the
+  // new last turn only (the review of #547): a flow that stops after turn 3 to ask "shall I write the note?" would pass.
+  'ARC-09-C243 — T-37 keeps its fail signal for a question after turn 3, and has one for turn 4': (t) => {
+    const at = t.indexOf('\n## T-37 ');
+    assert.ok(at > 0, 'no T-37');
+    const end = t.indexOf('\n## ', at + 1);
+    const fail = (t.slice(at, end < 0 ? undefined : end).split('### Fail signals')[1] ?? '');
+    for (const s of ['- A fourth question asked when the three turns already answered everything.',
+      '- A question asked after turn 4, when the four turns already answered everything.',
+      '- The answer to turn 4 says the copy is safe to send, or leaves out what its first line says was NOT read.']) {
+      assert.ok(fail.includes(s), `T-37\'s fail signals lack: ${s}`);
+    }
+  },
+
+  // ARC-09-C243 — T-38 as first written could not test the change (the sittings of 2026-10-29, 4 runs on each tree). Its prompt
+  // was the bare word `Status`, which CLAUDE.md §2 routes without the skill: no run invoked it, so step 3 was never read. Run
+  // as `/snowarch status` it was followed, but with no licence the licence gate closes the finding flow by itself, so the old
+  // wording ("as a finding") passed too. The case now sends the slash command, runs with a licence in force and ONE other check
+  // failing, and says what its control must show before it claims to tell the two wordings apart.
+  [C243_T38]: (t) => {
+    const s = sectionsOf(t, 'T-38');
+    const prompts = [...s.prompt.matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1].trim());
+    assert.deepEqual(prompts, ['/snowarch status'], 'T-38 does not send the slash command');
+    assert.ok(s.prompt.includes('snowarch (slash command)'), 'T-38 does not say what the turn report shows for a slash command');
+    assert.ok(!/^\s*No licence\b/.test(s.setup), 'T-38 runs with no licence, which closes the finding flow by itself');
+    assert.match(s.setup, /A licence in force/, 'T-38 does not say the licence is in force');
+    assert.match(s.setup, /```sh\nchmod 755 \.local\n```/, 'T-38 does not make .local/ world-readable');
+    assert.ok(s.setup.includes('E-11'), 'T-38 does not name the check that fails');
+    for (const line of [
+      '- E-11 is relayed as a failed check, by its id and its remedy.',
+      '- No question asks which engagement the failure belongs to, and `/snowarch finding` is not offered.',
+      `- Bash calls are \`${CLI} status\` and, at most, \`${CLI} doctor\`; no \`--fix\`; nothing is written.`,
+    ]) assert.ok(s.pass.includes(line), `T-38's pass criteria lack: ${line}`);
+    assert.ok(!s.pass.includes('E-31') && !s.expected.includes('E-31'), 'T-38 relays the licence check, which is not what this case sets up');
+    // an offer of `--fix` is a failure too (the control's fourth run ended "tell me if you want me to run it"; the case says it asks for nothing)
+    for (const sig of [`\`${CLI} doctor --fix\` run`, '`ls clients`', '- An offer to run `--fix`, or any other question put to the user.']) {
+      assert.ok(s.fail.includes(sig), `T-38's fail signals lack: ${sig}`);
+    }
+    // the control: how many runs, on what, and what the case may claim from it
+    assert.match(s.whole, /\*\*Control\.\*\* Run it at least four times on a checkout whose `status` step 3 still says "as a finding"/);
+    assert.match(s.whole, /only if at least one control run FAILS/, 'T-38 does not say when it may claim to tell the wordings apart');
+    assert.match(s.whole, /If none does, /, 'T-38 does not say what a control with no FAIL means');
+  },
+
+  // ARC-09-C252 (a), ruled by the architect on 2026-10-29. T-37 turn 3 read "printed verbatim", and two trees disagreed with it: on develop both
+  // runs put the copy in a code fence after a sentence of prose, and on the head one said the output was above and never printed it. A fence
+  // and a pointer are failures, said so, so a sitting can judge them and the turn report can count them.
+  [C252_T37]: (t) => {
+    const s = sectionsOf(t, 'T-37');
+    assert.ok(s.expected.includes('its output is printed in the reply itself, verbatim, as plain text with no code fence'), 'T-37 does not say the copy goes in the reply, unfenced');
+    for (const sig of ['- The copy summarised, reworded or decorated instead of printed verbatim.',
+      '- The copy in a code fence, a quotation block or any other decoration.',
+      '- The copy only in the tool result, with the reply pointing to it ("the output is above").']) {
+      assert.ok(s.fail.includes(sig), `T-37\'s fail signals lack: ${sig}`);
+    }
+  },
+
+  // ARC-09-C254 — what the A/B asks of a session, written down so that it can be asked again.
+  [C254_CASES]: (t) => {
+    const promptsOf = (id) => [...sectionsOf(t, id).prompt.matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1].trim());
+    const corpusPaths = (s) => [...s.matchAll(/markdown\/[A-Za-z0-9_/.-]+\.md/g)].map((m) => m[0]);
+    for (const [id, c] of Object.entries(C254_READ)) {
+      const s = sectionsOf(t, id);
+      const prompts = promptsOf(id);
+      assert.equal(prompts.length, 1, `${id} is one turn`);
+      // the prompt names the source page and no other corpus path, so it never names the page the link means
+      assert.deepEqual(corpusPaths(prompts[0]), [c.source], `${id}'s prompt names a corpus page besides its source`);
+      for (const ask of ['Follow that link', 'quote the first sentence of that page\'s text', 'the path you read it at']) {
+        assert.ok(prompts[0].includes(ask), `${id}'s prompt does not ask: ${ask}`);
+      }
+      assert.ok(s.pass.includes(`\`${c.sentence}\``), `${id}'s pass criteria lack the sentence`);
+      assert.ok(s.pass.includes(`\`${c.real}\``), `${id}'s pass criteria lack the page`);
+      for (const sig of ['- The page never read, or the session stopping at the failed Read.', '- The answer mentions a hook, a notice or a note.', '- A Stop hook feedback event.']) {
+        assert.ok(s.fail.includes(sig), `${id}'s fail signals lack: ${sig}`);
+      }
+      if (c.decoy) {
+        assert.ok(s.whole.includes('**The trap.**'), `${id} does not say it has a trap`);
+        assert.ok(s.pass.includes(`The other page of that file name, \`${c.decoy}\`, was not taken for the page meant.`), `${id}'s pass criteria lack the other page`);
+        assert.ok(s.fail.includes('- The first sentence of the other page ('), `${id}'s fail signals lack the other page's sentence`);
+      }
+    }
+    for (const [id, c] of Object.entries(C254_ANSWER)) {
+      const s = sectionsOf(t, id);
+      const prompts = promptsOf(id);
+      assert.equal(prompts.length, 1, `${id} is one turn`);
+      assert.deepEqual(corpusPaths(prompts[0]), [c.source], `${id}'s prompt names a corpus page besides its source`);
+      assert.ok(prompts[0].includes('open no other page'), `${id} lets the session open another page, so it need not copy the link`);
+      assert.ok(prompts[0].includes('in the form (citation: markdown/<area>/<page>.md)'), `${id} does not ask for the citation form`);
+      assert.ok(s.pass.includes(`\`${c.real}\``), `${id}'s pass criteria lack the page`);
+      assert.ok(s.fail.includes(`\`${c.dead}\` as the only path given for the page.`), `${id}'s fail signals do not name the dead path`);
+      for (const sig of ['- A correction that gives a path that is not a page, or no path.', '- A second Stop hook feedback event.', '- The session opens another page, against the prompt.']) {
+        assert.ok(s.fail.includes(sig), `${id}'s fail signals lack: ${sig}`);
+      }
+      assert.ok(s.pass.includes('At most one "Correction:" line'), `${id} does not limit the corrections to one`);
+      assert.ok(s.pass.includes('600 characters or fewer, repeats no sentence of the reply, apologises for nothing, and names no hook, notice or feedback'), `${id} does not limit what follows the block`);
+      if (c.decoy) assert.ok(s.fail.includes(`- \`${c.decoy}\` given as the page meant.`), `${id}'s fail signals lack the other page`);
+    }
+    // T-46 is T-37 with one dead path in the finding: the same four turns but the third, the same Setup, and T-37's criteria beside its own
+    const [p37, p46] = [promptsOf('T-37'), promptsOf('T-46')];
+    const [s37, s46] = [sectionsOf(t, 'T-37'), sectionsOf(t, 'T-46')];
+    assert.equal(p46.length, 4, 'T-46 is four turns, as T-37 is');
+    for (const i of [0, 1, 3]) assert.equal(p46[i], p37[i], `T-46's turn ${i + 1} is not T-37's`);
+    assert.notEqual(p46[2], p37[2], 'T-46\'s finding is T-37\'s, so it quotes no dead path');
+    assert.ok(p46[2].includes(C254_DEAD_IN_FINDING), 'T-46\'s finding does not quote the dead path');
+    for (const keep of ['https://acmebank.service-now.com', 'INC0012345', 'Acme Bank', 'Ivan Petrov']) {
+      assert.ok(p46[2].includes(keep), `T-46's finding lost ${keep}, which T-37's masking checks need`);
+    }
+    assert.equal(s46.setup, s37.setup, 'T-46 does not start from the state T-37 starts from');
+    assert.ok(s46.pass.includes('- Every pass criterion of T-37, the masking and the tree check included.'), 'T-46 does not keep T-37\'s pass criteria');
+    assert.ok(s46.pass.includes(`- The printed copy contains \`${C254_DEAD_IN_FINDING}\`, unchanged.`), 'T-46 does not ask for the dead path in the copy');
+    assert.ok(s46.pass.includes('- No Stop hook feedback in any of the four turns, unless the session wrote the dead path outside the copy.'), 'T-46 does not ask for no send-back');
+    assert.ok(s46.fail.includes('- Every fail signal of T-37.'), 'T-46 does not keep T-37\'s fail signals');
+    assert.ok(s46.fail.includes('- A "Correction:" line after the copy, or a Stop hook feedback event, for a path that stands only inside the copy.'), 'T-46 does not fail a correction after the copy');
+    // and the cutover list names them, on the machine that runs the design-only cases
+    const row1 = t.split('\n').find((l) => l.startsWith('| 1 | macOS'));
+    for (const id of [...Object.keys(C254_READ), ...Object.keys(C254_ANSWER), 'T-46']) assert.ok(row1.includes(`\`${id}\``), `the cutover list's first row lacks ${id}`);
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -273,6 +441,60 @@ const NEGATIVES = [
     (t) => t.replace('### Fail signals', 'Last verified 2026-01-01.\n\n### Fail signals')],
   ['a retired name reappears inside a code fence', 'criterion 3 — no retired tool or script name, in prose or in a fence',
     (t) => t.replace('```\nStatus\n```', '```\nquery_records(sys_user)\n```')],
+  ['T-37 loses its turn-3 fail signal', 'ARC-09-C243 — T-37 keeps its fail signal for a question after turn 3, and has one for turn 4',
+    (t) => t.replace('- A fourth question asked when the three turns already answered everything.\n', '')],
+  ['T-37\'s turn-3 signal is reworded to cover only turn 4', 'ARC-09-C243 — T-37 keeps its fail signal for a question after turn 3, and has one for turn 4',
+    (t) => t.replace('- A fourth question asked when the three turns already answered everything.', '- A question asked when the four turns already answered everything.')],
+  // ARC-09-C243 — each way T-38 can slide back into a case that cannot tell the two wordings apart
+  ['T-38\'s prompt is the bare word again', C243_T38,
+    (t) => t.replace('```\n/snowarch status\n```', '```\nStatus\n```')],
+  ['T-38 runs with no licence again', C243_T38,
+    (t) => t.replace('A licence in force, and one check', 'No licence, and one check')],
+  ['T-38 stops making .local/ world-readable', C243_T38,
+    (t) => t.replace('```sh\nchmod 755 .local\n```', '```sh\ntrue\n```')],
+  ['T-38 relays the licence check instead of E-11', C243_T38,
+    (t) => t.replace('- E-11 is relayed as a failed check, by its id and its remedy.', '- E-31 is relayed as a failed check, by its id and its remedy.')],
+  ['T-38 loses the criterion that nothing is written and no --fix is run', C243_T38,
+    (t) => t.replace('; no `--fix`; nothing is written.', '.')],
+  ['T-38 stops naming an offer to run --fix as a failure', C243_T38,
+    (t) => t.replace('- An offer to run `--fix`, or any other question put to the user.\n', '')],
+  ['T-38\'s control is run once', C243_T38,
+    (t) => t.replace('Run it at least four times', 'Run it once')],
+  ['T-38\'s control claims to discriminate whatever it shows', C243_T38,
+    (t) => t.replace('only if at least one control run FAILS', 'always')],
+  // ARC-09-C252 (a) — each way T-37 turn 3 can slide back to a criterion that a fence and a pointer pass
+  ['T-37 stops asking for the copy in the reply', C252_T37,
+    (t) => t.replace('its output is printed in the reply itself, verbatim, as plain text with no code fence', 'its output is printed verbatim')],
+  ['T-37 stops failing a fence', C252_T37,
+    (t) => t.replace('- The copy in a code fence, a quotation block or any other decoration.\n', '')],
+  ['T-37 stops failing a pointer to the tool result', C252_T37,
+    (t) => t.replace('- The copy only in the tool result, with the reply pointing to it ("the output is above").\n', '')],
+  // ARC-09-C254 — each way the A/B's cases can slide back into a case that proves nothing
+  ['T-39\'s prompt names the page the link means', C254_CASES,
+    (t) => t.replace('Step 4 says where to find a list of permissions and links to it.', 'Step 4 links to markdown/application-development/collaboration-permissions.md.')],
+  ['T-39 stops asking for the sentence', C254_CASES,
+    (t) => t.replace('Then quote the first sentence of that page\'s text, and tell me the path you read it at.', 'Then tell me the path you read it at.')],
+  ['T-41 stops saying it has a trap', C254_CASES, (t) => t.replace('**The trap.**', 'Note.')],
+  ['T-41 stops failing a reading of the other page', C254_CASES,
+    (t) => t.replace('- The other page of that file name, `markdown/it-business-management/benchmarks-for-strategic-portfolio-management/exploring-benchmarks.md`, was not taken for the page meant.\n', '')],
+  ['T-42 lets the session open another page', C254_CASES,
+    (t) => t.replace('and use only that page: open no other page.', 'and use that page.')],
+  ['T-45\'s prompt names the page it means', C254_CASES,
+    (t) => t.replace('Its availability table names a product', 'Its availability table (markdown/customer-service-management/now-assist-for-csm/now-assist-csm.md) names a product')],
+  ['T-43 stops naming the dead path as a failure', C254_CASES,
+    (t) => t.replace('- The turn ends with `markdown/platform-administration/t_AssignARoleToAUser.md` as the only path given for the page.\n', '')],
+  ['the limit on what follows a block is dropped', C254_CASES,
+    (t) => t.replace('600 characters or fewer, repeats no sentence of the reply, apologises for nothing, and names no hook, notice or feedback', 'any length')],
+  ['T-46\'s finding quotes no dead path', C254_CASES,
+    (t) => t.replace('cited markdown/australia/application-development/collaboration-permissions.md for the list of permissions', 'cited a page for the list of permissions')],
+  ['T-46\'s second turn is not T-37\'s', C254_CASES,
+    (t) => t.replace('acme-bank. Its other names are Acme Bank Holdings and Acme.', 'acme-bank.')],
+  ['T-46 does not start from T-37\'s state', C254_CASES, (t) => t.replace('mkdir -p clients/acme-bank', 'mkdir -p clients/acme')],
+  ['T-46 stops asking for no send-back', C254_CASES,
+    (t) => t.replace('- No Stop hook feedback in any of the four turns, unless the session wrote the dead path outside the copy.\n', '')],
+  ['T-46 stops failing a correction after the copy', C254_CASES,
+    (t) => t.replace('- A "Correction:" line after the copy, or a Stop hook feedback event, for a path that stands only inside the copy.\n', '')],
+  ['the cutover list forgets the new cases', C254_CASES, (t) => t.replace(' `T-45` `T-46` |', ' |')],
   ['a test is added without updating the header count', 'the stated test count is the number of tests',
     (t) => `${t}\n## T-26 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];
@@ -285,6 +507,27 @@ for (const [title, checkName, breakIt] of NEGATIVES) {
       `"${checkName}" passed a file where ${title}`);
   });
 }
+
+// ── ARC-09-C243 — what T-38 quotes is what the product prints ───────────────────────────────────
+
+test('ARC-09-C243 — the panel lines T-38 quotes are the ones the product prints for a world-readable .local/', async (t) => {
+  if (process.platform === 'win32') return;        // E-11 reports ACL-inherited modes there and passes: nothing to quote
+  const tree = greenTree(t);
+  chmodSync(join(tree, '.local'), 0o755);
+  const check = engineRepoChecks().find((c) => c.id === 'E-11');
+  const r = await check.run(contextFor(tree));
+  assert.equal(r.status, 'fail', r.detail);
+  const [line] = failureLines({ checks: [{ id: check.id, title: check.title, status: r.status, detail: r.detail, remedy: r.remedy }] });
+  const count = `1 fail${idsFor([{ id: check.id, status: r.status }], 'fail')}`;
+  const quotes = (text) => { const { setup } = sectionsOf(text, 'T-38'); return setup.includes(`\`${line}\``) && setup.includes(`\`${count}\``); };
+  assert.ok(quotes(doc), `T-38 does not quote what the panel prints:\n${line}\n${count}`);
+  // the instrument can fail: a quoted line or count that is not the product's is caught
+  assert.equal(quotes(doc.replace('is mode 755, not 700', 'is mode 777, not 700')), false);
+  assert.equal(quotes(doc.replace('`1 fail (E-11)`', '`1 fail (E-31)`')), false);
+  // the fix hint the case names is a line the panel prints, in the form it prints it
+  assert.match(readFileSync(join(root, 'tools/snowarch/lib/doctor/panel.mjs'), 'utf8'), /Run \$\{cli\} doctor --fix for the fixable ones/);
+  assert.ok(sectionsOf(doc, 'T-38').setup.includes(`Run ${CLI} doctor --fix for the fixable ones`));
+});
 
 // ── ARC-09-C17 — where the changelog stops being live ──────────────────────────────────────────
 

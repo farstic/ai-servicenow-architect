@@ -49,16 +49,13 @@ test('the install figures are attributed to a measurement, not asserted from now
   // generator is what keeps them the same — a test on only one of them would pass while the other
   // said something else.
   const readme = `${read('README.md')}\n${read('docs/INSTALL.md')}`;
-  // Every number in the install sentences carries where it came from. S-07 measured sparse; it did
-  // not measure full mode, and the README says so rather than borrowing the figure.
-  assert.match(readme, /302 MB/);
-  assert.match(readme, /measured\s+2026-09-06, ARC-00 S-07/);
-  // S11 added the job's own numbers beside S-07's, because they count different things — the tree
-  // you read against the tree plus `.git` the disk loses. Both carry their measurement.
-  assert.match(readme, /179 MB on Linux and macOS/);
-  assert.match(readme, /measured 2026-09-09 by `docs-real\.yml`/);
-  assert.match(readme, /447 MB and 48,997 files/);
-  assert.match(readme, /measured 2026-09-09 on the reference\s+macOS machine — ARC-00 S-07 did not measure full mode/);
+  // Every number in the install sentences carries where it came from. ARC-09-C244 made the whole corpus the
+  // default and measured it on all three platforms in one `docs-real.yml` run: the tree you read against the tree
+  // plus `.git` the disk loses, both attributed to that measurement.
+  assert.match(readme, /about 495 MB on disk/);
+  assert.match(readme, /293 MB on Linux and macOS/);
+  assert.match(readme, /51,665 files/);
+  assert.match(readme, /measured\s+2026-10-24\s+by\s+`docs-real\.yml`/);
 });
 
 test('NOTICE claims only what the checkout enforces', () => {
@@ -102,7 +99,7 @@ test('the ARC-06 anchors are consumed, not left behind', () => {
   assert.equal(/<!-- ARC-06(-S13)?: move to docs\/INSTALL\.md/.test(readme), false,
     'a move-me anchor survived the move');
   const install = read('docs/INSTALL.md');
-  assert.match(install, /302 MB/);
+  assert.match(install, /495 MB/);
   assert.match(install, /--instance-file/, 'the Operators paragraph did not arrive');
   assert.match(install, /mode live/, 'the live-mode sentence did not arrive');
 });

@@ -145,6 +145,7 @@ export function writeHead(text, version) {
 // generates the groups from the commit subjects since the previous tag. S01 shipped a stub that
 // moved the heading and nothing else; this is the real one, imported rather than re-implemented.
 import { writeChangelog as generateChangelog } from './changelog.mjs';
+import { PACKAGE_CHANGELOG, writePackageChangelog } from './package-changelog.mjs';
 
 export { generateChangelog };
 
@@ -177,6 +178,8 @@ const WRITTEN_HERE = Object.freeze([
   'README.md',
   'docs/README-head.md',
   'docs/CHANGELOG.md',
+  // ARC-09-C206 — the server package's changelog, renamed at a final by `writePackageChangelog`.
+  'packages/snowarch/CHANGELOG.md',
   // ARC-09-C60 — the clone tag a new user is told to use. `README.md` is generated from
   // `docs/INSTALL.md`, so the install page is the source and the README follows it.
   'docs/INSTALL.md',
@@ -272,6 +275,21 @@ export function applyWrites({ root, version, date, run, from = null, tag = {}, g
     tag: { ...tag, contract: contractSha }, read, write, ...(git ? { git } : {}) });
   if (!log.ok) return { ok: false, message: `release: ${log.message}`, touched };
   touched.push('docs/CHANGELOG.md');
+
+  // ARC-09-C206 — the server package's changelog, at a FINAL only: a release candidate that renamed its Unreleased
+  // would leave the final nothing to write, and the cut would refuse it for saying nothing.
+  // A tree without the file has nothing to rename; whether its source changed with nothing said is the preflight's
+  // refusal, which reads a missing file as saying nothing.
+  let current = null;
+  try { current = read(PACKAGE_CHANGELOG); } catch (e) { if (e?.code !== 'ENOENT') throw e; }
+  if (current !== null && !version.includes('-')) {
+    const pkg = writePackageChangelog(current, version, date);
+    if (!pkg.ok) return { ok: false, message: `release: ${pkg.message}`, touched };
+    if (pkg.changed) {
+      write(PACKAGE_CHANGELOG, pkg.text);
+      touched.push(PACKAGE_CHANGELOG);
+    }
+  }
 
   return { ok: true, touched, contractSha };
 }

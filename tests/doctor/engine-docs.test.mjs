@@ -35,11 +35,13 @@ const checks = engineDocsChecks();
 const PIN = 'a'.repeat(40);
 
 const status = (over = {}) => ({
-  present: true, path: 'vendor/ServiceNowDocs', mode: 'sparse',
+  // ARC-09-C244 — the default install is the whole corpus: 56 of 56 areas on disk, no skip-worktree entry left.
+  present: true, path: 'vendor/ServiceNowDocs', mode: 'full',
   pin: PIN, gitlink: PIN, head: PIN, gitlinkStaged: false,
   pinMatchesGitlink: true, headMatchesPin: true,
   family: 'australia', branch: 'australia', familyMatches: true,
-  sparse: 'cone', areasExpected: ['now/x'], areasPresent: ['now/x'], areasMissing: [],
+  sparse: 'full', areasExpected: ['now/x'], areasPresent: ['now/x'], areasMissing: [],
+  areaCount: 56, areasInTree: 56, skipWorktree: 0,
   rootMissing: [],
   citations: { checked: 289, dead: [] },
   ...over,
@@ -208,11 +210,40 @@ test('E-14 names the branch it found and the family it wanted', async (t) => {
 
 test('E-15 fails a pattern sparse-checkout and lists the missing areas', async (t) => {
   const r = await run(t, 'E-15', {
-    status: { sparse: 'pattern', areasMissing: ['now/a', 'now/b'], areasPresent: [] },
+    // A sparse that was asked for, in the pattern shape (the whole-corpus mode is the C244 case below).
+    status: { mode: 'sparse', sparse: 'pattern', areasMissing: ['now/a', 'now/b'], areasPresent: [] },
   });
   assert.equal(r.status, 'fail');
   assert.match(r.detail, /sparse checkout is "pattern"/);
   assert.match(r.detail, /2 area\(s\) missing: now\/a, now\/b/);
+});
+
+// ARC-09-C244 — corpus completeness. The whole corpus is complete when sparse checkout is off, no skip-worktree entry
+// is left and every area of the tree is on disk; short of that, under the whole-corpus mode, the switch did not
+// finish, and `doctor --fix` (a command an unlicensed install may run) completes it. A sparse that was asked for
+// warns, with its numbers taken from the tree. A recorded skip with a corpus on disk is E-12's finding.
+test('ARC-09-C244 — E-15 is corpus completeness: whole, unfinished, sparse by choice', async (t) => {
+  const whole = await run(t, 'E-15', {});
+  assert.equal(whole.status, 'ok');
+  assert.equal(whole.detail, 'full · 56/56 areas');
+  for (const [why, status] of [
+    ['the cited areas alone', { sparse: 'cone', areaCount: 20 }],
+    ['a pattern checkout', { sparse: 'pattern' }],
+    ['skip-worktree entries left', { skipWorktree: 3 }],
+    ['an area missing', { areaCount: 55 }],
+  ]) {
+    const r = await run(t, 'E-15', { status });
+    assert.equal(r.status, 'fail', why);
+    assert.equal(r.detail, 'the switch to the full corpus did not finish', why);
+    assert.match(r.remedy, /doctor --fix$/, why);
+  }
+  const asked = await run(t, 'E-15', { status: { mode: 'sparse', sparse: 'cone', areaCount: 20 } });
+  assert.equal(asked.status, 'warn');
+  assert.equal(asked.detail, 'sparse by choice — 36 of 56 areas are not on disk; answers about them are ungrounded');
+  const other = await run(t, 'E-15', { status: { mode: 'sparse', sparse: 'cone', areaCount: 3, areasInTree: 5 } });
+  assert.match(other.detail, /— 2 of 5 areas are not on disk/, 'the numbers come from the tree, not from a constant');
+  const skipped = await run(t, 'E-15', { status: { mode: 'skip', sparse: 'cone' } });
+  assert.equal(skipped.status, 'skip', 'a recorded skip with a corpus on disk is E-12\'s finding');
 });
 
 test('the other corpus checks defer to E-12 rather than repeating its diagnosis', async (t) => {

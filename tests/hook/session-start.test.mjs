@@ -428,8 +428,8 @@ test('an upgrade check older than a week is silence, not a hedged nudge', async 
 });
 
 test('the hook and the library agree on how old a check may be', async () => {
-  // The hook inlines the constant on purpose — its budget is 300 ms and it imports nothing on the
-  // fast path — so the two are compared here rather than trusted to stay equal.
+  // The hook inlines the constant on purpose — its budget is 300 ms, and it inlines a constant rather
+  // than import a module for one (ARC-09-C199) — so the two are compared here rather than trusted to stay equal.
   const { MAX_AGE_MS: LIB_MAX_AGE } = await import('../../tools/snowarch/lib/upgrade-check.mjs');
   assert.equal(UPGRADE_MAX_AGE_MS, LIB_MAX_AGE);
   assert.equal(UPGRADE_MAX_AGE_MS, 7 * 24 * 60 * 60 * 1000);

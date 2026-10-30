@@ -9,6 +9,9 @@
 // check never calls the masker; only reading the finished output can.
 //
 // README criterion 3. Runs on all three platforms.
+//
+// ARC-09-C211's store case lives here, not beside C208's cases in printed-keys.test.mjs: it needs the installed server,
+// and CI's no-install step runs printed-keys.test.mjs but not this file (the two lists in ci.yml).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -16,7 +19,8 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
-import { greenTree, linkInstall, readJson } from './helpers/tree.mjs';
+import { MASKED } from './helpers/masked.mjs';
+import { greenTree, linkInstall, readJson, writeJson } from './helpers/tree.mjs';
 
 /**
  * The fixture credential.
@@ -110,9 +114,11 @@ test('--json is the object and nothing else, masked username, no password', asyn
   const report = JSON.parse(text);
   const entry = report.server?.instances?.[0];
   assert.ok(entry, 'the report lists no instance — then it is not exercising the store');
-  // What it DOES carry: the shape, masked. `s***@corp.example.com` — enough to recognise which
-  // account it is, not enough to be one.
-  assert.match(entry.username, /^s\*\*\*@corp\.example\.com$/);
+  // What it DOES carry: the shape, masked. `s***@<domain>` — enough to recognise that it is an address and which letter
+  // it begins with, not enough to be one. The domain names the organisation, so it goes whole (ARC-09-C242, by the architect's
+  // ruling of 2026-10-28); this assertion read `s***@corp.example.com` and pinned the domain in the JSON.
+  assert.equal(entry.username, 's***@<domain>');
+  assert.ok(!text.includes('corp.example.com'), 'the username\'s domain is somewhere in the JSON');
   assert.ok(!JSON.stringify(report).includes(PASSWORD), 'the password is somewhere in the JSON');
 });
 
@@ -130,4 +136,31 @@ test('--fix --json is JSON, and redacted', async (t) => {
   const { text } = await run(root, { fix: true, yes: true, quick: true, json: true });
   assertRedacted('--fix --json', text);
   JSON.parse(text);   // ARC-08-S06's finding: `--fix --json` must be one JSON object, not prose
+});
+
+test('ARC-09-C211 — a store with an unknown key: SV-02 names the key path in backticks, and masks none', async (t) => {
+  // The server joins zod's path with dots and the runner's redaction read it as a first.last name: C210's probe
+  // printed SV-02 as "i***.p*** Unrecognized key(s) in object: 'notes'". A live checkout whose server can load the
+  // store, as json-boundary.test.mjs builds one, with an unknown key under the instance `pdi`.
+  const root = linkInstall(greenTree(t, { mode: 'live' }));
+  writeJson(root, '.local/instances.json', {
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: { pdi: {
+      url: 'https://dev12345.service-now.com', environment: 'pdi',
+      auth: { method: 'basic', username: 'admin', password: 'fixture-only' },
+      preset: 'read-only', flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false,
+      notes: 'an unknown key',
+    } },
+  });
+  chmodSync(join(root, '.local/instances.json'), 0o600);
+  const report = async (flags) => (await run(root, { 'no-cache': true, ...flags })).text;
+  const json = await report({ json: true });
+  const text = await report({});
+  const sv02 = JSON.parse(json).checks.find((c) => c.id === 'SV-02');
+  assert.match(sv02?.detail ?? '', /`instances\.pdi` Unrecognized key\(s\) in object: 'notes'/, JSON.stringify(sv02));
+  for (const [form, out] of [['text', text], ['json', json]]) {
+    const masked = out.split('\n').filter((l) => MASKED.test(l));
+    assert.deepEqual(masked, [], `the ${form} report prints a masked key:\n  ${masked.join('\n  ')}`);
+  }
 });

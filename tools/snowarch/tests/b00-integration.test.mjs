@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { bootstrapCommand } from '../lib/bootstrap.mjs';
 import { which } from '../lib/which.mjs';
 import { makeCheckout, recorder } from './helpers/workspace.mjs';
+import { initFixtureRepo } from './helpers/fixture-git.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const isWindows = process.platform === 'win32';
@@ -22,7 +23,7 @@ const sink = () => { const s = []; return { write: (x) => s.push(x), text: () =>
  */
 function gitCheckout() {
   const root = makeCheckout();
-  execFileSync('git', ['init', '-q'], { cwd: root });
+  initFixtureRepo((args) => execFileSync('git', args, { cwd: root }), root, ['-q', '-b', 'main']);
   return root;
 }
 

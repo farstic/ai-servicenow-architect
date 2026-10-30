@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/farstic/ai-servicenow-architect/engine.config.schema.json",
+  "$id": "https://github.com/farstic/snowarch/engine.config.schema.json",
   "title": "engine.config.json \u2014 the product's constants, in one place",
   "description": "Every value the engine, the server, the doctor and the release tooling would otherwise hand-write twice. Consumers read it; ARC-01 only defines it.",
   "type": "object",

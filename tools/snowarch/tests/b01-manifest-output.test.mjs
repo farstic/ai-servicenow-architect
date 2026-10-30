@@ -19,6 +19,7 @@ import { pathToFileURL } from 'node:url';
 import * as B01 from '../lib/steps/B01.mjs';
 import { runSteps } from '../lib/steps/index.mjs';
 import { hashFor } from '../lib/inputs.mjs';
+import { checkoutKey } from '../lib/state.mjs';
 import { integrityLine, integrityRemedy, integrityStatus, readManifestCache, writeManifestCache }
   from '../lib/licence/manifest.mjs';
 import { releaseManifestPath } from '../lib/local-paths.mjs';
@@ -98,7 +99,7 @@ test('ARC-09-C140 — a development tree, or a config that names no manifests, o
 async function runB01(root, over = {}) {
   const ctx = ctxFor(root, over);
   const state = { steps: { B01: { status: 'ok', inputsHash: hashFor('B01', ctx), finishedAt: NOW, durationMs: 0 } },
-    registration: 'project', hooksDisabledByBootstrap: false };
+    registration: 'project', hooksDisabledByBootstrap: false, checkout: checkoutKey(root, ctx.platform) };
   const lines = [];
   const r = await runSteps({ root, ctx, state, steps: [B01], onLine: (l) => lines.push(l), save: () => {} });
   return { ...r, lines, entry: state.steps.B01 };

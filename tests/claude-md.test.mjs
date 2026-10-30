@@ -22,7 +22,9 @@ const MARKER = /^\*\*Version:\*\* /;
 
 test('criterion 1 — the budget, in the state a release cut writes', () => {
   assert.ok(lines.length <= 200, `${lines.length} lines, cap 200`);
-  assert.ok(Buffer.byteLength(doc) <= 20_000, `${Buffer.byteLength(doc)} bytes, cap 20,000`);
+  // ARC-09-C250 — the owner's decision (2026-10-24): CLAUDE.md gains W1 and W2 and loses nothing, and the cap rises
+  // from 20,000 to 20,400 bytes to hold them.
+  assert.ok(Buffer.byteLength(doc) <= 20_600, `${Buffer.byteLength(doc)} bytes, cap 20,600`);
   // ARC-09-C185a — a release cut rewrites the Version marker (writers.mjs writeMarker), and the file the cut leaves
   // is the one the release's own suite reads. A -dev tree at the cap went green while `release.mjs 2.2.1-rc.99`
   // rolled back on this very case. So the budget is held at the longest version the cut writes for this release: an
@@ -31,8 +33,8 @@ test('criterion 1 — the budget, in the state a release cut writes', () => {
   const longest = `${base}-rc.99`;
   const cut = writeMarker(doc, longest);
   assert.ok(cut.ok, cut.message);
-  assert.ok(Buffer.byteLength(cut.text) <= 20_000,
-    `${Buffer.byteLength(cut.text)} bytes once the cut writes ${longest}, cap 20,000`);
+  assert.ok(Buffer.byteLength(cut.text) <= 20_600,
+    `${Buffer.byteLength(cut.text)} bytes once the cut writes ${longest}, cap 20,600`);
   console.log(`    CLAUDE.md: ${lines.length} lines · ${Buffer.byteLength(doc)} bytes · ${Buffer.byteLength(cut.text)} at ${longest}`);
 });
 
@@ -72,6 +74,14 @@ test('criterion 4 — the strings a session needs to find', () => {
   }
   // The plain word, as a trigger. Backticked or not, a session must be told what `Status` does.
   assert.match(doc, /\bStatus\b/);
+  // ARC-09-C188 — Status runs the panel command, and the release family and pin come from its `Docs:` line. The owner's
+  // test of the export read the family by probing the corpus for a branch, which a detached, absorbed checkout has
+  // none of, and reported it as "not a git checkout". The skill already said `./snowarch status`; §2 said otherwise.
+  const status = lines.find((l) => l.startsWith('When the user types `Status`')) ?? '';
+  // An escaped pattern, never a spelled launcher: the launcher audit reads every literal one as a site to account for.
+  assert.match(status, /run `\.[/]snowarch status`/, `§2 does not send Status to the panel command: ${status}`);
+  assert.match(status, /`Docs:` line is the release family and pin, never a git branch/, '§2 does not name where the family comes from');
+  assert.doesNotMatch(status, /doctor --quick --json/, '§2 still sends Status to the JSON report');
 });
 
 test('criterion 3 — the two blocks that are copied, not paraphrased', () => {
@@ -166,4 +176,74 @@ test('the fixture this cannot produce, produced', () => {
     'the paraphrase must not satisfy the verbatim check');
     assert.ok(!existsSync(join(dir, DEAD)), 'the dead path must not resolve');
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// ARC-09-C250 — NOTHING THAT WORKS IS REMOVED. The owner's rule (2026-10-24): CLAUDE.md changes are additions. The
+// list in tests/fixtures/claude-md-resources.txt was taken from CLAUDE.md at develop 00faaa57: every backticked span,
+// every bold span, every command flag, and every sentence that states a rule. A change that removes one edits the list
+// in the same pull request, where the reviewer and the owner see it. Bold spans are in because the nine sub-agent names
+// are bold, not backticked, and a list without them did not notice their removal.
+const RESOURCES = readFileSync(join(root, 'tests/fixtures/claude-md-resources.txt'), 'utf8').trimEnd().split('\n')
+  .filter((l) => l && !l.startsWith('#'))
+  .map((l) => ({ kind: l.slice(0, l.indexOf('\t')), text: l.slice(l.indexOf('\t') + 1) }));
+const removedFrom = (text) => RESOURCES.filter((r) => !text.includes(r.text));
+const named = (list) => list.map((r) => `${r.kind}: ${r.text}`);
+
+// The two additions the owner approved on 2026-10-24 (ARC-09-C250, W1 and W2), applied unless CLAUDE.md has them.
+const W1_AT = 'If the corpus does not cover it, say so rather than recalling it.';
+const W1 = ' In a Grep pattern write each `_` of a table, field or role name as `\\\\?_`: the corpus escapes underscores '
+  + '(`sc\\_req\\_item`).';
+const W2_AFTER = '- `docs/PLATFORM-NOTES.md`';
+const W2 = '- `vendor/docs-map.md` — the corpus map (area · title · pages · products, and how to find a page). Find a page by '
+  + 'Grep over `markdown/*/index.md` or `^product: <name>`, never by reading an `index.md` whole.';
+const withAdditions = (text) => {
+  let t = text.includes(W1) ? text : text.replace(W1_AT, () => `${W1_AT}${W1}`);
+  if (!t.includes(W2)) {
+    const all = t.split('\n');
+    all.splice(all.findIndex((l) => l.startsWith(W2_AFTER)) + 1, 0, W2);
+    t = all.join('\n');
+  }
+  return t;
+};
+
+test('ARC-09-C250 — nothing that works is removed: every listed span, rule and flag is still in CLAUDE.md', () => {
+  assert.ok(RESOURCES.length >= 150, `the list holds ${RESOURCES.length} entries — it read nothing`);
+  assert.deepEqual(named(removedFrom(doc)), [],
+    'removed from CLAUDE.md: a removal edits tests/fixtures/claude-md-resources.txt in the same pull request');
+  // ...and in the state a release cut writes, which rewrites only the Version line the list leaves out.
+  const base = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version.replace(/-.*$/, '');
+  assert.deepEqual(named(removedFrom(writeMarker(doc, `${base}-rc.99`).text)), []);
+});
+
+test('ARC-09-C250 — the approved additions, W1 and W2, remove nothing', () => {
+  const added = withAdditions(doc);
+  assert.ok(added.includes(W1) && added.includes(W2), 'W1 and W2 are not both in the text the case checks');
+  assert.deepEqual(named(removedFrom(added)), []);
+});
+
+test('ARC-09-C250 — the guard names a deleted rule, and only that rule', () => {
+  for (const pick of ['self-authorization is prohibited', 'A change to an instance is never filed there']) {
+    const rule = RESOURCES.find((r) => r.kind === 'rule' && r.text.includes(pick));
+    assert.ok(rule && doc.includes(rule.text), `"${pick}" is not a listed rule of CLAUDE.md`);
+    assert.deepEqual(named(removedFrom(doc.replace(rule.text, ''))), named([rule]));
+  }
+});
+
+// ARC-09-C250 — EVERY SENTENCE. A rewrite that carries none of the listed rule words, or a sentence one word shorter,
+// still removes what works: the list holds every sentence of CLAUDE.md at develop, so either is named. The first case is
+// C217c's variant B, which rewrites line 13's marker sentence and which the rule-word list did not notice.
+test('ARC-09-C250 — a rewritten sentence is named: C217c variant B\'s line 13', () => {
+  const old = 'A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — '
+    + 'verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.';
+  const rewrite = 'Only a name a corpus search misses carries "not documented in the bundled corpus — verify on the '
+    + 'instance", no citation; one found but unopened is cited by path as unverified; what the corpus does not settle is '
+    + 'an OPEN QUESTION.';
+  assert.ok(doc.includes(old), 'the sentence the rewrite replaces is not in CLAUDE.md');
+  assert.deepEqual(named(removedFrom(doc.replace(old, rewrite))), [`sentence: ${old}`]);
+});
+
+test('ARC-09-C250 — a sentence one word shorter is named', () => {
+  const sentence = 'If the corpus does not cover it, say so rather than recalling it.';
+  assert.ok(doc.includes(sentence), 'the sentence the case shortens is not in CLAUDE.md');
+  assert.deepEqual(named(removedFrom(doc.replace(sentence, sentence.replace(' rather', '')))), [`sentence: ${sentence}`]);
 });

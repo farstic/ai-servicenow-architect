@@ -4,8 +4,9 @@ The owner's live run of the ITSM sweep, the first group of ARC-09-C167b, on a de
 `23f85222` (2.2.1-dev), which carries ARC-09-C183's pre-write data-policy check. The owner ran steps 0 to 4 and stopped
 there. Steps 5 to 10 were not run. The architect session transcribed the results from the owner's pastes.
 
-The instance is cited by its label, `pditestdoit`: the same PDI as `tgdev`. No URL, account or sys_id appears here.
-The engagement's name, which prefixed the update set, is written `<engagement>`.
+The instance is the Brazil-family PDI of the 2.2.0-rc.1 live sitting, written `<label>` where its label was printed.
+No URL, account or sys_id appears here. The engagement's name, which prefixed the update set, is written
+`<engagement>`.
 
 | Field | Value |
 |---|---|
@@ -14,20 +15,20 @@ The engagement's name, which prefixed the update set, is written `<engagement>`.
 | **Machine** | macOS, the owner's |
 | **Clean?** | no: a development tree |
 | **Product version** | `2.2.1-dev`, develop `23f85222` |
-| **Instance** | `pditestdoit`, Brazil patch 0 (the bundled corpus is Australia) |
+| **Instance** | the same Brazil-family PDI, patch 0 (the bundled corpus is Australia) |
 | **Mode** | live |
 | **Preset** | custom |
 | **Writes allowed** | each write approved in the session, one question per call |
 
 ## Install timeline
 
-A development tree at develop `23f85222` (2.2.1-dev), run live against `pditestdoit`. A development tree is exempt
+A development tree at develop `23f85222` (2.2.1-dev), run live against that PDI. A development tree is exempt
 from the integrity check, which is why E-32 was skipped, and the licence is enforced. The install's own steps were not
 transcribed.
 
 ## Doctor summary
 
-Status printed `Mode: live — instance=pditestdoit (pdi) preset=custom`, with the Engine at 2.2.1-dev and the roster
+Status printed `Mode: live — instance=<label> (pdi) preset=custom`, with the Engine at 2.2.1-dev and the roster
 at 29 skills and 9 agents. The doctor reported 15 ok, 1 warn (E-23, hygiene) and 0 fail. E-32 was skipped, as it is for
 a development tree, and the licence was ok.
 

@@ -302,12 +302,16 @@ test('the page stays a page, and the tail stays a tail', () => {
   // commands that install a licence under its one name, in a fence so they paste — the file had gone into .local/
   // under its own name and read as missing. One is the Next block's folder: the line names it now, and the dialog
   // sentence moved to a line of its own. The prose around both was rewrapped rather than grown.
-  assert.ok(install <= 313, `${install} lines of install page (criterion: 313)`);
+  // 317 since ARC-09-C224: the Windows end-user test of 2026-10-22 met git's `… is not a commit!` line at the clone
+  // this page runs, so four lines say it is harmless, why, the command that shows it, and where the detail is.
+  // Nothing was deleted to pay for it.
+  assert.ok(install <= 317, `${install} lines of install page (criterion: 317)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.
   assert.match(read(INSTALL), /### What the corpus costs/);
-  assert.match(read(INSTALL), /measured 2026-09-06, ARC-00 S-07/);
+  // ARC-09-C244 — the corpus costs are the whole corpus, measured by docs-real on all three platforms.
+  assert.match(read(INSTALL), /measured\s+2026-10-24\s+by\s+`docs-real\.yml`/);
 });
 
 test('the server package\'s generated tables are current too', () => {

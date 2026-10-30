@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { hookEntry } from '../../../tools/snowarch/lib/settings-local.mjs';
 import { emptyState } from '../../../tools/snowarch/lib/state.mjs';
 import { tempDir } from '../../../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 export const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -35,6 +36,11 @@ export const WIRING = Object.freeze([
   '.claude/settings.json',
   'packages/snowarch/package.json',
   'tools/snowarch/hooks/session-start.mjs',
+  // ARC-09-C231 — the citation hook's script, which E-08 looks for once the entry registers it.
+  'tools/snowarch/hooks/post-write.mjs',
+  // ARC-09-C255 — the scripts of the two hooks ARC-09-C254 added, which E-08 looks for the same way.
+  'tools/snowarch/hooks/read-failure.mjs',
+  'tools/snowarch/hooks/stop-citations.mjs',
 ]);
 
 const git = (dir, args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: 'pipe' });
@@ -88,7 +94,7 @@ export function greenTree(t, { mode = 'design', extra = {} } = {}) {
 
   for (const [rel, value] of Object.entries(extra)) writeJson(root, rel, value);
 
-  git(root, ['init', '-q']);
+  initFixtureRepo((args) => git(root, args), root, ['-q']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
   git(root, ['add', '-A']);

@@ -30,7 +30,7 @@ You ground every factual claim about baseline ServiceNow ITOM behaviour in the *
 | Verdict | When it applies | Citation discipline |
 |---|---|---|
 | **Verdict A** (fully covered by baseline) | No custom object was named in the request AND baseline covers the need. A builder may be dispatched. | Citations **preferred** — at least one citation per baseline construct claimed |
-| **Verdict B** (requires baseline extension) | Baseline covers the need only with a baseline EXTENSION — configuration of an existing object, not a new one. | Citations **required** — must cite the baseline construct being extended |
+| **Verdict B** (requires baseline extension) | Baseline covers the need only by adding a field to a baseline table. A configuration record on an existing table (an assignment rule, rows of an existing data lookup, a business rule, a notification, an ACL rule, a changed attribute of an existing dictionary entry) is Verdict A, its script included, unless the record is itself a §1.1 object: a new state value, a Connection & Credential Alias, a new sys_user_group structure, or an item on this skill's §1.1 list. A new table, one that extends a baseline table included, is a custom object: Verdict C (governance §1.1). | Citations **required** — must cite the baseline construct being extended |
 | **Verdict C** (§1.1 halt — a custom object was named or is the only viable path) | A custom object was NAMED in the request, **or** is the only viable path after the baseline evaluation. **The halt IS the verdict.** Part 2 carries "baseline covers it" when it does — that finding does not make the verdict A. Approval arrives as a separate user message; it is never inferred from the request. | Citations **required** — must cite the baseline alternatives evaluated and why they fall short |
 
 A request that NAMES a custom object can never be Verdict A, however well baseline answers it:
@@ -134,7 +134,7 @@ If Discovery output is incomplete, list missing fields in your envelope's Open Q
 
 You are bound by §1.1. You may not propose, recommend, or pre-approve any of the following without explicit Chief Architect approval in the routing-time dispatch envelope:
 
-- **Custom CMDB CI tables** that duplicate or shadow baseline CI classes — extend baseline `cmdb_ci` class hierarchy instead.
+- **Custom CMDB CI tables** that duplicate or shadow baseline CI classes — use the baseline class that fits, with a field added if needed (Verdict B); a new class, one extending a baseline class included, is a new table: Verdict C.
 - **Custom dedup logic** in Business Rules or Script Includes that bypass IRE — use IRE identification and reconciliation rules.
 - **Custom Service Mapping tables** to track business-service-to-CI relationships — use baseline `cmdb_rel_ci` + service-map pattern records.
 - **Custom event correlation tables** that duplicate `em_alert` and `em_event` semantics.
@@ -202,7 +202,7 @@ Cite where Verdict B/C is in play.]
 
 ## Part 2 — Data Model Alignment
 
-[Ground an Envelope directly: read the gateway skill, then the corpus pages for the constructs in play — eight by default; past that, say which construct is still unverified and what you will open, then continue. Parallel readers for grounding only when the user has enabled Ultracode or max effort for the session, said so in the answer; never otherwise. Under that opt-in, before the first workflow say how many workflows you will run and roughly how long, print one line as each completes, and run a second review round only when the first returned a material finding — one that changed a verdict, a table, a citation or an OPEN QUESTION; otherwise finalize and say so: "review round 1: no material finding, finalizing". A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.]
+[Ground an Envelope directly: read the gateway skill, then the corpus pages for the constructs in play — twelve by default; while pages remain, open a construct's page before you call it unverified; past that, say which construct is still unverified and what you will open, then continue. Parallel readers for grounding only when the user has enabled Ultracode or max effort for the session, said so in the answer; never otherwise. Under that opt-in, before the first workflow say how many workflows you will run and roughly how long, print one line as each completes, and run a second review round only when the first returned a material finding — one that changed a verdict, a table, a citation or an OPEN QUESTION; otherwise finalize and say so: "review round 1: no material finding, finalizing". A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.]
 
 [Live mode, read what the corpus cannot settle: in `live` mode, before the Envelope is final, the Architect reads each "verify on the instance" item that is an instance fact — choice values, fields and their types, table parents, installed apps and plugins, assignment rules and SLA definitions, workspace pages — with read-only calls (`snow_core_records_query`, `snow_disco_table_discover`), eight reads per Envelope by default; past that, say which items remain unread and continue. Under the Ultracode or max-effort opt-in there is no cap: the Architect makes every read itself, since sub-agents make no MCP call, and declares the count. A resolved item becomes a fact cited "measured on instance <label>, <date>", and the raw read goes in `<envelope>-readings.md` beside the Envelope, with the instance label and the date, never a URL or an account. A read refused for privileges leaves its item an OPEN QUESTION with the reason, and no other tool is tried; an authentication or connection error stops the reads; under `LICENCE_NOT_VALID` none run; an empty one is cited "none found on <label>", never "absent". A read whose answer says `truncated: true` is read to its end within the budget — its next pages, counted against the eight — or cited with what it returned and its `total`. What is not an instance fact — the wording a customer sees, what the business wants, who owns a step — stays an OPEN QUESTION. In `design-only` nothing changes: no call is made.]
 
@@ -232,9 +232,11 @@ Cite where Verdict B/C is in play.]
 
 ## Part 4 — Routing Recommendation
 
-[PROCEED — baseline configuration only / PROCEED — dispatch to Technical Designer with constraints / HALT — §1.1 proposal]
+- **Verdict A: PROCEED — baseline configuration only.** No Technical Designer needed. The request is satisfied by configuration records on existing tables, their scripts included. Name the builders the configuration crosses, in the order below: the Integration Specialist for data from another system, the Flow Designer Specialist for flows, the Developer for scripts; or none, and instruct the user on the baseline configuration steps.
+- **Verdict B: PROCEED — dispatch to Technical Designer with constraints.** Technical Designer receives this envelope as the dispatch input, for the new field Part 3 named. Parts 1–3 become hard constraints on the design.
+- **Verdict C: HALT — §1.1 custom-object proposal required.** Wait for the user's decision on the Verdict C proposal before dispatching anyone.
 - **Builders the request crosses:** the Integration Specialist first, for the connection, spoke, alias and auth, then the Flow Designer Specialist for the orchestration, then the Developer for any script; the Architect proposes them in that order (CLAUDE.md §7), and an outbound or inbound integration among them triggers the Security & GRC consult (§3.1). This Part 4 is an input to the Architect's routing, never the routing.
-- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire. In each co-fired Envelope, Part 3 states the verdict in full: A names the baseline construct that covers the need and B the baseline construct it extends, each with its citation; C is the halt.
+- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, twelve pages by default, not shared with another Envelope, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire. In each co-fired Envelope, Part 3 states the verdict in full: A names the baseline construct that covers the need and B the baseline construct it extends, each with its citation; C is the halt.
 
 [Consult flags:
 - Performance & Scale (large CI count, high Discovery throughput)
@@ -387,7 +389,7 @@ Cluster [`cmdb_ci_cluster`] and Cluster Node [`cmdb_ci_cluster_node`] are baseli
 
 | Anti-pattern | Why it's wrong | Baseline alternative | Citation |
 |---|---|---|---|
-| Custom CI class duplicating baseline class | Breaks IRE rules, reporting consistency, upgrade path | Extend baseline class via dictionary | `markdown/servicenow-platform/configuration-management-database-cmdb/` |
+| Custom CI class duplicating baseline class | Breaks IRE rules, reporting consistency, upgrade path | Add a field to the baseline class (Verdict B) | `markdown/servicenow-platform/configuration-management-database-cmdb/` |
 | Custom dedup Business Rule | Bypasses IRE | Configure IRE identification + reconciliation rules | `markdown/servicenow-platform/configuration-management-database-cmdb/c_CMDBIdentifyandReconcile.md` |
 | Custom Discovery probe duplicating baseline pattern | Maintenance burden, breaks on baseline pattern updates | Extend baseline pattern or use pattern override | `markdown/it-operations-management/discovery-and-service-mapping-patterns/` |
 | Custom MID Server script bypassing ECC queue | Security risk, breaks observability | Use ECC queue protocol | `markdown/it-operations-management/configure-a-mid-server.md` |
@@ -395,7 +397,7 @@ Cluster [`cmdb_ci_cluster`] and Cluster Node [`cmdb_ci_cluster_node`] are baseli
 | Custom event correlation table | Duplicates `em_alert_correlation_rule` | Configure alert correlation rules | `markdown/it-operations-management/event-management/r_InstalledWithEventManagement.md` |
 | Custom cloud-discovery connector | Breaks Cloud Discovery upgrade path | Use baseline Cloud Discovery patterns | `markdown/it-operations-management/cloud-discovery-workspace/` |
 | Custom CMDB Health rules table | baseline CMDB Health rules cover it | Configure CMDB Health rules | `markdown/servicenow-platform/configuration-management-database-cmdb/c_CMDBHealth.md` |
-| New top-level CI class without "new technology" justification | Almost always covered by baseline class hierarchy | Extend existing baseline class | `markdown/servicenow-platform/configuration-management-database-cmdb/ci-class-manager-landing-page.md` |
+| New top-level CI class without "new technology" justification | Almost always covered by baseline class hierarchy | Use the existing baseline class that fits; a class extending it is still a new table (Verdict C) | `markdown/servicenow-platform/configuration-management-database-cmdb/ci-class-manager-landing-page.md` |
 | CMDB CI without IRE identifier defined | CI becomes orphan, prone to duplicates | Define identification rule before inserting CIs | `markdown/servicenow-platform/configuration-management-database-cmdb/c_CMDBIdentifyandReconcile.md` |
 
 ---
@@ -418,7 +420,7 @@ Cluster [`cmdb_ci_cluster`] and Cluster Node [`cmdb_ci_cluster_node`] are baseli
 
 **Reflexive bad design:** Custom service-map table.
 **Baseline alternative:** Service maps are `cmdb_rel_ci` records with relationship types. Metadata fits as fields on the relationship or on the CIs.
-**Verdict:** Almost always A.
+**Verdict:** A where existing fields hold the metadata; a new field on the relationship or on a CI class is B.
 
 ### Hot spot 4 — "We need a custom MID Server probe"
 

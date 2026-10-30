@@ -8,6 +8,104 @@ losing engagement content and without leaving a password behind.
 Read it once before you start. Nothing in your old setup is modified until step 6, so you can stop
 after any earlier step and still have exactly what you had this morning.
 
+## An install of 2.2.0 or earlier
+
+From 2.2.1 the Architect is installed from `https://github.com/farstic/snowarch.git`, and its signed manifest covers
+more of the release than 2.2.0's did. An install of 2.2.0 or earlier checks a release by its own, older rule, so its
+`upgrade` refuses 2.2.1 and changes nothing. It stops with one of these lines:
+
+```text
+upgrade: v2.2.1 has no verified signed manifest (… files in the published manifest differ from v2.2.1's own, the first .editorconfig) — nothing was changed
+upgrade: v2.2.1 has no verified signed manifest (the published manifest names …, and v2.2.1 here is …) — nothing was changed
+```
+
+Such an install is replaced once, by a fresh install of the current release in the same folder, so Claude Code keeps
+its memory and approvals for it, which follow the folder's path; the commands carry over what is yours. Run them from
+the folder that contains it, with its real name in place of `snowarch`. A file the old install does not have is not
+copied, and the copy says so.
+
+macOS / Linux:
+
+```sh
+mv snowarch snowarch-2.2.0
+git -c advice.detachedHead=false clone --branch v2.2.4 https://github.com/farstic/snowarch.git snowarch
+cd snowarch
+mkdir -p .local .claude
+cp -p ../snowarch-2.2.0/.local/licence.json ../snowarch-2.2.0/.local/instances.json .local/
+cp -p ../snowarch-2.2.0/.local/audit.jsonl .local/
+cp -p ../snowarch-2.2.0/.local/audit.jsonl.1 ../snowarch-2.2.0/.local/audit.jsonl.2 ../snowarch-2.2.0/.local/audit.jsonl.3 .local/
+cp -p ../snowarch-2.2.0/.claude/settings.local.json .claude/
+cp -Rp ../snowarch-2.2.0/clients .
+./bootstrap.sh --mode live
+```
+
+Windows PowerShell:
+
+```powershell
+Rename-Item snowarch snowarch-2.2.0
+git -c advice.detachedHead=false clone --branch v2.2.4 https://github.com/farstic/snowarch.git snowarch
+cd snowarch
+New-Item -ItemType Directory -Force .local, .claude | Out-Null
+Copy-Item ..\snowarch-2.2.0\.local\licence.json, ..\snowarch-2.2.0\.local\instances.json .local\
+Copy-Item ..\snowarch-2.2.0\.local\audit.jsonl .local\
+Copy-Item ..\snowarch-2.2.0\.local\audit.jsonl.1, ..\snowarch-2.2.0\.local\audit.jsonl.2, ..\snowarch-2.2.0\.local\audit.jsonl.3 .local\
+Copy-Item ..\snowarch-2.2.0\.claude\settings.local.json .claude\
+Copy-Item -Recurse ..\snowarch-2.2.0\clients .
+.\bootstrap.cmd --mode live
+```
+
+The licence, the instance store and the audit trail of instance writes (`audit.jsonl`, and the three older files it
+rotates into) carry over, and the new install continues the trail. The carried `.claude/settings.local.json` keeps your
+permissions, environment and hooks, SessionStart hooks of your own included; the bootstrap rewrites only its own
+hooks, the session banner, the citation check, the note on a Read of a page that is not there and the correction after a
+reply that cites one, which follow the new folder. An
+install that ran design-only (no instance) leaves out `--mode live`. With the carried store, `--mode live` keeps its
+default instance and does not run the wizard. Other folders of your own that git ignores (`deliverables/`, `memory/`,
+`reports/`) are copied the same way if you have them. Do not copy the rest of `.local/`: it describes the old folder,
+and a copied bootstrap record makes the new install skip steps it needs. Once the new install's `./snowarch status`
+reads as the old one did, delete `snowarch-2.2.0`.
+
+If its upgrade asks `Username for 'https://github.com':`, or stops with git's `could not read Username` followed by
+`upgrade: git could not fetch the release tags; nothing was changed`, the install cannot reach the address it was
+installed from: replace it as above.
+
+## An install made with `clone --branch` of a 2.2.1 release candidate, or later
+
+Such an install checks a release by the rule its own signed manifest carries, so it moves with the upgrade, from its
+folder.
+
+macOS / Linux:
+
+```sh
+git remote set-url origin https://github.com/farstic/snowarch.git
+./snowarch upgrade
+```
+
+Windows PowerShell:
+
+```powershell
+git remote set-url origin https://github.com/farstic/snowarch.git
+.\snowarch.cmd upgrade
+```
+
+The release tags your install already has stay where they are, so the upgrade's plan names the
+version you are on as before, for example `v2.2.1-rc.1 → v2.2.1`, and goes ahead as usual.
+Your `.local/`, your instances and your engagement folders stay where they are.
+
+If the upgrade stops at its fetch with `! [rejected] v2.2.1 -> v2.2.1 (would clobber existing tag)`, the install holds
+a tag of that name from its previous address: remove it with `git tag -d v2.2.1`, then upgrade again. Nothing else had
+changed.
+
+If the upgrade stops at its fetch with
+`upgrade: origin asked for credentials, or was not found — it may be private or moved; check it with git remote get-url origin; nothing was changed`,
+point the install at the address releases are published at: `git remote set-url origin https://github.com/farstic/snowarch.git`
+from its folder, then the upgrade again.
+
+An install that still has the v2.2.0 tag can go back with `upgrade --to v2.2.0`; it is then a 2.2.0 install again and
+returns by the fresh install above.
+
+The rest of this page is for the two-repository setup that came before 2.0.
+
 ## Who this is for
 
 - You cloned `farstic/claude-servicenow-live`, or
@@ -21,7 +119,7 @@ to a fresh machine.
 
 | Old | New |
 |---|---|
-| Two clones, kept in step by hand | One repository — `farstic/ai-servicenow-architect` |
+| Two clones, kept in step by hand | One repository — `farstic/snowarch` |
 | `claude mcp add servicenow-mcp …` with 12 `-e SERVICENOW_*` environment keys | A committed `.mcp.json`, server key `servicenow`. You never register anything |
 | Credentials in `~/.claude.json` and `~/.config/servicenow-mcp/instances.json` | `<checkout>/.local/instances.json`, mode `0600`, never committed, never in argv |
 | Tier 0 / Tier 1 / Tier 2 | Mode `design-only` or `live`, and a preset — `read-only`, `pdi-developer`, `full` or `custom` |
@@ -84,14 +182,14 @@ Get-ChildItem memory, scratchpad, deliverables, diagram-preview -ErrorAction Sil
 macOS / Linux:
 
 ```sh
-git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
+git -c advice.detachedHead=false clone --branch v2.2.4 https://github.com/farstic/snowarch.git && cd snowarch && ./bootstrap.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-git -c advice.detachedHead=false clone --branch v2.2.0 https://github.com/farstic/ai-servicenow-architect.git
-cd ai-servicenow-architect
+git -c advice.detachedHead=false clone --branch v2.2.4 https://github.com/farstic/snowarch.git
+cd snowarch
 .\bootstrap.cmd
 ```
 

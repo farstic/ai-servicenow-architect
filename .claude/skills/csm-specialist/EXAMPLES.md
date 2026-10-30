@@ -37,7 +37,7 @@ ServiceNow CSM cases extend `task`, which inherits the platform's audit history 
 
 Baseline notifications fire on key state transitions but are not required for this audit-trail requirement.
 
-(citation: markdown/customer-service-management/csm-case-management.md, markdown/now-platform/index.md for audit history)
+(citation: markdown/customer-service-management/csm-case-management.md, markdown/platform-security/c_DiffBtwnAuditHistSets.md for audit history)
 
 ## Part 2 — Data Model Alignment
 
@@ -61,7 +61,7 @@ Baseline notifications fire on key state transitions but are not required for th
 
 **Baseline reference fields:** no reference qualifiers material to this requirement.
 
-(citation: markdown/now-platform/index.md, markdown/customer-service-management/csm-data-management.md)
+(citation: markdown/platform-security/c_DiffBtwnAuditHistSets.md, markdown/platform-security/c_UnderstandingTheSysAuditTable.md, markdown/customer-service-management/csm-data-management.md)
 
 ## Part 3 — §1.1 Baseline-First Verdict
 
@@ -75,7 +75,7 @@ The audit-trail requirement is fully satisfied by three baseline constructs:
 
 No custom object needed. No new table. No new field. Pure configuration: ensure `sys_dictionary.audit = true` on the fields the engagement wants to audit (typically all of: `state`, `assigned_to`, `priority`, `category`, `account`, `contact`, `consumer`, `contract`, `entitlement`).
 
-(citation: markdown/now-platform/index.md for audit history)
+(citation: markdown/platform-security/c_DiffBtwnAuditHistSets.md for audit history)
 
 ## Part 4 — Routing Recommendation
 
@@ -155,7 +155,7 @@ The proposed "customer journey stage" is a **dimension** of the case record itse
 | `sn_customerservice_case.state` | Lifecycle state, not customer journey |
 | `sn_customerservice_case.priority` | Severity, not journey |
 | `sn_customerservice_case.category` | Issue type (e.g., billing, technical), not journey |
-| An account-level lifecycle stage on `customer_account` (not documented in the bundled corpus — verify on the instance) | This lives on the *account*, not the case. Cases inherit account context but the request is per-case journey, which may differ from account-level stage. |
+| An account-level lifecycle stage: Customer Success Management, a separate subscription, has an Engagement record (`sn_acct_lc_engagement`) whose required Account field ties it to an account and whose Stage is Initial onboarding, Adoption, Expand, Renew or Lost *(citations: `markdown/acct-lifecycle-events/account-lifecycle-create-engage.md`, `markdown/acct-lifecycle-events/account-lifecycle-domain-separation.md`, `markdown/acct-lifecycle-events/account-lifecycle-activate.md`)*; a stage field on `customer_account` itself is not documented in the bundled corpus — verify on the instance | This lives on the *account*, not the case. Cases inherit account context but the request is per-case journey, which may differ from account-level stage. |
 
 **Critical baseline fields to respect:** `account`, `contact`, `consumer`, `state`, `priority`, `category` — all already exist and the journey-stage field must not conflict with their semantics.
 
@@ -185,7 +185,7 @@ The five values map a *new dimension* that does not exist on `sn_customerservice
 
 **Why this is Verdict B, not Verdict C:**
 
-A new field on a baseline table is the smallest-scope custom object per §1.1's preference hierarchy (top of the list). It is not a new table, not a new scoped app, not a new Connection Alias, not a state extension on a baseline state field. It is the minimum-viable customisation, which §1.1 accepts at routing-time without halting — provided the Chief Architect approves the field name and engagement-scope conventions.
+A new field on a baseline table is the one schema addition Verdict B allows, at the top of §1.1's preference hierarchy. It is not a new table, not a new scoped app, not a new Connection Alias, not a state extension on a baseline state field, so it is not a §1.1 custom object: it proceeds at routing time without a halt, and its name follows the engagement's naming conventions.
 
 (citation: markdown/customer-service-management/csm-data-management.md — case data model)
 
@@ -218,7 +218,7 @@ Consult flags:
 ## Open Questions
 
 OQ-EV-1. **Engagement field-naming convention** — is `u_customer_journey_stage` correct? On `sn_customerservice_case` the platform names a new field by where it is created: in the table's own scope it takes no prefix, so `u_` there is the engagement's mark for a custom field; created from global, the platform adds `u_`; from a scoped app, that app's namespace, `x_<vendor>_<app>_customer_journey_stage` *(citation: `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*. Confirm with Chief Architect before Technical Designer dispatches.
-OQ-EV-2. **Auto-population** — should the field auto-populate from an account-level lifecycle stage, if the engagement's release has one? Such a field on `customer_account` is not documented in the bundled corpus — verify on the instance before design.
+OQ-EV-2. **Auto-population** — should the field auto-populate from an account-level stage? Where Customer Success Management is active — a separate subscription — an Engagement record tied to the account carries a Stage of Initial onboarding, Adoption, Expand, Renew or Lost *(citations: `markdown/acct-lifecycle-events/account-lifecycle-create-engage.md`, `markdown/acct-lifecycle-events/account-lifecycle-activate.md`)*; a stage field on `customer_account` itself is not documented in the bundled corpus — verify on the instance before design.
 OQ-EV-3. **Choice value localisation** — does the engagement need localised choice labels? Affects sys_choice record design.
 
 ---

@@ -1,7 +1,7 @@
 {
   "$schema": "./engine.config.schema.json",
   "product": "snowarch",
-  "repo": "farstic/ai-servicenow-architect",
+  "repo": "farstic/snowarch",
   "cli": "snowarch",
   "mcp": {
     "serverKey": "servicenow",

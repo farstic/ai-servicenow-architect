@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CORPUS_DIR, ROOT_FILES } from '../../tools/snowarch/lib/docs/sync.mjs';
 import { trackTempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { initFixtureRepo } from '../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 /**
  * One fixture corpus, two consumers.
@@ -23,6 +24,9 @@ import { trackTempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
  * UNINITIALISED, which is how a cloned engine repository actually arrives.
  */
 const AREAS = ['markdown/alpha', 'markdown/beta', 'markdown/gamma'];
+// ARC-09-C244 — an area the corpus has and nothing cites, as the real corpus has 36 of 56: the cone leaves it out
+// and the whole corpus brings it, so a test can tell the two checkouts apart by what is on disk.
+const UNCITED = 'markdown/uncited';
 // 197 characters, the longest path in the real corpus — the Windows long-path case, on the matrix.
 const LONG_NAME = `${'l'.repeat(197 - 'markdown/alpha/'.length - '.md'.length)}.md`;
 
@@ -54,7 +58,7 @@ const git = (args, cwd) => execFileSync(
 function buildUpstream(dir) {
   const src = join(dir, 'src');
   mkdirSync(src, { recursive: true });
-  git(['init', '-q', '-b', 'australia'], src);
+  initFixtureRepo((args) => git(args, src), src, ['-q', '-b', 'australia']);
   git(['config', 'user.email', 'fixture@example.invalid'], src);
   git(['config', 'user.name', 'fixture'], src);
 
@@ -62,7 +66,7 @@ function buildUpstream(dir) {
   // `git add -A` silently skips it and the completeness check then reports it missing — which it
   // did, on the first run of this fixture. The checker was right; the fixture was wrong.
   for (const f of ROOT_FILES) writeFileSync(join(src, f), `# fixture ${f}\n`);
-  for (const a of AREAS) {
+  for (const a of [...AREAS, UNCITED]) {
     mkdirSync(join(src, ...a.split('/')), { recursive: true });
     writeFileSync(join(src, ...a.split('/'), 'index.md'), `# ${a}\n`);
   }
@@ -139,7 +143,7 @@ function writeCitingSkill(root, page = CITED_PAGE) {
 
 function makeWorkspace({ scratch, pin, upstreamUrl }) {
   const w = trackTempDir(mkdtempSync(join(scratch, 'work-')));
-  git(['init', '-q'], w);
+  initFixtureRepo((args) => git(args, w), w, ['-q']);
   // The engine repository pins line endings (`* text=auto eol=lf`), so a fixture standing in for it
   // must too. Without this the workspace inherits the machine's `core.autocrlf`, and on the Windows
   // runner a file written LF, committed, and restored comes back CRLF — which is git behaving
@@ -175,4 +179,4 @@ function makeWorkspace({ scratch, pin, upstreamUrl }) {
 }
 
 
-export { AREAS, CITED_PAGE, LONG_NAME, git, buildUpstream, makeWorkspace, writeCitingSkill };
+export { AREAS, CITED_PAGE, LONG_NAME, UNCITED, git, buildUpstream, makeWorkspace, writeCitingSkill };

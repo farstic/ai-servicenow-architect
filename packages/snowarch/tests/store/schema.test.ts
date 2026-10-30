@@ -150,3 +150,21 @@ describe('lastProbe passthrough', () => {
     expect(ok(s).instances.pdi.lastProbe).toMatchObject({ somethingNew: 'ok' });
   });
 });
+
+describe('ARC-09-C211 — the path a store error names is a key, in backticks, never a name', () => {
+  // The engine's printer reads a bare `word.word` as a person's first.last and masks it: SV-02 printed
+  // "instances.pdi Unrecognized key(s) in object: 'notes'" as "i***.p*** …" (C210's probe). In backticks it is a key.
+  it('an unknown key in an instance names its object in backticks', () => {
+    const s = clone(); (s.instances.pdi as Record<string, unknown>).notes = 'x';
+    const e = err(s);
+    expect(e.code).toBe('STORE_SCHEMA_INVALID');
+    expect(e.message).toMatch(/^`instances\.pdi` Unrecognized key\(s\) in object: 'notes'$/);
+  });
+
+  it('an unknown key at the root names no path, and prints no empty backticks or leading space', () => {
+    const s = clone(); (s as Record<string, unknown>).notes = 'x';
+    const e = err(s);
+    expect(e.code).toBe('STORE_SCHEMA_INVALID');
+    expect(e.message).toBe("Unrecognized key(s) in object: 'notes'");
+  });
+});

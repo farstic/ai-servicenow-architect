@@ -1,7 +1,7 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -544,6 +544,99 @@ describe('ARC-07-W2 — the URL prompt re-asks', () => {
       expect(terminal.written()).toContain('"not a url" is not a URL — enter https://<host>');
       expect(terminal.written()).not.toContain(URL_EXHAUSTED);
       expect(existsSync(w.store)).toBe(false);
+    } finally { w.cleanup(); }
+  });
+});
+
+/**
+ * ARC-09-C223 — a bare host is proposed as a bare word is, and under --yes the URL used is said.
+ *
+ * A host typed without a scheme was refused as "not a URL". It is now a proposal: shown, with Enter to
+ * accept, at the prompt. Under --yes nobody is asked, and a proposal was taken without a word, which a
+ * bare word already did: so both forms now print the URL that will be stored (the architect's ruling).
+ */
+describe('ARC-09-C223 — a proposed URL', () => {
+  const BARE_HOST = 'dev12345.service-now.com';
+  const stored = (path: string) => (loadStore(path) as { store: Store }).store.instances.pdi?.url;
+
+  it('ARC-09-C223 — a bare host typed at the prompt is proposed, and Enter accepts it', async () => {
+    const w = workspace();
+    try {
+      const terminal = io([BARE_HOST, '', '']);
+      const result = await runAdd({ ...baseOptions, url: undefined }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(terminal.written()).toContain(`Proposed URL: ${URL_PDI} — Enter to accept, or type the full URL`);
+      expect(stored(w.store)).toBe(URL_PDI);
+    } finally { w.cleanup(); }
+  });
+
+  it('ARC-09-C223 — under --yes a bare word or host is used as proposed, and the URL is printed', async () => {
+    for (const url of ['dev12345', BARE_HOST]) {
+      const w = workspace();
+      try {
+        const terminal = io([]);
+        const result = await runAdd({ ...baseOptions, url, yes: true }, terminal,
+          { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+        expect(result.exitCode, url).toBe(EXIT_OK);
+        expect(terminal.written(), url).toContain(`Using ${URL_PDI}, proposed from what you entered.`);
+        expect(stored(w.store), url).toBe(URL_PDI);
+      } finally { w.cleanup(); }
+    }
+  });
+});
+
+/**
+ * ARC-09-C240 — a URL with credentials in it is refused, its password never printed, and nothing written.
+ *
+ * The normaliser quoted some of these back, password included (tests/cli/url.test.ts). These are the wizard's two
+ * paths to it: `--url` on argv, where the refusal is exit 2, and the prompt, which re-asks until it is exhausted.
+ */
+describe('ARC-09-C240 — a URL with credentials in it', () => {
+  const user = ['u', 'ser'].join('');
+  const pass = ['p', 'w', '1'].join('');            // assembled, never spelled
+  const shaped = [
+    `${user}:${pass}#x@acme.service-now.com`,
+    `${user}:${pass}?x@acme.service-now.com`,
+    `${user}:${pass}/x@acme.service-now.com`,
+    `${user}:${pass}@acme.service-now.com:99999`,
+    `https://${user}:${pass}#x@acme.service-now.com`,
+    `https://${user}:${pass}@acme.service-now.com:99999`,
+    `https://${user}:${pass}/x@acme.service-now.com`,
+  ];
+  const NEVER = 'Never put a username or password in the URL; the wizard will ask for them separately.';
+  const files = (dir: string) => readdirSync(dir, { recursive: true }).map(String).sort();
+
+  it('ARC-09-C240 — on argv each is refused with exit 2, no password is printed, and nothing is written', async () => {
+    for (const url of shaped) {
+      const w = workspace();
+      try {
+        const before = files(w.dir);
+        const terminal = io([]);
+        const result = await runAdd({ ...baseOptions, url, yes: true }, terminal,
+          { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+        expect(result.exitCode, url).toBe(EXIT_USAGE);
+        expect(terminal.written(), url).toContain(NEVER);
+        expect(terminal.written(), url).not.toContain(pass);
+        expect(existsSync(w.store), url).toBe(false);
+        expect(files(w.dir), url).toEqual(before);
+      } finally { w.cleanup(); }
+    }
+  });
+
+  it('ARC-09-C240 — typed at the prompt, each refusal says why, none prints the password, and nothing is written', async () => {
+    const w = workspace();
+    try {
+      const before = files(w.dir);
+      const terminal = io(shaped.slice(0, MAX_ATTEMPTS));
+      const result = await runAdd({ ...baseOptions, url: undefined }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(terminal.written()).toContain(URL_EXHAUSTED);
+      expect(terminal.written()).not.toContain(pass);
+      expect(terminal.written().split(NEVER).length - 1).toBe(MAX_ATTEMPTS);
+      expect(existsSync(w.store)).toBe(false);
+      expect(files(w.dir)).toEqual(before);
     } finally { w.cleanup(); }
   });
 });

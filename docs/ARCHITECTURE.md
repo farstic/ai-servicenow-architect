@@ -8,7 +8,7 @@
 ## The target tree
 
 ```
-ai-servicenow-architect/                      farstic/ai-servicenow-architect · one git tag per release
+snowarch/                                     farstic/snowarch · one git tag per release
 ├── CLAUDE.md                                 ≤200 lines: identity, routing protocol (Phase 1/2), §1.1 summary, the `Status` trigger (→ `/snowarch status`); imports nothing large
 ├── README.md                                 the ONE install page (2 commands, 2 dialogs, what you will see)
 ├── LICENSE · NOTICE                          single licence (BUSL-1.1 from 2.1.0, ADR-0011; Apache-2.0 before, D-02); Apache-2.0 attribution for ServiceNow/ServiceNowDocs
@@ -228,7 +228,7 @@ checkout.
 
 ```sh
 { [ -e vendor/ServiceNowDocs/.git ] || git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs ; } && \
-git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/financial-services-operations markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform legal && \
+git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/acct-lifecycle-events markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-relationship-management markdown/customer-service-management markdown/delta-xanadu-australia markdown/employee-service-management markdown/financial-services-operations markdown/governance-risk-compliance markdown/healthcare-life-sciences markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/release-notes markdown/servicenow-platform legal && \
 git -C vendor/ServiceNowDocs fetch --depth 1 origin c10276e953456835cdbb1f3a60d58ae1980be353 && \
 git -C vendor/ServiceNowDocs checkout --detach c10276e953456835cdbb1f3a60d58ae1980be353 && \
 { git submodule absorbgitdirs vendor/ServiceNowDocs || true ; } && \
@@ -715,6 +715,7 @@ anything), and the table below, which is generated from it.
 |  | `node present` | literal | no Node means the hook is disabled |
 |  | `hooks disabled` | literal | S-05: the launcher may have turned them off |
 |  | `registration` | literal | project or user changes what is written |
+|  | `hooks written` | literal | the hook entries this release writes |
 | `B08` the doctor | `packages/snowarch/dist/contract.json` | file | by sha — a different server answers differently |
 |  | `store mtime+size` | literal | NEVER the content: see the credential rule above |
 |  | `mode` | literal | design-only skips the server section |
@@ -1222,7 +1223,9 @@ account name on every platform. A home directory reads `~` — the run's own hom
 from `bin/snowarch.mjs`, because nothing under `lib/` may read the home itself) and the four generic
 shapes by pattern —
 and what follows it survives: the depth of the checkout, a space in the path, the drive letter — the
-part a maintainer uses, none of it naming anybody.
+part a maintainer uses, none of it naming anybody. An address's domain is the fourth, for the same reason: the server
+masks a username to `j***@clientco.com`, and the domain names the organisation, so it reads `<domain>` whatever the
+store holds (ARC-09-C242).
 
 **One report, one Mode line** (ARC-08-S05). The sections print in a fixed order — prereqs, repo,
 docs, roster, contract, legacy, host, server — and the last line is always the Mode line, because
@@ -1271,7 +1274,7 @@ about one registry rather than several:
 | `E-12` | docs | docs corpus present | — | yes |
 | `E-13` | docs | docs pin | — | yes |
 | `E-14` | docs | docs family | — | — |
-| `E-15` | docs | sparse set | — | yes |
+| `E-15` | docs | corpus completeness | — | yes |
 | `E-16` | docs | citations | — | — |
 | `E-17` | roster | roster from directory listing | yes | — |
 | `E-18` | roster | skill descriptions | yes | — |
@@ -1319,8 +1322,8 @@ REFUSED with the check's own command, and a grep test proves the module cannot r
 | `F5` | `store-mode` | restore the store directory mode | `.local/` |
 | `F6` | `toggles-mismatch` | rewrite the mode toggles | `.claude/settings.local.json` |
 | `F6` | `hooks-disabled-by-bootstrap` | remove the bootstrap's hook toggle | `.claude/settings.local.json` |
-| `F6` | `hook-absent` | register the SessionStart hook | `.claude/settings.local.json` |
-| `F6` | `hook-wrong` | rewrite the SessionStart hook | `.claude/settings.local.json` |
+| `F6` | `hook-absent` | register the hooks | `.claude/settings.local.json` |
+| `F6` | `hook-wrong` | rewrite the hooks | `.claude/settings.local.json` |
 | `F8` | `integrity-restore` | put the signed files back | `the covered files E-32 names; what it replaces is kept in .local/integrity-removed/` |
 | `F7` | `cache-stale` | clear the stale doctor cache | `.local/doctor-last.json` |
 <!-- /generated:doctor-fixes -->
@@ -1504,8 +1507,8 @@ remain readable at their source.
 
 | Predecessor | Where it landed | Import tag | Source archive |
 |---|---|---|---|
-| Claude ServiceNow Architecture Engine **v2.8.0** | the repository ROOT — `CLAUDE.md`, `.claude/`, `governance/`, `docs/` | `import/engine-v2.8.0-worktree` → `7f99a3a` | [`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live) — *(to be archived by ARC-10-S09; date recorded there)* |
-| `snow-mcp` **1.0.0** | `packages/snowarch/` | `import/snow-mcp-1.0.0` → `58a66e0` | [`farstic/snow-mcp`](https://github.com/farstic/snow-mcp) — *(to be archived by ARC-10-S09; date recorded there)* |
+| Claude ServiceNow Architecture Engine **v2.8.0** | the repository ROOT — `CLAUDE.md`, `.claude/`, `governance/`, `docs/` | `import/engine-v2.8.0-worktree` → `7f99a3a` | `farstic/claude-servicenow-live` — *(to be archived by ARC-10-S09; date recorded there)* |
+| `snow-mcp` **1.0.0** | `packages/snowarch/` | `import/snow-mcp-1.0.0` → `58a66e0` | `farstic/snow-mcp` — *(to be archived by ARC-10-S09; date recorded there)* |
 
 **The server was NOT grafted with `git subtree add`.** That was tried first and rejected on the
 evidence recorded above: it places the tree at a prefix without recording a rename, and

@@ -43,6 +43,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { loadContract, toolNames } from '../../../../packages/contract/lib/contract.mjs';
+import { SPARSE, sparseOf } from './status.mjs';
 
 /** The one phrase that marks a platform name the corpus does not document. Checked on the line. */
 export const MARKER = 'not documented in the bundled corpus — verify on the instance';
@@ -73,7 +74,7 @@ export const REASONS = Object.freeze({
   'payload-key': "a key of an external system's payload, or an input or output of an example action",
   'example-role': 'a role the example invents',
   'script-variable': 'a variable, parameter or property inside example code',
-  'script-code': 'a variable and its member written in a sentence about example code (current.approval, gr.next); a dotted name only, whose left half has no underscore',
+  'script-code': 'a variable and its member written in a sentence about example code (`current.approval`, `gr.next`); a dotted name only, whose left half has no underscore',
   'example-name': 'any other name the example invents: a group, a metric, an index, a file, a value',
 });
 
@@ -322,7 +323,7 @@ export function checkAllowList(list, roster, { prefixes = PLATFORM_PREFIXES, glu
     }
     const dottedId = e.identifier.includes('.');
     const camelId = !dottedId && CAMEL_NAME.test(e.identifier);
-    if (e.reason === 'script-code' && !dottedId) { fail('a script-code entry names a dotted name: current.approval, not a bare word'); continue; }
+    if (e.reason === 'script-code' && !dottedId) { fail('a script-code entry names a dotted name: `current.approval`, not a bare word'); continue; }
     if (dottedId) {
       // The dotted arm's one excuse. A table written with a word is a claim about the table, so the
       // left half must be a variable — no underscore — and the file must write the pair.
@@ -380,7 +381,7 @@ export function reasonCounts(list) {
  * than reporting a clean zero. The allow-list's roster-side errors are reported either way.
  */
 export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/ServiceNowDocs', allow, glued, tools,
-                                    prefixes = PLATFORM_PREFIXES, index } = {}) {
+                                    prefixes = PLATFORM_PREFIXES, index, shape } = {}) {
   const lists = (allow && glued) ? null : readAllowList();
   const list = allow ?? lists.allow;
   const gluedList = glued ?? lists.glued;
@@ -391,6 +392,14 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
   const none = () => ({ checked: 0, unexcused: [], scriptCode: 0, excused: 0 });
   if (!index && !existsSync(join(corpus, 'markdown'))) {
     return { status: 'missing', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [], deadPrefixes: [], allowErrors, reasons, dotted: none(), camel: none(), spaced: none() };
+  }
+  // ARC-09-C244 — the guard is defined against the whole corpus, which is what an install has by default. A sparse
+  // checkout holds only the cited areas: a name another area prints would read as unexcused there, and an excuse that
+  // area makes stale would read as sound. So it says it did not check, as it does for an absent corpus, and only the
+  // list's own errors count. `shape` is the checkout's (`sparseOf`), given by a test.
+  if (!index && [SPARSE.cone, SPARSE.pattern].includes(shape ?? sparseOf(corpus))) {
+    return { status: 'sparse', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [],
+      deadPrefixes: [], allowErrors, reasons, dotted: none(), camel: none(), spaced: none() };
   }
   const wants = rosterWants(roster);
   const idx = index ?? corpusIndex(corpus, wants);
@@ -554,6 +563,10 @@ export function formatIdentifiers(r) {
   const lines = r.allowErrors.map((e) => `ALLOW ${e.file} ${e.identifier} — ${e.why}`);
   if (r.status === 'missing') {
     lines.push('identifiers: examined nothing — the corpus is absent');
+    return { text: lines.join('\n'), code: r.allowErrors.length ? 1 : 0 };
+  }
+  if (r.status === 'sparse') {
+    lines.push('identifiers: not checked — the corpus is sparse; the guard reads the whole corpus');
     return { text: lines.join('\n'), code: r.allowErrors.length ? 1 : 0 };
   }
   for (const p of r.deadPrefixes) lines.push(`PREFIX ${p} — begins no corpus name; remove it from PLATFORM_PREFIXES`);

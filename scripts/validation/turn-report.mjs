@@ -11,7 +11,16 @@
 // bare file name in three of nine answers, which a checker has to be able to tell apart from a page
 // that does not exist.
 //
-//   node scripts/validation/turn-report.mjs <stream.jsonl> <checkout>
+// A skill run by its slash command (`/snowarch status`) is expanded by the CLI before the model's first step, so the stream
+// holds no Skill call and no Read of its file. The turn's prompt says it ran, so a run that is given the prompt reports it
+// as `slash command`; without that, the line read `skills: none` for a turn that followed the skill (ARC-09-C243).
+//
+// THE FINDING COPY (ARC-09-C252 (a)). `/snowarch finding` ends by running tools/snowarch/lib/finding.mjs on the note, and its output is
+// what the user sends. A turn that ran it is reported as: in the reply as printed, in the reply but in a code fence, or not in the reply
+// as printed (only in the tool result, or changed). T-37 turn 3 was judged by eye until a sitting found the copy fenced on one tree and
+// pointed to ("its output is above") on another; counted, a before and an after are numbers.
+//
+//   node scripts/validation/turn-report.mjs <stream.jsonl> <checkout> [<prompt.txt>]
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -33,6 +42,18 @@ function events(streamText) {
 
 const blocks = (e) => (e?.type === 'assistant' && Array.isArray(e.message?.content) ? e.message.content : []);
 
+/**
+ * What the main thread wrote after its last tool result: the reply, and the line after it when a Stop hook sent the turn
+ * on for a correction (ARC-09-C254). The stream's `result` row is only the last message, so it is the correction alone then.
+ * Text written before a tool call is narration, and a sub-agent's text (`parent_tool_use_id`) is not the main thread's.
+ */
+function finalText(evs) {
+  const main = evs.filter((e) => !e?.parent_tool_use_id);
+  const last = main.findLastIndex((e) => e?.type === 'user' && Array.isArray(e.message?.content)
+    && e.message.content.some((c) => c?.type === 'tool_result'));
+  return main.slice(last + 1).flatMap(blocks).filter((b) => b?.type === 'text').map((b) => b.text).join('\n');
+}
+
 /** `markdown/...` for a path that names a corpus page by any of its spellings, else null. */
 function corpusRelative(p) {
   const norm = String(p ?? '').replace(/\\/g, '/');
@@ -48,7 +69,7 @@ function walk(dir, out = []) {
   return out;
 }
 
-export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, 'vendor', 'ServiceNowDocs') } = {}) {
+export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, 'vendor', 'ServiceNowDocs'), prompt = '' } = {}) {
   const evs = events(streamText);
   const skills = [];
   const reads = new Set();
@@ -70,10 +91,39 @@ export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, '
     }
   }
 
-  // The answer: the result event when there is one, else what the assistant said.
+  // A skill the CLI ran from the prompt's slash command: no tool call in the stream shows it, the prompt does. Only a command
+  // that starts the prompt, whole, and names a skill this checkout has.
+  const slash = /^\/([a-z0-9][a-z0-9-]*)(?:\s|$)/.exec(String(prompt).trim());
+  if (slash && existsSync(join(repoRoot, '.claude', 'skills', slash[1], 'SKILL.md'))) addSkill(slash[1], 'slash command');
+
+  // The answer: what the model wrote after its last tool result when there is a result event (the result row alone is the last
+  // message, which is a correction line when a Stop hook asked for one), else all that the assistant said.
   const result = [...evs].reverse().find((e) => e?.type === 'result' && typeof e.result === 'string');
-  const answer = result ? result.result
+  const answer = result ? (finalText(evs) || result.result)
     : evs.flatMap(blocks).filter((b) => b?.type === 'text').map((b) => b.text).join('\n');
+
+  // The finder's output: the tool result of a Bash call that ran finding.mjs and printed the review list (the --next-name run prints a path
+  // and none, so it is no copy). Whether the reply holds it as printed, and whether inside a code fence (an odd number of fence lines before it).
+  const finderIds = new Set();
+  let finderOutput = null;
+  for (const e of evs) {
+    for (const b of blocks(e)) {
+      const command = String(b?.input?.command ?? '');
+      if (b?.type === 'tool_use' && b.name === 'Bash' && /lib\/finding\.mjs/.test(command)) finderIds.add(b.id);
+    }
+    if (e?.type === 'user' && Array.isArray(e.message?.content)) {
+      for (const c of e.message.content) {
+        if (c?.type !== 'tool_result' || !finderIds.has(c.tool_use_id)) continue;
+        const out = typeof c.content === 'string' ? c.content : (Array.isArray(c.content) ? c.content.map((x) => x?.text ?? '').join('\n') : '');
+        if (/Read before sending:/.test(out)) finderOutput = out.trim();
+      }
+    }
+  }
+  let findingCopy = null;
+  if (finderOutput) {
+    const at = answer.indexOf(finderOutput);
+    findingCopy = { verbatim: at >= 0, fenced: at >= 0 && (answer.slice(0, at).match(/^[ \t]*```/gm) ?? []).length % 2 === 1 };
+  }
 
   let repoNames = null;
   const repoBase = () => {
@@ -121,7 +171,7 @@ export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, '
       else citations.push({ cited, status: 'missing', resolved: null });
     }
   }
-  return { skills, corpusReads: [...reads], corpusSearches: searches, citations };
+  return { skills, corpusReads: [...reads], corpusSearches: searches, citations, findingCopy };
 }
 
 export function formatReport(r) {
@@ -129,7 +179,9 @@ export function formatReport(r) {
   const head = `skills: ${r.skills.length ? r.skills.map((s) => `${s.name} (${s.how})`).join(', ') : 'none'}`
     + ` · corpus pages read: ${r.corpusReads.length}${r.corpusSearches ? ` (+${r.corpusSearches} searches)` : ''}`
     + ` · citations: ${r.citations.length}`
-    + (r.citations.length ? ` (ok ${n('ok')} · bare ${n('bare')} · ambiguous ${n('ambiguous')} · missing ${n('missing')})` : '');
+    + (r.citations.length ? ` (ok ${n('ok')} · bare ${n('bare')} · ambiguous ${n('ambiguous')} · missing ${n('missing')})` : '')
+    + (r.findingCopy ? ` · finding copy: ${!r.findingCopy.verbatim ? 'NOT in the reply as printed (only in the tool result, or changed)'
+      : r.findingCopy.fenced ? 'in the reply, but in a code fence' : 'in the reply, verbatim, unfenced'}` : '');
   const detail = r.citations.filter((c) => c.status !== 'ok').map((c) => {
     if (c.status === 'missing') return `  MISSING ${c.cited}`;
     if (c.status === 'bare') return `  BARE ${c.cited} -> ${c.resolved}`;
@@ -139,7 +191,8 @@ export function formatReport(r) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [stream, repoRoot] = process.argv.slice(2);
-  if (!stream || !repoRoot) { console.error('usage: turn-report.mjs <stream.jsonl> <checkout>'); process.exit(2); }
-  console.log(formatReport(reportTurn(readFileSync(stream, 'utf8'), { repoRoot })));
+  const [stream, repoRoot, promptFile] = process.argv.slice(2);
+  if (!stream || !repoRoot) { console.error('usage: turn-report.mjs <stream.jsonl> <checkout> [<prompt.txt>]'); process.exit(2); }
+  const prompt = promptFile && existsSync(promptFile) ? readFileSync(promptFile, 'utf8') : '';
+  console.log(formatReport(reportTurn(readFileSync(stream, 'utf8'), { repoRoot, prompt })));
 }

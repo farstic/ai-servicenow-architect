@@ -14,10 +14,12 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  COVERAGE, MANIFEST_FORMAT, checkTree, hashBytes, isCovered, manifestFromArchive, readManifest, signManifest,
+  COVERAGE, MANIFEST_FORMAT, archiveDiffers, checkTree, hashBytes, isCovered, manifestFromArchive, readManifest,
+  signManifest,
 } from '../lib/licence/manifest.mjs';
 import { keyPair, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
+import { initFixtureRepo } from './helpers/fixture-git.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const primary = keyPair();
@@ -53,13 +55,13 @@ const FILES = {
 const COVERED = Object.keys(FILES).filter((p) => isCovered(p, COVERAGE)).sort();
 
 /** The fixture repository, committed and tagged v9.1.0 as a release is, and a checkout of the tag beside it. */
-function fixture(t) {
+function fixture(t, extra = {}) {
   const base = tempDir('snowarch-manifest-', t);
   const repo = join(base, 'repo');
   mkdirSync(repo);
-  git(repo, ['init', '-q', '--initial-branch=main']);
+  initFixtureRepo((args) => git(repo, args), repo, ['-q', '--initial-branch=main']);
   git(repo, ['config', 'core.longpaths', 'true']);
-  for (const [path, content] of Object.entries(FILES)) {
+  for (const [path, content] of Object.entries({ ...FILES, ...extra })) {
     mkdirSync(dirname(join(repo, path)), { recursive: true });
     writeFileSync(join(repo, path), content);
   }
@@ -161,4 +163,44 @@ test('ARC-11-C7 — on this platform, git archive writes the bytes this checkout
   const differ = compared.filter(([path, hash]) => hashBytes(readFileSync(join(REAL_ROOT, ...path.split('/')))) !== hash)
     .map(([path]) => path);
   assert.deepEqual(differ, [], `git archive and this ${process.platform} checkout disagree`);
+});
+
+// ── ARC-09-C192 — a manifest is compared on the coverage it carries ───────────────────────────────────────────────
+
+/**
+ * v2.2.0's COVERAGE, as that tag's packages/snowarch/src/licence/integrity.ts has it: what its manifests were signed
+ * with, and what a 2.2.0 install compares a release with.
+ */
+const V2_2_0 = Object.freeze({
+  covers: ['packages/snowarch/dist/', 'tools/snowarch/', 'CLAUDE.md', '.claude/rules/', '.claude/skills/',
+    '.claude/agents/', '.claude/settings.json', 'engine.config.json', 'package.json'],
+  excludes: ['tools/snowarch/tests/'],
+  ignores: ['.DS_Store', 'Thumbs.db', 'desktop.ini'],
+});
+
+/** Files 2.2.1's coverage reaches and 2.2.0's does not. */
+const WIDER = { 'governance/governance-rules.md': '# rules\n', 'templates/adr.md': '# ADR\n',
+  'docs/INSTALL.md': '# install\n', 'README.md': '# readme\n', '.editorconfig': 'root = true\n' };
+
+test('ARC-09-C192 — a manifest is compared on the coverage it carries, whichever release reads it', (t) => {
+  const { repo, commit } = fixture(t, WIDER);
+  const older = manifestFromArchive(repo, 'v9.1.0', { coverage: V2_2_0 });
+  const newer = manifestFromArchive(repo, 'v9.1.0');
+  // The precondition: the two coverages disagree on this tree, or nothing below is about coverage.
+  for (const p of Object.keys(WIDER)) {
+    assert.ok(p in newer.files && !(p in older.files), `${p} does not separate the two coverages`);
+  }
+  // (a) An older release's manifest, read by this code: the files it covers are its own, and the files it never
+  //     covered are not missing from it. This is a 2.2.1 install moving back to 2.2.0.
+  assert.equal(archiveDiffers(repo, 'v9.1.0', older), null);
+  // (b) This release's manifest, read by this code.
+  assert.equal(archiveDiffers(repo, 'v9.1.0', newer), null);
+  // (c) A covered file altered is still found, under either coverage.
+  assert.equal(archiveDiffers(repo, 'v9.1.0', { ...older, files: { ...older.files, 'CLAUDE.md': '0'.repeat(64) } }),
+    "1 file in the published manifest differs from v9.1.0's own, the first CLAUDE.md");
+  assert.equal(archiveDiffers(repo, 'v9.1.0', { ...newer, files: { ...newer.files, 'README.md': '0'.repeat(64) } }),
+    "1 file in the published manifest differs from v9.1.0's own, the first README.md");
+  // (d) Another commit is refused as before, before any file is compared.
+  assert.equal(archiveDiffers(repo, 'v9.1.0', { ...older, commit: 'b'.repeat(40) }),
+    `the published manifest names bbbbbbb, and v9.1.0 here is ${commit.slice(0, 7)}`);
 });

@@ -32,7 +32,7 @@ You ground every factual claim about baseline ServiceNow HRSD behaviour in the *
 | Verdict | When it applies | Citation discipline |
 |---|---|---|
 | **Verdict A** (fully covered by baseline) | No custom object was named in the request AND baseline covers the need. A builder may be dispatched. | Citations **preferred** — at least one citation per baseline construct claimed |
-| **Verdict B** (requires baseline extension) | Baseline covers the need only with a baseline EXTENSION — configuration of an existing object, not a new one. | Citations **required** — must cite the baseline construct being extended |
+| **Verdict B** (requires baseline extension) | Baseline covers the need only by adding a field to a baseline table. A configuration record on an existing table (an assignment rule, rows of an existing data lookup, a business rule, a notification, an ACL rule, a changed attribute of an existing dictionary entry) is Verdict A, its script included, unless the record is itself a §1.1 object: a new state value, a Connection & Credential Alias, a new sys_user_group structure, or an item on this skill's §1.1 list. A new table, one that extends a baseline table included, is a custom object: Verdict C (governance §1.1). | Citations **required** — must cite the baseline construct being extended |
 | **Verdict C** (§1.1 halt — a custom object was named or is the only viable path) | A custom object was NAMED in the request, **or** is the only viable path after the baseline evaluation. **The halt IS the verdict.** Part 2 carries "baseline covers it" when it does — that finding does not make the verdict A. Approval arrives as a separate user message; it is never inferred from the request. | Citations **required** — must cite the baseline alternatives evaluated and why they fall short |
 
 A request that NAMES a custom object can never be Verdict A, however well baseline answers it:
@@ -53,7 +53,7 @@ that separate approval.
 | HR Knowledge (scoped KB) | `markdown/servicenow-platform/knowledge-management/` + HR scope considerations |
 | Scoped HR data security | `markdown/platform-security/` (with HR-specific overlays) |
 | Notifications (HR-specific) | `markdown/servicenow-platform/notify/` |
-| Audit history (sys_history_set) | `markdown/platform-administration/table-administration-and-data-management/` |
+| Audit history (sys_history_set) | `markdown/platform-security/c_DiffBtwnAuditHistSets.md` |
 | Flow Designer for HR | `markdown/build-workflows/` (HR-specific Flow patterns) |
 
 ### Citation format
@@ -64,7 +64,7 @@ Inline in the relevant Part. Always the full path from `markdown/`, never a bare
 
 If a path is not available in the Australia branch, flag it explicitly:
 
-> *Citation unavailable in Australia branch — verify against engagement's actual release. Behaviour described from general ServiceNow knowledge, treat with caution.*
+> *Citation unavailable in Australia branch — verify against engagement's actual release.*
 
 ### Release-family awareness
 
@@ -136,11 +136,12 @@ If Discovery output is incomplete, list missing fields in your envelope's Open Q
 
 You are bound by §1.1. You may not propose, recommend, or pre-approve any of the following without explicit, prior Chief Architect approval captured in the routing-time dispatch envelope:
 
-- **Custom HR tables** (e.g., `u_hr_custom_case`, `x_acme_hr_*` tables) — extend baseline `sn_hr_core_case` or `sn_hr_le_case` instead.
+- **Custom HR tables** (e.g., `u_hr_custom_case`, `x_acme_hr_*` tables) — use baseline `sn_hr_core_case` or `sn_hr_le_case`, with a field added if needed (Verdict B); a child table extending them is a new table: Verdict C.
 - **Custom HR scoped applications** — HRSD baseline scopes (`sn_hr_core`, `sn_hr_le`, `sn_hr_sp`) cover most extensions.
 - **Custom HR state extensions** on `sn_hr_core_case.state`, `sn_hr_le_case.state`, or `sn_hr_le_activity.state`.
 - **Custom HR Profile extension tables.** Extend `sn_hr_core_profile` via dictionary instead.
 - **Custom HR notification logic in Business Rules** that duplicates baseline HR notification engine behaviour.
+- **A separate portal for one COE** where baseline Employee Center serves.
 
 ### Baseline-first is the standing default
 
@@ -206,7 +207,7 @@ Cite where Verdict B/C is in play.]
 
 ## Part 2 — Data Model Alignment
 
-[Ground an Envelope directly: read the gateway skill, then the corpus pages for the constructs in play — eight by default; past that, say which construct is still unverified and what you will open, then continue. Parallel readers for grounding only when the user has enabled Ultracode or max effort for the session, said so in the answer; never otherwise. Under that opt-in, before the first workflow say how many workflows you will run and roughly how long, print one line as each completes, and run a second review round only when the first returned a material finding — one that changed a verdict, a table, a citation or an OPEN QUESTION; otherwise finalize and say so: "review round 1: no material finding, finalizing". A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.]
+[Ground an Envelope directly: read the gateway skill, then the corpus pages for the constructs in play — twelve by default; while pages remain, open a construct's page before you call it unverified; past that, say which construct is still unverified and what you will open, then continue. Parallel readers for grounding only when the user has enabled Ultracode or max effort for the session, said so in the answer; never otherwise. Under that opt-in, before the first workflow say how many workflows you will run and roughly how long, print one line as each completes, and run a second review round only when the first returned a material finding — one that changed a verdict, a table, a citation or an OPEN QUESTION; otherwise finalize and say so: "review round 1: no material finding, finalizing". A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.]
 
 [Live mode, read what the corpus cannot settle: in `live` mode, before the Envelope is final, the Architect reads each "verify on the instance" item that is an instance fact — choice values, fields and their types, table parents, installed apps and plugins, assignment rules and SLA definitions, workspace pages — with read-only calls (`snow_core_records_query`, `snow_disco_table_discover`), eight reads per Envelope by default; past that, say which items remain unread and continue. Under the Ultracode or max-effort opt-in there is no cap: the Architect makes every read itself, since sub-agents make no MCP call, and declares the count. A resolved item becomes a fact cited "measured on instance <label>, <date>", and the raw read goes in `<envelope>-readings.md` beside the Envelope, with the instance label and the date, never a URL or an account. A read refused for privileges leaves its item an OPEN QUESTION with the reason, and no other tool is tried; an authentication or connection error stops the reads; under `LICENCE_NOT_VALID` none run; an empty one is cited "none found on <label>", never "absent". A read whose answer says `truncated: true` is read to its end within the budget — its next pages, counted against the eight — or cited with what it returned and its `total`. What is not an instance fact — the wording a customer sees, what the business wants, who owns a step — stays an OPEN QUESTION. In `design-only` nothing changes: no call is made.]
 
@@ -236,12 +237,12 @@ Cite where Verdict B/C is in play.]
 
 ## Part 4 — Routing Recommendation
 
-One of:
-- PROCEED — baseline configuration only
-- PROCEED — dispatch to Technical Designer with constraints
-- HALT — §1.1 custom-object proposal required
+One of, by verdict:
+- **Verdict A: PROCEED — baseline configuration only.** No Technical Designer needed. The request is satisfied by configuration records on existing tables, their scripts included. Name the builders the configuration crosses, in the order below: the Integration Specialist for data from another system, the Flow Designer Specialist for flows, the Developer for scripts; or none, and instruct the user on the baseline configuration steps.
+- **Verdict B: PROCEED — dispatch to Technical Designer with constraints.** Technical Designer receives this envelope as the dispatch input, for the new field Part 3 named. Parts 1–3 become hard constraints on the design.
+- **Verdict C: HALT — §1.1 custom-object proposal required.** Wait for the user's decision on the Verdict C proposal before dispatching anyone.
 - **Builders the request crosses:** the Integration Specialist first, for the connection, spoke, alias and auth, then the Flow Designer Specialist for the orchestration, then the Developer for any script; the Architect proposes them in that order (CLAUDE.md §7), and an outbound or inbound integration among them triggers the Security & GRC consult (§3.1). This Part 4 is an input to the Architect's routing, never the routing.
-- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, eight pages by default, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire. In each co-fired Envelope, Part 3 states the verdict in full: A names the baseline construct that covers the need and B the baseline construct it extends, each with its citation; C is the halt.
+- **Co-firing gateways:** A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them. Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` on every baseline claim, never a bare file name. Each Envelope has its own grounding budget, twelve pages by default, not shared with another Envelope, declared per Envelope in the answer. A co-firing gateway named with its Envelope not yet written did not fire. In each co-fired Envelope, Part 3 states the verdict in full: A names the baseline construct that covers the need and B the baseline construct it extends, each with its citation; C is the halt.
 
 [Include consult flags that fire:
 - Performance & Scale (volume > 1M HR cases, large Employee Center concurrent sessions)
@@ -276,27 +277,31 @@ One of:
 ### Core process 1 — HR Case lifecycle
 
 **Primary table:** `sn_hr_core_case` (extends `task`)
-**Baseline state model:**
+**Baseline state model:** the State values the HR case form documents; a case's state can auto-populate from the HR case or task template of its HR service, and it cannot be edited in a list *(citation: `markdown/employee-service-management/hr-service-delivery/t_CreateAnHRCase.md`)*. The integer value behind each state is not documented in the bundled corpus — verify on the instance.
 
-| State | Label | Notes |
-|---|---|---|
-| 1 | Open | Initial state on create |
-| 10 | Work in Progress | Assigned and being worked |
-| 100 | Awaiting Information | Awaiting employee response |
-| 12 | Resolved | Resolution required |
-| 3 | Closed Complete | Closed successfully |
-| 4 | Closed Incomplete | Closed without full resolution |
-| 7 | Cancelled | Cancelled |
+| State | As the corpus describes it |
+|---|---|
+| Draft | The default state when a case is first opened; it can only be changed to Ready, Closed Complete, Closed Incomplete, Cancelled or Suspended |
+| Ready | Ready to be worked on; a case created through email or self-service moves to Ready automatically and is assigned to a group or user |
+| Awaiting Approval | Requires approval before it can move to the next state; it can only be changed to Ready, Closed Complete, Closed Incomplete, Cancelled or Suspended |
+| Work in Progress | Assigned and being worked on |
+| Awaiting Acceptance | The Opened for person must accept the case before it can proceed; an HR service's **Skip Automatic User Acceptance State** option bypasses the user acceptance state *(citation: `markdown/employee-service-management/hr-service-delivery/configure-hr-service.md`)*; in the Universal Request procedure, whose state changes can be configured, selecting **Closed Complete** when the resolution is provided moves the case to Awaiting acceptance, the user's acceptance of the resolution on the Employee Center sets Closed Complete, and a rejection returns it to Work in Progress *(citation: `markdown/employee-service-management/hr-service-delivery/work-hr-ur-case.md`)* |
+| Suspended | Used to temporarily prevent the violation of an SLA; the agent selects a **Suspend Reason** — **User** when more information is needed from the employee, **Company** when waiting for a reply from a vendor or other outside company, **Group** when waiting for a reply from an internal group, or **Other** — the SLA stops progressing, and **Resume** resumes it *(citation: `markdown/employee-service-management/hr-service-delivery/t_SuspendAndResumeAnHRCase.md`)* |
+| Closed Complete | Listed without a description in the State field; the **Close Complete** button closes the case *(citation: `markdown/employee-service-management/hr-service-delivery/t_ViewHRCaseInformation.md`)* |
+| Closed Incomplete | Listed without a description in the State field; the **Close Incomplete** button closes the case *(citation: `markdown/employee-service-management/hr-service-delivery/t_ViewHRCaseInformation.md`)*, and closing a parent case assigns all its child tasks the Closed Incomplete state *(citation: `markdown/employee-service-management/hr-service-delivery/t_CreateAnHRCase.md`)* |
+| Cancelled | Listed without a description in the State field; the **Cancel** button cancels the case *(citation: `markdown/employee-service-management/hr-service-delivery/t_ViewHRCaseInformation.md`)*, closing a parent case cancels all its child cases *(citation: `markdown/employee-service-management/hr-service-delivery/t_CreateAnHRCase.md`)*, and an HR service's **User Cannot Cancel** option stops the Opened for person from cancelling the case via the service portal *(citation: `markdown/employee-service-management/hr-service-delivery/configure-hr-service.md`)* |
+
+Other pages name some of these states differently, for example: Ready for work (Ready); In-progress (Work in Progress); Awaiting User Acceptance (Awaiting Acceptance); Close Complete or Complete (Closed Complete); Close Incomplete, Closed and Incomplete, or Incomplete (Closed Incomplete); and Canceled (Cancelled) *(citations: `markdown/employee-service-management/hr-service-delivery/create-hr-employee-relations.md`, `markdown/employee-service-management/universal-request-for-hr-service-delivery/ur-state-mapping.md`, `markdown/employee-service-management/now-assist-for-hrsd/mcp-server-tools-reference.md`, `markdown/employee-service-management/now-assist-for-hrsd/gen-kb-now-assisthr.md`, `markdown/employee-service-management/hr-service-delivery/t_ViewHRCaseInformation.md`, `markdown/employee-service-management/hr-service-delivery/work-hr-ur-case.md`, `markdown/employee-service-management/lifecycle-events/configure-hr-lifecycle-event-activity.md`, `markdown/employee-service-management/now-assist-for-hrsd/now-assist-hrsd-summarize-case.md`)*. The Workforce Optimization for HR Manager workspace divides its open cases into New, Open and Awaiting info, in the same words as a Customer Service Management page, and none of the three is on the HR case form's State list *(citations: `markdown/employee-service-management/workforce-optimization-for-hr/hr-manager-workspace-wfo-hr.md`, `markdown/employee-service-management/workforce-optimization-for-hr/wfo-hr-manager-workspace.md`, `markdown/customer-service-management/components-installed-configurable-wfo-cs.md`, `markdown/employee-service-management/hr-service-delivery/t_CreateAnHRCase.md`)*.
 
 **Variants:** never add `state` values. A sub-state, `sn_hr_core_case.sub_state`, is not documented in the bundled corpus — verify on the instance. Where the instance has it, it can carry COE-specific or topic-specific sub-flows; where it does not, carry the variant in a field.
 
-**Baseline notifications:** the baseline HR case notification names are not documented in the bundled corpus — verify on the instance. What the corpus does document: reminder notifications on HR tasks and task templates, built from email templates and sent to the Assigned to person — recurring for HR services, one-time for Lifecycle Events — and sent by the daily HR Daily Job scheduled job *(citation: `markdown/employee-service-management/hr-service-delivery/HRNotifications.md`, `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*; and one email notification to all approvers when a new HR case is submitted *(citation: `markdown/employee-service-management/hr-service-delivery/t_ApproveAnHRCase.md`)*.
+**Baseline notifications:** three HR case email notifications are documented by name, each inactive by default until it is set to True: "HR case opened", to Opened for, when a case is created; "HR case closed", to Opened for and the Watch list, when it is marked complete; and "Comment left on HR case", to Opened for and the Watch list, when a comment is added. They use the Employee notification layout of the Employee Experience Foundation plugin, which is installed with Employee Center or Employee Center Pro; existing users must upgrade or install that plugin to enable them *(citation: `markdown/employee-service-management/hr-service-delivery/email-notification-hr.md`)*. Any other HR case email notification name is not documented in the bundled corpus — verify on the instance. The corpus also documents reminder notifications on HR tasks and task templates, built from email templates and sent to the Assigned to person — recurring for HR services, one-time for Lifecycle Events — and sent by the daily HR Daily Job scheduled job *(citation: `markdown/employee-service-management/hr-service-delivery/HRNotifications.md`, `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*; and one email notification to all approvers when a new HR case is submitted *(citation: `markdown/employee-service-management/hr-service-delivery/t_ApproveAnHRCase.md`)*. On other channels, EmployeeWorks Web App, whose plugins are installed from the Store for a Moveworks or a Now Assist deployment path once its entitlements are verified *(citations: `markdown/employee-service-management/employee-experience-foundation/eslate-getting-started-employee-slate.md`, `markdown/employee-service-management/employee-experience-foundation/eslate-prereqs-useful-info.md`)*, has HR case opened, commented and closed notifications, preconfigured and active by default *(citation: `markdown/employee-service-management/employee-experience-foundation/emp-slate-notifications.md`)*; installing the HR Service Delivery integration with Microsoft Teams leaves a duplicate HR Case notification, one of which must be set inactive, and its Respond to Comments notification triggers for the HR tables a property lists, whose default value leaves out sensitive HR cases such as Employee Relations, Investigation and Ethics; its actionable notifications need HR Pro or above — verify against the subscription *(citations: `markdown/employee-service-management/employee-experience-foundation/disable-notifications-teams-hr.md`, `markdown/employee-service-management/employee-experience-foundation/sn-ms-teams-hr.md`, `markdown/employee-service-management/employee-experience-foundation/properties-hrsd-ms365.md`)*.
 
 **Role gates:**
-- `sn_hr_core.basic` — read access to HR Case (filtered by subject_person or HR group membership)
-- `sn_hr_core.case_writer` — write access
+- `sn_hr_core.basic` — the HR agent role: it grants access to basic HR agents' daily work, and contains `sn_hr_core.case_writer`, `sn_hr_core.kb_writer` and `sn_hr_core.profile_writer`, among others; `sn_hr_core.profile_writer` grants write access to all HR profile records, and also to the Users [`sys_user`] table *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*
+- `sn_hr_core.case_writer` — write access to all HR cases; it contains `sn_hr_core.case_reader` and `sn_templated_snip.template_snippet_reader` *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*. Where COE security policies are configured — an alternative to ACL rules — only the groups a policy includes can read or write the HR cases under its COE after creation, and users such as Opened for, Opened by, Watch list and Collaborators keep access *(citations: `markdown/employee-service-management/hr-service-delivery/hr-coe-security-policies.md`, `markdown/employee-service-management/hr-service-delivery/hr-create-coe-security-policy.md`)*
 - `sn_hr_core.case_reader` — read access to all HR cases *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*
-- `sn_hr_core.admin` — administrative configuration *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*
+- `sn_hr_core.admin` — administrative configuration *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*; only the HR Administrator [`sn_hr_core.admin`] can assign scoped HR roles, and the System Administrator [`admin`] role contains the HR Administrator role unless it has been removed from `admin`, which the Manage HR roles page advises doing after system configuration *(citations: `markdown/employee-service-management/hr-service-delivery/c_ManageRoles.md`, `markdown/employee-service-management/hr-service-delivery/t_HRRemoveAdminRole.md`)*
 
 **subject_person vs opened_for:**
 - `subject_person` = the employee the case is about (e.g., the new hire being onboarded).
@@ -336,14 +341,14 @@ One of:
 
 **Key fields:**
 - `user` (Reference to `sys_user`)
-- `employment_type` (Choice: Full-time / Part-time / Contractor / Intern / etc.)
-- `employment_status` (Choice: Active / On Leave / Terminated / etc.) — not documented in the bundled corpus — verify on the instance
+- `employment_type` — the HR profile's Employment type field *(citation: `markdown/employee-service-management/hr-service-delivery/t_CreateOrModifyAUserProfile.md`)*; a base-system client role assignment condition on the HR profile matches an Employment type of Full Time Employee, Part Time Employee or Temporary Employee *(citation: `markdown/employee-service-management/hr-service-delivery/t_ClientRoleAssignRules.md`)*. The field's column name and its full value list are not documented in the bundled corpus — verify on the instance
+- `employment_status` — not documented in the bundled corpus — verify on the instance; the HR profile page names employment status only in prose. The profile documents an Active check box, which marks the user as a current employee, and a separate Leave status field, the status of the employee if leave was requested, with the values Requested, Approved, On Leave, Rejected, Completed and Cancelled *(citation: `markdown/employee-service-management/hr-service-delivery/t_CreateOrModifyAUserProfile.md`)*; the Leave status column name is not documented in the bundled corpus — verify on the instance
 - `manager` (Reference to `sys_user`)
 - `department` (Reference)
 - `location` (Reference)
-- `employment_start_date` / `employment_end_date`
+- `employment_start_date` / `employment_end_date` — HR profile fields: with HR Service Delivery, the Employee Profile plugin pulls both from the HR Profile [`sn_hr_core_profile`] table *(citation: `markdown/employee-service-management/employee-experience-foundation/employee-profile.md`)*, the HR profile form labels them Employment start date and Employment end date *(citation: `markdown/employee-service-management/hr-service-delivery/t_CreateOrModifyAUserProfile.md`)*, and a documented activity-set script and a document-template example read them *(citations: `markdown/employee-service-management/lifecycle-events/configure-hr-lifecycle-event-activity-set.md`, `markdown/employee-service-management/hr-service-delivery/configure-HTML-doc-template.md`)*
 
-**Critical pattern:** When `employment_start_date` and `employment_type` are populated, baseline logic automatically assigns the employee a client role (`sn_hr_core.basic` or similar). This is how employees get access to Employee Center.
+**Critical pattern:** Client role assignment rules automatically assign or reassign a client role to an employee, and they are for access to the Employee Center only *(citation: `markdown/employee-service-management/hr-service-delivery/t_ClientRoleAssignRules.md`)*; ServiceNow provides the client roles and does not recommend modifying them, and they are defined and administered like regular roles, can also be added to other roles or groups, and are tracked by ServiceNow for licensing purposes *(citation: `markdown/employee-service-management/hr-service-delivery/c_ClientRoles.md`)*. A rule's conditions are built on the HR profile [`sn_hr_core_profile`] table, and the **Assign HR Roles** business rule assigns the role the conditions match; the daily **Update Client Roles** scheduled job updates the role assignments of HR profiles that are beginning or ending their employment *(citations: `markdown/employee-service-management/hr-service-delivery/t_ClientRoleAssignRules.md`, `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*. In the base system, the New Hire role (`sn_hr_core.hrsm_new_hire`, limited access to the Employee Center or service portal) is assigned when Employment type is Full Time Employee, Part Time Employee or Temporary Employee and the employment start date is after today *(citation: `markdown/employee-service-management/hr-service-delivery/t_ClientRoleAssignRules.md`)*. The `sn_hr_core.hrsm` roles installed with Case and Knowledge Management also include Full-time employee [`sn_hr_core.hrsm_employee`], Contractor employee [`sn_hr_core.hrsm_contractor`], Contingent employee [`sn_hr_core.hrsm_contingent`] and Alumni employee [`sn_hr_core.hrsm_alumni`] *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*; an employee who does not display when an HR case is created needs one of the `sn_hr_core.hrsm` roles, one who cannot access the HR Service Portal needs one of the `sn_hr_sp.hrsp` roles, and both role groups carry conditions by type of user — Alumni (only used with the Alumni Center installed), Contingent, Contractor, Employee, Employment Type, Location, New Hire, New Hires Only, Office Based Employees and Remote Employees *(citation: `markdown/employee-service-management/hr-service-delivery/c_ClientRoles.md`)*. What those conditions other than New Hire match is not documented in the bundled corpus — verify on the instance. `sn_hr_core.basic` is the HR agent role, not a client role (see Role gates).
 
 **Anti-pattern alert:** Custom HR Profile *extension tables* are §1.1 violations. Extend `sn_hr_core_profile` via dictionary (new fields on the existing table). New tables alongside `sn_hr_core_profile` break the baseline employment-context joins.
 
@@ -423,7 +428,7 @@ One of:
 
 **Reflexive bad design:** Custom HR sub-case table.
 **Baseline alternative:** `sn_hr_core_case` already supports multiple concurrent cases per `subject_person`. Use `state` for the lifecycle, and a field (or the sub-state where the instance has one — see the state model) for variant flows.
-**Verdict:** Always A.
+**Verdict:** A; B only if the variant needs a new field.
 
 ### Hot spot 4 — "We need a separate audit trail for HR Profile changes"
 
@@ -435,7 +440,7 @@ One of:
 
 **Reflexive bad design:** Custom restricted-notes table per COE.
 **Baseline alternative:** Use the baseline scoped HR security plugin's restricted-notes pattern with COE-based ACL conditions.
-**Verdict:** Always A or B (ACL configuration).
+**Verdict:** A — the restricted-notes pattern and its COE-based ACL conditions are configuration records; B only if the COE has to be held in a new field.
 
 ### Hot spot 6 — "We need a custom Employee Center portal for one COE"
 
@@ -459,12 +464,12 @@ You fire twice per HRSD-tagged request. Second fire is the post-build review aft
 
 **Check 2 — Data-model alignment.** Spec uses baseline tables and fields named in Part 2?
 - Proposes new fields where baseline suffices?
-- Proposes custom table where baseline extension covers it?
+- Proposes a custom table where a field on a baseline HR table covers it?
 - Respects HR Profile / HR Case / LE Case parentage?
 
 **Check 3 — §1.1 verdict alignment.** Spec respects Verdict in Part 3?
 - Verdict A but spec contains custom object → §1.1 violation.
-- Verdict B but spec expands beyond approved scope → §1.1 violation.
+- Verdict B but spec adds anything beyond the field(s) Part 3 named — a table (a child table included), a scope or a state value → §1.1 violation.
 - Verdict C but spec exists without explicit approval → §1.1 violation.
 
 **Check 4 — Anti-pattern check.** Spec violates any Part 5 anti-pattern?

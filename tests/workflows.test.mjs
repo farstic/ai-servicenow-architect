@@ -340,9 +340,11 @@ test('ARC-09-C158 — Windows runs the upgrade set as two shards, and one requir
   const rows = [...shards.matchAll(/^ {10}- \{ shard: (\d), files: '([^']+)' \}$/gm)];
   assert.deepEqual(rows.map((r) => r[1]), ['1', '2'], 'not exactly shards 1 and 2');
   assert.match(shards, /node --test --test-concurrency=2 \$\{\{ matrix\.files \}\}/);
-  // By subject: the general cases in shard 1, the licence and manifest cases leading shard 2.
+  // By subject: the move itself in shard 1; the licence and manifest cases, then the run after a move
+  // (ARC-09-C215), leading shard 2.
   assert.equal(rows[0][2], 'tests/upgrade/upgrade.e2e.test.mjs');
-  assert.match(rows[1][2], /^tests\/upgrade\/upgrade-licence\.e2e\.test\.mjs /);
+  assert.match(rows[1][2],
+    /^tests\/upgrade\/upgrade-licence\.e2e\.test\.mjs tests\/upgrade\/upgrade-after-move\.e2e\.test\.mjs /);
   // The two lists together are the Linux and macOS list, file for file and once each: a file in one
   // and not the other would run on two operating systems and be believed to run on three.
   const windowsFiles = rows.flatMap((r) => r[2].split(/\s+/));
@@ -363,6 +365,9 @@ test('ARC-09-C158 — Windows runs the upgrade set as two shards, and one requir
   // The licence file states the rule that put its cases there, so the next case is placed by it.
   assert.match(readFileSync(join(root, 'tests/upgrade/upgrade-licence.e2e.test.mjs'), 'utf8').slice(0, 2000),
     /THE RULE, by subject and never by seconds: a case belongs here when what it measures is the licence\n \* gate or the signed manifest/);
+  // ARC-09-C215 — and so does the file of the run after a move.
+  assert.match(readFileSync(join(root, 'tests/upgrade/upgrade-after-move.e2e.test.mjs'), 'utf8').slice(0, 2000),
+    /THE RULE, by subject and never by seconds: a case belongs here when what it measures is the run after a\n \* move/);
 });
 
 test('release-dryrun runs the real release on three OSes, every commit (ARC-09-S03)', () => {
@@ -407,6 +412,45 @@ test('ARC-11-C6 — release.yml\'s evidence doctor alone runs licensed, and its 
   assert.ok(step.includes('cp -Rn .local/. "$SNOWARCH_STATE_ROOT/.local/"'), 'the doctor would not read this install\'s state');
   // Never job-wide: the hook is in exactly one step's environment.
   assert.equal(release.split('NODE_OPTIONS:').length - 1, 1, 'the hook reaches more than the evidence doctor');
+});
+
+test('ARC-09-C185b — release.yml installs, judges and measures the STAGED tree, and checks the distribution\'s tag', () => {
+  const release = wf('release.yml');
+  const verify = release.slice(release.indexOf('\n  verify:'), release.indexOf('\n  publish:'))
+    .split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  // The gates test the source here; the install half runs on the tag staged as the distribution stages it.
+  const stage = verify.indexOf('run: node scripts/distribution.mjs stage "$RUNNER_TEMP/dist" "${{ github.ref_name }}"');
+  assert.ok(stage > verify.indexOf('run: npm test'), 'the tag is not staged, or is staged before the gates');
+  assert.equal(verify.includes('snowarch.mjs bootstrap'), false, 'an install of this checkout, not of the staged tree');
+  const at = (step) => verify.slice(verify.lastIndexOf('- name:', verify.indexOf(step)), verify.indexOf(step));
+  for (const step of ['bootstrap.sh --mode design', 'bootstrap.cmd --mode design', 'run: node scripts/docs.mjs verify',
+    'snowarch.mjs doctor --json --no-network --no-cache']) {
+    assert.ok(verify.includes(step), `no step runs ${step}`);
+    assert.ok(at(step).includes('working-directory: ${{ runner.temp }}/dist'), `${step} runs outside the staged tree`);
+  }
+  // Both installs, as a user makes them, found by an escaped pattern, never a spelled launcher (the launcher audit).
+  const installs = verify.split('\n').map((l) => l.trim())
+    .filter((l) => /^(run: )?(call )?\.[\\/]bootstrap\.(sh|cmd) --mode design --yes --skip-claude-check$/.test(l));
+  assert.equal(installs.length, 2, 'the POSIX and the Windows install of the staged tree');
+  // The evidence stays where the upload and the judge read it, and the metrics measure the staged install.
+  assert.ok(verify.includes('> "$GITHUB_WORKSPACE/doctor-${{ matrix.os }}.json"'), 'the doctor report is not in the workspace');
+  assert.ok(verify.includes('install-metrics.mjs ${{ matrix.os }} --root "$RUNNER_TEMP/dist"'), 'the metrics measure this checkout');
+  // Judged as an install: no `npm ci` ran in the staged tree, so `--deps` is the default, and E-32 is asserted ok.
+  assert.ok(verify.includes('assert-doctor.mjs --in doctor-${{ matrix.os }}.json --expect-fail E-00\n'), 'the judge allows more than E-00');
+  assert.equal(verify.includes('--deps installed'), false, 'the staged tree had no npm ci');
+  assert.match(verify, /x\.id === 'E-32'\);\s+if \(c\?\.status !== 'ok'\)/, 'E-32 is not asserted ok');
+  // The distribution's own tag: fetched from the repository engine.config.json names, compared by tree, after the
+  // stage; an rc skips with its reason, asked of the module the publish job asks; nothing lets a final through.
+  const check = verify.slice(verify.indexOf('- name: The distribution\'s tag is this tag staged'));
+  const body = check.slice(0, check.indexOf('- name:', 1));
+  assert.ok(verify.indexOf('- name: The distribution\'s tag is this tag staged') > stage, 'the tag is compared before it is staged');
+  assert.ok(body.includes('m.isPrerelease(\'$TAG\')'), 'the rc skip does not ask the module');
+  assert.ok(body.includes('there is no tag to compare'), 'an rc skips without its reason');
+  assert.ok(body.includes('REPO=$(node -p "require(\'./engine.config.json\').repo")'), 'the repository is spelled, not read');
+  assert.ok(body.includes('fetch --no-tags "https://github.com/$REPO.git" "refs/tags/$TAG"'), 'the distribution tag is not fetched');
+  assert.ok(body.includes('rev-parse \'FETCH_HEAD^{tree}\'') && body.includes('rev-parse \'HEAD^{tree}\''), 'not a tree comparison');
+  assert.ok(body.includes('[ "$public" = "$staged" ]'), 'a different tree does not fail the step');
+  assert.equal(/continue-on-error|\|\| true/.test(body), false, 'a failed fetch or comparison is let through');
 });
 
 test('release.yml runs on tags only, and is the one workflow that may write (ARC-09-S03)', () => {
@@ -937,10 +981,10 @@ test('C19: the release judges its doctor report instead of letting -e decide', (
   assert.equal(/E-00 is expected there/.test(code), false,
     'the workflow writes the sentence itself — the body is composed in one place');
 
-  // ARC-09-C20: this job installs before it runs the doctor, so it says which world it is in. The
-  // bootstrap cells do NOT pass the flag and must not — the default is their shape, and a cell that
-  // started passing `installed` would stop noticing something installing too early.
-  assert.match(code, /--deps installed/);
+  // ARC-09-C20 said `--deps installed` here, because this job's `npm ci` ran in the tree the doctor read. ARC-09-C185b
+  // moved the install to the staged distribution tree, where no `npm ci` runs: the default is its shape now, as it is
+  // the bootstrap cells', and a judge that passed `installed` would stop noticing something installing too early.
+  assert.equal(/--deps/.test(code), false, 'the release judge passes --deps, and its staged tree had no npm ci');
   const ciCode = wf('ci.yml').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
   assert.equal(/--deps/.test(ciCode), false,
     'a bootstrap cell passes --deps — the default is its shape and saying so would invite changing it');

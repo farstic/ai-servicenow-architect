@@ -1,6 +1,6 @@
 # User Guide and Examples
 
-**Repository:** [`farstic/ai-servicenow-architect`](https://github.com/farstic/ai-servicenow-architect)
+**Repository:** [`farstic/snowarch`](https://github.com/farstic/snowarch)
 **Purpose:** The day-to-day operator's guide — four worked scenarios covering the most common ways the team uses the engine, including live deployment to a ServiceNow instance.
 **Audience:** Whole team
 **Last updated:** 29 May 2026
@@ -63,6 +63,9 @@ force refuses every MCP tool, and every command but `licence`, `doctor`, `status
 `valid_until` is a calendar date in UTC: the last day counts, until 00:00 UTC of the next day, and the
 commands print it as `<date> (UTC, N days)`.
 
+The banner also prints `Docs on disk:` — the release family, the corpus mode, and how many of the
+documentation map's areas this checkout has, naming the largest that are not installed.
+
 ### Reading the Mode line
 
 `Mode:` is the answer to "can this session touch a real instance?", and it comes from the doctor —
@@ -99,6 +102,29 @@ client secret, and if anything claiming to be this command does, stop and report
 
 Nothing is written to the instance by any of this. Setup configures a connection; using it is a
 separate, explicitly approved act.
+
+### Reporting a finding
+
+When the engine gets something wrong (a table name that does not exist, a step that failed, an answer that
+contradicts the documentation), type `/snowarch finding` and describe it. The engine:
+
+1. asks which engagement the finding belongs to; a finding about the product itself can go under a name of your
+   choice that your note will not use as a word, so not a common word such as `general`: the engagement's name is
+   masked on its own and with its parts joined by a space, a hyphen, an underscore, a dot or nothing, and, when the
+   name has four letters or more, any word that begins with it;
+2. the first time, asks for the client's other names (legal name, abbreviations, brands) and keeps them in
+   `clients/<engagement>/findings/aliases.txt`;
+3. writes your note to `clients/<engagement>/findings/`, which stays on your machine, because git ignores
+   `clients/`;
+4. prints a masked copy. Instance names and URLs, sys_ids, record numbers, e-mail addresses, IP addresses and home
+   folders become placeholders such as `<instance-url-1>` and `<record>`, and so do credentials in their usual forms
+   (key: value or key=value, user:password in a URL or after -u, Basic and Bearer tokens, known token prefixes),
+   your instance's stored username and password, and the client names you gave it. Its first line says when it
+   could not read your instance store or its credentials: then it may not have masked them.
+
+Before you send it, read the **Read before sending** list at its end. No rule knows people's names, places, company
+names or abbreviations you did not give it, ticket keys from other systems, a credential written in plain words, or
+record numbers with fewer than 6 digits. Then send the text to the person who issued your licence.
 
 ---
 
@@ -362,4 +388,4 @@ Type `Status` any time to see the loaded engagement, the locked release family, 
 
 ---
 
-*Documents the [AI ServiceNow Architect](https://github.com/farstic/ai-servicenow-architect) v2.6 for day-to-day operators.*
+*Documents the [AI ServiceNow Architect](https://github.com/farstic/snowarch) v2.6 for day-to-day operators.*

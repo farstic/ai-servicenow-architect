@@ -10,6 +10,7 @@ import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { DEFAULT_MODEL, SETTING_SOURCES, header, policyFor } from '../scripts/validation/session-policy.mjs';
 import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { formatReport, reportTurn } from '../scripts/validation/turn-report.mjs';
+import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 /**
  * ARC-09-C87 — the validation harness runs every case, isolates the session it runs, and reports what a
@@ -77,7 +78,17 @@ test('C87 (b) — the policy: Sonnet 5.5 by default, the clone\'s own settings, 
   const { cli } = POSIX;
   assert.deepEqual(t07.allowed.filter((a) => a.startsWith('Bash')), [`Bash(${cli}:*)`, `Bash(${cli} doctor:*)`]);
   assert.ok(policyFor('T-13').tools.includes('Write'));
-  for (const id of ['T-01', 'T-07', 'T-13', 'T-25']) {
+  // ARC-09-C243 — T-38 prints the status panel and may run the doctor, and nothing else of the launcher: a Bash grant for
+  // those two commands, never for the whole CLI, and no Write.
+  const t38 = policyFor('T-38');
+  assert.ok(t38.tools.includes('Bash'), 'T-38 runs the status command');
+  assert.deepEqual(t38.allowed.filter((a) => a.startsWith('Bash')), [`Bash(${cli} status:*)`, `Bash(${cli} doctor:*)`]);
+  assert.ok(!t38.tools.includes('Write'), 'T-38 writes nothing');
+  // ARC-09-C254 — T-46 is T-37 with a finding that quotes a dead path: the same finder run, the same note written, so the same tools and
+  // the same grants. The seven reading cases (T-39 to T-45) read the corpus and write nothing: the base set and no more.
+  assert.deepEqual(policyFor('T-46'), policyFor('T-37'), 'T-46 runs the finding flow that T-37 runs');
+  for (const id of ['T-39', 'T-40', 'T-41', 'T-42', 'T-43', 'T-44', 'T-45']) assert.deepEqual(policyFor(id), base, `${id} reads the corpus and nothing else`);
+  for (const id of ['T-01', 'T-07', 'T-13', 'T-25', 'T-37', 'T-38', 'T-46']) {
     const p = policyFor(id);
     assert.deepEqual(p.tools.filter((x) => ['Agent', 'Task', 'WebFetch', 'WebSearch', 'Edit'].includes(x)), [], `${id} has no sub-agent, web or edit tool`);
     // Every allowed pattern names a tool that exists: permission is never granted for a tool the session lacks.
@@ -131,7 +142,7 @@ function corpus(t) {
   writeFileSync(join(md, 'customer-service-management', 'twin.md'), 'x');
   writeFileSync(join(md, 'it-service-management', 'twin.md'), 'x');
   writeFileSync(join(md, 'customer-service-management', 'only-here.md'), 'x');
-  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir });
+  initFixtureRepo((args) => execFileSync('git', args, { cwd: dir }), dir, ['-q', '-b', 'main']);
   writeFileSync(join(dir, 'CLAUDE.md'), 'x');
   execFileSync('git', ['add', 'CLAUDE.md'], { cwd: dir });
   return dir;
@@ -187,6 +198,170 @@ test('C87 (c) — a turn with nothing to report says so, and never throws on a r
   const r = reportTurn('not json\n{"type":"assistant"}\n{"type":"assistant","message":{"content":"plain"}}\n', { repoRoot: dir });
   assert.deepEqual([r.skills.length, r.corpusReads.length, r.citations.length], [0, 0, 0]);
   assert.match(formatReport(r), /skills: none · corpus pages read: 0 · citations: 0/);
+});
+
+// ── a skill run by its slash command ────────────────────────────────────────────────────────────
+// ARC-09-C243 — `claude -p "/snowarch status"` has the CLI expand the skill before the model's first step, so the stream holds
+// no Skill call and no Read of the skill's file, and the report said `skills: none` for a turn that followed the skill. A
+// reviewer reads that line as "the skill was never read" (the sitting of 2026-10-29 read it that way for the bare `Status`
+// prompt, where it was true). The prompt is what says the skill ran, so the report is given the prompt.
+test('C243 — a turn whose prompt is a skill\'s slash command reports that skill; a prompt that is not one reports none', (t) => {
+  const dir = corpus(t);
+  mkdirSync(join(dir, '.claude', 'skills', 'snowarch'), { recursive: true });
+  writeFileSync(join(dir, '.claude', 'skills', 'snowarch', 'SKILL.md'), '---\nname: snowarch\n---\n');
+  const ran = stream([assistant(use('Bash', { command: `${POSIX.cli} status` })), { type: 'result', result: 'done' }]);
+  const skills = (prompt) => reportTurn(ran, { repoRoot: dir, prompt }).skills;
+  assert.deepEqual(skills('/snowarch status'), [{ name: 'snowarch', how: 'slash command' }]);
+  assert.deepEqual(skills('/snowarch'), [{ name: 'snowarch', how: 'slash command' }], 'a slash command with no argument');
+  assert.deepEqual(skills('  /snowarch status\n'), [{ name: 'snowarch', how: 'slash command' }], 'the prompt file ends in a newline');
+  assert.match(formatReport(reportTurn(ran, { repoRoot: dir, prompt: '/snowarch status' })), /^skills: snowarch \(slash command\) · /);
+  // each of these must report none: the detector is shown able to say no
+  assert.deepEqual(skills('Status'), [], 'a bare word is routed by CLAUDE.md, not by the skill');
+  assert.deepEqual(skills('/clear'), [], 'a slash command that is no skill of this checkout');
+  assert.deepEqual(skills('/snowarchx status'), [], 'a longer name is another command');
+  assert.deepEqual(skills('please run /snowarch status'), [], 'a slash command that is not the start of the prompt');
+  assert.deepEqual(skills(''), []);
+  assert.deepEqual(reportTurn(ran, { repoRoot: dir }).skills, [], 'no prompt given: nothing is claimed');
+  // a skill the model loaded itself is still reported as before, beside it
+  const both = reportTurn(stream([assistant(use('Skill', { skill: 'snowarch' }))]), { repoRoot: dir, prompt: '/snowarch status' });
+  assert.deepEqual(both.skills, [{ name: 'snowarch', how: 'Skill' }, { name: 'snowarch', how: 'slash command' }]);
+});
+
+test('C243 — the runner gives each turn\'s prompt file to the report, and the report takes it as its third argument', () => {
+  const code = read('scripts/validation/validation-run.sh').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  assert.match(code, /turn-report\.mjs" "\$OUT" "\$C" "\$RUN\/prompt\.txt"/, 'the report is not given the prompt');
+  // the prompt file is written before the session runs and the report runs after it, so it is this turn's prompt
+  assert.ok(code.indexOf('> "$RUN/prompt.txt"') < code.indexOf('turn-report.mjs'), 'the report reads a prompt that is not this turn\'s');
+  assert.match(read('scripts/validation/turn-report.mjs'), /usage: turn-report\.mjs <stream\.jsonl> <checkout> \[<prompt\.txt>\]/);
+});
+
+// ── a Stop hook sent the turn on ────────────────────────────────────────────────────────────────
+// ARC-09-C254 — when the Stop hook asks for a correction line, the `result` row of the stream is that line and nothing else: it
+// is the last message. Every reader that took `result.result` for the answer then graded the correction. The answer is what the
+// model wrote after its last tool result, the reply and the line after it; text written before a tool call is narration, and a
+// sub-agent's text is not the main thread's.
+const toolResult = (id = 't1') => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] } });
+const hookFeedback = (s) => ({ type: 'user', message: { content: [{ type: 'text', text: `Stop hook feedback:\n${s}` }] } });
+const DEAD = 'markdown/it-service-management/real-page.md';
+const REAL = 'markdown/it-service-management/incident/real-page.md';
+const statusOf = (r) => Object.fromEntries(r.citations.map((c) => [c.cited, c.status]));
+
+test('C254 — the answer is all the text after the last tool result: the reply, and the correction a Stop hook asked for', (t) => {
+  const dir = corpus(t);
+  const correction = `Correction: the page is ${REAL}.`;
+  const r = reportTurn(stream([
+    assistant(use('Read', { file_path: 'vendor/ServiceNowDocs/markdown/it-service-management/incident/real-page.md' })), toolResult(),
+    assistant(text(`A claim (citation: ${DEAD}).`)),
+    hookFeedback('Your reply cites a corpus page at a path that does not exist.'),
+    assistant(text(correction)),
+    { type: 'result', result: correction },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [DEAD]: 'missing', [REAL]: 'ok' }, 'the reply before the correction is part of the answer');
+  assert.match(formatReport(r), /citations: 2 \(ok 1 · bare 0 · ambiguous 0 · missing 1\)/);
+});
+
+test('C254 — the same when the hook gave its feedback as context, with nothing between the two messages', (t) => {
+  const dir = corpus(t);
+  const correction = `Correction: the page is ${REAL}.`;
+  const r = reportTurn(stream([
+    assistant(use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult(),
+    assistant(text(`A claim (citation: ${DEAD}).`)), assistant(text(correction)),
+    { type: 'result', result: correction },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [DEAD]: 'missing', [REAL]: 'ok' });
+});
+
+test('C254 — text written before the last tool result is narration, not the answer', (t) => {
+  const dir = corpus(t);
+  const final = `Done (citation: ${REAL}).`;
+  const r = reportTurn(stream([
+    assistant(text(`I will try ${DEAD} first.`), use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult('t1'),
+    assistant(text(`That did not work; ${DEAD} again.`), use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult('t2'),
+    assistant(text(final)),
+    { type: 'result', result: final },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [REAL]: 'ok' });
+});
+
+test('C254 — a sub-agent\'s text is not the main thread\'s, wherever it falls in the stream', (t) => {
+  const dir = corpus(t);
+  const final = `Final (citation: ${REAL}).`;
+  const sub = (...content) => ({ type: 'assistant', parent_tool_use_id: 'toolu_task', message: { content } });
+  const r = reportTurn(stream([
+    assistant(use('Task', { prompt: 'x' })),
+    sub(text(`The sub-agent says ${DEAD}.`)), toolResult('toolu_task'),
+    assistant(text(final)),
+    sub(text(`A sub-agent that reports late: ${DEAD}.`)),
+    { type: 'result', result: final },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [REAL]: 'ok' });
+  // a sub-agent's late tool result is not the main thread's last, so it does not cut the reply from its correction
+  const correction = `Correction: the page is ${REAL}.`;
+  const late = reportTurn(stream([
+    assistant(use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), toolResult(),
+    assistant(text(`A claim (citation: ${DEAD}).`)), hookFeedback('Your reply cites a corpus page at a path that does not exist.'),
+    assistant(text(correction)),
+    { type: 'user', parent_tool_use_id: 'toolu_task', message: { content: [{ type: 'tool_result', tool_use_id: 'x', content: 'late' }] } },
+    { type: 'result', result: correction },
+  ]), { repoRoot: dir });
+  assert.deepEqual(statusOf(late), { [DEAD]: 'missing', [REAL]: 'ok' });
+});
+
+test('C254 — a stream with no result row has the answer as it always had: all the assistant text', (t) => {
+  const dir = corpus(t);
+  const r = reportTurn(stream([assistant(text(`One (citation: ${DEAD}).`)), assistant(text(`Two (citation: ${REAL}).`))]), { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [DEAD]: 'missing', [REAL]: 'ok' });
+});
+
+test('C254 — a result row with no text blocks before it is still the answer', (t) => {
+  const dir = corpus(t);
+  const r = reportTurn(stream([assistant(use('Read', { file_path: 'docs/MODES-AND-PRESETS.md' })), { type: 'result', result: `It is (citation: ${REAL}).` }]),
+    { repoRoot: dir });
+  assert.deepEqual(statusOf(r), { [REAL]: 'ok' });
+});
+
+// ── the finding flow's copy: in the reply, as the finder printed it, and not in a fence ─────────────────────────────────────
+// ARC-09-C252 (a), ruled by the architect on 2026-10-29. T-37 turn 3 asks for the copy "verbatim", and a reviewer judged it by eye: on
+// develop both runs put it in a code fence after a sentence of prose, and on the head one said its output was above and never printed it.
+// The report counts it, so a before and an after are numbers and not impressions.
+const COPY_OUT = ['instance store NOT read — check every instance name · credentials NOT read — check usernames and passwords before sending', '',
+  '<engagement> showed the wrong group on <instance-url-1>.', '', 'Read before sending:', '- people: names of colleagues, users and customers'].join('\n');
+const FINDER = 'node tools/snowarch/lib/finding.mjs clients/acme-bank/findings/2026-10-29-wrong-group.md';
+const ran = (id, command, out) => [
+  { type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] } },
+  { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: out }] } },
+];
+const copyOf = (events, reply) => reportTurn(stream([...events, assistant(text(reply)), { type: 'result', result: reply }]), { repoRoot: root }).findingCopy;
+
+test('C252 (a) — the report says whether the finder\'s output is in the reply as printed, and whether it is in a code fence', () => {
+  const events = ran('t1', FINDER, COPY_OUT);
+  const send = 'Send the text above to the person who issued your licence.';
+  assert.deepEqual(copyOf(events, `${COPY_OUT}\n\n${send}`), { verbatim: true, fenced: false });
+  assert.deepEqual(copyOf(events, `The note is saved at clients/acme-bank/findings/x.md.\n\n${COPY_OUT}\n\n${send}`), { verbatim: true, fenced: false },
+    'a sentence before the copy is not a fence');
+  assert.deepEqual(copyOf(events, `The note is saved.\n\n\`\`\`\n${COPY_OUT}\n\`\`\`\n\n${send}`), { verbatim: true, fenced: true });
+  assert.deepEqual(copyOf(events, `\`\`\`text\n${COPY_OUT}\n\`\`\`\n${send}`), { verbatim: true, fenced: true }, 'a fence with a language');
+  assert.deepEqual(copyOf(events, `A fenced example first:\n\`\`\`\nx\n\`\`\`\n\n${COPY_OUT}\n${send}`), { verbatim: true, fenced: false },
+    'a fence that is closed before the copy does not hold it');
+  assert.deepEqual(copyOf(events, 'The masker ran; its output is above.\n\n' + send), { verbatim: false, fenced: false });
+  assert.deepEqual(copyOf(events, `${COPY_OUT.split('\n').slice(0, 3).join('\n')}\n\n${send}`), { verbatim: false, fenced: false }, 'a part of it is not the copy');
+  assert.deepEqual(copyOf(events, COPY_OUT.split('\n').map((l) => `> ${l}`).join('\n')), { verbatim: false, fenced: false }, 'a quotation block is not verbatim');
+});
+
+test('C252 (a) — a turn with no finder run, or only the one that names the note, has no finding copy to report', () => {
+  assert.equal(copyOf(ran('t2', `${POSIX.cli} status`, 'Mode: design-only'), 'Mode: design-only'), null);
+  assert.equal(copyOf(ran('t3', 'node tools/snowarch/lib/finding.mjs --next-name acme-bank wrong-group', 'clients/acme-bank/findings/2026-10-29-wrong-group.md'),
+    'I will write the note there.'), null);
+  // a finder run whose output has no review list is not a copy (a refusal prints one sentence)
+  assert.equal(copyOf(ran('t4', 'node tools/snowarch/lib/finding.mjs /etc/passwd', 'refused: not a note under clients/<engagement>/findings/'), 'refused'), null);
+  const line = formatReport(reportTurn(stream([...ran('t5', FINDER, COPY_OUT), assistant(text(COPY_OUT)), { type: 'result', result: COPY_OUT }]), { repoRoot: root }));
+  assert.match(line, /^skills: none · corpus pages read: 0 · citations: 0 · finding copy: in the reply, verbatim, unfenced$/);
+  const fenced = formatReport(reportTurn(stream([...ran('t6', FINDER, COPY_OUT), assistant(text(`\`\`\`\n${COPY_OUT}\n\`\`\``)), { type: 'result', result: `\`\`\`\n${COPY_OUT}\n\`\`\`` }]), { repoRoot: root }));
+  assert.match(fenced, / · finding copy: in the reply, but in a code fence$/);
+  const gone = formatReport(reportTurn(stream([...ran('t7', FINDER, COPY_OUT), assistant(text('Its output is above.')), { type: 'result', result: 'Its output is above.' }]), { repoRoot: root }));
+  assert.match(gone, / · finding copy: NOT in the reply as printed \(only in the tool result, or changed\)$/);
+  // a turn that ran no finder keeps the line it always had
+  assert.match(formatReport(reportTurn('', { repoRoot: root })), /^skills: none · corpus pages read: 0 · citations: 0$/);
 });
 
 // ── the gateways ask for the full path ──────────────────────────────────────────────────────────

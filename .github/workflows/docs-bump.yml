@@ -61,8 +61,10 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
 
+      # ARC-09-C250 — the whole corpus, and said so. The bump writes vendor/docs-map.md at the new pin, and the map is
+      # made from every area: a sparse corpus refuses it (`gen-docs-map --write` exits 2).
       - name: Obtain the corpus at the current pin
-        run: node scripts/docs.mjs sync
+        run: node scripts/docs.mjs sync --mode full
 
       - name: Refresh the pin and render the pull-request body
         id: plan
@@ -95,6 +97,14 @@ jobs:
         run: |
           echo "dry run: opened nothing, pushed nothing"
           cat body.md
+
+      # ARC-09-C250 — the corpus map moves with the pin, in the same commit: the refresh checked the new pin out and
+      # staged engine.config.json, so the map is written from it and staged beside it.
+      - name: Write the corpus map at the new pin
+        if: ${{ !inputs.dry_run && steps.plan.outputs.moved == 'true' }}
+        run: |
+          node scripts/gen-docs-map.mjs --write
+          git add vendor/docs-map.md
 
       - name: Open or update the pull request
         if: ${{ !inputs.dry_run && steps.plan.outputs.moved == 'true' }}

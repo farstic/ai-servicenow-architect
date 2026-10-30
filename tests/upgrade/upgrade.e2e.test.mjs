@@ -13,20 +13,25 @@
  * ARC-09-C158 — the cases whose subject is the licence or the signed manifest are in
  * `upgrade-licence.e2e.test.mjs`, so the Windows job can run as two shards. Its header states the
  * rule: a case goes to the file its subject names, never to the one that balances the clock.
+ * ARC-09-C215 — the cases whose subject is the run after a move are in
+ * `upgrade-after-move.e2e.test.mjs`, in the second shard. What stays here is the move itself: the
+ * plan, the prompt, the fetch, the floor, the refusals and the shapes a tree moves from.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import {
-  existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync,
+  existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
-import { bootstrapUser, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
+import { bootstrapUser, buildWorld, fakeClaude, git, republishManifests, snowarch } from './harness.mjs';
+import { stage } from '../../scripts/lib/distribution.mjs';
 import { COVERAGE, isCovered } from '../../tools/snowarch/lib/licence/manifest.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 const isWindows = process.platform === 'win32';
 const MINUTES = 10 * 60 * 1000;
@@ -88,6 +93,29 @@ test('AC 1 — a release that moves one declared input re-runs exactly that step
       .map((c) => `${c.id}: ${c.detail}`)));
   assert.match(snowarch(w.user, ['version'], { bin: w.bin }).stdout, /tag:\s+v9\.1\.0 \(exact\)/);
 }, MINUTES);
+
+test('ARC-09-C195 — a release that changes what a step depends on: the plan names the step the run re-runs',
+  async (t) => {
+    // U4 runs in the installed release's process. Here v9.1.0 adds a literal to B07's inputs, which v9.0.0's tables
+    // cannot see, so the plan left B07 out and U6 re-ran it: ARC-08-C29 across versions. U4 now asks v9.1.0's runner.
+    const w = await buildWorld(t, { b07Literal: true });
+    bootstrapUser(w.user);
+    assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.0.0');
+    const before = state(w.user);
+
+    const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+    assert.equal(r.status, 0, r.text);
+    const planned = r.text.match(/steps that will re-run: ([^\n]*)/)?.[1] ?? '';
+    assert.match(planned, /\bB07 the local toggles \(inputs changed\)/, `the plan left B07 out: ${planned}`);
+    assert.match(planned, /\bB02 the documentation corpus \(vendor\/docs-areas\.txt changed\)/, planned);
+    assert.doesNotMatch(r.text, /computed by the installed release/, 'the target was not the one that planned');
+
+    // …and the run re-ran what the plan named.
+    const after = state(w.user);
+    for (const id of ['B02', 'B07']) {
+      assert.notEqual(after.steps[id].finishedAt, before.steps[id].finishedAt, `${id} did not re-run`);
+    }
+  }, MINUTES);
 
 test('AC 2 — a release that moves the store schema migrates it, with a backup', async (t) => {
   const w = await buildWorld(t);
@@ -297,6 +325,143 @@ test('ARC-09-C170 — the from-label is a release tag or the commit, never an im
   assert.doesNotMatch(plan2.text, /import\//);
 }, MINUTES);
 
+// ARC-09-C185c — an install moved to the distribution repository, the move MIGRATION's "An install of a 2.2.1 release
+// candidate, or later" describes. Its origin is set to a repository that starts at a later release. `git fetch --tags
+// --prune` does NOT drop a tag the new origin lacks (only --prune-tags would): measured, so the install keeps naming the
+// release it is on.
+//
+// ARC-09-C192 — THE DISTRIBUTION IS STAGED, as farstic/snowarch is: each release one commit of its own history, which
+// shares nothing with the engineering repository's, and each manifest signed over that commit. The case first used a
+// bare clone of the engineering origin, whose shared history proved a move the real repository never makes.
+test('ARC-09-C185c — an install moved to a staged distribution, unrelated in history, keeps its tag and upgrades', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const staged = join(w.scratch, 'staged');
+  stage(w.work, staged, 'v9.1.0', { tag: true });
+  stage(w.work, staged, 'v9.2.0', { onto: 'main', tag: true });
+  const distribution = join(w.scratch, 'distribution.git');
+  // Through the harness's git(), as every git call here is: core.longpaths on Windows (C27b).
+  git(w.scratch, ['clone', '-q', '--bare', '--no-hardlinks', staged, distribution]);
+  assert.equal(git(distribution, ['tag', '--list', 'v9.0.0']), '');
+  republishManifests(w.licences, staged, ['v9.1.0', 'v9.2.0']);
+  git(w.user, ['remote', 'set-url', 'origin', pathToFileURL(distribution).href]);
+  assert.equal(git(w.user, ['remote', 'get-url', 'origin']), pathToFileURL(distribution).href);
+  // THE UPGRADE NEVER FORCE-FETCHES A TAG (the architect's rule): a tag moved by a remote is U4's to judge, not U2's to
+  // replace. An install still holding the engineering tags of the same names stops at the fetch, and nothing moves;
+  // MIGRATION's rc section quotes this line and gives `git tag -d`.
+  const before = git(w.user, ['rev-parse', 'HEAD']);
+  const clobber = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.equal(clobber.status, 1, clobber.text);
+  assert.match(clobber.text, /! \[rejected\] +v9\.1\.0 +-> v9\.1\.0 +\(would clobber existing tag\)/, clobber.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), before, 'the refused fetch moved the tree');
+  // An install made with `clone --branch` before those releases existed: its own tag, and none of the later ones.
+  for (const tag of ['v9.1.0', 'v9.2.0']) {
+    git(w.user, ['tag', '-d', tag]);
+    assert.equal(git(w.user, ['tag', '--list', tag]), '', `${tag} is still here`);
+  }
+
+  const check = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.match(check.text, /v9\.2\.0 available \(you are on v9\.0\.0\)/, check.text);
+  // The fetch kept the tag the install was cut from: MIGRATION's sentence, measured.
+  assert.equal(git(w.user, ['tag', '--list', 'v9.0.0']), 'v9.0.0', 'the fetch dropped the install\'s own tag');
+  // No common ancestor: the release the install moves to shares no history with the one it is on.
+  assert.equal(git(w.user, ['merge-base', 'HEAD', 'v9.1.0'], { allowFail: true }), null, 'the histories are related');
+  // An install on a BRANCH fast-forwards to the verified tag (ARC-09-C194), and across unrelated histories it cannot:
+  // refused at U5 with the tag checkout as the remedy. Nothing moves: HEAD, the branch and the working tree are as they
+  // were (measured: of `.local/`, only the currency cache every fetch writes changed).
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  git(w.user, ['checkout', '-q', '-B', 'main', 'v9.0.0']);
+  assert.equal(git(w.user, ['branch', '--show-current']), 'main');
+  git(w.user, ['fetch', '-q', 'origin', '+refs/heads/main:refs/remotes/origin/main']);
+  git(w.user, ['branch', '--set-upstream-to', 'origin/main', 'main']);
+  assert.equal(git(w.user, ['rev-parse', '--abbrev-ref', 'main@{upstream}']), 'origin/main');
+  const pulled = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
+  assert.equal(pulled.status, 1, pulled.text);
+  assert.match(pulled.text, /upgrade: main cannot fast-forward to v9\.2\.0 — resolve with git, or use --to v9\.2\.0 to check out the release tag; nothing was changed/);
+  assert.deepEqual([git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['status', '--porcelain'])], [head, ''], 'the refusal moved the tree');
+  git(w.user, ['checkout', '-q', '--detach', 'v9.0.0']);
+  assert.equal(git(w.user, ['branch', '--show-current']), '', 'the install is not back on its tag');
+  const plan = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin });
+  assert.match(plan.text, /Upgrade plan: v9\.0\.0 → v9\.1\.0/, plan.text);
+
+  // THE FULL MOVE, as MIGRATION § "An install made with `clone --branch` of a 2.2.1 release candidate, or later" makes it.
+  const licence = join(w.user, '.local/licence.json');
+  const licenceBefore = existsSync(licence) ? sha256(licence) : null;
+  const storeBefore = sha256(storePath(w.user));
+  const engagement = join(w.user, 'clients/acme/acme-engagement-state.md');
+  mkdirSync(join(w.user, 'clients/acme'), { recursive: true });
+  writeFileSync(engagement, '# acme\n');
+  assert.equal(readFileSync(engagement, 'utf8'), '# acme\n');
+  const moved = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(moved.status, 0, moved.text);
+  const target = git(distribution, ['rev-parse', 'v9.1.0^{commit}']);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), target, 'the tree is not at the new origin\'s v9.1.0');
+  // The version of record, as the product reads it (ARC-09-C137: a banner test does not open the file itself).
+  const version = snowarch(w.user, ['version'], { bin: w.bin }).stdout;
+  assert.match(version, /^snowarch 9\.1\.0 · /m, version);
+  assert.match(version, /tag:\s+v9\.1\.0 \(exact\)/, version);
+  // The integrity check reads the new tag's signed manifest, whose commit is the one the new origin's tag names.
+  const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
+  const e32 = (report.checks ?? []).find((c) => c.id === 'E-32');
+  assert.match(e32?.detail ?? '', /^Integrity: verified · v9\.1\.0 · \d+ files$/, JSON.stringify(e32));
+  // What the move leaves alone: the licence, the instance store, an engagement folder.
+  assert.equal(existsSync(licence) ? sha256(licence) : null, licenceBefore, 'the licence state changed');
+  assert.equal(sha256(storePath(w.user)), storeBefore, 'the move touched the credential store');
+  assert.equal(readFileSync(engagement, 'utf8'), '# acme\n', 'the move touched an engagement folder');
+  // The kept tag points at a commit the install already holds, and nothing reads it after the move: currency is read
+  // from the release the tree is on.
+  assert.equal(git(w.user, ['tag', '--list', 'v9.0.0']), 'v9.0.0');
+  const after = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.match(after.text, /v9\.2\.0 available \(you are on v9\.1\.0\)/, after.text);
+}, MINUTES);
+
+// ARC-09-C194 — A BRANCH INSTALL MOVES TO THE VERIFIED TAG. U5 used to `pull --ff-only origin <branch>`: the branch
+// went wherever the remote branch was, never checked against the manifest U4 had just verified, and finish() then
+// reported a move to the tag. A main that leads or lags its newest tag (INSTALL.md makes branch installs from main)
+// put a branch install on a commit nobody signed.
+test('ARC-09-C194 — a branch install fast-forwards to the verified tag, never past it, or is refused unmoved', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  // origin's main one commit PAST its newest tag.
+  const ahead = join(w.scratch, 'ahead');
+  git(w.scratch, ['clone', '-q', '--no-hardlinks', pathToFileURL(w.origin).href, ahead]);
+  git(ahead, ['checkout', '-q', '-B', 'main', 'v9.2.0']);
+  assert.equal(git(ahead, ['rev-parse', 'HEAD']), git(ahead, ['rev-parse', 'v9.2.0^{commit}']), 'the clone is not at the tag');
+  writeFileSync(join(ahead, 'NEXT.md'), 'a commit after the release\n');
+  git(ahead, ['add', 'NEXT.md']);
+  git(ahead, ['commit', '-q', '-m', 'after v9.2.0']);
+  git(ahead, ['push', '-q', '--force', 'origin', 'main']);
+  const past = git(ahead, ['rev-parse', 'HEAD']);
+  assert.notEqual(past, git(ahead, ['rev-parse', 'v9.2.0^{commit}']), 'origin main is not past the tag');
+  // The install, on a branch at v9.0.0 that tracks origin's main.
+  git(w.user, ['fetch', '-q', 'origin', '+refs/heads/main:refs/remotes/origin/main']);
+  git(w.user, ['checkout', '-q', '-B', 'main', 'v9.0.0']);
+  git(w.user, ['branch', '--set-upstream-to', 'origin/main', 'main']);
+  assert.equal(git(w.user, ['rev-parse', '--abbrev-ref', 'main@{upstream}']), 'origin/main');
+
+  // A branch with a commit of its own cannot fast-forward to the tag: refused, and nothing moves.
+  writeFileSync(join(w.user, 'MINE.md'), 'a local commit\n');
+  git(w.user, ['add', 'MINE.md']);
+  git(w.user, ['commit', '-q', '-m', 'mine']);
+  const mine = git(w.user, ['rev-parse', 'HEAD']);
+  const refused = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
+  assert.equal(refused.status, 1, refused.text);
+  assert.match(refused.text, /upgrade: main cannot fast-forward to v9\.2\.0 — resolve with git, or use --to v9\.2\.0 to check out the release tag; nothing was changed/);
+  assert.deepEqual([git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['status', '--porcelain'])], [mine, ''], 'the refusal moved the tree');
+
+  // Without it, the branch moves to the verified tag's commit exactly, not to origin's main past it.
+  git(w.user, ['reset', '-q', '--hard', 'v9.0.0']);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['rev-parse', 'v9.0.0^{commit}']));
+  const moved = snowarch(w.user, ['upgrade', '--yes'], { bin: w.bin });
+  assert.equal(moved.status, 0, moved.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), git(w.user, ['rev-parse', 'v9.2.0^{commit}']), 'the branch is not at the verified tag');
+  assert.notEqual(git(w.user, ['rev-parse', 'HEAD']), past, 'the branch went past the tag to origin\'s main');
+  assert.equal(git(w.user, ['branch', '--show-current']), 'main', 'the install left its branch');
+  const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
+  const e32 = (report.checks ?? []).find((c) => c.id === 'E-32');
+  assert.match(e32?.detail ?? '', /^Integrity: verified · v9\.2\.0 · \d+ files$/, JSON.stringify(e32));
+}, 2 * MINUTES);
+
 // ARC-09-C109 — what counts as an acceptance at `Proceed? [Y/n]`.
 //
 // `promptLine` in upgrade.mjs read a line and returned '' when stdin ended, and '' does not match
@@ -337,7 +502,7 @@ test('ARC-09-C109 control — Enter at the prompt is still yes: the default has 
   assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0');
 }, MINUTES);
 
-test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --force-floor does not',
+test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --force-floor completes it',
   async (t) => {
     const w = await buildWorld(t, { claudeFloor: '9.9.9' });
     bootstrapUser(w.user);
@@ -353,17 +518,16 @@ test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --for
     assert.match(r.text, /nothing was changed/);
     assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
 
-    // `--force-floor` gets past THIS command's refusal — and then the bootstrap's own preflight
-    // refuses, because `engine.config.json`'s floor is a separate promise the release does not
-    // get to waive. That is the right layering and worth asserting rather than working around:
-    // the flag overrides the TAG's request, not the engine's requirement.
+    // ARC-09-C194 — `--force-floor` DOES WHAT ITS HELP SAYS: "upgrade even though the release wants a newer Claude
+    // Code". It used to get past this command's refusal and then meet the target's B00, which refused the same Claude
+    // Code after U5 had moved the tree: a half state, asserted here as layering. The flag now also tells the target's
+    // bootstrap to skip that check, the one B00 can skip, so the upgrade it waves through is one that completes.
     const forced = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes', '--force-floor'], { env });
     assert.match(forced.text, /BELOW the floor/, 'the line is still printed when the flag is used');
-    assert.match(forced.text, /\[U5\/7\] move the checkout/, '--force-floor did not get past the plan');
-    assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0',
-      'the tree did not move');
-    assert.notEqual(forced.status, 0, 'the bootstrap preflight must still enforce the engine floor');
-    assert.match(forced.text, /Claude Code 2\.1\.100 found, ≥ 2\.1\.214 required/);
+    assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0', 'the tree did not move');
+    assert.match(forced.text, /Claude Code check skipped \(--skip-claude-check\)/, 'the bootstrap was not told to skip it');
+    assert.doesNotMatch(forced.text, /the bootstrap stopped/, 'the forced move ended in a half state');
+    assert.match(forced.text, /\[U7\/7\] doctor/, 'the forced move did not reach the doctor');
   }, MINUTES);
 
 test('a target that is not a release tag of this product is refused by name', async (t) => {
@@ -378,66 +542,53 @@ test('a target that is not a release tag of this product is refused by name', as
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
 }, MINUTES);
 
-test('already on the newest release is a sentence, not a no-op that looks like a failure', async (t) => {
+// ── ARC-09-C212 — the harness gives every product start a fixture home ──────────────────────────────────────────────
+
+/**
+ * The runtime half of ARC-09-C212; the class half is in `harness-shape.test.mjs`. The doctor opens `~/.claude.json`
+ * (E-23, E-30), and E-27's `claude mcp get`, through a real CLI on PATH, rewrites it while it answers
+ * (tools/snowarch/lib/doctor/checks/host.mjs:187). A harness that handed its children the developer's own home let a
+ * test run read, and could let it rewrite, the developer's file: C210's probe printed the counts of its
+ * credential-shaped keys into a test log.
+ */
+test('ARC-09-C212 — a marker ~/.claude.json in the real home is neither read nor rewritten by bootstrap, upgrade or doctor', async (t) => {
   const w = await buildWorld(t);
-  bootstrapUser(w.user);
-  assert.equal(snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin }).status, 0);
+  // A stand-in for the developer's home, never the real one: THIS process is pointed at it, so a child that inherits
+  // the process's home reads this file, and a child given the fixture home cannot.
+  const realHome = tempDir('snowarch-c212-realhome-', t);
+  const MARK = 'c212-marker-folder';
+  const { names: [stale] } = JSON.parse(readFileSync(new URL(
+    '../../tools/snowarch/lib/doctor/checks/stale-registrations.json', import.meta.url), 'utf8'));
+  // A stale-named registration (E-23) under a folder that does not exist (E-30): both report it, if they read it.
+  const marker = join(realHome, '.claude.json');
+  writeFileSync(marker, `${JSON.stringify({ projects: { [join(realHome, MARK)]: { mcpServers: {
+    [stale]: { command: 'node', env: { SN_PASSWORD: 'c212-not-a-secret' } } } } } }, null, 2)}\n`);
+  const before = { bytes: readFileSync(marker), mtimeMs: statSync(marker).mtimeMs };
 
-  const again = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
-  assert.equal(again.status, 0, again.text);
-  assert.match(again.text, /up to date \(v9\.2\.0\)/);
+  const saved = Object.fromEntries(['HOME', 'USERPROFILE', 'CLAUDE_CONFIG_DIR'].map((k) => [k, process.env[k]]));
+  t.after(() => {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  });
+  process.env.HOME = realHome;
+  process.env.USERPROFILE = realHome;
+  delete process.env.CLAUDE_CONFIG_DIR;
 
-  const check = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
-  assert.equal(check.status, 0, 'exit 4 means BEHIND, and this checkout is not');
-  assert.match(check.text, /up to date \(v9\.2\.0\)/);
-}, MINUTES);
+  const boot = bootstrapUser(w.user);
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  const doctor = snowarch(w.user, ['doctor', '--json', '--section', 'legacy'], { bin: w.bin });
+  const report = JSON.parse(doctor.stdout);
+  const check = (id) => report.checks.find((c) => c.id === id);
 
-test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t) => {
-  const w = await buildWorld(t);
-  bootstrapUser(w.user);
-
-  // The stop is PLANTED, not timed: a SIGINT at a wall-clock guess is a test that passes on a fast
-  // machine and hangs on a slow one. What it plants is the state a Ctrl-C during B02 leaves — a
-  // step recorded `fail` with everything before it `ok` — by moving the corpus upstream out of the
-  // way. It has to be outside git: an edit to `engine.config.json` would be replaced by the tag's
-  // own copy at `git checkout`, which is what the first version of this test discovered.
-  // `fileURLToPath`, never the scheme cut off the front. On Windows the URL is
-  // `file:///C:/Users/RUNNER~1/…` with the tilde percent-encoded, so `.replace('file://','')`
-  // produced `/C:/Users/RUNNER%7E1/…`, which resolved against the drive as `D:\C:\Users\…` and
-  // could not be renamed. This repository documents that trap in three other modules and I wrote
-  // the wrong one anyway; the Windows cell is what caught it.
-  const upstream = fileURLToPath(JSON.parse(readFileSync(join(w.user, 'engine.config.json'), 'utf8'))
-    .docs.upstream);
-  const parked = `${upstream}.parked`;
-  renameSync(upstream, parked);
-  // …and the corpus is EMPTIED, because a re-sparse of a checkout that is already there never asks
-  // the upstream anything: B02 has to CLONE for the missing upstream to be felt. Emptied rather
-  // than removed, and rather than just losing its `.git`: an absent directory makes the gitlink
-  // modified and U1 refuses the whole upgrade (correctly), and a directory with files but no
-  // `.git` makes the clone fail with "already exists and is not empty" on the RESUME too — which
-  // is a fixture that cannot be repaired, not a step that can.
-  const corpus = join(w.user, 'vendor', 'ServiceNowDocs');
-  for (const entry of readdirSync(corpus)) {
-    rmSync(join(corpus, entry), { recursive: true, force: true });
+  // Read: the doctor's two readers of ~/.claude.json found none, which is the fixture home's answer.
+  assert.equal(check('E-23')?.data?.present, false, `E-23 read a ~/.claude.json: ${JSON.stringify(check('E-23'))}`);
+  assert.match(check('E-30')?.detail ?? '', /^no ~\/\.claude\.json to read$/, JSON.stringify(check('E-30')));
+  // The bootstrap's own doctor (B09, `--quick`) names each warning it counted: with the fixture home, E-23 is not one.
+  assert.doesNotMatch(boot, /\bwarn \([^)]*\bE-23\b/, `the bootstrap's doctor read a ~/.claude.json:\n${boot}`);
+  for (const [what, text] of [['bootstrap', boot], ['upgrade', up.text], ['doctor', doctor.text]]) {
+    assert.equal(text.includes(MARK), false, `${what} printed the marker's folder:\n${text}`);
   }
-
-  const broken = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
-  assert.notEqual(broken.status, 0, 'the fixture did not actually stop the run');
-  assert.match(broken.text, /\[B02\/09\] docs … FAIL/);
-
-  // The promise the story makes about a failure: the tree is AT the new tag and the state file
-  // records which step stopped, so a re-run finishes rather than starting over.
-  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0');
-  assert.match(broken.text, /the tree is at v9\.1\.0 and the state file records the step/);
-  const stopped = state(w.user);
-  assert.equal(stopped.steps.B02.status, 'fail');
-  assert.equal(stopped.steps.B01.status, 'ok', 'a step before the failure was lost');
-
-  // Fix the cause the way a user would, and run it again. B01 is still cached; B02 finishes.
-  renameSync(parked, upstream);
-  const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
-  assert.equal(again.status, 0, again.text);
-  assert.match(again.text, /\[B01\/09\][^\n]*ok \(cached\)/, 'the resume re-ran a step it had done');
-  assert.match(again.text, /\[B02\/09\] docs … (ok|warn)/, 'the resume did not complete B02');
-  assert.notEqual(state(w.user).steps.B02.status, 'fail');
+  // Rewritten: the bytes and the time are the ones written above.
+  assert.deepEqual(readFileSync(marker), before.bytes, 'the marker ~/.claude.json was rewritten');
+  assert.equal(statSync(marker).mtimeMs, before.mtimeMs, 'the marker ~/.claude.json was touched');
 }, MINUTES);

@@ -6,19 +6,21 @@
  *
  * THE RULE, by subject and never by seconds: a case belongs here when what it measures is the licence
  * gate or the signed manifest — what U4 refuses, the manifest B01 fetches or holds, and E-31 or E-32 as
- * U7 reads them after the move. Every other upgrade case stays in `upgrade.e2e.test.mjs`, however long
- * it runs. A new case goes to the file its subject names; the two Windows shards' times follow from that,
- * and are measured rather than balanced (the architect's ruling, 2026-10-15).
+ * U7 reads them after the move. The run after a move is in `upgrade-after-move.e2e.test.mjs` (ARC-09-C215),
+ * and every other upgrade case stays in `upgrade.e2e.test.mjs`, however long it runs. A new case goes to the
+ * file its subject names; the two Windows shards' times follow from that, and are measured rather than
+ * balanced (the architect's ruling, 2026-10-15).
  *
  * Every case runs the command the way a user runs it, in a clone with a real origin, and builds its own
- * world, so no case here depends on one in the other file.
+ * world, so no case here depends on one in another file.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-import { manifestFromArchive, signManifest, writeManifestCache } from '../../tools/snowarch/lib/licence/manifest.mjs';
+import { COVERAGE, manifestFromArchive, signManifest, writeManifestCache } from '../../tools/snowarch/lib/licence/manifest.mjs';
 import { licenceFixture } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { bootstrapUser, buildEnforcementWorld, buildManifestWorld, buildWorld, git, snowarch } from './harness.mjs';
 
@@ -98,18 +100,63 @@ test('ARC-11-C7 — a target with no signed manifest, or one that is not its own
   assert.equal(git(w.user, ['status', '--porcelain']), status, 'the working tree changed after a refusal');
 }, MINUTES);
 
-test('ARC-11-C7 — a covered directory with a file the release does not ship stops the upgrade after U5, before U6', async (t) => {
+// ARC-09-C197 — a file the move would leave under a directory the target covers, and that its manifest does not list,
+// is U4's to name before anything moves; U5 found it only after the move. U5's check stays, for what U4 cannot see.
+
+test('ARC-09-C197 — a covered directory with a file the release does not ship is refused at U4, and nothing moves', async (t) => {
   const w = await buildWorld(t);
   bootstrapUser(w.user);
   // No manifest held, so the launcher cannot put the tree back before `upgrade` runs (ARC-11-C141); `upgrade` is in
-  // the repair set and runs, and the file the checkout leaves is U5's to find.
+  // the repair set and runs, and the file under a directory both releases cover is U4's to name.
   rmSync(join(w.user, '.local', 'release-manifest.json'));
   mkdirSync(join(w.user, '.claude', 'skills', 'mine'), { recursive: true });
   writeFileSync(join(w.user, '.claude', 'skills', 'mine', 'SKILL.md'), 'a skill nobody shipped\n');
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(r.status, 2, r.text);
+  assert.match(r.text, /release manifest: v9\.1\.0 fetched \(\d+ files\)/);
+  assert.match(r.text, /upgrade: 1 file is in folders v9\.1\.0 manages but not in its signed file list: \.claude\/skills\/mine\/SKILL\.md — move it out of those folders; nothing was changed/);
+  assert.match(r.text, /after the upgrade those folders must hold exactly what the release signed/);
+  assert.doesNotMatch(r.text, /\[U5\/7\]/, 'the refusal came after the tree started to move');
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
+  assert.equal(readFileSync(join(w.user, '.claude', 'skills', 'mine', 'SKILL.md'), 'utf8'), 'a skill nobody shipped\n');
+}, MINUTES);
+
+test('ARC-09-C197 — a file under a directory the target newly covers is refused at U4, by name, and nothing moves', async (t) => {
+  // v9.1.0 is signed over a coverage with one more directory than v9.0.0's; U4 reads it on its own (ARC-09-C192).
+  const w = await buildWorld(t, { coverage: { 'v9.1.0': { ...COVERAGE, covers: [...COVERAGE.covers, 'notes/'] } } });
+  bootstrapUser(w.user);
+  mkdirSync(join(w.user, 'notes'), { recursive: true });
+  writeFileSync(join(w.user, 'notes', 'mine.md'), 'my own notes\n');
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const status = git(w.user, ['status', '--porcelain']);
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(r.status, 2, r.text);
+  assert.match(r.text, /release manifest: v9\.1\.0 fetched \(\d+ files\)/);
+  assert.match(r.text, /upgrade: 1 file is in folders v9\.1\.0 manages but not in its signed file list: notes\/mine\.md — move it out of those folders; nothing was changed/);
+  assert.doesNotMatch(r.text, /\[U5\/7\]/, 'the refusal came after the tree started to move');
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
+  assert.equal(git(w.user, ['status', '--porcelain']), status, 'the working tree changed after a refusal');
+}, MINUTES);
+
+test('ARC-11-C7 — a signed file the move does not write stops the upgrade after U5, before U6, with the way back', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  // No manifest held, so the launcher cannot put NOTICE back before `upgrade` runs (ARC-11-C141).
+  rmSync(join(w.user, '.local', 'release-manifest.json'));
+  // A sparse checkout that leaves NOTICE out: git status stays clean (U1), git archive still has it (U4's check of
+  // the manifest), and the move does not write it, so only U5's check of the moved tree can see it. Measured on
+  // git 2.39.5, with NOTICE the same in both releases; a filter or an eol attribute reaches git archive too.
+  git(w.user, ['config', 'core.sparseCheckout', 'true']);
+  assert.equal(git(w.user, ['config', '--get', 'core.sparseCheckout']), 'true', 'core.sparseCheckout did not take');
+  mkdirSync(join(w.user, '.git', 'info'), { recursive: true });
+  writeFileSync(join(w.user, '.git', 'info', 'sparse-checkout'), '/*\n!/NOTICE\n');
+  git(w.user, ['read-tree', '-mu', 'HEAD']);
+  assert.equal(existsSync(join(w.user, 'NOTICE')), false, 'the sparse checkout left NOTICE in place');
+  assert.equal(git(w.user, ['status', '--porcelain', '--untracked-files=no']), '', 'U1 would refuse this tree');
   const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.equal(r.status, 1, r.text);
-  assert.match(r.text, /release manifest: v9\.1\.0 fetched \(\d+ files\)/);
-  assert.match(r.text, /upgrade: the tree at v9\.1\.0 is not what its signed manifest records — 1 file differs, the first \.claude\/skills\/mine\/SKILL\.md \(extra\); the upgrade stops before the bootstrap — return with: git checkout /);
+  assert.match(r.text, /upgrade: the tree at v9\.1\.0 is not what its signed manifest records — 1 file differs, the first NOTICE \(missing\); the upgrade stops before the bootstrap — return with: git checkout /);
   assert.doesNotMatch(r.text, /\[U6\/7\]/, 'the bootstrap ran on a tree that is not the release');
 }, MINUTES);
 
@@ -261,3 +308,80 @@ test('ARC-09-C140 — 2.1 to 2.1: the plan and the run agree on B01, after an in
   assert.match(again.text, /\[B01\/09\][^\n]*ok \(cached\)/, again.text);
   assert.equal(ran(again.text).includes('B01'), false, again.text);
 }, 3 * MINUTES);
+
+// ── ARC-09-C185c — an install whose origin is another GitHub repository than the one releases are published at ─────────
+
+test('ARC-09-C185c — a GitHub origin that is not the releases\' gets the set-url line at U4 and at U2; others stay silent', async (t) => {
+  // The final's manifest is signed over another commit than the tag the old origin carries, as a 2.2.1 final's is over
+  // its distribution commit (ARC-09-C185b).
+  const w = await buildWorld(t, { foreign: ['v9.2.0'] });
+  bootstrapUser(w.user);
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const home = 'https://github.com/farstic/snowarch.git';
+  const old = 'https://github.com/farstic/old-home.git';
+  const said = `upgrade: origin is ${old}, and releases are published at ${home} — git remote set-url origin ${home}`;
+  // A GitHub-shaped origin and no network: `insteadOf` sends git to the world's own origin, while the URL the install
+  // has configured, the one the product reads, stays the GitHub one.
+  const key = (to) => `url.${pathToFileURL(to).href}.insteadOf`;
+  const via = (url, to) => {
+    git(w.user, ['config', key(to), url]);
+    assert.equal(git(w.user, ['config', '--get', key(to)]), url, 'the insteadOf did not take');
+  };
+  const unvia = (to) => {
+    git(w.user, ['config', '--unset', key(to)]);
+    assert.equal(git(w.user, ['config', '--get', key(to)], { allowFail: true }), null, 'the insteadOf is still set');
+  };
+  const origin = (url) => {
+    git(w.user, ['remote', 'set-url', 'origin', url]);
+    assert.equal(git(w.user, ['config', '--get', 'remote.origin.url']), url, 'the origin did not move');
+  };
+  origin(old);
+  via(old, w.origin);
+
+  // U4: the published manifest names another commit than the tag here.
+  const u4 = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(u4.status, 1, u4.text);
+  assert.match(u4.text, /upgrade: v9\.2\.0 has no verified signed manifest \(the published manifest names ddddddd, and v9\.2\.0 here is [0-9a-f]{7}\) — nothing was changed/);
+  assert.ok(u4.text.includes(said), u4.text);
+
+  // U2: the old origin no longer answers, as a private repository does not, and the same line follows git's own error.
+  unvia(w.origin);
+  via(old, join(w.scratch, 'gone.git'));
+  const u2 = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
+  assert.equal(u2.status, 1, u2.text);
+  assert.ok(u2.text.includes(said), u2.text);
+  unvia(join(w.scratch, 'gone.git'));
+
+  // Controls, refused at U4 the same way: the releases' own repository, and an origin that is not on GitHub.
+  origin(home);
+  via(home, w.origin);
+  const own = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  unvia(w.origin);
+  origin(pathToFileURL(w.origin).href);
+  const mirror = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  for (const r of [own, mirror]) {
+    assert.equal(r.status, 1, r.text);
+    assert.match(r.text, /upgrade: v9\.2\.0 has no verified signed manifest \(the published manifest names ddddddd/, r.text);
+    assert.equal(r.text.includes('releases are published at'), false, r.text);
+  }
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'HEAD moved after a refusal');
+}, 2 * MINUTES);
+
+// ── ARC-09-C194 — the way back named after a move is the one that re-verifies ────────────────────────────────────────
+
+test('ARC-09-C194 — after a move from a release, the way back named is upgrade --to it, and it re-verifies', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const up = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(up.status, 0, up.text);
+  // The target's manifest is cached at U5, so `git checkout v9.0.0` would leave the cache naming v9.1.0: integrity
+  // reads 'other' and every command is refused. The upgrade back fetches, verifies and caches v9.0.0's own.
+  assert.match(up.text, /HEAD is detached at v9\.1\.0 — return with: \S+ upgrade --to v9\.0\.0/, up.text);
+  assert.doesNotMatch(up.text, /HEAD is detached at v9\.1\.0 — return with: git checkout/, up.text);
+  const back = snowarch(w.user, ['upgrade', '--to', 'v9.0.0', '--yes'], { bin: w.bin });
+  assert.equal(back.status, 0, back.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.0.0', back.text);
+  const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
+  const e32 = (report.checks ?? []).find((c) => c.id === 'E-32');
+  assert.match(e32?.detail ?? '', /^Integrity: verified · v9\.0\.0 · \d+ files$/, JSON.stringify(e32));
+}, 2 * MINUTES);

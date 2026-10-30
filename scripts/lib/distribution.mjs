@@ -105,8 +105,24 @@ function treeEntries(root, ref) {
   });
 }
 
-/** A blob's bytes as git stores them: no conversion the machine's configuration would make on the way out. */
-const blobOf = (root, sha) => execFileSync('git', ['-C', root, 'cat-file', 'blob', sha], { maxBuffer: 1 << 30 });
+/**
+ * Blobs' bytes as git stores them, in the order asked, from one `git cat-file --batch`: no conversion the machine's
+ * configuration would make on the way out, and one process for the whole tree rather than one per file.
+ */
+function blobsOf(root, shas) {
+  if (shas.length === 0) return [];
+  const out = execFileSync('git', ['-C', root, 'cat-file', '--batch'], { input: `${shas.join('\n')}\n`, maxBuffer: 1 << 30 });
+  const blobs = [];
+  let at = 0;
+  for (const sha of shas) {
+    const eol = out.indexOf(0x0a, at);
+    const [got, type, size] = out.subarray(at, eol).toString('utf8').split(' ');
+    if (got !== sha || type !== 'blob') throw new Error(`git cat-file answered "${got} ${type}" for ${sha}`);
+    blobs.push(out.subarray(eol + 1, eol + 1 + Number(size)));
+    at = eol + 1 + Number(size) + 1;        // the record's own trailing newline
+  }
+  return blobs;
+}
 
 /**
  * Write the shipped files into `dir`, byte for byte as HEAD stores them: each blob copied, as `stage` copies it, never
@@ -114,17 +130,16 @@ const blobOf = (root, sha) => execFileSync('git', ['-C', root, 'cat-file', 'blob
  * the blob holds LF). The executable bit where git records it. No `.git`, no history. Returns how many were written.
  */
 export function exportTree(root, dir, coverage = COVERAGE) {
-  let written = 0;
-  for (const entry of treeEntries(root, 'HEAD')) {
-    if (entry.type !== 'blob' || !isCovered(entry.path, coverage)) continue;
-    if (entry.mode === '120000') throw new Error(`${entry.path} is a symlink: the export writes files, and a link is not one`);
-    const to = join(dir, entry.path);
+  const entries = treeEntries(root, 'HEAD').filter((e) => e.type === 'blob' && isCovered(e.path, coverage));
+  const link = entries.find((e) => e.mode === '120000');
+  if (link) throw new Error(`${link.path} is a symlink: the export writes files, and a link is not one`);
+  blobsOf(root, entries.map((e) => e.sha)).forEach((bytes, i) => {
+    const to = join(dir, entries[i].path);
     mkdirSync(dirname(to), { recursive: true });
-    writeFileSync(to, blobOf(root, entry.sha));
-    if (entry.mode === '100755' && process.platform !== 'win32') chmodSync(to, 0o755);
-    written += 1;
-  }
-  return written;
+    writeFileSync(to, bytes);
+    if (entries[i].mode === '100755' && process.platform !== 'win32') chmodSync(to, 0o755);
+  });
+  return entries.length;
 }
 
 /** The corpus submodule: a gitlink in the tree, not a file, so `git archive` and the export leave it out. */
@@ -171,6 +186,11 @@ export function stage(root, clone, ref, { onto = null, tag = false, coverage = C
   if (!commit) throw new Error(`${ref} is not a commit in ${root}`);
   const annotated = tagOf(root, ref);
   if (tag && !annotated) throw new Error(`--tag needs an annotated tag; ${ref} is not one`);
+  // ARC-09-C185c: the distribution's history names nothing the install may not, so neither message may.
+  if (namesEngineering(ref)) throw new Error(`the commit message would be ${ref}, which names the engineering repository`);
+  if (annotated && namesEngineering(annotated.message)) {
+    throw new Error(`${ref}'s message names the engineering repository: the distribution tag would carry it`);
+  }
 
   const entries = treeEntries(root, commit);
   const link = entries.find((e) => e.type === 'commit' && e.path === CORPUS_GITLINK);
@@ -199,9 +219,10 @@ export function stage(root, clone, ref, { onto = null, tag = false, coverage = C
   // The blobs, copied: read from the engineering repository as stored, written into the clone without filters.
   const tmp = mkdtempSync(join(tmpdir(), 'snowarch-stage-'));
   try {
+    const bytes = blobsOf(root, blobs.map((b) => b.sha));
     const files = blobs.map((b, i) => {
       const file = join(tmp, String(i));
-      writeFileSync(file, blobOf(root, b.sha));
+      writeFileSync(file, bytes[i]);
       return file;
     });
     const written = blobs.length === 0 ? [] : gitIn(clone, ['hash-object', '-w', '--no-filters', '--stdin-paths'],
@@ -231,6 +252,60 @@ export function stage(root, clone, ref, { onto = null, tag = false, coverage = C
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
+}
+
+/**
+ * ARC-09-C185b — why the tag `ref` in the distribution clone `clone` is not `ref` of the engineering checkout `root`
+ * staged, or `null` when it is: its tree is the tree `stage` builds from `root`, in a clone made and removed here. The
+ * tree is the claim. The distribution commit's parent, date and message are the distribution's own; its files and its
+ * corpus pin are the tag's. `release.mjs --tag-only --push --distribution` asks it before the engineering tag leaves.
+ */
+export function stagedDiffers(root, clone, ref, { coverage = COVERAGE } = {}) {
+  if (tryGit(clone, ['rev-parse', '--git-dir']) === null) return `${clone} is not a git repository`;
+  const there = tryGit(clone, ['rev-parse', '--verify', '--quiet', `refs/tags/${ref}^{tree}`]);
+  if (!there) return `${clone} has no ${ref}: stage it there with --tag`;
+  const tmp = mkdtempSync(join(tmpdir(), 'snowarch-restage-'));
+  try {
+    const { tree } = stage(root, join(tmp, 'clone'), ref, { coverage });
+    return tree === there ? null : `${ref} in ${clone} is tree ${there.slice(0, 7)}, and ${ref} staged from here is ${tree.slice(0, 7)}`;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+/**
+ * ARC-09-C185c — the repositories a shipped file may link, each with its reason (the owner's ruling, 2026-10-19). The
+ * engineering repository goes private, and its name must not be discoverable from an install at all.
+ */
+export const ALLOWED_REPOS = Object.freeze([
+  { repo: 'snowarch', reason: 'the distribution repository: what a user installs, upgrades from, and reports issues on' },
+  { repo: 'snowarch-licences', reason: 'the licence and manifest repository the product fetches the revocation list and manifests from' },
+]);
+/** The engineering repository's name, built so this file is not a hit of its own scan. */
+const ENGINEERING_NAME = new RegExp(['ai', 'servicenow', 'architect'].join('-'), 'i');
+const FARSTIC_LINK = /github\.com[/:]farstic\/([A-Za-z0-9_.-]+)/g;
+// A sentence's full stop is not part of a name: `…/snowarch-licences.` names snowarch-licences.
+const allowedRepo = (name) => ALLOWED_REPOS.some((a) => a.repo === name.replace(/\.+$/, '').replace(/\.git$/, ''));
+
+/** Does `text` name the engineering repository, or link a farstic repository other than the allowed ones? */
+export function namesEngineering(text) {
+  return ENGINEERING_NAME.test(text) || [...text.matchAll(FARSTIC_LINK)].some((m) => !allowedRepo(m[1]));
+}
+
+/**
+ * Every line of a shipped file that names the engineering repository or links another farstic repository:
+ * `{ file, line, text }`. Read from HEAD's blobs, the bytes that ship; generator inputs are read through the outputs
+ * they compose, which ship.
+ */
+export function engineeringNames(root, { coverage = COVERAGE } = {}) {
+  const hits = [];
+  const entries = treeEntries(root, 'HEAD').filter((e) => e.type === 'blob' && isCovered(e.path, coverage));
+  blobsOf(root, entries.map((e) => e.sha)).forEach((bytes, i) => {
+    bytes.toString('utf8').split('\n').forEach((text, n) => {
+      if (namesEngineering(text)) hits.push({ file: entries[i].path, line: n + 1, text: text.trim().slice(0, 160) });
+    });
+  });
+  return hits;
 }
 
 /** A relative import specifier, or a literal dynamic one, per line. */

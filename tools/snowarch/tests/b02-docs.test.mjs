@@ -24,7 +24,7 @@ const FRAME_SPELL = spellings();
 // `RegExp.escape` is not on Node 20, and the spelling contains `.` and `\\`.
 const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import {
-  AREAS, buildUpstream, git, makeWorkspace, writeCitingSkill, CITED_PAGE,
+  AREAS, UNCITED, buildUpstream, git, makeWorkspace, writeCitingSkill, CITED_PAGE,
 } from '../../../tests/helpers/docs-fixture.mjs';
 import { trackTempDir } from './helpers/temp.mjs';
 
@@ -98,7 +98,11 @@ test('AC 1 — a fresh checkout syncs, measures, verifies, and attributes exactl
     assert.equal(typeof r.data[k], 'number', `${k} must be a number, not a path`);
   }
   assert.equal(ctx.state.docs.mode, 'sparse');
+  // ARC-09-C244 — a sparse B02 ran was asked for (only `--docs sparse` reaches it), and the state says so, or the
+  // next run would read the default and move the install to the whole corpus.
+  assert.equal(ctx.state.docs.optIn, true);
   assert.equal(ctx.state.docs.pin, upstream.pin);
+  assert.equal(r.detail, `sparse, ${AREAS.length} areas`);
 });
 
 test('AC 2 — --docs full checks out every area of the pin and records the mode', async () => {
@@ -110,6 +114,10 @@ test('AC 2 — --docs full checks out every area of the pin and records the mode
   assert.equal(r.status, 'ok');
   assert.equal(r.data.mode, 'full');
   assert.equal(ctx.state.docs.mode, 'full');
+  assert.equal(ctx.state.docs.optIn, undefined, 'the whole corpus is the default and carries no marker');
+  // ARC-09-C244 — the areas on disk, the one nothing cites included, not the cone's list.
+  assert.equal(r.detail, `full, ${AREAS.length + 1} areas`);
+  assert.ok(existsSync(join(w.root, CORPUS_DIR, ...UNCITED.split('/'))), 'the whole corpus left out an area');
   for (const area of AREAS) {
     assert.ok(existsSync(join(w.root, CORPUS_DIR, ...area.split('/'))), `${area} is missing`);
   }

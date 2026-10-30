@@ -16,7 +16,7 @@
 Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
 Licence: missing
 Engine: snowarch 9.9.9 · contract deadbeefdead
-Docs: vendor/ServiceNowDocs @ aa447ce4ea80 (australia) · sparse
+Docs: vendor/ServiceNowDocs @ aa447ce4ea80 (australia) · full
 Roster: 29 skills / 9 agents
 Instances: pdi (pdi, custom)
 Doctor: 15 ok, 0 warn, 1 fail (E-31) — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
@@ -97,5 +97,6 @@ Run ./snowarch doctor --fix for the fixable ones (2).
 WARNs are never listed one by one — that is `./snowarch doctor`. On a quick run 25 of 39 checks are
 `skip`, so a panel that listed every non-ok check would print 27 lines instead of one.
 
-**Exit code.** `0` when no check failed, `1` when one did. A `1` is a finding about the checkout,
-not a failure to render: the panel is printed either way.
+**Exit code.** `0` when no check failed, `1` when one did: the panel is printed either way, so a `1` is not a failure
+to render. It is also `1` when the doctor itself failed; then the one line printed is a Mode line that says
+`doctor unavailable`. Any other `1` is the command itself failing, and what it printed says why.

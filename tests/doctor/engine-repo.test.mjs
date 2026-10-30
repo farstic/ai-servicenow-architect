@@ -58,9 +58,9 @@ test('E-06 names every structural problem in engine.config.json', async (t) => {
   writeJson(root, 'engine.config.json', config);
   const r = await run('E-06', root, { config });
   assert.equal(r.status, 'fail');
-  assert.match(r.detail, /serverKey contains whitespace/);
-  assert.match(r.detail, /docs\.pin is not a 40-character sha/);
-  assert.match(r.detail, /floors\.git is missing/);
+  assert.match(r.detail, /`mcp\.serverKey` contains whitespace/);
+  assert.match(r.detail, /`docs\.pin` is not a 40-character sha/);
+  assert.match(r.detail, /`floors\.git` is missing/);
   assert.equal(r.command, 'git checkout -- engine.config.json');
 });
 
@@ -114,6 +114,21 @@ test('E-08 fails a SessionStart hook whose timeout is over the 10 s the settings
   const { problems, present } = sessionStartProblems(local, process.cwd());
   assert.equal(present, true);
   assert.match(problems.join(' '), /timeout is 30/);
+});
+
+// ARC-09-C239 — B07 writes the project path in double quotes, so a checkout path with a space runs the banner too. The
+// quoted entry is the healthy one; the unquoted one every earlier release wrote is an entry for B07 to rewrite.
+test('ARC-09-C239 — E-08 passes the quoted SessionStart entry and names the unquoted one as B07\'s to rewrite', () => {
+  const entry = (command) => ({ hooks: { SessionStart: [{ matcher: 'startup|resume', hooks: [{ type: 'command',
+    command, timeout: 10 }] }] } });
+  const quoted = sessionStartProblems(entry('node "${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs"'),
+    process.cwd());
+  assert.deepEqual([quoted.present, quoted.problems], [true, []]);
+  const bare = sessionStartProblems(entry('node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs'),
+    process.cwd());
+  assert.equal(bare.entry.length, 1, bare.problems.join('; '));
+  assert.match(bare.entry[0], /not in the form B07 writes/);
+  assert.equal(bare.scriptMissing, false);
 });
 
 test('E-09 finds a credential-shaped KEY at any depth, and never prints the value', async (t) => {

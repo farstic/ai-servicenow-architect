@@ -51,6 +51,7 @@ const SPELLED_BOOTSTRAP = spellings(CTX).bootstrap;
 
 import { engineRepoChecks } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { version as engineVersionOf } from '../../tools/snowarch/lib/config.mjs';
+import { checkoutKey } from '../../tools/snowarch/lib/state.mjs';
 import { greenTree, readJson, writeJson } from './helpers/tree.mjs';
 
 const E29 = engineRepoChecks().find((c) => c.id === 'E-29');
@@ -69,7 +70,7 @@ function finished(root, over = {}) {
       durationMs: 0, engineVersion: current };
   }
   writeJson(root, '.local/bootstrap-state.json',
-    { ...state, mode: 'live', steps, ...over });
+    { ...state, mode: 'live', steps, checkout: checkoutKey(root, 'darwin'), ...over });
   return root;
 }
 
@@ -186,7 +187,7 @@ test('a step the recorded mode never plans is not reported missing', async (t) =
     steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-20T09:00:00.000Z',
       durationMs: 0, engineVersion: current };
   }
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
 
   const r = await E29.run(ctxFor(root));
   assert.equal(r.status, 'ok', r.detail);
@@ -224,7 +225,7 @@ function midStep(root, runningId) {
     steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
       durationMs: 0, engineVersion: current };
   }
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   return { root, platform: 'darwin', env: { [RUNNING_STEP_ENV]: runningId },
     config: readJson(root, 'engine.config.json') };
 }
@@ -252,7 +253,7 @@ test('C32: it excludes the step that is running, not B09 by name', async (t) => 
     steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
       durationMs: 0, engineVersion: current };
   }
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   const r = await E29.run({ root, platform: 'darwin', env: { [RUNNING_STEP_ENV]: 'B07' },
     config: readJson(root, 'engine.config.json') });
   assert.equal(r.status, 'ok', r.detail);
@@ -284,7 +285,7 @@ test('C32: a step recorded as interrupted is a FAIL even while another step is r
   }
   steps.B02 = { status: 'failed', reason: 'interrupted', inputsHash: null,
     finishedAt: '2026-09-24T09:01:00.000Z', durationMs: 0, engineVersion: current };
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   const r = await E29.run({ root, platform: 'darwin', env: { [RUNNING_STEP_ENV]: 'B09' },
     config: readJson(root, 'engine.config.json') });
   assert.equal(r.status, 'fail', `an interrupted step was forgiven: ${r.detail}`);
@@ -325,7 +326,7 @@ function cachedUnderOlder(root, { older = '0.9.0', runningId = null } = {}) {
     steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
       durationMs: 0, engineVersion: id === 'B02' ? current : older };
   }
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   return { root, platform: 'darwin', config: readJson(root, 'engine.config.json'),
     env: runningId ? { [RUNNING_STEP_ENV]: runningId } : {} };
 }
@@ -367,11 +368,46 @@ test('ARC-08-C36 — a step that genuinely did not finish is still a FAIL', asyn
   }
   steps.B09 = { status: 'failed', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
     durationMs: 0, engineVersion: '0.9.0' };
-  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps, checkout: checkoutKey(root, 'darwin') });
   const r = await E29.run({ root, platform: 'darwin', env: {},
     config: readJson(root, 'engine.config.json') });
 
   assert.equal(r.status, 'fail', 'a failed step is no longer reported');
   assert.match(r.detail, /B09 failed/, 'the sentence no longer says which step failed, or how');
   assert.ok(r.command, 'a genuinely unfinished install lost its remedy');
+});
+
+// ── ARC-09-C198 — a record carried from another folder ─────────────────────────────────────────────────────────
+//
+// The cross-version sweep copied a 2.2.0 `.local/bootstrap-state.json` into a fresh checkout: the new install had no
+// corpus and no `settings.local.json`, and this check said "all current". The steps had run, in the folder the record
+// came from.
+
+test('ARC-09-C198 — a finished record copied into another folder is not all current there', async (t) => {
+  const from = finished(greenTree(t, { mode: 'live' }));
+  const root = greenTree(t, { mode: 'live' });
+  writeJson(root, '.local/bootstrap-state.json', readJson(from, '.local/bootstrap-state.json'));
+
+  const r = await E29.run(ctxFor(root));
+  assert.equal(r.status, 'fail', 'another folder\'s finished install was reported as this one\'s');
+  assert.equal(r.detail,
+    `bootstrap incomplete since ${engineVersionOf(root)}: the recorded steps were run in another folder`);
+  // E-29's own remedy line, the one every incomplete install gets.
+  assert.equal(r.remedy, SPELLED_BOOTSTRAP);
+  assert.equal(r.command, SPELLED_BOOTSTRAP);
+});
+
+test('ARC-09-C198 — a record written before the binding existed does not say all current either', async (t) => {
+  const root = finished(greenTree(t, { mode: 'live' }));
+  const state = readJson(root, '.local/bootstrap-state.json');
+  // Every record written before this release has no binding, in this folder or any other, and it cannot say which.
+  delete state.checkout;
+  writeJson(root, '.local/bootstrap-state.json', state);
+
+  const r = await E29.run(ctxFor(root));
+  assert.equal(r.status, 'fail', 'a record that does not say where its steps ran was reported as this folder\'s');
+  assert.equal(r.detail, `bootstrap incomplete since ${engineVersionOf(root)}: the record was written before this `
+    + 'release and does not say which folder its steps ran in');
+  assert.equal(r.remedy, SPELLED_BOOTSTRAP);
+  assert.equal(r.command, SPELLED_BOOTSTRAP);
 });

@@ -765,13 +765,14 @@ jobs:
       - name: 'ARC-11-C6 — a fixture licence for the steps outside the allowed set'
         id: licence
         run: node scripts/ci/licence-fixture.mjs
-      # Gate 6 is `docs verify`, which needs the corpus. The same sparse recipe B02 uses.
-      - name: The pinned corpus, sparse
+      # Gate 6 is `docs verify`, which needs the corpus, and the whole of it (ARC-09-C244): its identifier guard reads
+      # the whole corpus, as an install has by default, and says "not checked" on a sparse one.
+      - name: The pinned corpus, whole
         env:
           NODE_OPTIONS: ${{ steps.licence.outputs.node_options }}
           SNOWARCH_STATE_ROOT: ${{ steps.licence.outputs.root }}
           CLAUDE_PROJECT_DIR: ${{ steps.licence.outputs.root }}
-        run: node tools/snowarch/bin/snowarch.mjs docs sync --yes
+        run: node tools/snowarch/bin/snowarch.mjs docs sync --yes --mode full
       # ARC-09-S0x AC (acceptance item B09-07). The criterion is that the release runs on
       # windows-latest **under pwsh, with no Git Bash** — and until this acceptance pass this step
       # was `shell: bash` on all three OSes, which on windows-latest IS Git Bash. So the cell was
@@ -853,6 +854,7 @@ jobs:
           node --test --test-concurrency=2 \
             tests/upgrade/upgrade.e2e.test.mjs \
             tests/upgrade/upgrade-licence.e2e.test.mjs \
+            tests/upgrade/upgrade-after-move.e2e.test.mjs \
             tests/upgrade/upgrade-unit.test.mjs \
             tests/upgrade/harness-shape.test.mjs \
             tests/upgrade/plan-agrees.test.mjs \
@@ -867,9 +869,11 @@ jobs:
     # split instead, and each shard keeps 45 minutes.
     #
     # The cut is by SUBJECT, never by seconds: `upgrade-licence.e2e.test.mjs` holds the cases whose
-    # subject is the licence or the signed manifest, and its header states the rule. Shard 1 runs
-    # every other end-to-end case; shard 2 runs the licence cases and the four smaller files. The two
-    # lists together are exactly the list `upgrade-e2e` runs on Linux and macOS, and
+    # subject is the licence or the signed manifest, and its header states the rule. ARC-09-C215:
+    # `upgrade-after-move.e2e.test.mjs` holds the run after a move, by the same rule, after shard 1
+    # reached the 45 minutes on a slow runner with every case passing (run 39466322223). Shard 1 runs
+    # the move itself; shard 2 runs those two files first, side by side, then the four smaller ones.
+    # The two lists together are exactly the list `upgrade-e2e` runs on Linux and macOS, and
     # `tests/workflows.test.mjs` holds them to it.
     #
     # Not required contexts on their own: `upgrade-e2e-windows` needs both and is the context main's
@@ -880,7 +884,7 @@ jobs:
       matrix:
         include:
           - { shard: 1, files: 'tests/upgrade/upgrade.e2e.test.mjs' }
-          - { shard: 2, files: 'tests/upgrade/upgrade-licence.e2e.test.mjs tests/upgrade/upgrade-unit.test.mjs tests/upgrade/harness-shape.test.mjs tests/upgrade/plan-agrees.test.mjs tests/upgrade/tag-order.test.mjs' }
+          - { shard: 2, files: 'tests/upgrade/upgrade-licence.e2e.test.mjs tests/upgrade/upgrade-after-move.e2e.test.mjs tests/upgrade/upgrade-unit.test.mjs tests/upgrade/harness-shape.test.mjs tests/upgrade/plan-agrees.test.mjs tests/upgrade/tag-order.test.mjs' }
     runs-on: windows-latest
     # ARC-09-C134's 45 minutes, per shard. ARC-09-C28's `world[win32]` lines say where the time
     # goes: committing and tagging each world's first release, 19–23 s on a fast runner and 35–64 s

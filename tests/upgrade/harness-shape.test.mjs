@@ -16,13 +16,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 
 import { buildWorld, LONGPATHS, NOT_COPIED, persistLongPaths } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { applyWrites } from '../../scripts/lib/release/writers.mjs';
+import { scanProductStarts } from '../../tools/snowarch/tests/helpers/licence-hook/starts.mjs';
+import { initFixtureRepo } from '../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -199,7 +201,7 @@ test('C27b: a `-c` override does not persist, and a config write does', (t) => {
   // Asserted as git behaviour rather than as a sentence in a comment, because "I thought `-c`
   // persisted" is the belief that cost the cycle, and a belief is what a control is for.
   const dir = tempDir('snowarch-longpaths-', t);
-  rgit(dir, ['init', '-q', '-b', 'main', '.']);
+  initFixtureRepo((args) => rgit(dir, args), dir, ['-q', '-b', 'main']);
   // Deliberately NOT through `rgit`: this case is about what a bare call sees, which is the whole
   // question. Exempt from the scan below by the marker on the line.
   const get = () => run(dir, 'git', ['config', '--local', '--get', 'core.longpaths']); // scan-exempt: the subject
@@ -330,4 +332,27 @@ test('C13: ARC-09-S11 AC 3 — the released shape is produced, tagged, and check
     assert.equal(r.status, 0,
       `${file} fails on the RELEASED tree:\n${`${r.stdout}${r.stderr}`.slice(0, 3000)}`);
   }
+});
+
+// ── ARC-09-C212 — every product start in the harness gets a fixture home ────────────────────────────────────────────
+
+/**
+ * The class: every start of the product under tests/upgrade/, read by the same reader as the licence spawn rule. A
+ * start that is not given the harness's fixture home (`fixtureHome(`) hands its child the developer's own HOME, and
+ * the doctor that child runs opens the developer's `~/.claude.json` (E-23, E-30) and lets E-27's `claude mcp get`,
+ * through a real CLI on PATH, rewrite it while it answers (tools/snowarch/lib/doctor/checks/host.mjs:187).
+ */
+test('ARC-09-C212 — the two product starts in tests/upgrade/ both give their child the fixture home', async () => {
+  const { starts, unresolved, files } = await scanProductStarts({ roots: [join(REAL_ROOT, 'tests/upgrade')],
+    base: REAL_ROOT });
+  assert.ok(files >= 8, `the reader read ${files} files`);
+  assert.deepEqual(unresolved, []);
+  // The reader names a file the platform's way (`relative()`): on Windows `tests\upgrade\harness.mjs`. POSIX here, so
+  // the expected names are one spelling on every cell.
+  const posix = (p) => p.split(sep).join('/');
+  // bootstrapUser and snowarch(): U6's bootstrap and U7's doctor are THEIR children, and inherit what they are given.
+  assert.deepEqual(starts.map((s) => posix(s.file)), ['tests/upgrade/harness.mjs', 'tests/upgrade/harness.mjs'],
+    `the product starts moved: ${starts.map((s) => `${posix(s.file)}:${s.line}`).join(', ')}`);
+  const bare = starts.filter((s) => !/\bfixtureHome\(/.test(s.args)).map((s) => `${posix(s.file)}:${s.line}`);
+  assert.deepEqual(bare, [], 'a product start that does not give its child the fixture home');
 });

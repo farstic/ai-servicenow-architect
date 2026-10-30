@@ -21,7 +21,7 @@
     "capabilities": null,
     "docs": {
       "present": true,
-      "mode": "sparse",
+      "mode": "full",
       "pin": "aa447ce4ea802c880af9dd365a114d3e6eb1cc19",
       "family": "australia",
       "head": "aa447ce4ea802c880af9dd365a114d3e6eb1cc19",
@@ -360,7 +360,7 @@
     {
       "id": "E-15",
       "section": "docs",
-      "title": "sparse set",
+      "title": "corpus completeness",
       "status": "skip",
       "severity": "fail",
       "detail": "not in the --quick subset",

@@ -27,7 +27,7 @@ import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 import {
   chmodSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { licenceFixture, licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
@@ -36,6 +36,7 @@ import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { writeHead, writeMarker } from '../../scripts/lib/release/writers.mjs';
 import { AREAS, buildUpstream } from '../helpers/docs-fixture.mjs';
 import { LAST_UNENFORCED_RELEASE } from '../../tools/snowarch/lib/doctor/checks/licence.mjs';
+import { initFixtureRepo } from '../../tools/snowarch/tests/helpers/fixture-git.mjs';
 
 export const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -398,7 +399,7 @@ function pointAtFixtureCorpus(work, upstream, { licences = null } = {}) {
  */
 function licencesRepo(scratch) {
   const bare = join(scratch, 'licences.git');
-  gitRaw(['init', '--quiet', '--bare', '--initial-branch=main', bare]);
+  initFixtureRepo(gitRaw, bare, ['--quiet', '--bare', '--initial-branch=main']);
   return { bare, url: pathToFileURL(bare).href };
 }
 
@@ -407,16 +408,20 @@ function licencesRepo(scratch) {
  * licensed child trusts — and pushed to the world's licences repository as `releases/<tag>.json`, in one commit.
  *
  * `unsigned` tags get none, and `altered` ones a manifest with one hash changed and signed all the same: a record that
- * verifies and is not the tag's (ARC-11-C7's two refusals at U4).
+ * verifies and is not the tag's (ARC-11-C7's two refusals at U4). `foreign` ones are signed over another commit, as a
+ * final's is over its distribution commit when the install's origin carries the engineering tag (ARC-09-C185c).
+ * `coverage` signs a tag over a coverage of its own, `{ [tag]: { covers, excludes, ignores } }`: a release that covers
+ * a directory the one before it did not (ARC-09-C197). U4 reads it on that coverage (ARC-09-C192).
  */
-function publishManifests(work, licences, tags, { unsigned = [], altered = [] } = {}) {
+function publishManifests(work, licences, tags, { unsigned = [], altered = [], foreign = [], coverage = {} } = {}) {
   const clone = join(dirname(licences.bare), 'licences-work');
-  gitRaw(['init', '--quiet', '--initial-branch=main', clone]);
+  initFixtureRepo(gitRaw, clone, ['--quiet', '--initial-branch=main']);
   mkdirSync(join(clone, 'releases'), { recursive: true });
   const { primary } = licenceFixture();
   for (const tag of tags.filter((x) => !unsigned.includes(x))) {
-    const manifest = manifestFromArchive(work, tag);
+    const manifest = manifestFromArchive(work, tag, coverage[tag] ? { coverage: coverage[tag] } : {});
     if (altered.includes(tag)) manifest.files['CLAUDE.md'] = '0'.repeat(64);
+    if (foreign.includes(tag)) manifest.commit = 'd'.repeat(40);
     const doc = signManifest(manifest, primary.privateKey);
     writeFileSync(join(clone, 'releases', `${tag}.json`), `${JSON.stringify(doc, null, 2)}\n`);
   }
@@ -425,8 +430,26 @@ function publishManifests(work, licences, tags, { unsigned = [], altered = [] } 
   git(clone, ['push', '--quiet', licences.bare, 'main']);
 }
 
+/**
+ * ARC-09-C192 — `tags`' manifests signed again from `dir`, over ITS commits: a distribution clone's, as a final from
+ * 2.2.1 is signed from the staged clone (ARC-09-C185b). One commit on the world's licences repository, over what is
+ * there, so the upgrade and the doctor read these from now on.
+ */
+export function republishManifests(licences, dir, tags) {
+  const work = join(dirname(licences.bare), `licences-${tags.join('-')}`);
+  gitRaw(['clone', '--quiet', licences.url, work]);
+  const { primary } = licenceFixture();
+  for (const tag of tags) {
+    const doc = signManifest(manifestFromArchive(dir, tag), primary.privateKey);
+    writeFileSync(join(work, 'releases', `${tag}.json`), `${JSON.stringify(doc, null, 2)}\n`);
+  }
+  git(work, ['add', '-A']);
+  git(work, ['commit', '--quiet', '-m', 'the distribution manifests']);
+  git(work, ['push', '--quiet', licences.bare, 'main']);
+}
+
 export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null,
-  unsigned = [], altered = [] } = {}) {
+  unsigned = [], altered = [], foreign = [], coverage = {}, b07Literal = false } = {}) {
   const marks = [];
   const worldStart = process.hrtime.bigint();
   const scratch = tempDir('snowarch-upgrade-', t);
@@ -464,7 +487,7 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // exists — a list here would be the copy that goes stale when somebody adds the next generator.
   phase('gen-all', marks, () => execFileSync(process.execPath,
     [join(work, 'scripts/gen-all.mjs')], { cwd: work, stdio: 'pipe' }));
-  phase('git-init', marks, () => git(work, ['init', '-q', '-b', 'main']));
+  phase('git-init', marks, () => initFixtureRepo((args) => git(work, args), work, ['-q', '-b', 'main']));
   // Written into the fixture repository the moment it exists, so every git that ever runs here —
   // including ones this suite does not spawn — reads it. See `persistLongPaths`.
   persistLongPaths(work);
@@ -478,6 +501,16 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // One area REMOVED rather than added: every area the file names must exist upstream, and a
   // release that asks for one that does not is a broken release rather than a test.
   writeFileSync(areas, `${AREAS.slice(0, -1).join('\n')}\n`);
+  // ARC-09-C195 — release A also changes what B07 depends on, as 2.2.5 did with "hooks written": a literal input the
+  // release before it cannot see. Off by default. An anchor that moved throws, so the case never tests nothing.
+  if (b07Literal) {
+    const inputs = join(work, 'tools/snowarch/lib/inputs.mjs');
+    const anchor = '      TEXT(`hooks written=${JSON.stringify(hookEntry())}`),\n';
+    const src = readFileSync(inputs, 'utf8');
+    if (src.split(anchor).length !== 2) throw new Error('harness: B07\'s "hooks written" line moved in inputs.mjs');
+    const added = "      TEXT('c195 fixture=a literal this release adds'),\n";
+    writeFileSync(inputs, src.replace(anchor, () => `${anchor}${added}`));
+  }
   phase('rewrite-version-A', marks, () => rewriteVersion(work, '9.1.0'));
   commit(work, 'feat(docs): one fewer area', upstream.pin);
   const tA = process.hrtime.bigint();
@@ -541,7 +574,8 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   const tB = process.hrtime.bigint();
   await tagRelease(work, '9.2.0', { claudeFloor });
   marks.push(`tag-B=${Math.round(Number(process.hrtime.bigint() - tB) / 1e6)}ms`);
-  phase('manifests', marks, () => publishManifests(work, licences, ['v9.0.0', 'v9.1.0', 'v9.2.0'], { unsigned, altered }));
+  phase('manifests', marks, () => publishManifests(work, licences, ['v9.0.0', 'v9.1.0', 'v9.2.0'],
+    { unsigned, altered, foreign, coverage }));
 
   // ── the bare origin, and the user's clone at v9.0.0 ───────────────────────────────────────
   const origin = join(scratch, 'origin.git');
@@ -623,7 +657,7 @@ async function buildTwoReleaseWorld(t, { from, to, label, modules = 'link', mani
   pointAtFixtureCorpus(work, upstream, { licences: licences?.url ?? null });
   phase(`modules-${modules}`, marks, () => placeModules(work, modules));
   phase('gen-all-old', marks, () => regenerate(work));
-  phase('git-init', marks, () => git(work, ['init', '-q', '-b', 'main']));
+  phase('git-init', marks, () => initFixtureRepo((args) => git(work, args), work, ['-q', '-b', 'main']));
   persistLongPaths(work);
   disableBackgroundGit(work);
   commit(work, from, upstream.pin);
@@ -659,6 +693,25 @@ async function buildTwoReleaseWorld(t, { from, to, label, modules = 'link', mani
   return { scratch, work, origin, user, bin, licences };
 }
 
+/**
+ * ARC-09-C212 — the home every product start here gives its child, and everything that child spawns: HOME and
+ * USERPROFILE (what `homedir()` reads on POSIX and on Windows) and CLAUDE_CONFIG_DIR, in the world beside the user's
+ * clone. Applied after the caller's `env`, so no case hands a child the developer's own home.
+ *
+ * The product reads the home once, in `bin/snowarch.mjs`, and the doctor opens `~/.claude.json` there (E-23, E-30).
+ * Given the developer's home, a harness run read the developer's file: C210's probe printed the counts of its
+ * credential-shaped keys into a test log. And E-27's `claude mcp get` rewrites that file while it answers when the
+ * `claude` it finds on PATH is a real one (`tools/snowarch/lib/doctor/checks/host.mjs:187`); with this home, a real
+ * CLI a future case reaches answers against the fixture's. `harness-shape.test.mjs` holds the class, and
+ * `upgrade.e2e.test.mjs` the runtime.
+ */
+export function fixtureHome(user) {
+  const home = join(dirname(user), `${basename(user)}-home`);
+  const config = join(home, '.claude');
+  mkdirSync(config, { recursive: true });
+  return { HOME: home, USERPROFILE: home, CLAUDE_CONFIG_DIR: config };
+}
+
 /** The user's clone, bootstrapped design-only, with a v1 store beside it. */
 export function bootstrapUser(user, { store = true, licence = {} } = {}) {
   // `spawnSync` and an explicit throw, not `execFileSync`: its error message names the COMMAND and
@@ -667,7 +720,8 @@ export function bootstrapUser(user, { store = true, licence = {} } = {}) {
   const r = spawnSync(process.execPath,
     [join(user, 'tools/snowarch/bin/snowarch.mjs'), 'bootstrap',
       '--mode', 'design', '--yes', '--skip-claude-check', '--docs', 'sparse'],
-    { cwd: user, encoding: 'utf8', env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user }, { licence }) });
+    { cwd: user, encoding: 'utf8',
+      env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user, ...fixtureHome(user) }, { licence }) });
   if (r.status !== 0) {
     throw new Error(`the fixture bootstrap exited ${r.status ?? r.signal ?? 'abnormally'}:\n`
       + `${r.stdout ?? ''}${r.stderr ?? ''}`);
@@ -718,7 +772,7 @@ export function snowarch(user, args, { env = {}, input = '', bin = null, licence
       cwd: user, encoding: 'utf8', input,
       // `licence: false` (ARC-11-C6 step 6): the fixture's keys are trusted and no licence is written, so the state is
       // `missing`, the path a user without a licence takes.
-      env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user, ...path, ...env }, { licence }),
+      env: licensedEnv({ ...process.env, CLAUDE_PROJECT_DIR: user, ...path, ...env, ...fixtureHome(user) }, { licence }),
     });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '',
     text: `${r.stdout ?? ''}${r.stderr ?? ''}` };

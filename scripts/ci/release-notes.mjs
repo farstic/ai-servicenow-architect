@@ -38,11 +38,14 @@ import { sectionFor } from '../lib/release/changelog.mjs';
 export const RELEASE_BODY_MAX = 125_000;
 
 /** The repository the continuation link points into. */
-const REPO = 'farstic/ai-servicenow-architect';
+const REPO = 'farstic/snowarch';
 
-/** The sentence ARC-09-C19 puts beside the numbers, wherever the body is assembled. */
-const DOCTOR_NOTE = '\n_The attached doctor JSONs come from hosted runners without Claude Code — '
-  + 'E-00 is expected there, and every other check must be ok._\n';
+/**
+ * The sentence ARC-09-C19 puts beside the numbers, wherever the body is assembled. ARC-09-C185b: the reports are taken on
+ * installs of the staged distribution tree, which is what a user clones, so the sentence says so.
+ */
+const DOCTOR_NOTE = '\n_The attached doctor JSONs come from installs of the staged distribution tree, made as a user '
+  + 'makes them, on hosted runners without Claude Code — E-00 is expected there, and every other check must be ok._\n';
 
 /**
  * The body, bounded, with the Notes truncated at a PARAGRAPH boundary if they do not fit.
