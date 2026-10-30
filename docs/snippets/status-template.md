@@ -16,7 +16,7 @@
 Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
 Licence: missing
 Engine: snowarch 9.9.9 · contract deadbeefdead
-Docs: vendor/ServiceNowDocs @ aa447ce4ea80 (australia) · full
+Docs: vendor/ServiceNowDocs @ c10276e95345 (australia) · full
 Roster: 29 skills / 9 agents
 Instances: pdi (pdi, custom)
 Doctor: 15 ok, 0 warn, 1 fail (E-31) — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
