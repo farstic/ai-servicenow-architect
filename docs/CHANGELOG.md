@@ -95,6 +95,11 @@ before it moves anything, and plans from the release it moves to.
   gateway now names the employee client roles (`sn_hr_core.hrsm_*`), the client role assignment rules that grant them,
   and the COE security policies that limit which groups can read or write the HR cases under a COE after creation.
   The Technical Designer's worked example no longer gives employees the agent role in its ACL matrix (ARC-09-C250).
+- The "Read before sending" list of `/snowarch finding` no longer opens with "The Architect". A note that says "The
+  Architect said …", which is nearly every finding, put the product's own name in that list as a likely person or
+  company, in the one list the reader has to read. The list now looks past a sentence-initial "The" to find a product
+  name, so "The Architect", "The Now Assist" and "The Service Desk" are not items and "The Hague" still is. What the
+  masker hides is unchanged (ARC-09-C257).
 
 ### Changed
 

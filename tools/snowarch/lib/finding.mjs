@@ -126,12 +126,18 @@ export function maskFinding(text, { engagement = '', aliases = [], labels = [], 
 }
 
 const PRODUCT = new Set(['Service Desk', 'Now Assist', 'Business Rule', 'Script Include', 'Flow Designer',
-  'Service Operations Workspace', 'Online Banking']);
+  'Service Operations Workspace', 'Online Banking', 'Architect']);
+
+/**
+ * A product's name, alone or after a sentence-initial "The" (ARC-09-C257): "The Architect said …" names nobody, and nearly every
+ * finding starts like that. The article is looked past only to find a product name, never dropped in general: "The Hague" stays.
+ */
+const isProduct = (hit) => PRODUCT.has(hit) || (hit.startsWith('The ') && PRODUCT.has(hit.slice('The '.length)));
 
 /** Advisory, not a mask: capitalised runs and codes left in the masked text, likely names, places and systems. */
 export function reviewList(masked) {
   const hits = masked.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b|\b[A-Z][A-Za-z]*\d+[A-Za-z\d]*\b|\b[A-Z]{3,}(?:-[A-Z0-9]+)+\b/g) ?? [];
-  return [...new Set(hits)].filter((h) => !PRODUCT.has(h) && !/^(?:PN|ARC|E|SV)-/.test(h));
+  return [...new Set(hits)].filter((h) => !isProduct(h) && !/^(?:PN|ARC|E|SV)-/.test(h));
 }
 
 /** What no pattern catches, said every time: the reader checks these before sending. */

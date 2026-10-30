@@ -616,3 +616,21 @@ test('ARC-09-C251 — a stem inside a longer word stays: the left boundary of ma
   // names nobody: `nacme`, `xacmey` and `Macme01` stay, and a stem that begins a word is still masked.
   assert.equal(maskStemWords('nacme, xacmey, Macme01, acme and nacme', ['acme'], () => '<x>'), 'nacme, xacmey, Macme01, <x> and nacme');
 });
+
+test('ARC-09-C257 — the review list does not name the product: "The Architect said …" is no hit, and "The Hague" still is', async () => {
+  const { reviewList, renderFinding } = await finding();
+  // The owner's rc.1 probe: nearly every finding begins by saying what the Architect did, and the capitalised-run pattern read
+  // "The Architect" as a company or a person, so "- The Architect" led the one list the reader must read before sending.
+  assert.deepEqual(reviewList('The Architect said the incident table had no baseline field for this.'), []);
+  assert.deepEqual(reviewList('The Architect\'s answer named Business Rule as the owner.'), []);
+  // A product name after a sentence-initial "The" is still the product's: PRODUCT holds the name, and the article is not part of it.
+  assert.deepEqual(reviewList('The Now Assist skill was off, and The Service Desk team agreed.'), []);
+  // "The" is not stripped in general: a place or a company that begins with it is a true hit, and stays.
+  assert.deepEqual(reviewList('The Hague office rejected it; The Architect said so; The Acme Group agreed.'), ['The Hague', 'The Acme Group']);
+  // The whole reply, as the owner read it: no "- The Architect" item, and the person the masker kept is still listed.
+  reset();
+  const out = renderFinding('The Architect said so, and Ivan Petrov agreed.', STORE, { storeRead: true, credentialsRead: true });
+  const items = out.slice(out.lastIndexOf('Read before sending:')).split('\n').filter((l) => l.startsWith('- '));
+  assert.ok(!items.includes('- The Architect'), 'the product itself is in the review list');
+  assert.ok(items.includes('- Ivan Petrov'), 'a person the masker kept left the review list');
+});
