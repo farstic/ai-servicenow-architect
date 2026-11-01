@@ -11,7 +11,6 @@
 // answered a check that said "the server has no proxy" would be asserting something nobody has
 // measured. Saying which environment was inspected costs one clause and is true today.
 import { execFileSync } from 'node:child_process';
-import { isIP } from 'node:net';
 import { bootstrapOf, cliOf } from '../spell.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -51,8 +50,9 @@ function lookupTarget(ctx, remote) {
   let url;
   try { url = new URL(raw); } catch { return null; }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-  const host = url.hostname.replace(/^\[|\]$/g, '');
-  if (host === '' || isIP(host) !== 0) return null;
+  // An IP literal needs no lookup: the URL parser has normalised a numeric host to a dotted quad, and an IPv6 host keeps its brackets.
+  const host = url.hostname;
+  if (host === '' || host.startsWith('[') || /^\d+(?:\.\d+){3}$/.test(host)) return null;
   const inEnv = ctx.env ?? process.env;
   if (['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY'].some((name) => inEnv[name] || inEnv[name.toLowerCase()])) return null;
   if (ask(['config', '--get-urlmatch', 'http.proxy', raw])) return null;
