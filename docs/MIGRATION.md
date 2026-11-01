@@ -72,12 +72,15 @@ installed from: replace it as above.
 ## An install made with `clone --branch` of a 2.2.1 release candidate, or later
 
 Such an install checks a release by the rule its own signed manifest carries, so it moves with the upgrade, from its
-folder.
+folder. It holds the release tags from v2.2.1 on at the commits of the address it was cloned from, and those are not the
+commits published at farstic/snowarch. Git will not replace a tag it has, and the upgrade never forces one, so remove
+those tags first; the upgrade names the tags your install holds and prints these commands itself.
 
 macOS / Linux:
 
 ```sh
 git remote set-url origin https://github.com/farstic/snowarch.git
+git tag -d v2.2.1 v2.2.2 v2.2.3 v2.2.4
 ./snowarch upgrade
 ```
 
@@ -85,21 +88,26 @@ Windows PowerShell:
 
 ```powershell
 git remote set-url origin https://github.com/farstic/snowarch.git
+git tag -d v2.2.1 v2.2.2 v2.2.3 v2.2.4
 .\snowarch.cmd upgrade
 ```
 
-The release tags your install already has stay where they are, so the upgrade's plan names the
-version you are on as before, for example `v2.2.1-rc.1 → v2.2.1`, and goes ahead as usual.
-Your `.local/`, your instances and your engagement folders stay where they are.
+The tags you remove come back at the published commits with the upgrade's fetch. The release candidate tag your install
+is on stays where it is, so the upgrade's plan names the version you are on as before, for example
+`v2.2.1-rc.1 → v2.2.1`, and goes ahead as usual. Your `.local/`, your instances and your engagement folders stay where
+they are.
 
 If the upgrade stops at its fetch with `! [rejected] v2.2.1 -> v2.2.1 (would clobber existing tag)`, the install holds
-a tag of that name from its previous address: remove it with `git tag -d v2.2.1`, then upgrade again. Nothing else had
-changed.
+tags from its previous address: the upgrade has just named them (`these tags came from another repository`) and printed
+the `git tag -d` for exactly those. Run it, then upgrade again. Nothing had changed.
+
+To keep this folder exactly as it is, replace the install instead, as above: a fresh clone of farstic/snowarch, with the
+licence, the instance store, `clients/` and the rest carried over as listed there.
 
 If the upgrade stops at its fetch with
 `upgrade: origin asked for credentials, or was not found — it may be private or moved; check it with git remote get-url origin; nothing was changed`,
 point the install at the address releases are published at: `git remote set-url origin https://github.com/farstic/snowarch.git`
-from its folder, then the upgrade again.
+from its folder, then the upgrade again; if that stops at the tags, as above, run the `git tag -d` it prints.
 
 An install that still has the v2.2.0 tag can go back with `upgrade --to v2.2.0`; it is then a 2.2.0 install again and
 returns by the fresh install above.
