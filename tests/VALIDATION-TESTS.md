@@ -2013,7 +2013,7 @@ Turn 2:
 
 ---
 
-## T-37 — `/snowarch finding` writes one note in the engagement's folder and prints only a masked copy to send
+## T-37 — `/snowarch finding` writes one note in the engagement's folder, prints a masked copy, and writes it to a file beside the note to send
 
 **Covers:** ARC-09-C221 (the skill's `finding` section; `tools/snowarch/lib/finding.mjs`) · **Modes:** design-only ✅ · live ✅ (where a store exists, its names are also masked by value)
 
@@ -2057,17 +2057,19 @@ Is the copy safe to send?
 
 1. Turn 1: the engagement is asked for, with no default; `_unfiled` is never offered.
 2. The other names are asked for once and written to `clients/acme-bank/findings/aliases.txt`.
-3. `node tools/snowarch/lib/finding.mjs --next-name acme-bank <slug>` runs, and the note is written to the path it printed.
-4. `node tools/snowarch/lib/finding.mjs <that path>` runs, and its output is printed in the reply itself, verbatim, as plain text with no code fence.
-5. The answer closes with: Send the text above to the person who issued your licence.
+3. `node tools/snowarch/lib/finding.mjs --next-name acme-bank <slug>` runs, and the note is written to the path it printed. The slug names the problem and never the client, a person, a place or a system.
+4. `node tools/snowarch/lib/finding.mjs <that path>` runs, and its output is printed in the reply itself, verbatim, as plain text with no code fence; the last line, which names the masked copy's file, is part of it.
+5. The answer closes with: Send that file to the person who issued your licence, never the note; copying from this window can lose characters.
 6. Turn 4: the answer says the copy is masked, that people, places, company names, ticket keys, record numbers with fewer than 6 digits and a credential written in plain words still need a reader, and which of the two the copy's first line says was NOT read.
 
 ### Pass criteria
 
 - The printed copy carries no `acmebank`, no `INC0012345`, no `9d385017`, and no `Acme`. `Ivan Petrov` is named under **Read before sending**.
 - In design-only the copy's first line reads `instance store NOT read — check every instance name · credentials NOT read — check usernames and passwords before sending`.
-- From the tree, not the model's words: after the session, outside `.local/` and `.claude/settings.local.json`, which the runner's bootstrap writes (B07), `git status --porcelain --untracked-files=all --ignored` lists exactly two new files, `clients/acme-bank/findings/aliases.txt` and one note beside it, and nothing else changed.
-- Bash calls are reads of the findings folder, `./snowarch status`, and the two `finding.mjs` runs; Write calls are exactly the two files; nothing sends the copy anywhere.
+- From the tree, not the model's words: after the session, outside `.local/` and `.claude/settings.local.json`, which the runner's bootstrap writes (B07), `git status --porcelain --untracked-files=all --ignored` lists exactly three new files, `clients/acme-bank/findings/aliases.txt`, one note beside it, and that note's `.masked.txt`, and nothing else changed.
+- That `.masked.txt` holds the printed copy's masked text and nothing else: no first line, no warnings and no **Read before sending** list, and no `acmebank`, no `INC0012345`, no `9d385017` and no `Acme`.
+- The name of that file, as the last line of the reply gives it, holds no `acme`, no `acmebank` and no `Ivan`.
+- Bash calls are reads of the findings folder, `./snowarch status`, and the two `finding.mjs` runs; Write calls are exactly the two files, the note and `aliases.txt`; nothing sends the copy anywhere.
 - The answer to turn 4 names a credential written in plain words as something the masker cannot know, and says exactly what the copy's first line says was NOT read: in design-only, the instance store and the credentials; in live, with both read, neither.
 
 ### Fail signals
@@ -2078,6 +2080,7 @@ Is the copy safe to send?
 - The copy only in the tool result, with the reply pointing to it ("the output is above").
 - A credential asked for, or an offer to send the finding on the user's behalf.
 - Any file written outside `clients/acme-bank/findings/`.
+- A slug that names the client, a person, a place or a system.
 - A fourth question asked when the three turns already answered everything.
 - A question asked after turn 4, when the four turns already answered everything.
 - The answer to turn 4 says the copy is safe to send, or leaves out what its first line says was NOT read.
@@ -2401,7 +2404,7 @@ The session is told to open no other page, so it cannot check the link and copie
 
 **Covers:** ARC-09-C254 (the Stop hook does not check a finding's printed copy; `tools/snowarch/lib/finding-copy.mjs`) with T-37's finding flow · **Modes:** design-only ✅ · live ✅
 
-T-37 with one change: the finding in turn 3 quotes a dead path that the resolver can name. A finding records a path as the user saw it, and the most natural finding to report is a dead citation; the copy the finder prints is for the user to send as it is, so nothing is added after it. One session, from a checkout where `clients/` holds only what Setup writes.
+T-37 with one change: the finding in turn 3 quotes a dead path that the resolver can name. A finding records a path as the user saw it, and the most natural finding to report is a dead citation; the finder prints its copy, and writes the same text to a file, for the user to send as it is, so nothing is added after it but the finder's own last line. One session, from a checkout where `clients/` holds only what Setup writes.
 
 ### Setup
 
@@ -2440,7 +2443,7 @@ Is the copy safe to send?
 ### Expected behaviour
 
 1. Everything T-37 expects of the four turns.
-2. The printed copy quotes the dead path as the user wrote it, `markdown/australia/application-development/collaboration-permissions.md`. Nothing follows the copy except the closing line, Send the text above to the person who issued your licence.
+2. The printed copy quotes the dead path as the user wrote it, `markdown/australia/application-development/collaboration-permissions.md`. Nothing follows the copy except the finder's last line, which names the masked file, and the closing line, Send that file to the person who issued your licence, never the note; copying from this window can lose characters.
 3. No "Correction:" line appears in any turn, and the Stop hook sends no turn back: a path that stands only inside the finder's printed copy is a finding's record of what the user saw.
 4. If the session writes the dead path again outside the copy, in its own words, a send-back is allowed, and it is judged as in T-42.
 
