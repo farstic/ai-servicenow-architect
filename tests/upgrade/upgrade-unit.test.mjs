@@ -166,6 +166,7 @@ test('ARC-09-C262 — the upgrade\'s fetch runs in git\'s English, whatever the 
   harnessGit(root, ['commit', '-q', '-m', 'fixture']);
   harnessGit(root, ['remote', 'add', 'origin', join(root, 'does-not-exist.git')]);
   const calls = [];
+  // unlicensed start: every call the upgrade makes through this seam is git's (fetch, config, ls-files), and the seam only records them
   const run = (cmd, args, opts) => { calls.push({ cmd, args, env: opts?.env }); return spawnSync(cmd, args, opts); };
   const lines = [];
   const log = { step: (l) => lines.push(l), fail: (l) => lines.push(`FAIL ${l}`), warn: (l) => lines.push(`WARN ${l}`), ok: (l) => lines.push(String(l)) };
