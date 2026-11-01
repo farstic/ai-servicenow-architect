@@ -529,7 +529,12 @@ test('ARC-09-C242 — the script end to end: a finding under any engagement prin
     return out;
   };
   for (const engagement of ['beta-corp', 'zqx']) {
-    const out = await run(engagement);
+    const reply = await run(engagement);
+    // ARC-09-C258: the last paragraph is the one place the engagement's folder is named, as the path of the file to send; the file
+    // itself holds the masked text only, and everything above that paragraph still prints no name.
+    const at = reply.lastIndexOf('\nMasked copy ');
+    const out = reply.slice(0, at);
+    assert.equal(reply.slice(at + 1), `Masked copy written to clients/${engagement}/findings/2026-10-28-note.masked.txt: the text above and nothing else.\n`);
     assert.deepEqual(printed(out, ['zqx', 'betacorp', 'beta-corp']), [], `a name was printed under ${engagement}:\n${out}`);
     // The warning describes the masking, which reads every instance, so both engagements get it.
     assert.ok(out.split('\n').includes(SHORT_NAME), `no warning under ${engagement}:\n${out}`);

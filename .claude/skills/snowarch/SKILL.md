@@ -227,8 +227,8 @@ configuration file by hand instead.
 
 ## finding
 
-Records something the engine got wrong as a note in the engagement's own folder, and prints a masked copy for the
-user to send. The note stays on this machine; this skill sends nothing.
+Records something the engine got wrong as a note in the engagement's own folder, and prints a masked copy and writes it
+to a file beside the note, for the user to send. The note stays on this machine; this skill sends nothing.
 
 1. **Ask which engagement the finding belongs to.** Offer no default. A finding about the product rather than a
    client goes under a name the user chooses that the note will not use as a word: the masker masks the engagement's
@@ -243,9 +243,11 @@ user to send. The note stays on this machine; this skill sends nothing.
    there** with the Write tool. Claude Code's own permission flow governs the write; this skill grants no write and
    promises no prompt.
 5. Run `node tools/snowarch/lib/finding.mjs <that path>`. **Print its output verbatim in your reply**: the tool result
-   is not what the user reads. Give what ran, the warnings, the masked text and the "Read before sending" list as plain
-   text, with no code fence, no quotation and no "the output is above". Nothing goes in place of it.
-6. Close with: Send the text above to the person who issued your licence.
+   is not what the user reads. Give what ran, the warnings, the masked text, the "Read before sending" list and the last
+   line, which names the masked copy's file or says it was not written, as plain text, with no code fence, no quotation
+   and no "the output is above". Nothing goes in place of it. The tool also writes that file, beside the note.
+6. Close with: Send that file to the person who issued your licence, never the note; copying from this window can lose
+   characters. When the last line says the copy was NOT written, there is no file: close with that line instead.
 
 The masker cannot know people's names, places, company names or abbreviations it was not given, ticket keys in
 other systems, record numbers with fewer than 6 digits, or a credential written in plain words that no rule
