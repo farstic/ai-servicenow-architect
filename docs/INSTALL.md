@@ -72,8 +72,10 @@ Plan — Enter runs it as shown · type a number to choose that line's value · 
   Steps  B01 workspace · B02 docs · B05 tool list · B07 Claude settings · B09 summary
 release manifest: v2.1.0-rc.1 fetched (372 files)
 [B01/09] workspace … ok (2 s)
-[docs] 31.7 s · pin 11b39be · full · complete
-[B02/09] docs … ok (32 s)
+[docs] 23.2 s · pin c10276e · full · complete
+[docs] 51,665 files · 293 MB working tree
+citations: checked: 588 | dead: 0
+[B02/09] docs … ok (24 s)
 [B03/09] mode … ok (0.0 s)
 [B04/09] deps … skipped (design-only)
 [B05/09] tool list … ok (0.0 s)
