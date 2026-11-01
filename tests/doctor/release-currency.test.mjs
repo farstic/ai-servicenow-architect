@@ -30,8 +30,8 @@ import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { NO_PROMPT_ENV } from '../../tools/snowarch/lib/spawn-env.mjs';
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { doctorCommand, runDoctor } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { createRegistry } from '../../tools/snowarch/lib/doctor/registry.mjs';
 
@@ -584,11 +584,8 @@ const C207_CASES = {
     fatal: /^fatal: could not read Username for 'http:\/\/127\.0\.0\.1:\d+': terminal prompts disabled$/ },
   404: { name: '404', reason: REFUSED_AUTH,
     fatal: /^fatal: repository 'http:\/\/127\.0\.0\.1:\d+\/fixture\.git\/' not found$/ },
-  // `.invalid` never resolves (RFC 6761), so this is a DNS failure on any machine, answered by its own resolver.
-  DNS: { name: 'DNS',
-    reason: 'DNS failure for snowarch-e28.invalid — check the network; if you are behind a corporate proxy, git reads '
-      + 'HTTPS_PROXY / http.proxy (docs/TROUBLESHOOTING.md#proxy_unreachable)',
-    fatal: /^fatal: unable to access 'http:\/\/snowarch-e28\.invalid\/fixture\.git\/': Could not resolve host: snowarch-e28\.invalid$/ },
+  // ARC-09-C261: the DNS case is gone from here. It asked the runner's own resolver for a name that never resolves, and on a macOS
+  // runner that lookup hung until E-28's budget; it is proved below with the lookup and git injected.
 };
 
 /** E-28's sentence when its git runs out of its budget. */
@@ -659,21 +656,19 @@ async function warmedUp(c, root, env) {
     + `${Date.now() - started} ms, its budget ${WARM_UP_MS} ms — ARC-09-C214`);
 }
 
-test('ARC-09-C207 — a remote that wants a credential, has no such repository, or does not resolve is a warning with its reason, never a crash', async (t) => {
+test('ARC-09-C207 — a remote that wants a credential or has no such repository is a warning with its reason, never a crash', async (t) => {
   const s401 = await answering(t, 401);
   const s404 = await answering(t, 404);
   const cases = [
     { ...C207_CASES[401], url: `http://127.0.0.1:${s401.port}/fixture.git`, server: s401 },
     { ...C207_CASES[404], url: `http://127.0.0.1:${s404.port}/fixture.git`, server: s404 },
-    { ...C207_CASES.DNS, url: 'http://snowarch-e28.invalid/fixture.git' },
   ];
   const details = [];
   for (const c of cases) {
     const { root, env, marker, aside } = refusedBy(t, c.url);
     // git's own account of the call, written to files so it never mixes into the stderr E-28 classifies.
     const traces = { GIT_TRACE: join(aside, 'trace.txt'), GIT_TRACE_CURL: join(aside, 'trace-curl.txt') };
-    // The DNS case has no server to prove a warm-up by; the two before it started the same helper.
-    if (c.server) await warmedUp(c, root, env);
+    await warmedUp(c, root, env);
     const before = c.server?.log.length ?? 0;
     const started = Date.now();
     const { results } = await runChecks([E28], { root, flags: { noNetwork: false }, now: realClock,
@@ -707,14 +702,17 @@ test('ARC-09-C207 — a remote that wants a credential, has no such repository, 
 });
 
 test('ARC-09-C207 — the doctor exits 0 when E-28 is its only check that is not ok', async (t) => {
-  // The doctor gives its checks the process environment (`childEnv`), so this case uses the one failure that no helper,
-  // prompt or proxy changes into another: a name that never resolves. Whatever the failure, the exit is the claim.
+  // Whatever E-28 warns about, the exit is the claim. ARC-09-C261: the resolver and git are injected through a wrapper, so the case
+  // reaches no resolver; it used to ask the runner's own for a name that never resolves, and that lookup can hang.
+  const { TIMED_OUT } = await import('../../tools/snowarch/lib/probe-net.mjs');
   const { root } = refusedBy(t, 'http://snowarch-e28.invalid/fixture.git');
+  const git = remoteGit({ ls: remoteSilent(TIMED_OUT) });
+  const injected = { ...E28, run: (ctx) => E28.run({ ...ctx, exec: git.exec, lookup: resolver({ ok: false, timedOut: true }).lookup }) };
   writeFileSync(join(root, 'engine.config.json'), readFileSync(join(REAL_ROOT, 'engine.config.json')));
   writeFileSync(join(root, 'package.json'), readFileSync(join(REAL_ROOT, 'package.json')));
   const chunks = [];
   const code = await doctorCommand({ flags: { json: true }, out: { write: (s) => chunks.push(s) },
-    err: { write: () => {} }, cwd: root, registry: createRegistry([E28]), input: { isTTY: false } });
+    err: { write: () => {} }, cwd: root, registry: createRegistry([injected]), input: { isTTY: false } });
   const report = JSON.parse(chunks.join(''));
   const r = report.checks.find((c) => c.id === 'E-28');
   assert.equal(r.status, 'warn', `${r.status} — ${r.detail}`);
@@ -807,4 +805,139 @@ test('ARC-09-C210 — the same record on a tree below its latest release still s
   const r = await e28With(t, { cache: TAGLESS_RECORD, describe: 'v9.1.0', tags: ['v9.2.0'] });
   assert.equal(r.status, 'warn', r.detail);
   assert.match(r.detail, /^v9\.2\.0 available/, r.detail);
+});
+
+// ── ARC-09-C261 — a resolver that does not answer is told from a remote that does not ───────────────────────────────
+//
+// develop's push run for #559 (run 41272168945): test (macos-latest, node 20) failed in the C207 DNS case, which asked the runner's own
+// resolver for `snowarch-e28.invalid` through real git. The lookup hung until E-28's 15 s budget and the doctor said `origin did not
+// answer within 15 s` where the case expected `DNS failure for …`: a warning with a reason, as the contract wants, but naming the wrong
+// party, and a test that depended on the runner's resolver. E-28 now looks the name up itself, in a child that is killed at its own 5 s,
+// before it asks git, and says DNS when DNS did not answer. Every case below injects the lookup and git, so none reaches a resolver. The
+// four old texts are pinned beside the new one, because the lookup adds ONE outcome and changes no other.
+
+const ORIGIN_HOST = 'git.example.invalid';
+const ORIGIN = `https://${ORIGIN_HOST}/fixture.git`;
+const NXDOMAIN = (host) => `DNS failure for ${host} — check the network; if you are behind a corporate proxy, git reads HTTPS_PROXY / `
+  + 'http.proxy (docs/TROUBLESHOOTING.md#proxy_unreachable)';
+const DNS_SILENT = (host) => `DNS did not answer for ${host} within 5 s — check the network or the DNS servers this machine uses; if you `
+  + 'are behind a corporate proxy, git reads HTTPS_PROXY / http.proxy (docs/TROUBLESHOOTING.md#proxy_unreachable)';
+const PROXY = 'http://proxy.example.invalid:3128';
+
+/**
+ * git as E-28 asks it, answering by command: the origin's URL, the proxy settings (git exits 1 for a key that is not set, which
+ * `execFileSync` raises), and the `ls-remote`, which `ls` decides. `calls` is every command, so a case can say what git was not asked.
+ */
+function remoteGit({ url = ORIGIN, urlmatch = null, remoteProxy = null, ls }) {
+  const calls = [];
+  const unset = () => { throw Object.assign(new Error('git config: the key is not set'), { status: 1, stdout: '', stderr: '' }); };
+  const exec = (_cmd, args) => {
+    calls.push(args.join(' '));
+    if (args.includes('get-url')) return url === null ? '' : `${url}\n`;
+    if (args.includes('--get-urlmatch')) return urlmatch ?? unset();
+    if (args.includes('--get')) return remoteProxy ?? unset();
+    if (args.includes('ls-remote')) return ls();
+    if (args.includes('rev-parse')) return 'abc1234\n';
+    return '';
+  };
+  return { exec, asked: (word) => calls.filter((c) => c.includes(word)) };
+}
+const gitFails = (stderr) => () => { throw Object.assign(new Error('git failed'), { status: 128, stderr }); };
+const remoteSilent = (code) => () => { throw Object.assign(new Error('git failed'), { code, signal: 'SIGTERM', status: null, stderr: '' }); };
+/** A lookup that answers `answer`, and a record of what it was asked. */
+const resolver = (answer) => { const seen = []; return { seen, lookup: (host, options) => { seen.push({ host, options }); return answer; } }; };
+
+/** E-28 against the injected git and resolver, with its own root and no proxy in its environment unless `env` says so. */
+async function e28Against(t, { git, lookup, env = {} }) {
+  const root = tempDir('snowarch-c261-', t);
+  const result = await E28.run({ root, flags: { noNetwork: false }, now: realClock, env, exec: git.exec, lookup });
+  return { result, root };
+}
+
+/** host.mjs's source with `mutate` applied and its relative imports made absolute, static and dynamic, loaded as a module of its own. */
+async function loadHostMutant(t, mutate, marker) {
+  const dir = join(REAL_ROOT, 'tools', 'snowarch', 'lib', 'doctor', 'checks');
+  const mutated = mutate(readFileSync(join(dir, 'host.mjs'), 'utf8'))
+    .replace(/(\bfrom\s+|\bimport\()'(\.{1,2}\/[^']+)'/g, (_, lead, rel) => `${lead}'${pathToFileURL(resolve(dir, rel)).href}'`);
+  assert.ok(mutated.includes(marker), `the mutation did not apply: the step this control turns off is not where it looks (${marker})`);
+  const file = join(tempDir('snowarch-c261-mutant-', t), 'host-mutant.mjs');
+  writeFileSync(file, mutated);
+  return import(pathToFileURL(file).href);
+}
+
+test('ARC-09-C261 — a resolver that did not answer within its 5 s is told as DNS, git is not asked, and nothing is cached', async (t) => {
+  const { TIMED_OUT } = await import('../../tools/snowarch/lib/probe-net.mjs');
+  const git = remoteGit({ ls: remoteSilent(TIMED_OUT) });
+  const dns = resolver({ ok: false, timedOut: true });
+  const { result, root } = await e28Against(t, { git, lookup: dns.lookup });
+  assert.equal(result.status, 'warn', result.detail);
+  assert.equal(result.detail, DNS_SILENT(ORIGIN_HOST));
+  assert.deepEqual(git.asked('ls-remote'), [], 'git was asked although DNS had not answered');
+  // The host goes in as the host alone, with the budget as an option: the probe puts it in the child's argv.
+  assert.deepEqual(dns.seen, [{ host: ORIGIN_HOST, options: { timeoutMs: 5_000 } }]);
+  assert.equal(result.data?.refreshed, false);
+  assert.equal(existsSync(join(root, '.local', 'upgrade-check.json')), false, 'nothing was measured, and the cache was written');
+});
+
+test('ARC-09-C261 — a resolver that answered changes no text: no such host, a silent remote, a credential and an unnamed failure read as before', async (t) => {
+  const { TIMED_OUT } = await import('../../tools/snowarch/lib/probe-net.mjs');
+  const gone = `fatal: unable to access '${ORIGIN}/': Could not resolve host: ${ORIGIN_HOST}`;
+  const asked = "fatal: could not read Username for 'https://git.example.invalid': terminal prompts disabled";
+  for (const [why, answer, ls, expected] of [
+    ['no such host', { ok: false, code: 'ENOTFOUND' }, gitFails(`${gone}\n`), `${NXDOMAIN(ORIGIN_HOST)}\n${gone}`],
+    ['a silent remote', { ok: true }, remoteSilent(TIMED_OUT), 'origin did not answer within 15 s'],
+    ['a credential wanted', { ok: true }, gitFails(`${asked}\n`), `${REFUSED_AUTH}\n${asked}`],
+    ['an unnamed failure', { ok: true }, gitFails('error: something nothing names\n'), "could not list origin's release tags\nerror: something nothing names"],
+  ]) {
+    const git = remoteGit({ ls });
+    const { result } = await e28Against(t, { git, lookup: resolver(answer).lookup });
+    assert.equal(result.status, 'warn', `${why}: ${result.detail}`);
+    assert.equal(result.detail, expected, why);
+    assert.equal(git.asked('ls-remote').length, 1, `${why}: git was not asked once`);
+  }
+});
+
+test('ARC-09-C261 — the lookup is left out, and E-28 goes straight to git, wherever it would be false or meaningless', async (t) => {
+  const tags = lsRemote(['v9.1.0']);
+  const skips = [
+    ['no origin url', { url: null }, {}],
+    ['an IP literal', { url: 'http://127.0.0.1:8080/fixture.git' }, {}],
+    ['an IPv6 literal', { url: 'http://[::1]:8080/fixture.git' }, {}],
+    ['an ssh url', { url: 'ssh://git@git.example.invalid/o/r.git' }, {}],
+    ['an scp-style url', { url: 'git@git.example.invalid:o/r.git' }, {}],
+    ['a git url', { url: 'git://git.example.invalid/o/r.git' }, {}],
+    ['a file url', { url: 'file:///srv/repo.git' }, {}],
+    ['a local path', { url: '/srv/repo.git' }, {}],
+    ...['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy'].map((k) => [`${k} set`, {}, { [k]: PROXY }]),
+    // NO_PROXY is not read: a hand-written matcher is a new way to be wrong in a proxied network, and a false "DNS did not answer" is worse.
+    ['HTTPS_PROXY and a NO_PROXY that names the host', {}, { HTTPS_PROXY: PROXY, NO_PROXY: ORIGIN_HOST }],
+    // git's own matching, which covers http.proxy and http.<url>.proxy: E-28 asks `--get-urlmatch` and acts on what git answers.
+    ['http.proxy or http.<url>.proxy, by git\'s own matching', { urlmatch: PROXY }, {}],
+    ['remote.origin.proxy', { remoteProxy: PROXY }, {}],
+  ];
+  for (const [why, over, env] of skips) {
+    const git = remoteGit({ ...over, ls: () => tags });
+    const dns = resolver({ ok: false, timedOut: true });
+    const { result } = await e28Against(t, { git, lookup: dns.lookup, env });
+    assert.deepEqual(dns.seen, [], `${why}: the lookup ran`);
+    assert.equal(git.asked('ls-remote').length, 1, `${why}: git was not asked`);
+    assert.doesNotMatch(String(result.detail), /^DNS did not answer/, `${why}: ${result.detail}`);
+  }
+  // And for a plain http(s) origin with nothing in the way, it runs once, for that host.
+  const git = remoteGit({ url: 'http://git.example.invalid/fixture.git', ls: () => tags });
+  const dns = resolver({ ok: true });
+  await e28Against(t, { git, lookup: dns.lookup });
+  assert.deepEqual(dns.seen.map((s) => s.host), [ORIGIN_HOST]);
+});
+
+test('ARC-09-C261 — mutation control: with the lookup step turned off, a silent resolver reads as a silent remote again', async (t) => {
+  const { TIMED_OUT } = await import('../../tools/snowarch/lib/probe-net.mjs');
+  const mutant = await loadHostMutant(t, (s) => s.replace(/const dnsAnswered = [^\n]*;\n/, 'const dnsAnswered = { ok: true };\n'),
+    'const dnsAnswered = { ok: true };');
+  const e28 = mutant.hostChecks().find((c) => c.id === 'E-28');
+  const git = remoteGit({ ls: remoteSilent(TIMED_OUT) });
+  const result = await e28.run({ root: tempDir('snowarch-c261-', t), flags: { noNetwork: false }, now: realClock, env: {},
+    exec: git.exec, lookup: resolver({ ok: false, timedOut: true }).lookup });
+  assert.equal(result.detail, 'origin did not answer within 15 s',
+    'without the lookup step the case does not read as the remote again: the case above cannot tell the step from none');
 });
