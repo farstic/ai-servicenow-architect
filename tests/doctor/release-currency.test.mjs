@@ -384,6 +384,8 @@ test('ARC-09-C47 — a record describing another tree is not used (the interrupt
   const r = await E28.run({ root, flags: { noNetwork: false }, now: realClock,
     exec: (_cmd, args) => {
       if (args.includes('describe')) return 'v9.1.0\n';
+      // ARC-09-C261: E-28 now also asks git for the origin's URL before the remote, so this counts the ls-remote and not "anything else".
+      if (!args.includes('ls-remote')) return '';
       askedRemote += 1;
       return lsRemote(['v9.1.0']);
     } });

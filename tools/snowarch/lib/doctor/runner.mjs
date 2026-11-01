@@ -23,7 +23,10 @@ import { isServerCheck, SECTIONS } from './registry.mjs';
 import { spellings } from '../launcher-spelling.mjs';
 
 export const DEFAULT_TIMEOUT_MS = 15_000;
-export const NETWORK_TIMEOUT_MS = 20_000;
+// ARC-09-C261: E-28, the one network check, asks DNS for up to 5 s and then the remote for up to 15 s, in synchronous calls one after the
+// other. A timer cannot fire during them, but the first `await` after them lets it, so the budget holds both and some to spare: it was
+// 20 s, which a resolver answering at 4.9 s and a silent remote would have exceeded. tools/snowarch/tests/dns-probe.test.mjs holds the sum.
+export const NETWORK_TIMEOUT_MS = 25_000;
 
 /** `--section a,b`. `server` means every `SV-` check, whatever section they declare. */
 export function selectSections(requested) {
