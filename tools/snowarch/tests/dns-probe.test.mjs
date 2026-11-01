@@ -11,10 +11,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tempDir } from './helpers/temp.mjs';
 
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const probe = () => import('../lib/dns-probe.mjs');
 /** A child program of the test's own: what the probe runs in place of the real lookup, so no resolver is asked. */
 const childFile = (t, body) => { const file = join(tempDir('c261-child-', t), 'child.mjs'); writeFileSync(file, body); return file; };
@@ -30,6 +32,22 @@ test('ARC-09-C261 — the lookup has its own 5 s, and E-28 still ends inside the
   // two other seconds are for the `git config` questions, the child's start and the imports.
   assert.ok(DNS_BUDGET + REMOTE_BUDGET_MS + 2_000 <= NETWORK_TIMEOUT_MS,
     `${DNS_BUDGET} + ${REMOTE_BUDGET_MS} ms and 2 s to spare do not fit in the runner's ${NETWORK_TIMEOUT_MS} ms for a network check`);
+});
+
+test('ARC-09-C261 — the runner says 25 s for a network check and 15 s for the rest, in its own text and on the architecture page', async () => {
+  // The architect's ruling of 2026-11-01: DNS stays at 5 s and the runner's budget for a network check goes to 25 s, and nothing may still
+  // say 20: not the sentence the runner prints when a check hangs, which is built from the budget, and not the page that describes it.
+  const runner = await import('../lib/doctor/runner.mjs');
+  assert.equal(runner.NETWORK_TIMEOUT_MS, 25_000);
+  assert.equal(runner.DEFAULT_TIMEOUT_MS, 15_000);
+  assert.equal(runner.timeoutFor({ network: true }), 25_000);
+  assert.equal(runner.timeoutFor({ network: false }), 15_000);
+  assert.equal(runner.timedOutText(runner.timeoutFor({ network: true })), 'timed out after 25 s');
+  const page = readFileSync(join(ROOT, 'docs', 'ARCHITECTURE.md'), 'utf8').replace(/\s+/g, ' ');
+  const said = /after its timeout \((\d+) s, (\d+) s for a network check\)/.exec(page);
+  assert.ok(said, 'the architecture page no longer says what the runner\'s timeouts are, in the shape this test reads');
+  assert.deepEqual([Number(said[1]) * 1000, Number(said[2]) * 1000], [runner.DEFAULT_TIMEOUT_MS, runner.NETWORK_TIMEOUT_MS],
+    'the architecture page and the runner disagree about the doctor\'s timeouts');
 });
 
 test('ARC-09-C261 — localhost resolves in the real child, from the hosts file', async () => {
