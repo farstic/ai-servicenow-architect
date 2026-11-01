@@ -363,7 +363,7 @@ test('a launcher that names a sentence the generator does not have is an error, 
   const dir = tempDir('launcher-gen-');
   try {
     mkdirSync(join(dir, 'tools/snowarch/lib'), { recursive: true });
-    for (const f of ['net-sentences.mjs', 'remedies.json', 'text.json']) {
+    for (const f of ['net-sentences.mjs', 'size.mjs', 'remedies.json', 'text.json']) {
       copyFileSync(join(root, 'tools/snowarch/lib', f), join(dir, 'tools/snowarch/lib', f));
     }
     copyFileSync(join(root, 'engine.config.json'), join(dir, 'engine.config.json'));
