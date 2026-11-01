@@ -1194,7 +1194,7 @@ whatever it costs). They are required rather than defaulted — the failure mode
 `network` is a doctor that touched the network on a machine that has none.
 
 **The runner owns three promises.** Every selected check runs: one that throws becomes a `fail`
-carrying its message, one that hangs becomes a `fail` after its timeout (15 s, 20 s for a network
+carrying its message, one that hangs becomes a `fail` after its timeout (15 s, 25 s for a network
 check), and a report that stopped at the first bad answer would describe a checkout as healthy up to
 the point where it stopped looking. Nothing reaches the output unredacted — the redaction pass is
 applied by the runner, so a check cannot forget it. And a check that names an error `code` gets its

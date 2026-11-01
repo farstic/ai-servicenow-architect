@@ -72,7 +72,11 @@ export function planRun(checks, { quick = false, noNetwork = false, sections = n
   return { selected, skipped };
 }
 
-const timeoutFor = (check) => (check.network ? NETWORK_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
+/** The budget a check gets: its network one when it declares `network`, else the default (the tests read it, and the architecture page quotes both). */
+export const timeoutFor = (check) => (check.network ? NETWORK_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
+
+/** What a check that hangs is reported as, built from its budget so that the sentence and the budget cannot disagree ("timed out after 25 s"). */
+export const timedOutText = (budgetMs) => `timed out after ${Math.round(budgetMs / 1000)} s`;
 
 /** One check, run defensively: never throws, always timed, always shaped like a CheckResult. */
 async function runOne(check, ctx, now, budgetFor = timeoutFor) {
@@ -88,7 +92,7 @@ async function runOne(check, ctx, now, budgetFor = timeoutFor) {
         // once every check has answered" — which the `clearTimeout` already guaranteed — and the price
         // was a budget the event loop could not see: a check pending on nothing ended the whole doctor
         // in exit 13 before its budget fired, with no report at all.
-        timer = setTimeout(() => reject(new Error(`timed out after ${Math.round(budget / 1000)} s`)),
+        timer = setTimeout(() => reject(new Error(timedOutText(budget))),
           budget);
       }),
     ]);
