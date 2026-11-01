@@ -166,8 +166,13 @@ test('ARC-09-C262 — the upgrade\'s fetch runs in git\'s English, whatever the 
   harnessGit(root, ['commit', '-q', '-m', 'fixture']);
   harnessGit(root, ['remote', 'add', 'origin', join(root, 'does-not-exist.git')]);
   const calls = [];
-  // unlicensed start: every call the upgrade makes through this seam is git's (fetch, config, ls-files), and the seam only records them
-  const run = (cmd, args, opts) => { calls.push({ cmd, args, env: opts?.env }); return spawnSync(cmd, args, opts); };
+  // Every call the upgrade makes through this seam is git's (fetch, config, ls-files): the command is a literal, so the start is
+  // git's and no product start, which tests/upgrade/ counts and gives the fixture home (ARC-09-C212).
+  const run = (cmd, args, opts) => {
+    assert.equal(cmd, 'git', 'the upgrade ran something other than git before its fetch');
+    calls.push({ cmd, args, env: opts?.env });
+    return spawnSync('git', args, opts); // scan-exempt: the upgrade's own git call, passed through exactly as the product makes it
+  };
   const lines = [];
   const log = { step: (l) => lines.push(l), fail: (l) => lines.push(`FAIL ${l}`), warn: (l) => lines.push(`WARN ${l}`), ok: (l) => lines.push(String(l)) };
   const env = { ...process.env, LANG: 'de_DE.UTF-8', LC_ALL: 'de_DE.UTF-8', LC_MESSAGES: 'de_DE.UTF-8', LANGUAGE: 'de' };
