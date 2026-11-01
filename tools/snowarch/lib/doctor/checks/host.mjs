@@ -37,7 +37,9 @@ export const REMOTE_BUDGET_MS = 15_000;
  * itself and a lookup that fails or hangs on this machine would then be a false "DNS did not answer", which is worse than the old
  * message. So NO_PROXY is not read (a hand-written matcher is a new way to be wrong): HTTPS_PROXY, HTTP_PROXY or ALL_PROXY in either
  * case skips the lookup whatever NO_PROXY says, and so does what git itself answers for this URL (`--get-urlmatch http.proxy`, which
- * covers `http.proxy` and `http.<url>.proxy`) and for `remote.<name>.proxy`.
+ * covers `http.proxy` and `http.<url>.proxy`) and for `remote.<name>.proxy`. Git is asked about the URL without its user, password, query
+ * and fragment, so no credential of the origin is on a command line (ARC-09-C240); the cost is that a section pinned to a user no longer
+ * matches, so one more lookup runs, and its worst case is a warning that already names the proxy settings.
  */
 function lookupTarget(ctx, remote) {
   const run = ctx.exec ?? execFileSync;
@@ -55,7 +57,10 @@ function lookupTarget(ctx, remote) {
   if (host === '' || host.startsWith('[') || /^\d+(?:\.\d+){3}$/.test(host)) return null;
   const inEnv = ctx.env ?? process.env;
   if (['HTTPS_PROXY', 'HTTP_PROXY', 'ALL_PROXY'].some((name) => inEnv[name] || inEnv[name.toLowerCase()])) return null;
-  if (ask(['config', '--get-urlmatch', 'http.proxy', raw])) return null;
+  // git matches `http.<url>.proxy` on scheme, host, port and path, and on the user only when a section names one, so nothing it needs is lost
+  // by asking about the origin without the parts that can carry a credential.
+  url.username = ''; url.password = ''; url.search = ''; url.hash = '';
+  if (ask(['config', '--get-urlmatch', 'http.proxy', url.href])) return null;
   if (ask(['config', '--get', `remote.${remote}.proxy`])) return null;
   return host;
 }
