@@ -319,7 +319,15 @@ test('ARC-09-C185c — a GitHub origin that is not the releases\' gets the set-u
   const head = git(w.user, ['rev-parse', 'HEAD']);
   const home = 'https://github.com/farstic/snowarch.git';
   const old = 'https://github.com/farstic/old-home.git';
-  const said = `upgrade: origin is ${old}, and releases are published at ${home} — git remote set-url origin ${home}`;
+  // ARC-09-C262 — the install holds three final tags from 2.2.1 on, which name the old origin's commits, so the line carries the
+  // two commands that take it to the published address: git will not replace a tag it has, and the upgrade never forces one.
+  const said = [
+    `upgrade: origin is ${old}, and releases are published at ${home}; this clone's release tags from 2.2.1 on (v9.0.0, v9.1.0, v9.2.0) came from ${old}, `
+      + 'they name other commits than the published ones, and git will not replace a tag it has — run these two commands:',
+    `  git remote set-url origin ${home}`,
+    '  git tag -d v9.0.0 v9.1.0 v9.2.0',
+  ];
+  const saidIn = (text) => said.every((line) => text.includes(line)) && /\nthen run \S+ upgrade again/.test(text);
   // A GitHub-shaped origin and no network: `insteadOf` sends git to the world's own origin, while the URL the install
   // has configured, the one the product reads, stays the GitHub one.
   const key = (to) => `url.${pathToFileURL(to).href}.insteadOf`;
@@ -342,14 +350,14 @@ test('ARC-09-C185c — a GitHub origin that is not the releases\' gets the set-u
   const u4 = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
   assert.equal(u4.status, 1, u4.text);
   assert.match(u4.text, /upgrade: v9\.2\.0 has no verified signed manifest \(the published manifest names ddddddd, and v9\.2\.0 here is [0-9a-f]{7}\) — nothing was changed/);
-  assert.ok(u4.text.includes(said), u4.text);
+  assert.ok(saidIn(u4.text), u4.text);
 
   // U2: the old origin no longer answers, as a private repository does not, and the same line follows git's own error.
   unvia(w.origin);
   via(old, join(w.scratch, 'gone.git'));
   const u2 = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
   assert.equal(u2.status, 1, u2.text);
-  assert.ok(u2.text.includes(said), u2.text);
+  assert.ok(saidIn(u2.text), u2.text);
   unvia(join(w.scratch, 'gone.git'));
 
   // Controls, refused at U4 the same way: the releases' own repository, and an origin that is not on GitHub.

@@ -449,7 +449,7 @@ export function republishManifests(licences, dir, tags) {
 }
 
 export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true, extraFile = null,
-  unsigned = [], altered = [], foreign = [], coverage = {}, b07Literal = false } = {}) {
+  unsigned = [], altered = [], foreign = [], coverage = {}, b07Literal = false, prerelease = null } = {}) {
   const marks = [];
   const worldStart = process.hrtime.bigint();
   const scratch = tempDir('snowarch-upgrade-', t);
@@ -574,7 +574,21 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   const tB = process.hrtime.bigint();
   await tagRelease(work, '9.2.0', { claudeFloor });
   marks.push(`tag-B=${Math.round(Number(process.hrtime.bigint() - tB) / 1e6)}ms`);
-  phase('manifests', marks, () => publishManifests(work, licences, ['v9.0.0', 'v9.1.0', 'v9.2.0'],
+  // ARC-09-C262 — a prerelease of the NEXT version, for the install that tested it and rolls back: the engineering repository
+  // carries release candidates and the distribution never does. Off by default, so every other case builds the world it
+  // always did. Built as release B is, after the version rewrite: the contract embeds the package version.
+  if (prerelease) {
+    phase('rewrite-version-pre', marks, () => rewriteVersion(work, prerelease));
+    execFileSync(process.execPath, [join(work, 'scripts/build-dist.mjs')],
+      { cwd: work, stdio: 'pipe', encoding: 'utf8' });
+    execFileSync(process.execPath, [join(work, 'packages/contract/pin.mjs'), '--yes'],
+      { cwd: work, stdio: 'pipe', encoding: 'utf8' });
+    regenerate(work);
+    commit(work, 'chore(release): a prerelease', upstream.pin);
+    await tagRelease(work, prerelease, { claudeFloor });
+  }
+  phase('manifests', marks, () => publishManifests(work, licences,
+    ['v9.0.0', 'v9.1.0', 'v9.2.0', ...(prerelease ? [`v${prerelease}`] : [])],
     { unsigned, altered, foreign, coverage }));
 
   // ── the bare origin, and the user's clone at v9.0.0 ───────────────────────────────────────
