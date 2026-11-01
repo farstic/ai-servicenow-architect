@@ -30,6 +30,11 @@ before it moves anything, and plans from the release it moves to.
 
 ### Fixed
 
+- The upgrade's remedy for an install cloned from the engineering repository now works. The first line names the release tags the
+  install holds from v2.2.1 on and prints two commands, each on a line of its own, `git remote set-url origin …` and `git tag -d …`,
+  because git refuses to replace those tags and the upgrade never forces one; when the fetch is refused for that reason it says
+  which tags came from another repository and prints the command that removes exactly those, where it said only that it could not
+  fetch the release tags; and the fetch runs in git's English, so the lines read the same in every locale (ARC-09-C262).
 - The doctor's release-currency check (E-28) now says when the machine's DNS did not answer for the remote's name within 5 s, where
   it said the remote did not answer within 15 s; a name that does not resolve reads as before (ARC-09-C261).
 - `./snowarch doctor --json` left a second instance address unmasked: where one value named two instances, or the same
