@@ -10,7 +10,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -67,6 +67,122 @@ test('ARC-09-C185c — originLine: a GitHub origin that is not the releases\' re
   assert.match(line('git@github.com:farstic/old-home.git') ?? '', /origin is git@github\.com:farstic\/old-home\.git,/);
   // No configured repository, no line: the product cannot say where releases are.
   assert.equal(originLine('https://github.com/farstic/old-home.git', undefined, 'CLI'), null);
+});
+
+// ── ARC-09-C262 — an install cloned from the engineering repository can follow the printed lines to the published one ───
+//
+// The drill of rc.2 → v2.2.4 refused twice. At U4 the first line said `git remote set-url origin <home>`, and an install that
+// followed it met U2's `! [rejected] v2.2.1 -> v2.2.1 (would clobber existing tag)`, because its release tags from 2.2.1 on name
+// the engineering repository's commits and the staged distribution shares none with it. The upgrade never forces a tag, so the
+// way out is the reader's own `git tag -d`, and the product's lines now say so, naming the tags.
+
+test('ARC-09-C262 — originLines: the two commands with every tag a clone holds from 2.2.1 on, and today\'s one line when it holds none', async () => {
+  const { originLine, originLines } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const home = 'https://github.com/farstic/snowarch.git';
+  const old = 'https://github.com/farstic/old-home.git';
+  const tags = ['v2.2.1', 'v2.2.2', 'v2.2.3', 'v2.2.4'];
+  // No tag, no change: today's single line, byte for byte.
+  assert.deepEqual(originLines(old, 'farstic/snowarch', 'CLI', []), [originLine(old, 'farstic/snowarch', 'CLI')]);
+  assert.deepEqual(originLines(old, 'farstic/snowarch', 'CLI'), [originLine(old, 'farstic/snowarch', 'CLI')]);
+  const lines = originLines(old, 'farstic/snowarch', 'CLI', tags);
+  assert.deepEqual(lines, [
+    `upgrade: origin is ${old}, and releases are published at ${home}; this clone's release tags from 2.2.1 on `
+      + `(v2.2.1, v2.2.2, v2.2.3, v2.2.4) came from ${old}, they name other commits than the published ones, and git will not `
+      + 'replace a tag it has — run these two commands:',
+    `  git remote set-url origin ${home}`,
+    '  git tag -d v2.2.1 v2.2.2 v2.2.3 v2.2.4',
+    'then run CLI upgrade again',
+  ]);
+  // The two commands are lines of their own: Windows PowerShell 5.1 has no `&&`.
+  assert.equal(lines.some((l) => l.includes('&&')), false, lines.join('\n'));
+  // Silent where the old line is silent, tags or not.
+  for (const url of [home, 'https://gitlab.example.com/mirrors/snowarch.git', '/srv/git/snowarch.git', '', null]) {
+    assert.deepEqual(originLines(url, 'farstic/snowarch', 'CLI', tags), [], String(url));
+  }
+  assert.deepEqual(originLines(old, undefined, 'CLI', tags), []);
+  // A credential in the URL is never printed, in any of the lines.
+  const masked = originLines('https://someone:ghp_secret@github.com/farstic/old-home.git', 'farstic/snowarch', 'CLI', tags).join('\n');
+  assert.equal(/ghp_secret|someone/.test(masked), false, masked);
+  assert.match(masked, /origin is https:\/\/github\.com\/farstic\/old-home\.git, and releases/);
+});
+
+test('ARC-09-C262 — the tags git refused to replace are read from its own lines, and named with the one command that removes them', async () => {
+  const { clobberedTags, clobberLines } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const stderr = [
+    'From /srv/git/snowarch.git',
+    ' ! [rejected]        v2.2.1     -> v2.2.1  (would clobber existing tag)',
+    ' ! [rejected]        v2.2.10    -> v2.2.10  (would clobber existing tag)',
+    ' ! [rejected]        v2.2.2     -> v2.2.2  (would clobber existing tag)',
+    ' * [new tag]         v2.2.5     -> v2.2.5',
+    ' ! [rejected]        main       -> origin/main  (non-fast-forward)',
+    'error: some refs were not updated',
+  ].join('\n');
+  // Semver order, not git's: v2.2.10 comes after v2.2.2.
+  assert.deepEqual(clobberedTags(stderr), ['v2.2.1', 'v2.2.2', 'v2.2.10']);
+  for (const other of ['fatal: unable to access \'https://example.invalid/\': Could not resolve host: example.invalid', '', undefined]) {
+    assert.deepEqual(clobberedTags(other), [], String(other));
+  }
+
+  const home = 'https://github.com/farstic/snowarch.git';
+  assert.deepEqual(clobberLines(['v2.2.1', 'v2.2.2'], { url: home, repo: 'farstic/snowarch', cli: 'CLI' }), {
+    fail: `upgrade: these tags came from another repository: v2.2.1, v2.2.2 — this clone holds them at other commits than origin (${home}) `
+      + 'does, and git will not replace a tag it has; this upgrade never forces one; nothing was changed',
+    steps: ['  git tag -d v2.2.1 v2.2.2', 'then run CLI upgrade again'],
+  });
+  // An origin that is not where releases are published: the claim is only what git said.
+  const mirror = clobberLines(['v2.2.1'], { url: 'https://gitlab.example.com/mirrors/snowarch.git', repo: 'farstic/snowarch', cli: 'CLI' });
+  assert.equal(mirror.fail, 'upgrade: git will not replace tags this clone already has: v2.2.1 — origin (https://gitlab.example.com/mirrors/snowarch.git) '
+    + 'holds them at other commits; this upgrade never forces one; nothing was changed');
+  assert.deepEqual(mirror.steps, ['  git tag -d v2.2.1', 'then run CLI upgrade again']);
+  // No origin URL, no parenthesis; a credential in the URL is never printed.
+  assert.equal(clobberLines(['v2.2.1'], { url: '', repo: 'farstic/snowarch', cli: 'CLI' }).fail.includes('()'), false);
+  const masked = JSON.stringify(clobberLines(['v2.2.1'], { url: 'https://someone:ghp_secret@github.com/farstic/snowarch.git', repo: 'farstic/snowarch', cli: 'CLI' }));
+  assert.equal(/ghp_secret|someone/.test(masked), false, masked);
+});
+
+test('ARC-09-C262 — distributedTagsHere: the final tags from 2.2.1 on that a clone holds, oldest first, and nothing else', async (t) => {
+  const { distributedTagsHere } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const make = (tags) => {
+    const root = tempDir('snowarch-c262-tags-', t);
+    initFixtureRepo((args) => harnessGit(root, args), root, ['-q', '-b', 'main']);
+    writeFileSync(join(root, 'a.txt'), 'a\n');
+    harnessGit(root, ['add', 'a.txt']);
+    harnessGit(root, ['commit', '-q', '-m', 'fixture']);
+    for (const tag of tags) harnessGit(root, ['tag', tag]);
+    return root;
+  };
+  // Before 2.2.1 nothing was published at the distribution; a release candidate never is; a name that is no release is no tag.
+  assert.deepEqual(distributedTagsHere(make(['v2.0.5', 'v2.1.2', 'v2.2.0', 'v2.2.1', 'v2.2.1-rc.1', 'v2.2.10', 'v2.2.2', 'v2.2.5-rc.2',
+    'v3.0.0', 'import/v2.2.3', 'not-a-release'])), ['v2.2.1', 'v2.2.2', 'v2.2.10', 'v3.0.0']);
+  assert.deepEqual(distributedTagsHere(make(['v2.2.0', 'v2.2.1-rc.1', 'v2.2.5-rc.2'])), []);
+  assert.deepEqual(distributedTagsHere(make([])), []);
+});
+
+test('ARC-09-C262 — the upgrade\'s fetch runs in git\'s English, whatever the reader\'s locale, so the failure it classifies is the one it reads', async (t) => {
+  const root = tempDir('snowarch-c262-env-', t);
+  initFixtureRepo((args) => harnessGit(root, args), root, ['-q', '-b', 'main']);
+  writeFileSync(join(root, 'engine.config.json'), readFileSync(join(REPO, 'engine.config.json')));
+  harnessGit(root, ['add', 'engine.config.json']);
+  harnessGit(root, ['commit', '-q', '-m', 'fixture']);
+  harnessGit(root, ['remote', 'add', 'origin', join(root, 'does-not-exist.git')]);
+  const calls = [];
+  // Every call the upgrade makes through this seam is git's (fetch, config, ls-files): the command is a literal, so the start is
+  // git's and no product start, which tests/upgrade/ counts and gives the fixture home (ARC-09-C212).
+  const run = (cmd, args, opts) => {
+    assert.equal(cmd, 'git', 'the upgrade ran something other than git before its fetch');
+    calls.push({ cmd, args, env: opts?.env });
+    return spawnSync('git', args, opts); // scan-exempt: the upgrade's own git call, passed through exactly as the product makes it
+  };
+  const lines = [];
+  const log = { step: (l) => lines.push(l), fail: (l) => lines.push(`FAIL ${l}`), warn: (l) => lines.push(`WARN ${l}`), ok: (l) => lines.push(String(l)) };
+  const env = { ...process.env, LANG: 'de_DE.UTF-8', LC_ALL: 'de_DE.UTF-8', LC_MESSAGES: 'de_DE.UTF-8', LANGUAGE: 'de' };
+  await upgradeCommand({ flags: { check: true }, log, root, env, cwd: root, run });
+  const fetch = calls.find((c) => c.cmd === 'git' && c.args[0] === 'fetch');
+  assert.ok(fetch, `the upgrade did not fetch:\n${lines.join('\n')}`);
+  assert.equal(fetch.env.LC_ALL, 'C', 'the fetch ran in the reader\'s locale');
+  // gettext ignores LANGUAGE when the locale is C, but unsetting it costs nothing and rests on no such rule.
+  assert.equal(fetch.env.LANGUAGE, undefined, 'LANGUAGE was left set');
+  assert.equal(fetch.env.GIT_TERMINAL_PROMPT, '0', 'the fetch lost its no-prompt environment');
 });
 
 // ── ARC-09-C194 — every floor the tag states is judged at U4, before anything moves ──────────────────────────────

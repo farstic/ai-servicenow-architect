@@ -34,7 +34,7 @@ import { localDir, storePath } from '../local-paths.mjs';
 import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from '../exit.mjs';
 import { branchState, describe, git, isShallow, versionTag } from '../git.mjs';
 import { askOnce, isYes } from '../ask.mjs';
-import { childEnv, NO_PROMPT_ENV } from '../spawn-env.mjs';
+import { childEnv, ENGLISH_ENV, NO_PROMPT_ENV } from '../spawn-env.mjs';
 import { loadConfig, root as defaultRoot, version as readVersion } from '../config.mjs';
 import { loadState, notHereReason, recordedHere } from '../state.mjs';
 // ARC-08-C29 — the runner's own step list, so the plan and the run are one computation.
@@ -45,7 +45,7 @@ import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
 import { manifestSays, refreshManifest, refreshWithUpgrade } from '../licence/fetch.mjs';
-import { DISTRIBUTION_FROM, MANIFESTS_FROM, archiveDiffers, checkTree, signedRelease, writeManifestCache }
+import { DISTRIBUTION_FROM, MANIFESTS_FROM, archiveDiffers, checkTree, distributedRelease, signedRelease, writeManifestCache }
   from '../licence/manifest.mjs';
 import { hashFor, INPUTS, STEP_IDS } from '../inputs.mjs';
 import { MODE, effectiveDocsMode } from '../docs/sync.mjs';
@@ -270,11 +270,77 @@ export function originLine(url, repo, cli) {
   const at = githubRepoOf(url);
   if (!at || typeof repo !== 'string' || repo === '') return null;
   if (at.toLowerCase() === repo.toLowerCase()) return null;
-  // An http(s) URL may carry a token as its user, with or without a password; an ssh user is a login name, kept.
-  const shown = String(url).trim().replace(/^(https?:\/\/)[^@/]+@/i, '$1');
+  const shown = shownUrl(url);
   const home = `https://github.com/${repo}.git`;
   return `upgrade: origin is ${shown}, and releases are published at ${home} — git remote set-url origin ${home}, `
     + `then run ${cli} upgrade again`;
+}
+
+/** An origin URL as it is printed: an http(s) URL may carry a token as its user, with or without a password, and that is never shown; an ssh user is a login name, kept. */
+const shownUrl = (url) => String(url ?? '').trim().replace(/^(https?:\/\/)[^@/]+@/i, '$1');
+
+/**
+ * ARC-09-C262 — `originLine` for an install that holds release tags from DISTRIBUTION_FROM on, as the lines to print: the two
+ * commands, each a line of its own (Windows PowerShell 5.1 has no `&&`), with every such tag named. Such tags came from the
+ * origin the install was cloned from, and the staged distribution shares no commit with that repository for any of them, so git
+ * refuses to replace them at U2 and the upgrade never forces a tag: the reader removes them first. `tags` is what
+ * `distributedTagsHere` answers, offline. An install that holds none gets today's single line, and an origin `originLine` is
+ * silent for stays silent.
+ */
+export function originLines(url, repo, cli, tags = []) {
+  const line = originLine(url, repo, cli);
+  if (line === null) return [];
+  if (tags.length === 0) return [line];
+  const shown = shownUrl(url);
+  const home = `https://github.com/${repo}.git`;
+  return [
+    `upgrade: origin is ${shown}, and releases are published at ${home}; this clone's release tags from ${DISTRIBUTION_FROM} on `
+      + `(${tags.join(', ')}) came from ${shown}, they name other commits than the published ones, and git will not replace a `
+      + 'tag it has — run these two commands:',
+    `  git remote set-url origin ${home}`,
+    `  git tag -d ${tags.join(' ')}`,
+    `then run ${cli} upgrade again`,
+  ];
+}
+
+/**
+ * ARC-09-C262 — the final tags from DISTRIBUTION_FROM on that this install holds, oldest first: the tags a clone made from the
+ * engineering repository holds at commits the distribution does not share, so the ones git would refuse to replace. By
+ * construction, not by a network call: every final from 2.2.1 on is staged there as a commit of its own. A release candidate is
+ * never published at the distribution, and a tag before DISTRIBUTION_FROM never was, so neither is named. A tag the install had
+ * already replaced is named too, which does no harm: the next fetch brings it back.
+ */
+export function distributedTagsHere(root, { opts = {} } = {}) {
+  return releaseTags(root, { pre: false, opts }).map((t) => t.tag).filter(distributedRelease).reverse();
+}
+
+/**
+ * ARC-09-C262 — the tags git refused to update at U2, from its own lines (`! [rejected]  v2.2.1 -> v2.2.1  (would clobber
+ * existing tag)`), in semver order where they are releases: git's own order is by name, which puts v2.2.10 before v2.2.2. The
+ * fetch runs in git's English (ENGLISH_ENV), so the shape is the same in every locale.
+ */
+export function clobberedTags(stderr = '') {
+  const names = [...String(stderr).matchAll(/^\s*! \[rejected\]\s+(\S+)\s+->\s+\S+\s+\(would clobber existing tag\)\s*$/gm)].map((m) => m[1]);
+  const releases = sortTags(names).reverse().map((t) => t.tag);
+  return [...releases, ...names.filter((n) => !releases.includes(n))];
+}
+
+/**
+ * ARC-09-C262 — what U2 says when git refused to replace tags: why, and the one command that removes them, so the next fetch brings
+ * the published ones. Never forced here: a tag a remote moved is U4's to judge against the signed manifest, not U2's to replace.
+ * "Came from another repository" is claimed only when origin IS where releases are published, because then the tags here can only
+ * have come from somewhere else; for any other origin the line says what git said. `fail` is the failure line, `steps` follow it.
+ */
+export function clobberLines(tags, { url, repo, cli }) {
+  const shown = shownUrl(url);
+  const at = shown === '' ? 'origin' : `origin (${shown})`;
+  const published = typeof repo === 'string' && repo !== '' && githubRepoOf(url)?.toLowerCase() === repo.toLowerCase();
+  const fail = published
+    ? `upgrade: these tags came from another repository: ${tags.join(', ')} — this clone holds them at other commits than ${at} does, `
+      + 'and git will not replace a tag it has; this upgrade never forces one; nothing was changed'
+    : `upgrade: git will not replace tags this clone already has: ${tags.join(', ')} — ${at} holds them at other commits; `
+      + 'this upgrade never forces one; nothing was changed';
+  return { fail, steps: [`  git tag -d ${tags.join(' ')}`, `then run ${cli} upgrade again`] };
 }
 
 /**
@@ -956,16 +1022,25 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   const fetchArgs = ['fetch', '--tags', '--prune', ...(shallow ? ['--unshallow'] : []), remote];
   // ARC-09-C190 — with prompts off: a remote that wants a credential no helper holds fails now, with git's reason,
   // instead of waiting on a prompt until FETCH_TIMEOUT_MS. A helper's stored credential still applies.
-  const fetched = run('git', fetchArgs, { cwd: root, encoding: 'utf8', env: childEnv(root, { ...env, ...NO_PROMPT_ENV }),
+  // ARC-09-C262 — in git's English, so the classifier below reads the failure whatever the reader's locale.
+  const fetched = run('git', fetchArgs, { cwd: root, encoding: 'utf8', env: childEnv(root, { ...env, ...NO_PROMPT_ENV, ...ENGLISH_ENV }),
     timeout: FETCH_TIMEOUT_MS, stdio: 'pipe' });
   if (fetched.status !== 0) {
     const stderr = String(fetched.stderr ?? fetched.error?.message ?? '').trim();
     if (stderr) for (const line of stderr.split('\n')) log.step(line);
+    const originUrl = git(root, ['config', '--get', `remote.${remote}.url`], { ...opts, allowFail: true });
+    const launcher = spellings({ platform, env }).cli;
+    // ARC-09-C262 — git refused to replace tags the install holds: say which, why, and the command that removes them.
+    const clobbered = clobberedTags(stderr);
+    if (clobbered.length > 0) {
+      const { fail, steps } = clobberLines(clobbered, { url: originUrl, repo: config.repo, cli: launcher });
+      log.fail(fail);
+      for (const step of steps) log.step(step);
+      return EXIT_FAIL;
+    }
     const { line } = classifyGitFetchError(stderr, { remote });
     log.fail(line ?? 'upgrade: git could not fetch the release tags; nothing was changed');
-    const moved = originLine(git(root, ['config', '--get', `remote.${remote}.url`], { ...opts, allowFail: true }),
-      config.repo, spellings({ platform, env }).cli);
-    if (moved) log.step(moved);
+    for (const moved of originLines(originUrl, config.repo, launcher, distributedTagsHere(root, { opts }))) log.step(moved);
     return EXIT_FAIL;
   }
 
@@ -1090,9 +1165,10 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
       // ARC-09-C185c — signed over another commit than the tag here: the tag came from somewhere else than the release.
       const local = git(root, ['rev-parse', `${target}^{commit}`], { ...opts, allowFail: true });
       if (fetched.outcome === 'fetched' && fetched.entry.doc.manifest.commit !== local) {
-        const moved = originLine(git(root, ['config', '--get', `remote.${remote}.url`], { ...opts, allowFail: true }),
-          config.repo, spellings({ platform, env }).cli);
-        if (moved) log.step(moved);
+        // ARC-09-C262 — and with the tags an install cloned from that other repository holds, which git would refuse to replace.
+        const moved = originLines(git(root, ['config', '--get', `remote.${remote}.url`], { ...opts, allowFail: true }),
+          config.repo, spellings({ platform, env }).cli, distributedTagsHere(root, { opts }));
+        for (const line of moved) log.step(line);
       }
       return EXIT_FAIL;
     }

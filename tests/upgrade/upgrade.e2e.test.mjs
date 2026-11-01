@@ -354,11 +354,17 @@ test('ARC-09-C185c — an install moved to a staged distribution, unrelated in h
   assert.equal(clobber.status, 1, clobber.text);
   assert.match(clobber.text, /! \[rejected\] +v9\.1\.0 +-> v9\.1\.0 +\(would clobber existing tag\)/, clobber.text);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), before, 'the refused fetch moved the tree');
-  // An install made with `clone --branch` before those releases existed: its own tag, and none of the later ones.
-  for (const tag of ['v9.1.0', 'v9.2.0']) {
-    git(w.user, ['tag', '-d', tag]);
-    assert.equal(git(w.user, ['tag', '--list', tag]), '', `${tag} is still here`);
-  }
+  // ARC-09-C262 — and the product says what git cannot: which tags, and the one command that removes them. This origin is a
+  // file URL, not the published address, so the claim is only what git said; the case after this one has the address.
+  assert.ok(clobber.text.includes(`upgrade: git will not replace tags this clone already has: v9.1.0, v9.2.0 — origin (${pathToFileURL(distribution).href}) `
+    + 'holds them at other commits; this upgrade never forces one; nothing was changed'), clobber.text);
+  assert.doesNotMatch(clobber.text, /could not fetch the release tags/, clobber.text);
+  assert.match(clobber.text, /\nthen run \S+ upgrade again/, clobber.text);
+  // The command, as printed. An install made with `clone --branch` before those releases existed: its own tag, and none of the later ones.
+  const printed = [...clobber.text.matchAll(/^ {2}(git tag -d .+)$/gm)].map((m) => m[1]);
+  assert.deepEqual(printed, ['git tag -d v9.1.0 v9.2.0'], clobber.text);
+  git(w.user, printed[0].split(' ').slice(1));
+  for (const tag of ['v9.1.0', 'v9.2.0']) assert.equal(git(w.user, ['tag', '--list', tag]), '', `${tag} is still here`);
 
   const check = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
   assert.match(check.text, /v9\.2\.0 available \(you are on v9\.0\.0\)/, check.text);
@@ -414,6 +420,78 @@ test('ARC-09-C185c — an install moved to a staged distribution, unrelated in h
   const after = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
   assert.match(after.text, /v9\.2\.0 available \(you are on v9\.1\.0\)/, after.text);
 }, MINUTES);
+
+// ARC-09-C262 — THE OWNER'S rc DRILL. An install cloned from the engineering repository, moved to a release candidate and
+// rolled back to the final before it: the first refusal sent it to the published address, and the second refused its tags
+// ("would clobber existing tag"), because its finals from 2.2.1 on name the engineering repository's commits and the staged
+// distribution shares none with them. The first line now carries both commands, and the move completes.
+test('ARC-09-C262 — an engineering clone rolled back from a release candidate to the final before it follows the printed lines and completes', async (t) => {
+  const w = await buildWorld(t, { prerelease: '9.3.0-rc.1' });
+  bootstrapUser(w.user);
+  // The distribution, staged as farstic/snowarch is: every final one commit of its own history, each manifest signed over that
+  // commit, and no release candidate in it.
+  const staged = join(w.scratch, 'staged');
+  stage(w.work, staged, 'v9.0.0', { tag: true });
+  stage(w.work, staged, 'v9.1.0', { onto: 'main', tag: true });
+  stage(w.work, staged, 'v9.2.0', { onto: 'main', tag: true });
+  const distribution = join(w.scratch, 'distribution.git');
+  git(w.scratch, ['clone', '-q', '--bare', '--no-hardlinks', staged, distribution]);
+  assert.equal(git(distribution, ['tag', '--list', 'v9.3.0-rc.1']), '', 'the distribution carries a release candidate');
+  republishManifests(w.licences, staged, ['v9.0.0', 'v9.1.0', 'v9.2.0']);
+
+  // GitHub-shaped addresses and no network: `insteadOf` sends git to the world's own repositories, while the URL the install has
+  // configured, the one the product reads, stays the GitHub one.
+  const home = 'https://github.com/farstic/snowarch.git';
+  const old = 'https://github.com/farstic/old-home.git';
+  const via = (url, to) => {
+    const key = `url.${pathToFileURL(to).href}.insteadOf`;
+    git(w.user, ['config', key, url]);
+    assert.equal(git(w.user, ['config', '--get', key]), url, 'the insteadOf did not take');
+  };
+  git(w.user, ['remote', 'set-url', 'origin', old]);
+  via(old, w.origin);
+  via(home, distribution);
+
+  // The drill's forward leg: the install moves to the release candidate, from the engineering repository.
+  const forward = snowarch(w.user, ['upgrade', '--to', 'v9.3.0-rc.1', '--pre', '--yes'], { bin: w.bin });
+  assert.equal(forward.status, 0, forward.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.3.0-rc.1', forward.text);
+  const engagement = join(w.user, 'clients/acme/acme-engagement-state.md');
+  mkdirSync(join(w.user, 'clients/acme'), { recursive: true });
+  writeFileSync(engagement, '# acme\n');
+  const storeBefore = sha256(storePath(w.user));
+
+  // The rollback, first try: refused at U4, and the lines name the tags and carry both commands.
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+  const first = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(first.status, 1, first.text);
+  assert.match(first.text, /upgrade: v9\.2\.0 has no verified signed manifest \(the published manifest names [0-9a-f]{7}, and v9\.2\.0 here is [0-9a-f]{7}\) — nothing was changed/, first.text);
+  assert.ok(first.text.includes(`upgrade: origin is ${old}, and releases are published at ${home}; this clone's release tags from 2.2.1 on `
+    + `(v9.0.0, v9.1.0, v9.2.0) came from ${old}, they name other commits than the published ones, and git will not replace a tag it has `
+    + '— run these two commands:'), first.text);
+  const commands = [...first.text.matchAll(/^ {2}(git .+)$/gm)].map((m) => m[1]);
+  assert.deepEqual(commands, [`git remote set-url origin ${home}`, 'git tag -d v9.0.0 v9.1.0 v9.2.0'], first.text);
+  assert.match(first.text, /\nthen run \S+ upgrade again/, first.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'the refusal moved the tree');
+
+  // The commands, as printed.
+  for (const command of commands) git(w.user, command.split(' ').slice(1));
+  assert.equal(git(w.user, ['tag', '--list', 'v9.2.0']), '', 'the tag is still here');
+  assert.equal(git(w.user, ['tag', '--list', 'v9.3.0-rc.1']), 'v9.3.0-rc.1', 'the release candidate\'s tag went with them');
+
+  // The rollback, second try: the published tags come in, the manifest is the one signed over that commit, and the move completes.
+  const second = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
+  assert.equal(second.status, 0, second.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), git(distribution, ['rev-parse', 'v9.2.0^{commit}']), 'the tree is not at the distribution\'s v9.2.0');
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.2.0');
+  const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
+  const e32 = (report.checks ?? []).find((c) => c.id === 'E-32');
+  assert.match(e32?.detail ?? '', /^Integrity: verified · v9\.2\.0 · \d+ files$/, JSON.stringify(e32));
+  // What the move leaves alone, and the release candidate's tag, which the distribution never carried.
+  assert.equal(git(w.user, ['tag', '--list', 'v9.3.0-rc.1']), 'v9.3.0-rc.1');
+  assert.equal(sha256(storePath(w.user)), storeBefore, 'the rollback touched the credential store');
+  assert.equal(readFileSync(engagement, 'utf8'), '# acme\n', 'the rollback touched an engagement folder');
+}, 3 * MINUTES);
 
 // ARC-09-C194 — A BRANCH INSTALL MOVES TO THE VERIFIED TAG. U5 used to `pull --ff-only origin <branch>`: the branch
 // went wherever the remote branch was, never checked against the manifest U4 had just verified, and finish() then
