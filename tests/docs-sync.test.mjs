@@ -484,8 +484,10 @@ test('failure mapping — every row, and the proxy password never appears', () =
     ['fatal: remote error: upload-pack: not our ref ba513f2', {},
       'pin ba513f2 not fetchable from upstream (force-push or history rewrite?) — maintainer: '
       + `run ${SPELL.cli} docs sync --upstream`],
+    // ARC-09-C260: a docs sync that fills the disk says what the documentation takes. It names no flag (`--mode full` is `docs sync`'s, and the
+    // bootstrap's own is `--docs`), so it is true in `docs sync` and in B02's FAIL alike.
     ['fatal: write error: No space left on device', {},
-      'insufficient disk space: need ~400 MB free (~700 MB for --mode full)'],
+      'insufficient disk space: the whole documentation (the default) takes about 490 MB on disk, a sparse checkout about 365 MB'],
     ['fatal: something nobody predicted\nand a second line', {},
       'git failed: fatal: something nobody predicted'],
   ];
