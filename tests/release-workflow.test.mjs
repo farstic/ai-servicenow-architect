@@ -168,16 +168,19 @@ test('the walk counts real files, and a symlinked entry is not counted twice', (
 
 test('--table renders the columns docs/INSTALL.md quotes, with the file-bytes note', () => {
   const rows = [
-    { os: 'ubuntu-latest', docsBytes: 187 * 1024 * 1024, docsFiles: 34_360, docsSeconds: 25.3, depsBytes: 420 * 1024 * 1024, bootstrapSeconds: 61.2 },
-    { os: 'macos-latest', docsBytes: 187 * 1024 * 1024, docsFiles: 34_360, docsSeconds: 27.5, depsBytes: 420 * 1024 * 1024, bootstrapSeconds: 64.0 },
-    { os: 'windows-latest', docsBytes: 191 * 1024 * 1024, docsFiles: 34_360, docsSeconds: 35.1, depsBytes: 421 * 1024 * 1024, bootstrapSeconds: 80.4 },
+    { os: 'ubuntu-latest', docsBytes: 187_000_000, docsFiles: 34_360, docsSeconds: 25.3, depsBytes: 420_000_000, bootstrapSeconds: 61.2 },
+    { os: 'macos-latest', docsBytes: 187_000_000, docsFiles: 34_360, docsSeconds: 27.5, depsBytes: 420_000_000, bootstrapSeconds: 64.0 },
+    { os: 'windows-latest', docsBytes: 191_000_000, docsFiles: 34_360, docsSeconds: 35.1, depsBytes: 421_000_000, bootstrapSeconds: 80.4 },
   ];
   const md = table(rows);
-  assert.match(md, /^\| OS \| docs on disk \| docs files \| B02 time \| node_modules \| bootstrap total \|$/m);
+  // ARC-09-C259: the column is "docs working tree", the name of what it measures (the sum of the corpus's file sizes, as the
+  // bootstrap's `[docs]` line and `docs status` say), and not "docs on disk", which is the size `du` gives and docs-real quotes.
+  assert.match(md, /^\| OS \| docs working tree \| docs files \| B02 time \| node_modules \| bootstrap total \|$/m);
   assert.match(md, /^\| ubuntu-latest \| 187 MB \| 34360 \| 25\.3 s \| 420 MB \| 61\.2 s \|$/m);
   assert.equal((md.match(/^\| \w/gm) ?? []).length, 4, 'three rows and a header');
-  // The semantics ARC-06-S14's summary and the install page share: file bytes, not `du` blocks.
+  // The semantics ARC-06-S14's summary and the install page share: file bytes, not `du` blocks, in megabytes of 10^6 bytes.
   assert.match(md, /sum of file sizes/);
+  assert.match(md, /megabytes are 10\^6 bytes/);
 
   // The install page's band: the corpus is ~180 MB of working tree, and a row far outside that is
   // a measurement of something else.
@@ -188,7 +191,8 @@ test('seconds and megabytes round the way the page reads them', () => {
   assert.equal(seconds(25_349), 25.3);
   assert.equal(seconds(0), 0);
   assert.equal(seconds(undefined), null);
-  assert.equal(megabytes(187 * 1024 * 1024), 187);
+  assert.equal(megabytes(187_000_000), 187);
+  assert.equal(megabytes(1_500_000), 2, '1,500,000 bytes are 2 MB of 10^6 bytes, and 1 of 2^20');
 });
 
 // ── assert-assets ──────────────────────────────────────────────────────────────────────────────

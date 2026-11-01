@@ -319,6 +319,20 @@ test('the page stays a page, and the tail stays a tail', () => {
   assert.match(read(INSTALL), /measured\s+2026-10-30\s+by\s+`docs-real\.yml`/);
 });
 
+test('ARC-09-C259 — the page counts one megabyte: no units clause, and the transcript\'s [docs] line is the page\'s own working-tree figure', () => {
+  const page = read(INSTALL);
+  // The clause that said the bootstrap's `[docs]` line and install-metrics.md count 2^20-byte megabytes (the architect's ruling of 2026-10-30,
+  // ARC-09-C244) comes out with the row that gave the product one unit.
+  assert.doesNotMatch(page, /2\^20|Sizes here are decimal/);
+  // What the bootstrap prints is the page's own figure: the transcript is a real run's, and its `[docs]` line counts the working tree in the
+  // megabytes the corpus costs below it do.
+  const line = /^\[docs\] [\d,]+ files · (\d+) MB working tree$/m.exec(page);
+  assert.ok(line, 'the "What you will see" transcript has no `[docs] <files> files · <n> MB working tree` line');
+  const figure = /\*\*working tree\*\* is (\d+) MB on Linux/.exec(page.replace(/\s+/g, ' '));
+  assert.ok(figure, 'the corpus costs no longer give the working tree for Linux');
+  assert.equal(line[1], figure[1], 'the transcript and the corpus costs count the working tree in different megabytes');
+});
+
 test('the server package\'s generated tables are current too', () => {
   // A different document from this one — the server's own reference README — and the story's
   // "four table blocks" belong to it, not to the install page. Checked here because the two

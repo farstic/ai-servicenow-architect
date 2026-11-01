@@ -227,6 +227,25 @@ test('check 4 — disk, with the full corpus asking for more than the sparse one
   assert.equal(unmeasured.status, 'warn');
 });
 
+test('ARC-09-C259 — the disk check counts gigabytes of 10^9 bytes: the floors are 1 GB and 1.5 GB, and 12,000,000,000 free bytes read 12.0 GB', () => {
+  // The floors were 1 GiB and 1.5 GiB and the detail printed GiB as "GB", so a Mac with 11.2 GiB free said "11.2 GB" where the
+  // drive's own label says 12 GB. The refusal point moves with the unit, down by 6.9%, and the launchers hold the same bytes
+  // (tests/size-unit.test.mjs reads all three files).
+  const statfs = (free) => () => ({ bavail: free / 4096, bsize: 4096 });
+  assert.equal(DISK_SPARSE, 1_000_000_000);
+  assert.equal(DISK_FULL, 1_500_000_000);
+  const roomy = checkDisk({ root: '/r', docs: 'sparse', plat: 'darwin', statfs: statfs(12_000_000_000) });
+  assert.equal(roomy.status, 'ok');
+  assert.equal(roomy.detail, '12.0 GB free');
+  const tight = checkDisk({ root: '/r', docs: 'sparse', plat: 'darwin', statfs: statfs(900_000_000) });
+  assert.equal(tight.status, 'fail');
+  assert.equal(tight.detail, '0.9 GB free, 1.0 GB needed');
+  assert.match(tight.remedy, /free up 100 MB on \/r/);
+  // A fresh whole corpus: 1.4 GB is under its 1.5 GB floor, 1.6 GB is over it.
+  assert.equal(checkDisk({ root: '/r', docs: 'full', plat: 'darwin', hasCorpus: false, statfs: statfs(1_400_000_000) }).status, 'fail');
+  assert.equal(checkDisk({ root: '/r', docs: 'full', plat: 'darwin', hasCorpus: false, statfs: statfs(1_600_000_000) }).status, 'ok');
+});
+
 /**
  * ARC-09-C40 — the preflight probe retries, on the same schedule B02's checkout has had since
  * ARC-03-C1.
