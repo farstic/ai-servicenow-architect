@@ -196,7 +196,7 @@ test('ARC-08-C23 — B04 announces a size it measured, or no size at all', async
   printed.length = 0;
   await runB04(ctx({ steps: { B04: { data: { sizeBytes: 71_000_000 } } } }));
   const announced = printed.find((l) => l.startsWith('[B04/09]'));
-  assert.equal(announced, '[B04/09] deps … installing (npm ci, ~68 MB last time)');
+  assert.equal(announced, '[B04/09] deps … installing (npm ci, ~71 MB last time)');
 
   // A first install has nothing to quote, and says nothing rather than inventing a magnitude.
   printed.length = 0;

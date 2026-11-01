@@ -310,6 +310,9 @@ test('the page stays a page, and the tail stays a tail', () => {
   // 293 MB tree reads 279 there. Two lines say so, not the one the ruling allowed for: the paragraph's last line was full, so
   // any clause starts new lines, and the shortest that names the unit, both producers and the conversion takes two. They come
   // out with the 2.2.6 row that gives the product one unit. Nothing was deleted to pay for it.
+  // Back down to 317 and up to 319 again since ARC-09-C259, the row that gave the product one unit (moved into 2.2.5 by the owner's
+  // directive of 2026-11-01): the clause came out, and the transcript took the two lines of the docs step it lacked, the size line
+  // and the citations line, as a CI run's log prints them. The cap follows the page's real length both ways.
   assert.ok(install <= 319, `${install} lines of install page (criterion: 319)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
@@ -317,6 +320,20 @@ test('the page stays a page, and the tail stays a tail', () => {
   assert.match(read(INSTALL), /### What the corpus costs/);
   // ARC-09-C244 — the corpus costs are the whole corpus, measured by docs-real on all three platforms.
   assert.match(read(INSTALL), /measured\s+2026-10-30\s+by\s+`docs-real\.yml`/);
+});
+
+test('ARC-09-C259 — the page counts one megabyte: no units clause, and the transcript\'s [docs] line is the page\'s own working-tree figure', () => {
+  const page = read(INSTALL);
+  // The clause that said the bootstrap's `[docs]` line and install-metrics.md count 2^20-byte megabytes (the architect's ruling of 2026-10-30,
+  // ARC-09-C244) comes out with the row that gave the product one unit.
+  assert.doesNotMatch(page, /2\^20|Sizes here are decimal/);
+  // What the bootstrap prints is the page's own figure: the transcript is a real run's, and its `[docs]` line counts the working tree in the
+  // megabytes the corpus costs below it do.
+  const line = /^\[docs\] [\d,]+ files · (\d+) MB working tree$/m.exec(page);
+  assert.ok(line, 'the "What you will see" transcript has no `[docs] <files> files · <n> MB working tree` line');
+  const figure = /\*\*working tree\*\* is (\d+) MB on Linux/.exec(page.replace(/\s+/g, ' '));
+  assert.ok(figure, 'the corpus costs no longer give the working tree for Linux');
+  assert.equal(line[1], figure[1], 'the transcript and the corpus costs count the working tree in different megabytes');
 });
 
 test('the server package\'s generated tables are current too', () => {

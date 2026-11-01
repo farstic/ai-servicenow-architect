@@ -15,6 +15,7 @@ import { SPARSE, modeOf, recordedMode, sparseOf } from './shape.mjs';
 import { verifyCitations } from './verify.mjs';
 import { needSpell, spellings } from '../text.mjs';
 import { restoreRemedy } from '../licence/manifest.mjs';
+import { megabytes } from '../size.mjs';
 
 /**
  * The doctor's E-12 line, owned here and imported by ARC-08 — never retyped.
@@ -284,7 +285,7 @@ export function docsStatus({ root = process.cwd(), verify = true, measure: doMea
 
 const short = (sha) => (sha ? sha.slice(0, 7) : '—');
 const commas = (n) => (n === null ? '—' : n.toLocaleString('en-US'));
-const mb = (b) => (b === null ? '—' : `${Math.round(b / 1_000_000)} MB`);
+const mb = (b) => (b === null ? '—' : `${megabytes(b)} MB`);
 
 /**
  * The human screen, and the exit code that goes with it.

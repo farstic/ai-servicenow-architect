@@ -152,6 +152,12 @@ before it moves anything, and plans from the release it moves to.
   Read of the page is what grounds a claim. When one request fires several gateways, each Envelope has twelve pages of
   its own, not shared with another. The budget and the co-fire rule read the same in CLAUDE.md and in the six gateways
   (ARC-09-C256).
+- The bootstrap, the release's install-metrics table and the CI gates count one megabyte, 10^6 bytes, as the install page and
+  `./snowarch docs status` do. The bootstrap's `[docs]` line, which read 279 MB for the working tree the page calls 293 MB,
+  now reads 293 MB; the table's "docs on disk" column, which summed file sizes and not what the disk holds, is "docs working
+  tree"; and the footprint gate reads 16.0 MB where it read 15.3, with its limit of 80 unchanged. The bootstrap's disk check
+  counts the same way, so its floors move with the unit, 1 GiB → 1 GB and 1.5 GiB → 1.5 GB for a fresh whole corpus, and it
+  prints gigabytes of 10^9 bytes where it printed GiB as "GB" (ARC-09-C259).
 
 ### Added
 

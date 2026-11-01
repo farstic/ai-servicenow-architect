@@ -6,6 +6,7 @@
 // The du figure is printed alongside for context only; it is never the thing compared.
 import { readdirSync, statSync } from 'node:fs';
 import { existsSync, writeSync } from 'node:fs';
+import { MB } from '../../tools/snowarch/lib/size.mjs';
 
 const limitMb = Number(process.argv[2] ?? 80);
 const dir = process.argv[3] ?? 'node_modules';
@@ -22,7 +23,7 @@ let bytes = 0, files = 0;
     else { try { bytes += statSync(p).size; files++; } catch { /* vanished mid-walk */ } }
   }
 })(dir);
-const mb = bytes / 1048576;
+const mb = bytes / MB;
 writeSync(1, `node_modules: ${mb.toFixed(1)} MB (limit ${limitMb}) — summed file content, `
   + `${files} files\n`);
 if (mb > limitMb) {

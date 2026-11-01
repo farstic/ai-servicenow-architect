@@ -22,6 +22,7 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync, writeSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { megabytes } from '../../tools/snowarch/lib/size.mjs';
 
 const argv = process.argv.slice(2);
 const value = (n) => (argv.indexOf(n) === -1 ? undefined : argv[argv.indexOf(n) + 1]);
@@ -62,8 +63,8 @@ export function directorySize(dir) {
 /** Seconds, one decimal — the unit a reader compares against the install page. */
 export const seconds = (ms) => (Number.isFinite(ms) ? Math.round(ms / 100) / 10 : null);
 
-/** Megabytes, whole — the unit the page and ARC-06-S14's summary both use. */
-export const megabytes = (bytes) => Math.round(bytes / (1024 * 1024));
+/** Megabytes, whole — the unit the page and ARC-06-S14's summary both use, 10^6 bytes (ARC-09-C259: tools/snowarch/lib/size.mjs). */
+export { megabytes };
 
 /**
  * One machine's numbers, from the state file the bootstrap wrote and the tree it produced.
@@ -96,7 +97,7 @@ export function collect({ root = ROOT, os, node = process.version } = {}) {
 
 /** The markdown table `docs/INSTALL.md` links to. One row per machine, in the order given. */
 export function table(rows) {
-  const head = ['| OS | docs on disk | docs files | B02 time | node_modules | bootstrap total |',
+  const head = ['| OS | docs working tree | docs files | B02 time | node_modules | bootstrap total |',
     '|---|---|---|---|---|---|'];
   const body = rows.map((r) => `| ${r.os} | ${megabytes(r.docsBytes)} MB | ${r.docsFiles} `
     + `| ${r.docsSeconds ?? '—'} s | ${megabytes(r.depsBytes)} MB | ${r.bootstrapSeconds ?? '—'} s |`);
@@ -105,8 +106,9 @@ export function table(rows) {
     '',
     ...head, ...body,
     '',
-    '`docs on disk` and `node_modules` are the **sum of file sizes**, not `du`\'s allocated blocks —',
+    '`docs working tree` and `node_modules` are the **sum of file sizes**, not `du`\'s allocated blocks —',
     'about 3% smaller, and the only figure that means the same thing on all three platforms.',
+    'All megabytes are 10^6 bytes, the unit `docs status` and the install page use.',
     '',
   ].join('\n');
 }
