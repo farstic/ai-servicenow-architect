@@ -4,15 +4,16 @@
 // that does not. On a macOS runner the resolver hung on a name that never resolves until E-28's whole 15 s budget had gone, and the
 // doctor said the remote had not answered: a warning with a reason, but the wrong party.
 //
-// It runs in a short-lived child, `spawnSync(process.execPath, ['-e', <script>, <host>], { timeout })`, and for two reasons not in this
+// It runs in a short-lived child, `spawnSync(process.execPath, [<dns-lookup-child.mjs>, <host>], { timeout })`, and for two reasons not in this
 // process. An in-process `dns.lookup` that hangs cannot be cancelled and would keep the CLI alive after the doctor had printed (the CLI
 // ends with `process.exitCode`, never `process.exit()`); a child is killed at its budget, so nothing outlives the check. And c-ares
 // (`dns.Resolver`) does not have getaddrinfo's semantics: it does not read the hosts file, search domains or a macOS scoped resolver the
-// way git does, so it could call a resolver silent that git finds working. The host is the child's argument, never part of its script.
+// way git does, so it could call a resolver silent that git finds working. The host is the child's argument, never part of any code.
 //
 // Only a child that did not answer in its budget changes what E-28 says. An answer, with a host or with "no such host", and any other
 // failure, leave git to say what it says.
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import { TIMED_OUT } from './probe-net.mjs';
 
@@ -22,15 +23,15 @@ import { TIMED_OUT } from './probe-net.mjs';
  */
 export const DNS_BUDGET = 5_000;
 
-/** The child's whole program. The host is `process.argv[1]`: an argument, and never a part of this text. */
-const LOOKUP_SCRIPT = 'require("node:dns").lookup(process.argv[1], (e) => { if (e) console.log(e.code || "ERROR"); process.exit(e ? 1 : 0); });';
+/** The child's whole program, a file of its own: the host is its first argument, and never a part of any code. */
+const CHILD = fileURLToPath(new URL('./dns-lookup-child.mjs', import.meta.url));
 
 /**
  * Whether `host` resolves, within `timeoutMs`: `{ ok: true }`, `{ ok: false, timedOut: true }` when the child was killed for not answering,
- * or `{ ok: false, code }` with the resolver's own code (`ERROR` when it gave none). `spawn` and `script` are the tests' seams.
+ * or `{ ok: false, code }` with the resolver's own code (`ERROR` when it gave none). `spawn` and `child` are the tests' seams.
  */
-export function lookupHost(host, { timeoutMs = DNS_BUDGET, spawn = spawnSync, script = LOOKUP_SCRIPT } = {}) {
-  const r = spawn(process.execPath, ['-e', script, host],
+export function lookupHost(host, { timeoutMs = DNS_BUDGET, spawn = spawnSync, child = CHILD } = {}) {
+  const r = spawn(process.execPath, [child, host],
     { encoding: 'utf8', timeout: timeoutMs, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
   if (r.error?.code === TIMED_OUT || (r.signal && r.status === null)) return { ok: false, timedOut: true };
   if (r.status === 0) return { ok: true };
