@@ -830,20 +830,34 @@ const PROXY = 'http://proxy.example.invalid:3128';
  * git as E-28 asks it, answering by command: the origin's URL, the proxy settings (git exits 1 for a key that is not set, which
  * `execFileSync` raises), and the `ls-remote`, which `ls` decides. `calls` is every command, so a case can say what git was not asked.
  */
-function remoteGit({ url = ORIGIN, urlmatch = null, remoteProxy = null, ls }) {
+function remoteGit({ url = ORIGIN, urlmatch = null, sections = [], remoteProxy = null, ls }) {
   const calls = [];
   const unset = () => { throw Object.assign(new Error('git config: the key is not set'), { status: 1, stdout: '', stderr: '' }); };
   const exec = (_cmd, args) => {
     calls.push(args.join(' '));
     if (args.includes('get-url')) return url === null ? '' : `${url}\n`;
-    if (args.includes('--get-urlmatch')) return urlmatch ?? unset();
+    if (args.includes('--get-urlmatch')) {
+      // `urlmatch` answers whatever is asked; `sections` answer the way git matches the URL it is asked about.
+      const hit = sections.find((s) => urlmatches(s.url, args.at(-1)));
+      return hit ? hit.proxy : (urlmatch ?? unset());
+    }
     if (args.includes('--get')) return remoteProxy ?? unset();
     if (args.includes('ls-remote')) return ls();
     if (args.includes('rev-parse')) return 'abc1234\n';
     return '';
   };
-  return { exec, asked: (word) => calls.filter((c) => c.includes(word)) };
+  return { exec, asked: (word) => calls.filter((c) => c.includes(word)), all: () => [...calls] };
 }
+/**
+ * Whether the `http.<url>.proxy` section for `section` matches `asked`, by the rules git documents (git-config, "http.<url>.*"): scheme,
+ * host and port equal, the section's path a prefix of the URL's, and the user compared only when the section names one, in which case it
+ * must be the URL's own. A section with no user matches a URL with any user, or none.
+ */
+const urlmatches = (section, asked) => {
+  const s = new URL(section);
+  const a = new URL(asked);
+  return s.protocol === a.protocol && s.host === a.host && (s.username === '' || s.username === a.username) && a.pathname.startsWith(s.pathname);
+};
 const gitFails = (stderr) => () => { throw Object.assign(new Error('git failed'), { status: 128, stderr }); };
 const remoteSilent = (code) => () => { throw Object.assign(new Error('git failed'), { code, signal: 'SIGTERM', status: null, stderr: '' }); };
 /** A lookup that answers `answer`, and a record of what it was asked. */
@@ -930,6 +944,57 @@ test('ARC-09-C261 — the lookup is left out, and E-28 goes straight to git, whe
   const dns = resolver({ ok: true });
   await e28Against(t, { git, lookup: dns.lookup });
   assert.deepEqual(dns.seen.map((s) => s.host), [ORIGIN_HOST]);
+});
+
+test('ARC-09-C261 — no credential of the origin reaches a command line: git is asked about the URL without user, password, query and fragment', async (t) => {
+  // Another local user reads any argv in `ps`, even for the milliseconds a git child lives (ARC-09-C240: a URL's credentials are never
+  // exposed). The secrets are made up; the origin is written the three ways a credential rides in a URL.
+  const tags = lsRemote(['v9.1.0']);
+  const origins = [
+    'https://alice:s3cret@git.example.invalid/fixture.git',
+    'https://tok-example-0123@git.example.invalid/fixture.git',
+    'https://git.example.invalid/fixture.git?access_token=tok-example-0123#frag',
+  ];
+  for (const url of origins) {
+    const git = remoteGit({ url, ls: () => tags });
+    const dns = resolver({ ok: true });
+    await e28Against(t, { git, lookup: dns.lookup });
+    for (const call of git.all()) assert.doesNotMatch(call, /alice|s3cret|tok-example|access_token|frag|[@?#]/, `${url}: a command line carries it: ${call}`);
+    assert.deepEqual(git.asked('--get-urlmatch'), [`config --get-urlmatch http.proxy ${ORIGIN}`], url);
+    assert.deepEqual(dns.seen.map((s) => s.host), [ORIGIN_HOST], url);
+  }
+});
+
+test('ARC-09-C261 — a proxy section that names no user still skips the lookup, whichever user the origin names', async (t) => {
+  const git = remoteGit({ url: 'https://alice@git.example.invalid/fixture.git', sections: [{ url: 'https://git.example.invalid/', proxy: PROXY }],
+    ls: () => lsRemote(['v9.1.0']) });
+  const dns = resolver({ ok: false, timedOut: true });
+  const { result } = await e28Against(t, { git, lookup: dns.lookup });
+  assert.deepEqual(dns.seen, [], 'the lookup ran although the proxy section for this host names no user');
+  assert.equal(git.asked('ls-remote').length, 1);
+  assert.doesNotMatch(String(result.detail), /^DNS did not answer/, result.detail);
+});
+
+test('ARC-09-C261 — the documented miss: a proxy section pinned to a user is not matched, the lookup runs, and a silent resolver ends in the DNS warning, never in a crash', async (t) => {
+  // The URL git is asked about carries no user (the case above), so `http.<alice@url>.proxy` cannot match it: one more lookup, and the
+  // worst case is a warning whose text already names the proxy settings.
+  const git = remoteGit({ url: 'https://alice@git.example.invalid/fixture.git', sections: [{ url: 'https://alice@git.example.invalid/', proxy: PROXY }],
+    ls: () => lsRemote(['v9.1.0']) });
+  const dns = resolver({ ok: false, timedOut: true });
+  const { result } = await e28Against(t, { git, lookup: dns.lookup });
+  assert.equal(result.status, 'warn', result.detail);
+  assert.equal(result.detail, DNS_SILENT(ORIGIN_HOST));
+  assert.match(result.detail, /http\.proxy/, 'the warning no longer names the proxy settings');
+  assert.deepEqual(dns.seen, [{ host: ORIGIN_HOST, options: { timeoutMs: 5_000 } }]);
+  assert.deepEqual(git.asked('ls-remote'), []);
+});
+
+test('ARC-09-C261 — the host given to the lookup is the bare host name: no user, no password, no port, no path, in lower case', async (t) => {
+  const git = remoteGit({ url: 'https://Alice:s3cret@Git.Example.INVALID:8443/org/repo.git', ls: () => lsRemote(['v9.1.0']) });
+  const dns = resolver({ ok: true });
+  await e28Against(t, { git, lookup: dns.lookup });
+  assert.deepEqual(dns.seen, [{ host: ORIGIN_HOST, options: { timeoutMs: 5_000 } }]);
+  assert.doesNotMatch(dns.seen[0].host, /[@:/]/);
 });
 
 test('ARC-09-C261 — mutation control: with the lookup step turned off, a silent resolver reads as a silent remote again', async (t) => {
