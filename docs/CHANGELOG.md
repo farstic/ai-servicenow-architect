@@ -100,6 +100,9 @@ before it moves anything, and plans from the release it moves to.
   company, in the one list the reader has to read. The list now looks past a sentence-initial "The" to find a product
   name, so "The Architect", "The Now Assist" and "The Service Desk" are not items and "The Hague" still is. What the
   masker hides is unchanged (ARC-09-C257).
+- The out-of-disk message of a failed documentation sync now says what the documentation takes (about 490 MB on disk, a sparse
+  checkout about 365 MB), and the one for a failed npm install says what the dependencies take (about 16 MB). Both read "need
+  ~400 MB free (~700 MB for --mode full)", which named a flag the bootstrap does not have (ARC-09-C260).
 
 ### Changed
 
