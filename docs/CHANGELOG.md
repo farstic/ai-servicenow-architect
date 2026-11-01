@@ -141,8 +141,12 @@ before it moves anything, and plans from the release it moves to.
   in the reply; the copy is what you send, so it is in the reply, as the masker printed it (ARC-09-C252).
 - `/snowarch finding` now also writes the masked copy to a file beside your note, `<note>.masked.txt`, and tells you to
   send that file, never the note. Copying the text out of the Claude Code window lost characters twice in testing. The
-  file holds the masked text and nothing else, and is replaced each time you run it; when the file cannot be written, the
-  last line of the reply says so, and the text above it is then the only copy (ARC-09-C258).
+  file holds the masked text and nothing else, and is replaced each time you run it. The file's name travels with it, so
+  the note's name is masked like the text: a note named for the client, an alias or a record number gets no copy, and the
+  last line of the reply says so without repeating the name; the Architect names a note for the problem, and
+  `--next-name` refuses a slug that holds the engagement's name or an alias. When the file cannot be written, the last
+  line says so: the text above it is then the only current copy, and an older copy beside the note, which is left as it
+  was, is out of date (ARC-09-C258).
 - The Architect's default budget for grounding an Envelope is twelve corpus pages, not eight, and while pages remain
   in it, the Architect opens a construct's page before it calls the construct unverified. A Grep line finds a page; a
   Read of the page is what grounds a claim. When one request fires several gateways, each Envelope has twelve pages of
