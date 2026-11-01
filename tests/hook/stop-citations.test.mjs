@@ -165,16 +165,25 @@ test('ARC-09-C254 — a folder, a placeholder and a bare area are no page', asyn
 // not push a "Correction:" line after it. The paths inside the finder's printed copy are not checked. The copy is found by its own
 // structure, from its header line to the end of its "Read before sending:" list, not by reading the transcript: the hook has the reply,
 // a transcript may not exist (a session that keeps none), and the structure is the finder's own output, run here through the real
-// `renderFinding` so that a change to it breaks this file and not a user's turn.
+// `renderFinding` so that a change to it breaks this file and not a user's turn. ARC-09-C258 ends the finder's output with one more
+// paragraph, where the masked copy was written or that it was not: it lies after the list, so outside the copy, and holds no corpus path.
 const NOTE = (path) => `The Architect cited ${path} in a design note, and the page is not there.`;
-const SEND = 'Send the text above to the person who issued your licence.';
+const SEND = 'Send that file to the person who issued your licence, never the note; copying from this window can lose characters.';
+const FILE_LINE = 'Masked copy written beside the note as 2026-10-29-dead-citation.masked.txt: the text above and nothing else.';
+const NOT_WRITTEN = 'Masked copy NOT written (EACCES): the text above is the only copy. Do not send the note.';
+// ...and the other two ways it can end: beside an older copy, and with a note whose name the masker changes (it echoes no name).
+const NOT_WRITTEN_OLDER = 'Masked copy NOT written (ENOSPC): the text above is the only current copy, and the older 2026-10-29-dead-citation.masked.txt '
+  + 'beside the note is out of date. Do not send it or the note.';
+const NOT_WRITTEN_NAME = 'Masked copy NOT written: the note\'s name holds a name the masker masks, and the file\'s name would show it. '
+  + 'Rename the note without it and run again. Do not send the note.';
 const HEADERS = [
   ['store read, credentials read', { storeRead: true, credentialsRead: true }],
   ['store read, credentials not read', { storeRead: true, credentialsRead: false }],
   ['store not read, credentials read', { storeRead: false, credentialsRead: true }],
   ['neither read', { storeRead: false, credentialsRead: false }],
 ];
-const copyOf = (note, flags = HEADERS[3][1]) => renderFinding(note, { engagement: 'acme-bank', aliases: [], labels: [], storeUrls: [], usernames: [] }, flags);
+/** The finder's whole output, last paragraph included; with an empty `line`, only what it printed up to the end of its review list. */
+const copyOf = (note, flags = HEADERS[3][1], line = FILE_LINE) => renderFinding(note, { engagement: 'acme-bank', aliases: [], labels: [], storeUrls: [], usernames: [] }, flags, line);
 const SAVED = 'The note is saved at clients/acme-bank/findings/2026-10-29-dead-citation.md.';
 
 test('ARC-09-C254 — a finding\'s printed copy that quotes a dead path is left alone, in each of the finder\'s four headers, and costs no lookup', async (t) => {
@@ -190,6 +199,22 @@ test('ARC-09-C254 — a finding\'s printed copy that quotes a dead path is left 
   assert.equal(reads, 0, 'a path that stands only inside the copy needs no look at the corpus');
 });
 
+test('ARC-09-C258 — the finder\'s last line, the file it wrote or the copy it could not write, is no part of the copy and costs no correction', async (t) => {
+  const root = project(t);
+  let reads = 0;
+  const load = (corpus) => { reads += 1; return loadIndex(corpus); };
+  for (const [why, flags] of HEADERS) {
+    for (const line of [FILE_LINE, NOT_WRITTEN, NOT_WRITTEN_OLDER, NOT_WRITTEN_NAME]) {
+      const out = copyOf(NOTE(DEAD), flags, line);
+      assert.ok(out.endsWith(`\n\n${line}\n`), `${why}: the finder's own output does not end with its last line, so this test would prove nothing`);
+      assert.deepEqual(await report(stopping(`${SAVED}\n\n${out}\n${SEND}`), { root, load }), SILENT, `${why}: ${line.slice(0, 24)}`);
+    }
+  }
+  assert.equal(reads, 0, 'a last line that names a file needs no look at the corpus');
+  // The line is not what is exempt: a dead path written on the line after it is still sent back.
+  assert.deepEqual(await report(stopping(`${copyOf(NOTE(DEAD))}See also ${DEAD}.`), { root }), block(ONE(DEAD, REAL)));
+});
+
 test('ARC-09-C254 — the same dead path in an ordinary reply still sends it back', async (t) => {
   const root = project(t);
   assert.deepEqual(await report(stopping(NOTE(DEAD)), { root }), block(ONE(DEAD, REAL)));
@@ -200,10 +225,12 @@ test('ARC-09-C254 — in a finding turn, a dead path written outside the copy is
   const root = project(t);
   const other = 'markdown/australia/alpha/page-one.md';
   const copy = copyOf(NOTE(DEAD));
+  const list = copyOf(NOTE(DEAD), undefined, '');
   for (const [why, message, expected] of [
     ['before the copy', `The Architect also cited ${DEAD} earlier.\n\n${copy}\n${SEND}`, block(ONE(DEAD, REAL))],
     ['after the copy, with a blank line', `${copy}\nSee also ${DEAD}.`, block(ONE(DEAD, REAL))],
-    ['on the line right after the copy\'s last item', `${copy.trimEnd()}\nSee also ${DEAD}.`, block(ONE(DEAD, REAL))],
+    ['on the line right after the finder\'s last line', `${copy.trimEnd()}\nSee also ${DEAD}.`, block(ONE(DEAD, REAL))],
+    ['on the line right after the review list\'s last item', `${list.trimEnd()}\nSee also ${DEAD}.`, block(ONE(DEAD, REAL))],
     ['another dead path outside, the quoted one inside', `Also ${other}.\n\n${copy}\n${SEND}`, block(ONE(other, 'markdown/alpha/page-one.md'))],
   ]) assert.deepEqual(await report(stopping(message), { root }), expected, why);
 });
@@ -227,7 +254,7 @@ test('ARC-09-C254 — a copy with Windows line endings, or indented, is still th
 
 test('ARC-09-C254 — the review list is part of the copy: an item that names a path is not checked either', async (t) => {
   const root = project(t);
-  const copy = copyOf(NOTE(DEAD));
+  const copy = copyOf(NOTE(DEAD), undefined, '');
   const withItem = `${copy.trimEnd()}\n- check ${DEAD} against the page the user saw\n`;
   assert.deepEqual(await report(stopping(`${withItem}\n${SEND}`), { root }), SILENT);
 });

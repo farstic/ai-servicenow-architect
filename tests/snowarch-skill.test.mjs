@@ -64,6 +64,12 @@ const NAME = 'a common word is named only as the engagement not to use, and the 
 // ARC-09-C252 (a), ruled by the architect on 2026-10-29: T-37 turn 3 found the copy fenced after a sentence of prose (develop, 0 of 2) and, once,
 // not printed at all ('its output is above'). The copy is what the user sends, so it goes in the reply itself.
 const COPY = 'the finding flow prints the masker\'s output in the reply itself, as plain text with no code fence';
+// ARC-09-C258, ruled by the architect on 2026-11-01: copying the printed text out of the Claude Code window lost characters twice, so the
+// finder also writes the masked copy to a file beside the note, and the user sends that file, never the note. When it could not write the
+// file its last line says so, and the closing sentence is that line, not a sentence about a file that is not there.
+const FILE = 'the finding flow says the copy is a file beside the note, prints its last line, and sends that file, never the note';
+/** A text with its spaces read as any whitespace: the skill and the guide wrap their lines, and a negative must find the words wherever they wrap. */
+const loose = (words) => new RegExp(words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
 
 const frontmatterOf = (text) => {
   const m = /^---\n([\s\S]*?)\n---\n/.exec(text);
@@ -232,7 +238,7 @@ const CHECKS = {
     const section = t.slice(at, end < 0 ? undefined : end);
     assert.match(section, /node tools\/snowarch\/lib\/finding\.mjs --next-name/);
     assert.match(section, /Print its output verbatim/);
-    assert.match(section, /Send the text above to the person who issued your licence\./);
+    assert.match(flat(section), /Send that file to the person who issued your licence, never the note/);
     assert.match(section, /`_unfiled`/, 'the section does not say that a finding never goes under `_unfiled`');
   },
 
@@ -290,6 +296,32 @@ const CHECKS = {
       assert.ok(step.includes(phrase), `step 5 of the finding flow lacks: ${phrase}`);
     }
   },
+
+  [FILE]: (t, { guide = GUIDE } = {}) => {
+    const section = flat(sectionOf(t, 'finding'));
+    const opening = section.slice(0, section.indexOf(' 1. '));
+    assert.ok(opening.includes('prints a masked copy and writes it to a file beside the note, for the user to send'),
+      'the opening does not say the copy is also written to a file beside the note');
+    // The architect's finding on the PR: the file's name travels with the file and is made from the slug, so the slug names the problem.
+    const four = section.match(/ 4\. Run .*?(?= 5\. )/)?.[0] ?? '';
+    assert.ok(four.includes('with a slug that names the problem, never the client, a person, a place or a system, because the file the user sends is named from it'),
+      'step 4 does not say what the slug may name, and why');
+    const five = section.match(/ 5\. Run .*?(?= 6\. )/)?.[0] ?? '';
+    assert.ok(five.includes('the "Read before sending" list and the last line, which names the masked copy\'s file or says it was not written, as plain text'),
+      'step 5 does not have the last line printed, whether it names the file or says it was not written');
+    assert.ok(five.includes('The tool also writes that file, beside the note.'), 'step 5 does not say the tool writes the file');
+    const six = section.match(/ 6\. Close with: .*?(?= The masker cannot know)/)?.[0] ?? '';
+    assert.ok(six.includes('Send that file to the person who issued your licence, never the note; copying from this window can lose characters.'),
+      'step 6 does not send the file and never the note');
+    assert.ok(six.includes('When the last line says the copy was NOT written, there is no current file: close with that line instead.'),
+      'step 6 has no closing for a copy that was not written');
+    const item = paragraphWith(guide, 'asks which engagement the finding belongs to');
+    assert.ok(item.includes('prints a masked copy and writes it, and nothing else, to `clients/<engagement>/findings/<note>.masked.txt` beside your note'),
+      'the user guide does not say where the copy is written');
+    assert.ok(paragraphWith(guide, 'Before you send it, read the **Read before sending** list')
+      .includes('Then send that file, not your note, to the person who issued your licence; copying out of the window can lose characters.'),
+    'the user guide does not say to send the file and not the note');
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -316,7 +348,7 @@ const NEGATIVES = [
   ['a write grant scoped to the findings folder is added', 'allowed-tools is EXACTLY the eleven entries, in order',
     (t) => t.replace(/^(allowed-tools: .*)$/m, '$1, Edit(clients/*/findings/*.md)')],
   ['the finding section loses the closing sentence', 'the finding section asks for the engagement, prints the masker verbatim, and sends nothing',
-    (t) => t.replace('Send the text above to the person who issued your licence.', 'Send the text above.')],
+    (t) => t.replace(loose('Send that file to the person who issued your licence, never the note; copying from this window can lose characters.'), 'Send the text above.')],
   // ARC-09-C243: each of these breaks the file in one way, and the matching check has to notice.
   ['status says finding again', STATUS, (t) => t.replace('report it as a failed check', 'report it as a finding')],
   ['status brings the findings back in the plural', STATUS,
@@ -347,6 +379,22 @@ const NEGATIVES = [
   ['step 5 allows a code fence', COPY, (t) => t.replace(/as plain\s+text, with no code fence/, 'in a code fence')],
   ['step 5 lets the reply point to the output', COPY, (t) => t.replace(' and no "the output is above"', '')],
   ['step 5 loses the reason', COPY, (t) => t.replace(/: the tool result\s+is not what the user reads/, '')],
+  // ARC-09-C258: each way the file can drop out of the flow, and each has to be noticed
+  ['the opening forgets the file', FILE, (t) => t.replace(loose('and writes it to a file beside the note, '), '')],
+  ['step 5 stops printing the last line', FILE,
+    (t) => t.replace(loose('the "Read before sending" list and the last line, which names the masked copy\'s file or says it was not written, as plain text'),
+      'the "Read before sending" list as plain text')],
+  ['step 5 says nothing of the file the tool writes', FILE, (t) => t.replace(loose(' The tool also writes that file, beside the note.'), '')],
+  ['step 6 sends the text again', FILE,
+    (t) => t.replace(loose('Send that file to the person who issued your licence, never the note; copying from this window can lose characters.'),
+      'Send the text above to the person who issued your licence.')],
+  ['step 6 drops "never the note"', FILE, (t) => t.replace(loose('licence, never the note; copying'), 'licence; copying')],
+  ['step 6 loses the closing for a copy that was not written', FILE,
+    (t) => t.replace(loose(' When the last line says the copy was NOT written, there is no current file: close with that line instead.'), '')],
+  ['step 6 says there is no file when an older one may be there', FILE,
+    (t) => t.replace(loose('there is no current file:'), 'there is no file:')],
+  ['step 4 stops saying what the slug may name', FILE,
+    (t) => t.replace(loose('with a slug that names the problem, never the client, a person, a place or a system, because the file the user sends is named from it, '), '')],
 ];
 
 for (const [title, checkName, breakIt] of NEGATIVES) {
@@ -381,6 +429,12 @@ const OTHER = [
   // ARC-09-C251: the guide says, as the skill does, that a name of four letters or more masks the words it begins
   ['the guide drops the four-letter clause', (o) => CHECKS[NAME](doc, o),
     { guide: GUIDE.replace(/,\s+and,\s+when\s+the\s+name\s+has\s+four\s+letters\s+or\s+more,\s+any\s+word\s+that\s+begins\s+with\s+it/, '') }],
+  // ARC-09-C258: the guide says where the copy is written, and to send that file and not the note
+  ['the guide forgets the file', (o) => CHECKS[FILE](doc, o),
+    { guide: GUIDE.replace(loose('and writes it, and nothing else, to `clients/<engagement>/findings/<note>.masked.txt` beside your note'), '') }],
+  ['the guide sends the text again', (o) => CHECKS[FILE](doc, o),
+    { guide: GUIDE.replace(loose('Then send that file, not your note, to the person who issued your licence; copying out of the window can lose characters.'),
+      'Then send the text to the person who issued your licence.') }],
   ['the guide drops item 4\'s caveat', (o) => CHECKS[NAME](doc, o),
     { guide: GUIDE.replace(' Its first line says when it\n   could not read your instance store or its credentials: then it may not have masked them.', '') }],
   ['the guide suggests another name', (o) => CHECKS[NAME](doc, o),

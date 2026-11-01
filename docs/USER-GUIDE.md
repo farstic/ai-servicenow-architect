@@ -116,15 +116,17 @@ contradicts the documentation), type `/snowarch finding` and describe it. The en
    `clients/<engagement>/findings/aliases.txt`;
 3. writes your note to `clients/<engagement>/findings/`, which stays on your machine, because git ignores
    `clients/`;
-4. prints a masked copy. Instance names and URLs, sys_ids, record numbers, e-mail addresses, IP addresses and home
-   folders become placeholders such as `<instance-url-1>` and `<record>`, and so do credentials in their usual forms
+4. prints a masked copy and writes it, and nothing else, to `clients/<engagement>/findings/<note>.masked.txt` beside
+   your note. Instance names and URLs, sys_ids, record numbers, e-mail addresses, IP addresses and home folders
+   become placeholders such as `<instance-url-1>` and `<record>`, and so do credentials in their usual forms
    (key: value or key=value, user:password in a URL or after -u, Basic and Bearer tokens, known token prefixes),
    your instance's stored username and password, and the client names you gave it. Its first line says when it
    could not read your instance store or its credentials: then it may not have masked them.
 
 Before you send it, read the **Read before sending** list at its end. No rule knows people's names, places, company
 names or abbreviations you did not give it, ticket keys from other systems, a credential written in plain words, or
-record numbers with fewer than 6 digits. Then send the text to the person who issued your licence.
+record numbers with fewer than 6 digits. Then send that file, not your note, to the person who issued your licence;
+copying out of the window can lose characters.
 
 ---
 
