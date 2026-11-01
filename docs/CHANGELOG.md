@@ -30,6 +30,8 @@ before it moves anything, and plans from the release it moves to.
 
 ### Fixed
 
+- The doctor's release-currency check (E-28) now says when the machine's DNS did not answer for the remote's name within 5 s, where
+  it said the remote did not answer within 15 s; a name that does not resolve reads as before (ARC-09-C261).
 - `./snowarch doctor --json` left a second instance address unmasked: where one value named two instances, or the same
   instance twice, only the first became `<host>`, and the rest stayed in the text a user pastes into an issue. Every
   ServiceNow-hosted instance URL in the output is masked now (ARC-09-C227).
