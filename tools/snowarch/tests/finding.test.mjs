@@ -529,13 +529,13 @@ test('ARC-09-C242 — the script end to end: a finding under any engagement prin
     return out;
   };
   for (const engagement of ['beta-corp', 'zqx']) {
-    const reply = await run(engagement);
-    // ARC-09-C258: the last paragraph is the one place the engagement's folder is named, as the path of the file to send; the file
-    // itself holds the masked text only, and everything above that paragraph still prints no name.
-    const at = reply.lastIndexOf('\nMasked copy ');
-    const out = reply.slice(0, at);
-    assert.equal(reply.slice(at + 1), `Masked copy written to clients/${engagement}/findings/2026-10-28-note.masked.txt: the text above and nothing else.\n`);
+    const out = await run(engagement);
     assert.deepEqual(printed(out, ['zqx', 'betacorp', 'beta-corp']), [], `a name was printed under ${engagement}:\n${out}`);
+    // ARC-09-C258, the architect's ruling of 2026-11-01: the window's output is what a user copies, so the whole of it, the last
+    // paragraph included, names no engagement or store, and a carve-out for that paragraph would be a weaker guard. It names the
+    // file by its name beside the note, and that name has passed the masker (a name it masks gets no copy).
+    assert.ok(out.endsWith('\nMasked copy written beside the note as 2026-10-28-note.masked.txt: the text above and nothing else.\n'),
+      `the last paragraph is not the one ruled, under ${engagement}:\n${out}`);
     // The warning describes the masking, which reads every instance, so both engagements get it.
     assert.ok(out.split('\n').includes(SHORT_NAME), `no warning under ${engagement}:\n${out}`);
   }
@@ -649,14 +649,18 @@ test('ARC-09-C257 — the review list does not name the product: "The Architect 
 // masked text and nothing else: the block between the reply's two blank lines. Its name is made from the validated note's, so
 // no argument can point the write anywhere else, and a refused path leaves nothing behind. The architect's three hardenings
 // (2026-11-01) are tests below: the temporary file (its folder, its name, its mode, its removal on every failure), a symlinked
-// findings folder with a mutation control, and the Windows cells, which run every test here except the three that need a symlink.
+// findings folder with a mutation control, and the Windows cells, which run every test here except those that need a symlink or
+// a read-only folder. His review of the PR added three: the last line names no engagement, the file's name is itself masked (it
+// travels with the file, so a note named for the client gets no copy), and a failed write beside an older copy says so.
 
 const LIB = join(dirname(fileURLToPath(import.meta.url)), '..', 'lib');
 const FINDINGS = (root) => join(root, 'clients', 'acme-bank', 'findings');
 const NOTE_REL = 'clients/acme-bank/findings/2026-10-23-slow-list.md';
 const COPY_REL = 'clients/acme-bank/findings/2026-10-23-slow-list.masked.txt';
-const WRITTEN = `Masked copy written to ${COPY_REL}: the text above and nothing else.`;
+const WRITTEN = 'Masked copy written beside the note as 2026-10-23-slow-list.masked.txt: the text above and nothing else.';
 const NOT_WRITTEN = /^Masked copy NOT written \([A-Z]+\): the text above is the only copy\. Do not send the note\.$/;
+const NAME_LEAK = 'Masked copy NOT written: the note\'s name holds a name the masker masks, and the file\'s name would show it. '
+  + 'Rename the note without it and run again. Do not send the note.';
 const NO_STORE = { engagement: 'acme-bank', aliases: [], labels: [], storeUrls: [], usernames: [] };
 const POSIX_ONLY = { skip: process.platform === 'win32' ? 'a symlink needs elevation on Windows, and a file mode means nothing there' : false };
 const NOT_ROOT = { skip: process.platform === 'win32' || process.getuid?.() === 0 ? 'a folder mode stops nobody on Windows, or root' : false };
@@ -824,7 +828,7 @@ test('ARC-09-C258 — the copy goes through a temporary file in the note\'s own 
     modes.push(fstatSync(fd).mode & 0o777);
     writeFileSync(fd, text);
   };
-  for (let i = 0; i < 2; i += 1) assert.match(writeMaskedCopy(target, 'masked\n', { write: spy }), /^Masked copy written to /);
+  for (let i = 0; i < 2; i += 1) assert.match(writeMaskedCopy(target, 'masked\n', { write: spy }), /^Masked copy written beside the note as /);
   assert.deepEqual(seen.map((names) => names.length), [1, 1], `a write has one temporary file, in the note's folder: ${JSON.stringify(seen)}`);
   for (const [name] of seen) assert.match(name, /^2026-10-23-slow-list\.masked\.txt\.[0-9a-f]{12}\.tmp$/);
   assert.notEqual(seen[0][0], seen[1][0], 'the temporary name is not random');
@@ -877,19 +881,115 @@ test('ARC-09-C258 — a symlink on the way to the note, its folder or the note i
   assert.deepEqual(tree(own), before, 'a copy was made of what a symlinked note points at');
 });
 
-test('ARC-09-C258 — mutation control: with the folder check removed, the same run writes into the folder outside', POSIX_ONLY, async (t) => {
-  // The test above is only worth its name if it can fail. This runs the finder with its realpath comparison turned into `if (false)`.
-  const source = readFileSync(join(LIB, 'finding.mjs'), 'utf8');
-  const mutated = source.replace(/if \(realpathSync\(path\) !== [^\n]*\) \{/, 'if (false) {')
+/**
+ * The finder's source with `mutate` applied and its relative imports made absolute, loaded as a module of its own: a mutation
+ * control runs the real code with one check turned off. `marker` is the text the mutation leaves, so a control whose target has
+ * moved fails loudly and cannot pass for the wrong reason.
+ */
+async function loadMutant(t, mutate, marker) {
+  const mutated = mutate(readFileSync(join(LIB, 'finding.mjs'), 'utf8'))
     .replace(/from '\.\/([a-z-]+\.mjs)'/g, (_, file) => `from '${pathToFileURL(join(LIB, file)).href}'`);
-  assert.ok(mutated.includes('if (false) {'), 'the mutation did not apply: the realpath comparison is not where this control looks for it');
+  assert.ok(mutated.includes(marker), `the mutation did not apply: the code this control turns off is not where it looks (${marker})`);
   const file = join(tempDir('c258-mutant-', t), 'finding-mutant.mjs');
   writeFileSync(file, mutated);
-  const { main } = await import(pathToFileURL(file).href);
+  return import(pathToFileURL(file).href);
+}
+
+test('ARC-09-C258 — mutation control: with the folder check removed, the same run writes into the folder outside', POSIX_ONLY, async (t) => {
+  // The test above is only worth its name if it can fail. This runs the finder with its realpath comparison turned into `if (false)`.
+  const { main } = await loadMutant(t, (s) => s.replace(/if \(realpathSync\(path\) !== [^\n]*\) \{/, 'if (false) {'), 'if (false) {');
   const { root, outside } = symlinkedFolder(t);
   let out = '';
   const code = await main([FOLDER_NOTE], { root, env: {}, out: { write: (s) => { out += s; } } });
   assert.equal(code, 0, out);
   assert.ok(readdirSync(outside).includes('note.masked.txt'),
     'the finder without its folder check wrote nothing outside: the test above cannot tell that check from none');
+});
+
+// ── the file's name travels with the file (the architect's finding on the PR, 2026-11-01) ────────────────────────────
+//
+// The copy is a file the user sends, so its name goes with it, and the name is made from the note's slug, which is only checked for
+// its format. `2026-11-01-acme-sla-breach.md` would give an attachment called `2026-11-01-acme-sla-breach.masked.txt`. So the finder
+// masks the note's name with the values it masks the text with, and a name the masker changes gets no copy.
+
+/** A note in the checkout's findings folder, with the engagement's alias file in place. */
+function leakyCheckout(t) {
+  const root = checkout(t, 'unused');
+  writeFileSync(join(FINDINGS(root), 'aliases.txt'), 'Contoso Holdings\n');
+  return root;
+}
+
+test('ARC-09-C258 — a note whose name holds the engagement\'s name, an alias or a record number gets no copy, and the line does not echo the name', async (t) => {
+  const root = leakyCheckout(t);
+  for (const slug of ['acme-bank-sla-breach', 'contoso-holdings-outage', 'inc0010001-wrong-group']) {
+    const name = `2026-11-01-${slug}.md`;
+    writeFileSync(join(FINDINGS(root), name), 'The list for INC0010002 never loaded.\n');
+    const { code, out } = await runFinder(root, [`clients/acme-bank/findings/${name}`]);
+    assert.equal(code, 0, `${slug}: ${out}`);
+    assert.equal(linesOf(out).at(-1), NAME_LEAK, `${slug}: the last line is not the one ruled`);
+    assert.ok(!out.includes(slug), `${slug}: the reply echoes the name`);
+    assert.ok(out.includes('The list for <record> never loaded.') && out.includes('Read before sending:'), `${slug}: the masked text is no longer printed`);
+    assert.deepEqual(tree(FINDINGS(root)).filter((n) => /\.masked\.txt|\.tmp$/.test(n)), [], `${slug}: something was written beside the note`);
+    rmSync(join(FINDINGS(root), name));
+  }
+  // A slug that names the problem is copied, with the alias file in place and the engagement named in the folder.
+  writeFileSync(join(FINDINGS(root), '2026-11-01-wrong-group.md'), 'The list for INC0010002 never loaded.\n');
+  const clean = await runFinder(root, ['clients/acme-bank/findings/2026-11-01-wrong-group.md']);
+  assert.equal(linesOf(clean.out).at(-1), 'Masked copy written beside the note as 2026-11-01-wrong-group.masked.txt: the text above and nothing else.');
+  assert.ok(existsSync(join(FINDINGS(root), '2026-11-01-wrong-group.masked.txt')));
+});
+
+test('ARC-09-C258 — the store\'s own names are masked in the note\'s name too: a slug that holds an instance label gets no copy', async (t) => {
+  const { main } = await finding();
+  const root = checkout(t, 'unused');
+  const name = '2026-11-01-beta-corp-prod-outage';
+  writeFileSync(join(FINDINGS(root), `${name}.md`), 'The list view was slow.\n');
+  let out = '';
+  const store = storeOf(t, [['beta-corp-prod', 'https://betacorp.service-now.com']]);
+  const code = await main([`clients/acme-bank/findings/${name}.md`], { root, env: { SNOW_STORE: store },
+    credentialReader: async () => ({ read: false, usernames: [] }), out: { write: (s) => { out += s; } } });
+  assert.equal(code, 0, out);
+  assert.equal(linesOf(out).at(-1), NAME_LEAK);
+  assert.equal(existsSync(join(FINDINGS(root), `${name}.masked.txt`)), false);
+});
+
+test('ARC-09-C258 — --next-name refuses a slug that holds the engagement\'s name or an alias, and the refusal names no slug', async (t) => {
+  const root = leakyCheckout(t);
+  for (const slug of ['acme-bank-sla-breach', 'contoso-holdings-outage']) {
+    const { code, out } = await runFinder(root, ['--next-name', 'acme-bank', slug]);
+    assert.equal(code, 2, `${slug} was given a path: ${out}`);
+    assert.match(out, /^finding: .*choose a slug that names the problem, never the client/);
+    assert.ok(!out.includes(slug), `the refusal echoes ${slug}`);
+  }
+  const ok = await runFinder(root, ['--next-name', 'acme-bank', 'wrong-assignment-group']);
+  assert.equal(ok.code, 0, ok.out);
+  assert.match(ok.out, /^clients\/acme-bank\/findings\/\d{4}-\d{2}-\d{2}-wrong-assignment-group\.md\n$/);
+});
+
+test('ARC-09-C258 — mutation control: with the copy-time name check turned off, the same note is copied under the leaking name', async (t) => {
+  const { main } = await loadMutant(t, (s) => s.replace(/const nameClean = [^\n]*;/, 'const nameClean = true;'), 'const nameClean = true;');
+  const root = leakyCheckout(t);
+  const name = '2026-11-01-acme-bank-sla-breach';
+  writeFileSync(join(FINDINGS(root), `${name}.md`), 'The list for INC0010002 never loaded.\n');
+  let out = '';
+  const code = await main([`clients/acme-bank/findings/${name}.md`], { root, env: {}, out: { write: (s) => { out += s; } } });
+  assert.equal(code, 0, out);
+  assert.ok(existsSync(join(FINDINGS(root), `${name}.masked.txt`)),
+    'the finder without its name check wrote no file under the leaking name: the test above cannot tell that check from none');
+});
+
+// ── a failed write beside an older copy (the architect's finding on the PR) ──────────────────────────────────────────
+
+test('ARC-09-C258 — a write that fails beside an older copy says the older one is out of date, and leaves it as it was, edited by hand or not', async (t) => {
+  const { resolveFindingPath, writeMaskedCopy } = await finding();
+  const root = checkout(t, 'x');
+  const older = join(root, COPY_REL);
+  writeFileSync(older, 'an older masked copy, edited by hand\n');
+  const before = tree(FINDINGS(root));
+  const full = () => { throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' }); };
+  const line = writeMaskedCopy(resolveFindingPath(root, NOTE_REL), 'masked\n', { write: full });
+  assert.equal(line, 'Masked copy NOT written (ENOSPC): the text above is the only current copy, and the older 2026-10-23-slow-list.masked.txt '
+    + 'beside the note is out of date. Do not send it or the note.');
+  assert.equal(readFileSync(older, 'utf8'), 'an older masked copy, edited by hand\n', 'the older copy was changed or deleted');
+  assert.deepEqual(tree(FINDINGS(root)), before, 'a temporary file was left, or the older copy went');
 });

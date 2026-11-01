@@ -302,6 +302,10 @@ const CHECKS = {
     const opening = section.slice(0, section.indexOf(' 1. '));
     assert.ok(opening.includes('prints a masked copy and writes it to a file beside the note, for the user to send'),
       'the opening does not say the copy is also written to a file beside the note');
+    // The architect's finding on the PR: the file's name travels with the file and is made from the slug, so the slug names the problem.
+    const four = section.match(/ 4\. Run .*?(?= 5\. )/)?.[0] ?? '';
+    assert.ok(four.includes('with a slug that names the problem, never the client, a person, a place or a system, because the file the user sends is named from it'),
+      'step 4 does not say what the slug may name, and why');
     const five = section.match(/ 5\. Run .*?(?= 6\. )/)?.[0] ?? '';
     assert.ok(five.includes('the "Read before sending" list and the last line, which names the masked copy\'s file or says it was not written, as plain text'),
       'step 5 does not have the last line printed, whether it names the file or says it was not written');
@@ -309,7 +313,7 @@ const CHECKS = {
     const six = section.match(/ 6\. Close with: .*?(?= The masker cannot know)/)?.[0] ?? '';
     assert.ok(six.includes('Send that file to the person who issued your licence, never the note; copying from this window can lose characters.'),
       'step 6 does not send the file and never the note');
-    assert.ok(six.includes('When the last line says the copy was NOT written, there is no file: close with that line instead.'),
+    assert.ok(six.includes('When the last line says the copy was NOT written, there is no current file: close with that line instead.'),
       'step 6 has no closing for a copy that was not written');
     const item = paragraphWith(guide, 'asks which engagement the finding belongs to');
     assert.ok(item.includes('prints a masked copy and writes it, and nothing else, to `clients/<engagement>/findings/<note>.masked.txt` beside your note'),
@@ -386,7 +390,11 @@ const NEGATIVES = [
       'Send the text above to the person who issued your licence.')],
   ['step 6 drops "never the note"', FILE, (t) => t.replace(loose('licence, never the note; copying'), 'licence; copying')],
   ['step 6 loses the closing for a copy that was not written', FILE,
-    (t) => t.replace(loose(' When the last line says the copy was NOT written, there is no file: close with that line instead.'), '')],
+    (t) => t.replace(loose(' When the last line says the copy was NOT written, there is no current file: close with that line instead.'), '')],
+  ['step 6 says there is no file when an older one may be there', FILE,
+    (t) => t.replace(loose('there is no current file:'), 'there is no file:')],
+  ['step 4 stops saying what the slug may name', FILE,
+    (t) => t.replace(loose('with a slug that names the problem, never the client, a person, a place or a system, because the file the user sends is named from it, '), '')],
 ];
 
 for (const [title, checkName, breakIt] of NEGATIVES) {

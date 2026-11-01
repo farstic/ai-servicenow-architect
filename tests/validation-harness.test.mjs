@@ -327,7 +327,7 @@ test('C254 — a result row with no text blocks before it is still the answer', 
 const COPY_OUT = ['instance store NOT read — check every instance name · credentials NOT read — check usernames and passwords before sending', '',
   '<engagement> showed the wrong group on <instance-url-1>.', '', 'Read before sending:', '- people: names of colleagues, users and customers', '',
   // ARC-09-C258: the finder's last paragraph, which the reply has to carry as well
-  'Masked copy written to clients/acme-bank/findings/2026-10-29-wrong-group.masked.txt: the text above and nothing else.'].join('\n');
+  'Masked copy written beside the note as 2026-10-29-wrong-group.masked.txt: the text above and nothing else.'].join('\n');
 const FINDER = 'node tools/snowarch/lib/finding.mjs clients/acme-bank/findings/2026-10-29-wrong-group.md';
 const ran = (id, command, out) => [
   { type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] } },

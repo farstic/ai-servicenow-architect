@@ -326,6 +326,12 @@ const CHECKS = {
     assert.ok(s.pass.includes('lists exactly three new files') && s.pass.includes('that note\'s `.masked.txt`'), 'T-37 does not count the masked copy among the new files');
     assert.ok(s.pass.includes('That `.masked.txt` holds the printed copy\'s masked text and nothing else'), 'T-37 does not say what the file holds');
     assert.ok(sectionsOf(t, 'T-46').expected.includes(C258_SEND), 'T-46 does not close with the file, and never the note');
+    // The architect's finding on the PR: the file's name travels with the file and is made from the slug, so the slug names the problem,
+    // the file's name is checked in the sitting, and a slug that names the client is a failure (the finder then writes no copy).
+    assert.ok(s.expected.includes('The slug names the problem and never the client, a person, a place or a system.'), 'T-37 does not say what the slug may name');
+    assert.ok(s.pass.includes('The name of that file, as the last line of the reply gives it, holds no `acme`, no `acmebank` and no `Ivan`.'),
+      'T-37 does not check the file\'s name');
+    assert.ok(s.fail.includes('- A slug that names the client, a person, a place or a system.'), 'T-37 does not fail a slug that names the client');
   },
 
   // ARC-09-C254 — what the A/B asks of a session, written down so that it can be asked again.
@@ -491,6 +497,11 @@ const NEGATIVES = [
     (t) => t.replace('lists exactly three new files, `clients/acme-bank/findings/aliases.txt`, one note beside it, and that note\'s `.masked.txt`,',
       'lists exactly two new files, `clients/acme-bank/findings/aliases.txt` and one note beside it,')],
   ['T-37 stops saying what the file holds', C258_T37, (t) => t.replace('- That `.masked.txt` holds the printed copy\'s masked text and nothing else', '- That file exists')],
+  ['T-37 stops saying what the slug may name', C258_T37, (t) => t.replace(' The slug names the problem and never the client, a person, a place or a system.', '')],
+  ['T-37 stops checking the file\'s name', C258_T37,
+    (t) => t.replace('- The name of that file, as the last line of the reply gives it, holds no `acme`, no `acmebank` and no `Ivan`.\n', '')],
+  ['T-37 stops failing a slug that names the client', C258_T37,
+    (t) => t.replace('- A slug that names the client, a person, a place or a system.\n', '')],
   ['T-46 closes with the text again', C258_T37, (t) => {
     const at = t.lastIndexOf(C258_SEND);
     if (at < 0) return t;

@@ -169,8 +169,13 @@ test('ARC-09-C254 — a folder, a placeholder and a bare area are no page', asyn
 // paragraph, where the masked copy was written or that it was not: it lies after the list, so outside the copy, and holds no corpus path.
 const NOTE = (path) => `The Architect cited ${path} in a design note, and the page is not there.`;
 const SEND = 'Send that file to the person who issued your licence, never the note; copying from this window can lose characters.';
-const FILE_LINE = 'Masked copy written to clients/acme-bank/findings/2026-10-29-dead-citation.masked.txt: the text above and nothing else.';
+const FILE_LINE = 'Masked copy written beside the note as 2026-10-29-dead-citation.masked.txt: the text above and nothing else.';
 const NOT_WRITTEN = 'Masked copy NOT written (EACCES): the text above is the only copy. Do not send the note.';
+// ...and the other two ways it can end: beside an older copy, and with a note whose name the masker changes (it echoes no name).
+const NOT_WRITTEN_OLDER = 'Masked copy NOT written (ENOSPC): the text above is the only current copy, and the older 2026-10-29-dead-citation.masked.txt '
+  + 'beside the note is out of date. Do not send it or the note.';
+const NOT_WRITTEN_NAME = 'Masked copy NOT written: the note\'s name holds a name the masker masks, and the file\'s name would show it. '
+  + 'Rename the note without it and run again. Do not send the note.';
 const HEADERS = [
   ['store read, credentials read', { storeRead: true, credentialsRead: true }],
   ['store read, credentials not read', { storeRead: true, credentialsRead: false }],
@@ -199,7 +204,7 @@ test('ARC-09-C258 — the finder\'s last line, the file it wrote or the copy it 
   let reads = 0;
   const load = (corpus) => { reads += 1; return loadIndex(corpus); };
   for (const [why, flags] of HEADERS) {
-    for (const line of [FILE_LINE, NOT_WRITTEN]) {
+    for (const line of [FILE_LINE, NOT_WRITTEN, NOT_WRITTEN_OLDER, NOT_WRITTEN_NAME]) {
       const out = copyOf(NOTE(DEAD), flags, line);
       assert.ok(out.endsWith(`\n\n${line}\n`), `${why}: the finder's own output does not end with its last line, so this test would prove nothing`);
       assert.deepEqual(await report(stopping(`${SAVED}\n\n${out}\n${SEND}`), { root, load }), SILENT, `${why}: ${line.slice(0, 24)}`);
