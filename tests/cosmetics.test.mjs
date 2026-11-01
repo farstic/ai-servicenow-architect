@@ -142,8 +142,9 @@ test('B04 quotes a size it measured, or none at all — the helper half', () => 
   // THE LINE is asserted in `tools/snowarch/tests/b04-deps.test.mjs`. This file's first version
   // had only the assertions below, and restoring the literal left it green: a test that never
   // reads the line cannot fail on a literal printed into it.
+  // ARC-09-C259: the line counts the megabyte the install page does, 10^6 bytes, so 71,000,000 bytes read 71 (2^20-byte ones read 68).
   assert.equal(installSizeHint({ steps: { B04: { data: { sizeBytes: 71_000_000 } } } }),
-    ', ~68 MB last time');
+    ', ~71 MB last time');
   // A first install has nothing to quote and says nothing. A made-up magnitude is worse than none:
   // a user watching a download is deciding whether to wait, and a wrong number is what makes them
   // stop at the wrong moment.

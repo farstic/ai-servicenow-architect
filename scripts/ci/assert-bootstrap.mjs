@@ -25,6 +25,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { computeSettings } from '../../tools/snowarch/lib/settings-local.mjs';
+import { megabytes } from '../../tools/snowarch/lib/size.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const argv = process.argv.slice(2);
@@ -269,7 +270,7 @@ if (argv.includes('--summary') && process.env.GITHUB_STEP_SUMMARY) {
     // blocks, which on these runners is ~3% more (174 here against the page's 179 on POSIX). `du`
     // is also absent on Windows, so a walk is the only portable answer — a table whose column
     // silently meant two things on three platforms would be worse than one that says which.
-    mb = String(Math.round(directorySize(vendor) / (1024 * 1024)));
+    mb = String(megabytes(directorySize(vendor)));
   } catch { /* the corpus assertion has already reported its absence */ }
   // Header and row together: `$GITHUB_STEP_SUMMARY` is per-CELL, so a header written once
   // somewhere else would leave twelve tables with no columns. The run's summary page stacks them.

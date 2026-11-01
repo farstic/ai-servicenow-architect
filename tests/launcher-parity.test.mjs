@@ -155,12 +155,19 @@ test('the launcher is short — it is a launcher, not a second implementation', 
   // died on "already exists and is not an empty directory". Three lines remember whether the corpus
   // was there BEFORE this run so a failure removes only what this run created. The comment is the
   // part a reader needs: `rm -rf` in a launcher must say who is allowed to run it.
-  assert.ok(lines - generated <= 209,
+  //
+  // Raised 209 → 214 (total 238) by ARC-09-C259. Five lines for the disk check's unit: the launcher printed GiB as "GB" and refused
+  // at 1 GiB while the page, the doctor and B00 said gigabytes of 10^9 bytes, so the floor is now a number of bytes with a name
+  // (DISK_FLOOR_BYTES, the same bytes as B00.mjs's DISK_SPARSE and bootstrap.ps1's $DiskFloorBytes, which tests/size-unit.test.mjs
+  // reads in all three files), a name for the gigabyte it prints, two lines of comment saying so, and one `case` that keeps an
+  // empty or non-numeric `df` answer a refusal, as the old `[ … ] 2>/dev/null` made it, now that the number is multiplied first.
+  assert.ok(lines - generated <= 214,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
   // Raised 231 → 233 (total only; the hand-written count is unchanged) by ARC-09-C157: two GENERATED lines, the
   // folder slot MSG_ROOT_SLOT and the Next block's second line, because the line now names the folder `claude`
   // has to start in. The one hand-written line that prints it changed in place.
-  assert.ok(lines <= 233, `${lines} total lines`);
+  // Raised 233 → 238 by ARC-09-C259: the five hand-written lines above.
+  assert.ok(lines <= 238, `${lines} total lines`);
 });
 
 test('the state and the cache bash writes are the ones Node reads', async () => {
@@ -356,7 +363,7 @@ test('a launcher that names a sentence the generator does not have is an error, 
   const dir = tempDir('launcher-gen-');
   try {
     mkdirSync(join(dir, 'tools/snowarch/lib'), { recursive: true });
-    for (const f of ['net-sentences.mjs', 'remedies.json', 'text.json']) {
+    for (const f of ['net-sentences.mjs', 'size.mjs', 'remedies.json', 'text.json']) {
       copyFileSync(join(root, 'tools/snowarch/lib', f), join(dir, 'tools/snowarch/lib', f));
     }
     copyFileSync(join(root, 'engine.config.json'), join(dir, 'engine.config.json'));
@@ -541,7 +548,9 @@ test('the Windows launcher is a launcher too — the budget, with the region rep
   // throws, which no exit-code check sees — so the call moved into `try/catch` (seven lines where
   // bash needs a `|| { … }`), and `Remove-Item -Recurse -Force` with its guard takes three where
   // `rm -rf` takes one.
-  assert.ok(lines - generated <= 298,
+  // Raised 298 → 302 (total 322) by ARC-09-C259, for bootstrap.sh's 209 → 214 less the `case` PowerShell does not need: two lines of
+  // comment, the floor as a named number of bytes and the gigabyte it prints, in place of 1073741824 written twice.
+  assert.ok(lines - generated <= 302,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
 });
 

@@ -146,7 +146,7 @@ export function classifyGitFailure(stderr, { upstream, pin, env = process.env, s
     return SENTENCE.unfetchablePin(pin, spell.cli);
   }
   if (low.includes('no space left on device')) {
-    return SENTENCE.noDiskSpace;
+    return SENTENCE.noDiskSpaceDocs;
   }
   const first = text.split('\n').map((l) => l.trim()).find(Boolean) ?? '(no stderr)';
   return `git failed: ${first}`;

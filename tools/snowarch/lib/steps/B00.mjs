@@ -28,6 +28,7 @@ import { CORPUS_DIR, MODE, RETRY_WAITS_MS, attemptSuffix } from '../docs/sync.mj
 import { corpusProbe, probeNetwork, probeRetryReason } from '../probe-net.mjs';
 import { which } from '../which.mjs';
 import { INPUTS } from '../inputs.mjs';
+import { GB, gigabytes, megabytes } from '../size.mjs';
 
 export const id = 'B00';
 export const title = 'preflight';
@@ -39,13 +40,16 @@ export const cacheable = false;
 // set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
 export const inputs = INPUTS.B00.resolve;
 
-/** Disk. Not a configured floor — it is what this repository costs, and the numbers are its own. */
-const GIB = 1024 ** 3;
-export const DISK_SPARSE = 1 * GIB;      // the floor: a sparse corpus ≈ 372 MB + deps ≈ 72 MB + headroom
-export const DISK_FULL = 1.5 * GIB;      // a fresh whole corpus ≈ 495 MB on disk (ARC-09-C244) + deps + headroom
+/**
+ * Disk. Not a configured floor — it is what this repository costs, and the numbers are its own. Decimal, as the page's are
+ * (ARC-09-C259): both launchers hold the same floor as a number of bytes (`DISK_FLOOR_BYTES`, `$DiskFloorBytes`), and
+ * tests/size-unit.test.mjs reads all three files.
+ */
+export const DISK_SPARSE = 1 * GB;       // the floor: a sparse corpus ≈ 365 MB on disk + deps ≈ 72 MB + headroom
+export const DISK_FULL = 1.5 * GB;       // a fresh whole corpus ≈ 490 MB on disk (docs-real run 41063258542) + deps + headroom
 
-const mb = (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`;
-const gb = (bytes) => `${(bytes / GIB).toFixed(1)} GB`;
+const mb = (bytes) => `${megabytes(bytes)} MB`;
+const gb = (bytes) => `${gigabytes(bytes)} GB`;
 
 /**
  * Run a tool by its RESOLVED path.

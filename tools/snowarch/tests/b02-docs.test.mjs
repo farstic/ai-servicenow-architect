@@ -42,11 +42,11 @@ before(() => {
 after(() => { rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 
 /** A workspace that cites a page the fixture corpus has, with nothing checked out yet. */
-function workspace({ pin = null } = {}) {
-  const w = makeWorkspace({ scratch, pin: pin ?? upstream.pin, upstreamUrl });
+function workspace({ pin = null, up = upstream, url = upstreamUrl } = {}) {
+  const w = makeWorkspace({ scratch, pin: pin ?? up.pin, upstreamUrl: url });
   writeFileSync(join(w.root, 'engine.config.json'), `${JSON.stringify({
-    docs: { family: 'australia', pin: pin ?? upstream.pin, areasFile: 'vendor/docs-areas.txt',
-      upstream: upstreamUrl },
+    docs: { family: 'australia', pin: pin ?? up.pin, areasFile: 'vendor/docs-areas.txt',
+      upstream: url },
     mcp: { serverKey: 'servicenow', packageDir: 'packages/snowarch' },
     floors: { node: '20.0.0', claudeCode: '2.1.214', git: '2.34.1' },
   }, null, 2)}\n`);
@@ -69,6 +69,27 @@ async function closedPort() {
   await new Promise((res) => server.close(res));
   return port;
 }
+
+test('ARC-09-C259 — the [docs] line counts a megabyte as docs status does, 10^6 bytes: a corpus with a 1,500,000-byte page reads 2 MB', async () => {
+  // A second upstream of its own, so the shared one's branches stay as the other cases in this file expect them: the family tip,
+  // one commit ahead, holds a page of 1,500,000 bytes in a cited area, and that commit is the pin.
+  const dir = join(scratch, 'c259');
+  const big = buildUpstream(dir);
+  const src = join(dir, 'src');
+  writeFileSync(join(src, 'markdown', 'alpha', 'big-page.md'), 'x'.repeat(1_500_000));
+  git(['add', '-A'], src);
+  git(['commit', '-qm', 'a page of 1,500,000 bytes'], src);
+  const pin = git(['rev-parse', 'HEAD'], src).trim();
+  git(['push', '-q', big.bare, 'australia'], src);
+
+  const w = workspace({ pin, up: big, url: pathToFileURL(big.bare).href });
+  const ctx = withLines(ctxFor(w));
+  const r = await runB02(ctx);
+  assert.equal(r.status, 'ok', JSON.stringify(r));
+  const text = ctx.lines.join('\n');
+  // 1,500,000 bytes and a few small files: 2 MB in 10^6-byte megabytes, 1 in 2^20-byte ones (1.43).
+  assert.match(text, /^\[docs\] [\d,]+ files · 2 MB working tree$/m, text);
+});
 
 test('AC 1 — a fresh checkout syncs, measures, verifies, and attributes exactly once', async () => {
   const w = workspace();

@@ -15,6 +15,7 @@
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, relative, resolve, sep } from 'node:path';
+import { megabytes } from '../../tools/snowarch/lib/size.mjs';
 
 const root = process.cwd();
 const CORPUS = 'vendor/ServiceNowDocs';
@@ -144,7 +145,7 @@ const shape = WHOLE ? 'full' : 'cone';
 check(status.sparse === shape, `sparse mode is ${status.sparse}, expected ${shape}`);
 check(status.areasMissing.length === 0, `areas missing: ${status.areasMissing.join(', ')}`);
 check(status.sizeBytes <= CAP_BYTES,
-  `${Math.round(status.sizeBytes / 1e6)} MB exceeds the ${CAP_BYTES / 1e6} MB cap`);
+  `${megabytes(status.sizeBytes)} MB exceeds the ${megabytes(CAP_BYTES)} MB cap`);
 // The NOTICE claim, on a real checkout on every OS — not only in a fixture.
 for (const p of ['LICENSE', 'legal']) check(existsSync(join(corpus, p)), `${p} is missing from the checkout`);
 
@@ -176,7 +177,7 @@ if (isWindows) {
   check(longpaths === 'true', `core.longpaths is "${longpaths}", expected true`);
 }
 
-const mb = (b) => (b === null ? '—' : String(Math.round(b / 1e6)));
+const mb = (b) => (b === null ? '—' : String(megabytes(b)));
 const treeUse = usage(files);
 const gitUse = usage(walk(gitDir()));
 const seconds = syncSeconds.toFixed(1);
