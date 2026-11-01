@@ -325,7 +325,9 @@ test('C254 — a result row with no text blocks before it is still the answer', 
 // develop both runs put it in a code fence after a sentence of prose, and on the head one said its output was above and never printed it.
 // The report counts it, so a before and an after are numbers and not impressions.
 const COPY_OUT = ['instance store NOT read — check every instance name · credentials NOT read — check usernames and passwords before sending', '',
-  '<engagement> showed the wrong group on <instance-url-1>.', '', 'Read before sending:', '- people: names of colleagues, users and customers'].join('\n');
+  '<engagement> showed the wrong group on <instance-url-1>.', '', 'Read before sending:', '- people: names of colleagues, users and customers', '',
+  // ARC-09-C258: the finder's last paragraph, which the reply has to carry as well
+  'Masked copy written beside the note as 2026-10-29-wrong-group.masked.txt: the text above and nothing else.'].join('\n');
 const FINDER = 'node tools/snowarch/lib/finding.mjs clients/acme-bank/findings/2026-10-29-wrong-group.md';
 const ran = (id, command, out) => [
   { type: 'assistant', message: { content: [{ type: 'tool_use', id, name: 'Bash', input: { command } }] } },
@@ -335,7 +337,7 @@ const copyOf = (events, reply) => reportTurn(stream([...events, assistant(text(r
 
 test('C252 (a) — the report says whether the finder\'s output is in the reply as printed, and whether it is in a code fence', () => {
   const events = ran('t1', FINDER, COPY_OUT);
-  const send = 'Send the text above to the person who issued your licence.';
+  const send = 'Send that file to the person who issued your licence, never the note; copying from this window can lose characters.';
   assert.deepEqual(copyOf(events, `${COPY_OUT}\n\n${send}`), { verbatim: true, fenced: false });
   assert.deepEqual(copyOf(events, `The note is saved at clients/acme-bank/findings/x.md.\n\n${COPY_OUT}\n\n${send}`), { verbatim: true, fenced: false },
     'a sentence before the copy is not a fence');
@@ -345,6 +347,8 @@ test('C252 (a) — the report says whether the finder\'s output is in the reply 
     'a fence that is closed before the copy does not hold it');
   assert.deepEqual(copyOf(events, 'The masker ran; its output is above.\n\n' + send), { verbatim: false, fenced: false });
   assert.deepEqual(copyOf(events, `${COPY_OUT.split('\n').slice(0, 3).join('\n')}\n\n${send}`), { verbatim: false, fenced: false }, 'a part of it is not the copy');
+  assert.deepEqual(copyOf(events, `${COPY_OUT.split('\n').slice(0, -2).join('\n')}\n\n${send}`), { verbatim: false, fenced: false },
+    'the copy without the last line, the one that names the file, is not the output');
   assert.deepEqual(copyOf(events, COPY_OUT.split('\n').map((l) => `> ${l}`).join('\n')), { verbatim: false, fenced: false }, 'a quotation block is not verbatim');
 });
 

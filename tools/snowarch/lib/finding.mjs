@@ -3,15 +3,19 @@
 // ARC-09-C221 — `/snowarch finding`'s masker: a user's finding, as text they can send to the person who issued their
 // licence, with the client's data masked.
 //
-// The note stays in `clients/<engagement>/findings/`, which git ignores; what leaves is this script's output, so the
-// masking is code with tests (tools/snowarch/tests/finding.test.mjs), never the model's care. The order and every rule
-// are the architect's privacy red-team's (2026-10-23), measured on its corpus before this file was written: 6 of 42
-// leak cases survived, each a class no pattern catches and each named in the output's "Read before sending" list; ARC-09-C251
-// closed two, a MID host name and a ticket key that begin with a name the masker was given.
+// The note stays in `clients/<engagement>/findings/`, which git ignores; what leaves is this script's output, and the file it
+// writes from it (ARC-09-C258), so the masking is code with tests (tools/snowarch/tests/finding.test.mjs), never the model's
+// care. The order and every rule are the architect's privacy red-team's (2026-10-23), measured on its corpus before this file
+// was written: 6 of 42 leak cases survived, each a class no pattern catches and each named in the output's "Read before
+// sending" list; ARC-09-C251 closed two, a MID host name and a ticket key that begin with a name the masker was given.
 //
-// READ-ONLY, and the only path control there is: the skill's grant is a Bash rule, which cannot constrain arguments, so
-// this script accepts nothing but a note under `clients/<engagement>/findings/` and refuses the rest with a sentence.
-import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
+// The only path control there is: the skill's grant is a Bash rule, which cannot constrain arguments, so this script accepts
+// nothing but a note under `clients/<engagement>/findings/` and refuses the rest with a sentence. It reads that note and writes
+// exactly one file, beside it: `<note>.masked.txt`, the masked text and nothing else, under a name made from the note's, never
+// from an argument (ARC-09-C258, `writeMaskedCopy`). The name is masked as the text is, because it travels with the file: a note
+// named for the client gets no copy.
+import { closeSync, existsSync, lstatSync, openSync, readFileSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { redact } from './redact.mjs';
@@ -218,10 +222,15 @@ export function stemWarnings(storeUrls = []) {
 /**
  * The whole output: what ran, the warnings, the masked text, and what the reader must still check. The two tiers are
  * reported apart: the store's names can be read where its credentials cannot (a checkout without its dependencies, a
- * store the loader refuses), and a header that said only "(store read)" then hid unmasked usernames.
+ * store the loader refuses), and a header that said only "(store read)" then hid unmasked usernames. `copyLine`, when given,
+ * is the last paragraph (ARC-09-C258): where the masked copy was written, or that it was not.
  */
-export function renderFinding(text, values = {}, { storeRead = false, credentialsRead = false } = {}) {
-  const masked = maskFinding(text, values);
+export function renderFinding(text, values = {}, { storeRead = false, credentialsRead = false } = {}, copyLine = '') {
+  return renderMasked(maskFinding(text, values), values, { storeRead, credentialsRead }, copyLine);
+}
+
+/** `renderFinding` over text already masked, so a run masks once and the copy and the reply are the same masked text. */
+function renderMasked(masked, values, { storeRead, credentialsRead }, copyLine) {
   const instanceNames = new Set([
     ...(values.labels ?? []).filter((l) => !ENV_WORDS.has(l)),
     ...(values.storeUrls ?? []).flatMap((u) => { try { return [new URL(u).hostname.toLowerCase()]; } catch { return []; } }),
@@ -233,7 +242,7 @@ export function renderFinding(text, values = {}, { storeRead = false, credential
   credentialsRead ? 'credentials read' : CREDENTIALS_NOT_READ].join(' · ');
   const review = [...(credentialsRead ? [] : [CREDENTIALS_NOT_READ]), ...reviewList(masked), ...FIXED_REVIEW];
   return [head, ...aliasWarnings(values), ...stemWarnings(values.storeUrls), '', masked.trimEnd(), '', 'Read before sending:',
-    ...review.map((r) => `- ${r}`), ''].join('\n');
+    ...review.map((r) => `- ${r}`), ...(copyLine ? ['', copyLine] : []), ''].join('\n');
 }
 
 const refuse = (why) => ({ ok: false,
@@ -267,10 +276,64 @@ export function nextFindingName(root, engagement, slug, { date = today() } = {})
   if (engagement === '_unfiled') throw new Error('`_unfiled` holds design artefacts only, never a finding');
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(engagement)) throw new Error(`"${engagement}" is not an engagement folder name`);
   if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw new Error(`"${slug}" is not a slug: lowercase letters, digits and hyphens`);
+  // ARC-09-C258: the masked copy is a file the user sends, so its name goes with it, and the name is made from this slug. One the masker
+  // would change (the engagement's name, an alias) is refused here, before the note exists, which spares a rename. The check at copy time,
+  // which also holds the store's names, is the guarantee. The refusal names no slug.
+  if (maskFinding(slug, { engagement, aliases: readAliases(join(root, 'clients', engagement, 'findings', 'aliases.txt')) }) !== slug) {
+    throw new Error('that slug holds a name the masker masks, and the masked copy\'s file name would show it: choose a slug that names the problem, never the client');
+  }
   const base = `clients/${engagement}/findings/${date}-${slug}`;
   for (let n = 1; ; n += 1) {
     const rel = n === 1 ? `${base}.md` : `${base}-${n}.md`;
     if (!existsSync(join(root, rel))) return rel;
+  }
+}
+
+/** The masked copy's name, beside the note: `<note>.md` becomes `<note>.masked.txt`, which resolveFindingPath does not take for a note. */
+const maskedCopyName = (name) => `${name.replace(/\.md$/, '')}.masked.txt`;
+
+const randomSuffix = () => randomBytes(6).toString('hex');
+
+/**
+ * The last line when the note's name holds a name the masker masks: the file's name would show it, and travels with the file. It
+ * echoes no name, and no engagement either.
+ */
+const NAME_NOT_WRITTEN = 'Masked copy NOT written: the note\'s name holds a name the masker masks, and the file\'s name would show it. '
+  + 'Rename the note without it and run again. Do not send the note.';
+
+/**
+ * ARC-09-C258 — the masked copy as a file beside the note, for the user to send in place of the printed text, which loses
+ * characters when it is copied out of the Claude Code window: the masked text and nothing else, one final newline. The name is
+ * made from the validated note's. The text goes to a temporary file in the same folder, opened exclusively with mode 0600, and
+ * the temporary file is renamed over the destination, so an older copy or a symlink there is replaced, never followed or left
+ * half written. A failure removes the temporary file it made, and is no error exit: the reply carries the text either way, and
+ * its last line, returned here, says where the copy is or why it is not. It names the file by its name and never the folder, and
+ * when a failed write leaves an older copy beside the note it says that copy is out of date and leaves it alone: it may have been
+ * edited by hand. `write` and `suffix` are the test's seams.
+ */
+export function writeMaskedCopy(target, masked, { write = writeFileSync, suffix = randomSuffix } = {}) {
+  const name = maskedCopyName(target.name);
+  const dest = join(dirname(target.path), name);
+  const temp = `${dest}.${suffix()}.tmp`;
+  let fd;
+  let made = false;
+  try {
+    fd = openSync(temp, 'wx', 0o600);
+    made = true;
+    write(fd, `${masked.trimEnd()}\n`);
+    closeSync(fd);
+    fd = undefined;
+    renameSync(temp, dest);
+    return `Masked copy written beside the note as ${name}: the text above and nothing else.`;
+  } catch (e) {
+    if (fd !== undefined) { try { closeSync(fd); } catch { /* the failure being reported is the first one */ } }
+    if (made) { try { unlinkSync(temp); } catch { /* nothing more can be done about it */ } }
+    let older = false;
+    try { older = lstatSync(dest).isFile(); } catch { /* no older copy */ }
+    const code = e?.code ?? 'error';
+    return older
+      ? `Masked copy NOT written (${code}): the text above is the only current copy, and the older ${name} beside the note is out of date. Do not send it or the note.`
+      : `Masked copy NOT written (${code}): the text above is the only copy. Do not send the note.`;
   }
 }
 
@@ -296,11 +359,19 @@ async function credentialValues(storePath, root) {
   return { read: true, usernames: Object.values(r.store.instances).map((e) => e?.auth?.username).filter(Boolean) };
 }
 
-/** `finding.mjs <clients/<engagement>/findings/<name>.md>` or `finding.mjs --next-name <engagement> <slug>`. */
+/**
+ * `finding.mjs <clients/<engagement>/findings/<name>.md>` prints the masked copy and writes it to `<name>.masked.txt` beside the
+ * note; `finding.mjs --next-name <engagement> <slug>` prints a free path for a note.
+ */
 export async function main(argv, { root = ENGINE_ROOT, env = process.env, out = process.stdout,
   credentialReader = credentialValues } = {}) {
   if (argv[0] === '--next-name') {
     try { out.write(`${nextFindingName(root, argv[1], argv[2])}\n`); return 0; } catch (e) { out.write(`finding: ${e.message}\n`); return 2; }
+  }
+  // The note is the one argument: an --out, or any other, would say where the copy goes, and its name is made from the note's.
+  if (argv.length > 1) {
+    out.write(`${refuse('takes the note and nothing else, so there is no --out: the masked copy is written beside the note, under a name made from the note\'s').reason}\n`);
+    return 2;
   }
   const target = resolveFindingPath(root, argv[0]);
   if (!target.ok) { out.write(`${target.reason}\n`); return 2; }
@@ -312,7 +383,14 @@ export async function main(argv, { root = ENGINE_ROOT, env = process.env, out = 
   const values = { engagement: target.engagement,
     aliases: readAliases(join(root, 'clients', target.engagement, 'findings', 'aliases.txt')),
     labels: hosts.labels, storeUrls: hosts.hosts.map((h) => `https://${h}`), usernames: credentials.usernames };
-  out.write(renderFinding(readFileSync(target.path, 'utf8'), values, { storeRead: hosts.read, credentialsRead: credentials.read }));
+  const masked = maskFinding(readFileSync(target.path, 'utf8'), values);
+  // ARC-09-C258: the copy is a file the user sends, so its name goes with it, and the name is made from the note's, which was only
+  // checked for its format. A name the masker changes (the client's, an alias, a record number, a store's own) would show in the
+  // attachment, so no file is written, and the last line says so without echoing it.
+  const base = target.name.replace(/\.md$/, '');
+  const nameClean = maskFinding(base, values) === base;
+  const copyLine = nameClean ? writeMaskedCopy(target, masked) : NAME_NOT_WRITTEN;
+  out.write(renderMasked(masked, values, { storeRead: hosts.read, credentialsRead: credentials.read }, copyLine));
   return 0;
 }
 

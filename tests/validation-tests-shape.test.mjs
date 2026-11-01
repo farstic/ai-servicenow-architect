@@ -81,6 +81,10 @@ const CLI = POSIX.cli;
 /** The name of the C252 (a) check on T-37, which its negatives refer to. */
 const C252_T37 = 'ARC-09-C252 — T-37 turn 3 asks for the copy in the reply, unfenced, and fails a fence and a pointer to the tool result';
 
+/** The name of the C258 check on T-37 and T-46, and the closing sentence they share, which its negatives refer to. */
+const C258_T37 = 'ARC-09-C258 — T-37 and T-46 say the copy is also a file: its last line is printed, the reply closes with the file, and the tree has three new files';
+const C258_SEND = 'Send that file to the person who issued your licence, never the note; copying from this window can lose characters.';
+
 /** The name of the T-38 check, which the negatives below refer to. */
 const C243_T38 = 'ARC-09-C243 — T-38 tests the path the change touched: the slash command, a licence in force, one other failing check, and a control that says what it proves';
 
@@ -313,6 +317,23 @@ const CHECKS = {
     }
   },
 
+  // ARC-09-C258, ruled by the architect on 2026-11-01. The finder also writes the masked copy to a file beside the note, so T-37 asks for its last
+  // line in the reply, closes with that file and never the note, and counts three new files in the tree, not two; T-46 closes the same way.
+  [C258_T37]: (t) => {
+    const s = sectionsOf(t, 'T-37');
+    assert.ok(s.expected.includes('the last line, which names the masked copy\'s file, is part of it'), 'T-37 does not ask for the finder\'s last line in the reply');
+    assert.ok(s.expected.includes(C258_SEND), 'T-37 does not close with the file, and never the note');
+    assert.ok(s.pass.includes('lists exactly three new files') && s.pass.includes('that note\'s `.masked.txt`'), 'T-37 does not count the masked copy among the new files');
+    assert.ok(s.pass.includes('That `.masked.txt` holds the printed copy\'s masked text and nothing else'), 'T-37 does not say what the file holds');
+    assert.ok(sectionsOf(t, 'T-46').expected.includes(C258_SEND), 'T-46 does not close with the file, and never the note');
+    // The architect's finding on the PR: the file's name travels with the file and is made from the slug, so the slug names the problem,
+    // the file's name is checked in the sitting, and a slug that names the client is a failure (the finder then writes no copy).
+    assert.ok(s.expected.includes('The slug names the problem and never the client, a person, a place or a system.'), 'T-37 does not say what the slug may name');
+    assert.ok(s.pass.includes('The name of that file, as the last line of the reply gives it, holds no `acme`, no `acmebank` and no `Ivan`.'),
+      'T-37 does not check the file\'s name');
+    assert.ok(s.fail.includes('- A slug that names the client, a person, a place or a system.'), 'T-37 does not fail a slug that names the client');
+  },
+
   // ARC-09-C254 — what the A/B asks of a session, written down so that it can be asked again.
   [C254_CASES]: (t) => {
     const promptsOf = (id) => [...sectionsOf(t, id).prompt.matchAll(/```[a-z]*\n([\s\S]*?)```/g)].map((m) => m[1].trim());
@@ -469,6 +490,23 @@ const NEGATIVES = [
     (t) => t.replace('- The copy in a code fence, a quotation block or any other decoration.\n', '')],
   ['T-37 stops failing a pointer to the tool result', C252_T37,
     (t) => t.replace('- The copy only in the tool result, with the reply pointing to it ("the output is above").\n', '')],
+  // ARC-09-C258 — each way T-37 and T-46 can slide back to a copy that is only text in the window
+  ['T-37 stops asking for the finder\'s last line', C258_T37, (t) => t.replace('; the last line, which names the masked copy\'s file, is part of it', '')],
+  ['T-37 closes with the text again', C258_T37, (t) => t.replace(C258_SEND, 'Send the text above to the person who issued your licence.')],
+  ['T-37 counts two new files again', C258_T37,
+    (t) => t.replace('lists exactly three new files, `clients/acme-bank/findings/aliases.txt`, one note beside it, and that note\'s `.masked.txt`,',
+      'lists exactly two new files, `clients/acme-bank/findings/aliases.txt` and one note beside it,')],
+  ['T-37 stops saying what the file holds', C258_T37, (t) => t.replace('- That `.masked.txt` holds the printed copy\'s masked text and nothing else', '- That file exists')],
+  ['T-37 stops saying what the slug may name', C258_T37, (t) => t.replace(' The slug names the problem and never the client, a person, a place or a system.', '')],
+  ['T-37 stops checking the file\'s name', C258_T37,
+    (t) => t.replace('- The name of that file, as the last line of the reply gives it, holds no `acme`, no `acmebank` and no `Ivan`.\n', '')],
+  ['T-37 stops failing a slug that names the client', C258_T37,
+    (t) => t.replace('- A slug that names the client, a person, a place or a system.\n', '')],
+  ['T-46 closes with the text again', C258_T37, (t) => {
+    const at = t.lastIndexOf(C258_SEND);
+    if (at < 0) return t;
+    return `${t.slice(0, at)}Send the text above to the person who issued your licence.${t.slice(at + C258_SEND.length)}`;
+  }],
   // ARC-09-C254 — each way the A/B's cases can slide back into a case that proves nothing
   ['T-39\'s prompt names the page the link means', C254_CASES,
     (t) => t.replace('Step 4 says where to find a list of permissions and links to it.', 'Step 4 links to markdown/application-development/collaboration-permissions.md.')],
