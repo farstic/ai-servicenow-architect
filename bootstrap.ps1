@@ -152,10 +152,14 @@ if ($SkipClaude) {
   Say "ok B00 claudeCode: $ClaudeV"
 }
 
+# ARC-09-C259: the floor is in bytes and decimal, the same number as DISK_SPARSE in B00.mjs and DISK_FLOOR_BYTES in bootstrap.sh
+# (tests/size-unit.test.mjs reads all three).
+$DiskFloorBytes = 1000000000
+$GbBytes = 1000000000
 $FreeBytes = (Get-PSDrive -Name ($Root.Substring(0, 1)) -ErrorAction SilentlyContinue).Free
 if (-not $FreeBytes) { $FreeBytes = 0 }
-if ($FreeBytes -lt 1073741824) { Die 'B00' 'less than 1 GiB free' ("free up space on $Root") 3 }
-Say ("ok B00 disk: {0} GB free" -f [int]($FreeBytes / 1073741824))
+if ($FreeBytes -lt $DiskFloorBytes) { Die 'B00' 'less than 1 GB free' ("free up space on $Root") 3 }
+Say ("ok B00 disk: {0} GB free" -f [int]($FreeBytes / $GbBytes))
 
 # ARC-09-C29: the host THIS RUN will contact, which is the corpus remote (B02 fetches it). The
 # product repository is never contacted by a bootstrap — `upgrade` uses the checkout's own

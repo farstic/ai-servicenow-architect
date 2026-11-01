@@ -323,7 +323,7 @@ rather than discovering the second after fixing the first. Any FAIL ends the run
 | 1 | root | `cwd` is not the checkout, or git reports a different toplevel (both compared through `realpath`) | `remedies.json` → the platform's own `cd` |
 | 2 | git | absent, or below `floors.git` | `xcode-select` · `winget` · the distribution package |
 | 3 | Claude Code | absent, or below `floors.claudeCode`. Not logged in is a **WARN**, never a FAIL — signing in is Claude Code's own first-run flow | the install page |
-| 4 | disk | less than 1 GiB free (1.5 GiB for the full corpus). Unmeasurable is a WARN, not a FAIL | `free up <n> MB on <mount>` |
+| 4 | disk | less than 1 GB free (1.5 GB for the full corpus). Unmeasurable is a WARN, not a FAIL | `free up <n> MB on <mount>` |
 | 5 | network | `HEAD https://github.com/` fails — through `HTTPS_PROXY` by CONNECT tunnel, honouring `NO_PROXY` | the shared network vocabulary (below) |
 | 6 | Node | absent or below `floors.node` — a `note:` in design-only, a FAIL only for live | `brew` · `winget` · nvm |
 | 7 | platform | never; 32-bit is a WARN | — |

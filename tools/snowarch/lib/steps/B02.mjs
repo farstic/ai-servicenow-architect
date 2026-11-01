@@ -18,6 +18,7 @@ import { CORPUS_TEXT } from './format.mjs';
 import { FILE, TEXT, ABSENT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
 import { needSpell, spellings } from '../launcher-spelling.mjs';
+import { megabytes } from '../size.mjs';
 
 export const id = 'B02';
 export const title = 'docs';
@@ -100,7 +101,7 @@ export const run = async (ctx) => {
   // The size line is `docsStatus`'s measurement, not a second walk of the tree.
   const status = docsStatus({ root: ctx.root, verify: false, measure: true });
   ctx.line?.(`[docs] ${status.fileCount.toLocaleString('en-US')} files · `
-    + `${Math.round(status.sizeBytes / (1024 * 1024))} MB working tree`);
+    + `${megabytes(status.sizeBytes)} MB working tree`);
 
   const citations = verifyCitations({ root: ctx.root });
   ctx.line?.(`citations: checked: ${citations.checked} | dead: ${citations.dead.length}`);

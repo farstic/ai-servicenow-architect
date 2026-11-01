@@ -29,7 +29,8 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const SCANNED = ['tools', 'scripts/ci', 'bootstrap.sh', 'bootstrap.ps1'];
 const LITERAL = /1024\s*\*\*\s*[234]|1024\s*\*\s*1024|\b2\s*\*\*\s*(?:20|30)\b|\b1_?048_?576\b|\b1_?073_?741_?824\b/;
 const DIVISION = /\/\s*\(?\s*(?:1e6|1e9|1_?000_?000(?:_?000)?)\b/;
-const SIZE_MODULE = 'tools/snowarch/lib/size.mjs';
+/** The unit and the test of the unit: the only files where a decimal divisor is written, the second to show the old formulas agree. */
+const SIZE_FILES = new Set(['tools/snowarch/lib/size.mjs', 'tools/snowarch/tests/size.test.mjs']);
 /** The only nanoseconds-to-milliseconds lines, by file and exact text: a time, not a size. */
 const NS_TO_MS = new Map([
   ['scripts/ci/banner-timing.mjs', 'return { ms: Number(process.hrtime.bigint() - started) / 1e6, r };'],
@@ -39,7 +40,7 @@ const NS_TO_MS = new Map([
 
 /** The lines of a file that spell a binary megabyte or gigabyte, or divide by a decimal one, outside the allowances. */
 function byteDivisors(rel, text) {
-  if (rel === SIZE_MODULE) return [];
+  if (SIZE_FILES.has(rel)) return [];
   return text.split('\n').flatMap((line, i) => {
     const t = line.trim();
     if (!LITERAL.test(t) && !DIVISION.test(t)) return [];
@@ -61,7 +62,7 @@ test('ARC-09-C259 — no byte divisor is written outside size.mjs: the instrumen
     assert.equal(byteDivisors(rel, line).length, 0, `${rel}: the nanosecond line is flagged`);
     assert.equal(byteDivisors('elsewhere.mjs', line).length, 1, 'the nanosecond allowance holds for its own file and no other');
   }
-  assert.equal(byteDivisors(SIZE_MODULE, 'export const MB = 1e6; const x = b / 1e6;').length, 0, 'size.mjs is the one place a divisor may be');
+  for (const rel of SIZE_FILES) assert.equal(byteDivisors(rel, 'const x = b / 1e6;').length, 0, `${rel} is a place a divisor may be`);
 
   const files = execFileSync('git', ['ls-files', '-z', '--', ...SCANNED], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 26 })
     .split('\0').filter((f) => /\.(mjs|js|ts|sh|ps1|cmd|yml)$/.test(f));

@@ -104,9 +104,14 @@ else
   ge "$CLAUDE_V" "$(floor claudeCode)" || die B00 "Claude Code $CLAUDE_V found, >= $(floor claudeCode) required" "$MSG_CLAUDE" 3
   say "ok B00 claudeCode: $CLAUDE_V"
 fi
+# ARC-09-C259: the floor is in bytes and decimal, the same number as DISK_SPARSE in B00.mjs and $DiskFloorBytes in bootstrap.ps1
+# (tests/size-unit.test.mjs reads all three). `df -Pk` counts 1024-byte blocks, so a block count times 1024 is the free bytes.
+DISK_FLOOR_BYTES=1000000000
+GB_BYTES=1000000000
 FREE_KB="$(df -Pk "$ROOT" | awk 'NR==2{print $4}')"
-[ "$FREE_KB" -ge 1048576 ] 2>/dev/null || die B00 "less than 1 GiB free" "free up space on $ROOT" 3
-say "ok B00 disk: $((FREE_KB/1048576)) GB free"
+case "$FREE_KB" in ''|*[!0-9]*) FREE_KB=0 ;; esac
+[ "$((FREE_KB * 1024))" -ge "$DISK_FLOOR_BYTES" ] || die B00 "less than 1 GB free" "free up space on $ROOT" 3
+say "ok B00 disk: $((FREE_KB * 1024 / GB_BYTES)) GB free"
 # `-h` is deliberately absent: with it, the pattern `HEAD` matches no head ref, `--exit-code`
 # returns 2, and git says nothing — so a probe that reads only stderr called that "reachable"
 # and one that reads only the exit code called it "unreachable". Both were reading a flag bug.

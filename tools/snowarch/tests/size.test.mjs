@@ -26,7 +26,8 @@ test('ARC-09-C259 — megabytes rounds as docs status and assert-docs always rou
   for (const [bytes, mb] of [[0, 0], [499_999, 0], [500_000, 1], [1_499_999, 1], [1_500_000, 2], [293_000_000, 293],
     [299_499_999, 299], [299_500_000, 300]]) {
     assert.equal(megabytes(bytes), mb, `${bytes} bytes`);
-    // The two functions this one replaces, as they were written: docs/status.mjs and scripts/ci/assert-docs.mjs. No output changes.
+    // The two functions this one replaces, as they were written: docs/status.mjs and scripts/ci/assert-docs.mjs. No output changes. (This
+    // file and size.mjs are the two places tests/size-unit.test.mjs lets a decimal divisor be written: the unit and the test of the unit.)
     assert.equal(megabytes(bytes), Math.round(bytes / 1_000_000), `${bytes}: not what docs status computed`);
     assert.equal(megabytes(bytes), Math.round(bytes / 1e6), `${bytes}: not what assert-docs computed`);
   }
