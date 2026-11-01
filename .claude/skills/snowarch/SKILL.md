@@ -239,15 +239,16 @@ to a file beside the note, for the user to send. The note stays on this machine;
    Keep them in `clients/<engagement>/findings/aliases.txt`, one per line, `#` for a comment. "None" is an answer.
 3. **Compose the note in the user's words**: what was asked, what happened, what was expected, the `Engine:` line
    of `./snowarch status`, and today's date.
-4. Run `node tools/snowarch/lib/finding.mjs --next-name <engagement> <slug>` for a free path, and **write the note
-   there** with the Write tool. Claude Code's own permission flow governs the write; this skill grants no write and
-   promises no prompt.
+4. Run `node tools/snowarch/lib/finding.mjs --next-name <engagement> <slug>` for a free path, with a slug that names the
+   problem, never the client, a person, a place or a system, because the file the user sends is named from it, and
+   **write the note there** with the Write tool. Claude Code's own permission flow governs the write; this skill grants
+   no write and promises no prompt.
 5. Run `node tools/snowarch/lib/finding.mjs <that path>`. **Print its output verbatim in your reply**: the tool result
    is not what the user reads. Give what ran, the warnings, the masked text, the "Read before sending" list and the last
    line, which names the masked copy's file or says it was not written, as plain text, with no code fence, no quotation
    and no "the output is above". Nothing goes in place of it. The tool also writes that file, beside the note.
 6. Close with: Send that file to the person who issued your licence, never the note; copying from this window can lose
-   characters. When the last line says the copy was NOT written, there is no file: close with that line instead.
+   characters. When the last line says the copy was NOT written, there is no current file: close with that line instead.
 
 The masker cannot know people's names, places, company names or abbreviations it was not given, ticket keys in
 other systems, record numbers with fewer than 6 digits, or a credential written in plain words that no rule
