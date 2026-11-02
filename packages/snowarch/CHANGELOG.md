@@ -5,6 +5,12 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
+then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
+with credentials the instance has just refused.
+
+## 2.2.5 — 2026-11-02
+
 **The corpus map ships with every release (ARC-09-C250).** `vendor/docs-map.md` joins the release coverage beside
 `vendor/docs-areas.txt`, so a distribution carries it and its signed manifest covers it. The map is made from the whole
 corpus at the pin: an install that is sparse by choice still reads every area's row, and the session banner's
@@ -46,10 +52,6 @@ bare word is now checked as `https://<input>` through the same checks, in their 
 the bare word's shape (`proposed: true`), and one that fails gets that check's own code and sentence; nonsense is still
 `URL_INVALID`, quoted back as typed. Under `--yes`, where nobody is asked, the wizard now prints `Using <url>, proposed
 from what you entered.` for a bare word and a bare host alike.
-
-**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
-then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
-with credentials the instance has just refused.
 
 ## 2.2.4 — 2026-10-23
 
