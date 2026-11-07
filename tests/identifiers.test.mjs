@@ -551,3 +551,61 @@ test('the real roster: the three arms hold, and what they rest on is pinned', ()
   assert.deepEqual({ checked: r.camel.checked, excused: r.camel.excused }, CAMEL_REAL);
   assert.deepEqual({ checked: r.spaced.checked, excused: r.spaced.excused }, SPACED_REAL);
 });
+
+// ARC-09-C263 (M6) — the roster must not CALL "not documented" a name the corpus prints. The Stop hook asks the model to correct such a
+// line in an answer; this keeps the text it reads from teaching one. Strict attribution: the phrase follows the name's closing mark (or
+// the name heads a table row that carries it). Planted on the fixture corpus above, each outcome once on each side.
+const strictOf = (t, skill) => run(fixture(t, skill));
+
+test('ARC-09-C263 M6 — a roster line that marks a name the corpus prints as not documented fails, and says which line', (t) => {
+  const r = strictOf(t, 'The table `present_plain_name` — not documented in the bundled corpus — verify on the instance.\n');
+  assert.deepEqual(r.strict.printed.map((p) => [p.file, p.line, p.identifier]), [[FILE, 1, 'present_plain_name']]);
+  assert.equal(r.status, 'fail');
+  const f = formatIdentifiers(r);
+  assert.equal(f.code, 1);
+  assert.match(f.text, /^STRICT \.claude\/skills\/fx\/SKILL\.md:1 present_plain_name — the roster calls it not documented, and the corpus prints it/m);
+  assert.match(f.text, /^strict marker subjects: checked 1 \| printed by the corpus 1$/m);
+});
+
+test('ARC-09-C263 M6 — the other side: words between the name and the phrase, a name the corpus does not print, and a fence mark nothing', (t) => {
+  // The phrase is about something later in the sentence, not about the name.
+  assert.deepEqual(strictOf(t, 'The table `present_plain_name` holds names; the field below is not documented in the bundled corpus.\n').strict, { checked: 0, printed: [] });
+  // A name the corpus really lacks, marked: that is what the marker is for.
+  const lacks = strictOf(t, 'Uses `sn_invented_table` — not documented in the bundled corpus — verify on the instance.\n');
+  assert.deepEqual(lacks.strict, { checked: 1, printed: [] });
+  assert.equal(lacks.status, 'ok');
+  // Inside a fence it is a transcript, not a claim.
+  assert.deepEqual(strictOf(t, '```\n`present_plain_name` is not documented\n```\n').strict, { checked: 0, printed: [] });
+  // A bare "verify on the instance" is a deferral, not an absence.
+  assert.deepEqual(strictOf(t, '`present_plain_name` — verify on the instance.\n').strict, { checked: 0, printed: [] });
+});
+
+test('ARC-09-C263 M6 — a table row\'s first cell is its subject; a name in a later cell is not', (t) => {
+  const row = strictOf(t, '| `present_plain_name` | baseline | not documented in the bundled corpus |\n');
+  assert.deepEqual(row.strict.printed.map((p) => p.identifier), ['present_plain_name']);
+  const later = strictOf(t, '| table | note |\n| --- | --- |\n| plain | `present_plain_name` is baseline | not documented here |\n');
+  assert.deepEqual(later.strict, { checked: 0, printed: [] });
+});
+
+test('ARC-09-C263 M6 — a dotted name in a namespace is looked up whole; a table written with a field is left to the hook', (t) => {
+  // sn_demo. has five names in the fixture corpus: a namespace.
+  const printed = strictOf(t, '`sn_demo.admin` is not documented in the bundled corpus.\n');
+  assert.deepEqual(printed.strict.printed.map((p) => p.identifier), ['sn_demo.admin']);
+  const absent = strictOf(t, '`sn_demo.nobody` is not documented in the bundled corpus.\n');
+  assert.deepEqual(absent.strict, { checked: 1, printed: [] });
+  // hr_case. has one dotted name: a table with a field, looked up by its parts, which the corpus index does not hold per page.
+  const byParts = strictOf(t, '`hr_case.reopened` is not documented in the bundled corpus.\n');
+  assert.deepEqual(byParts.strict, { checked: 0, printed: [] });
+});
+
+test('ARC-09-C263 M6 — custom names are the customer\'s: never looked up', (t) => {
+  assert.deepEqual(strictOf(t, '`x_acme_present_plain_name` is not documented in the bundled corpus.\n').strict, { checked: 0, printed: [] });
+});
+
+test('ARC-09-C263 M6 — the real roster: every strict subject is a name the corpus really lacks', { skip: WHOLE_CORPUS ? false : 'needs the whole corpus' }, () => {
+  const r = verifyIdentifiers({ root: ROOT, index: realIndexOnce() });
+  assert.deepEqual(r.strict.printed, []);
+  // Three tokens, `employment_status`, `sub_state` and `sn_aia_version`; the two `sn_hr_core_case.sub_state` sites are by parts.
+  // A change here is a decision made in review, like the counts above.
+  assert.equal(r.strict.checked, 3);
+});
