@@ -9,6 +9,33 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**The Architect reads with no page limit, and the machine checks what it read.** The grounding rule no longer stops at twelve
+pages: the Architect reads the corpus pages for the constructs in play until each is cited from a page it read, or an escape-safe
+search did not find it, and ends Part 2 of every Envelope with `Pages read: <n>`. At the end of each turn the Stop hook compares
+the answer's names and citations with the pages the session actually read and the names the corpus prints, and asks the Architect
+once to correct what does not match.
+
+### Changed
+
+- The grounding rule (`CLAUDE.md` and the six gateways' Part 2) has no page limit and no resting label. It said "twelve by default;
+  while pages remain, open a construct's page before you call it unverified; past that, say which construct is still unverified",
+  and 38 of 41 measured Envelopes stopped under twelve pages and 3 at exactly twelve, then called constructs "not documented", one
+  of them "in the pages I opened". Now a construct a search finds is opened, never labelled; "not documented in the bundled corpus"
+  is for a construct an escape-safe search did not find; only names the request, the skill, a page read or an instance read gives
+  are printed; two pages that disagree are both cited and the difference is an OPEN QUESTION; and a field a page creates in an
+  example belongs to that example, not to baseline. A co-fired Envelope states its own count (ARC-09-C263).
+- The Stop hook has a second part. It reads the session transcript and a names index of the corpus and asks, once, about a name
+  called "not documented" that the corpus prints, a name nothing the session read gives, a page cited and never read, "unverified"
+  or "not opened" in the final reply, and a page count above the pages read. What stayed open after that one ask is shown to you,
+  as a line beginning "Grounding check:", never to the model. It never prints a name the corpus does not print (ARC-09-C263).
+
+### Added
+
+- `./snowarch doctor` gains E-33, the grounding names index of the docs pin, and `--fix` builds it (F9). The index
+  (`.local/corpus-names/`, about 9 MB for the whole corpus) is built at `docs sync` and by bootstrap, which now runs again on an
+  upgrade for an install made before it existed, and says "the names index is not held" in the plan (ARC-09-C263).
+- `docs verify` fails a roster line that calls a name "not documented" when the corpus prints it (ARC-09-C263).
+
 ## 2.2.5 — 2026-11-02
 
 ### Notes
