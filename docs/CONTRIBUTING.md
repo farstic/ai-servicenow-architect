@@ -315,6 +315,18 @@ prescribe the disproven step will send the next person to do it. So resolving a 
 sweeping every cell that repeats it, not only the cell that reported it, and pinning a load-bearing
 claim with a test that reds when the tree moves.
 
+**A fixture captured from a real session is sanitised by key, and fails closed.** ARC-09-C263
+(2026-11-07): the first set of recorded transcripts went out with the capturing account's id in 23
+rows, because the sanitiser replaced the identifiers its author had noticed, by value, and nothing
+failed when one survived. The rule for every fixture made from a real session: replace identity
+fields by KEY (`accountUuid`, `organizationUuid`, `userEmail` and any key a capture shows with an
+identity name) with a registered placeholder; read the real values from the capture itself and make
+the generator throw when one survives in its output; hold the property in a test that embeds no real
+value and proves it can fail with a value planted at run time
+(`tests/transcript-fixtures-identity.test.mjs`); and before the first push run an identity scan over
+every commit of the branch, with the capture's own values and counts only, and gitleaks. A public
+repository keeps what it is given.
+
 
 **The upgrade harness builds a whole tree, and the guard on it is a subset.** `tests/upgrade/` is
 excluded from `npm test` (it builds git worlds and costs minutes) and runs in `upgrade-e2e` on three
