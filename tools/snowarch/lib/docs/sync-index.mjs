@@ -29,7 +29,7 @@ export function indexAfterSync({ root, corpus, pin, say = () => {}, cli = './sno
   } catch (e) {
     // A non-zero exit still printed its JSON line; read it when it is there.
     try { out = JSON.parse(String(e?.stdout ?? '').trim().split('\n').pop()); } catch { out = null; }
-    if (!out) out = { built: false, ms: 0, meta: null, error: e?.code === 'ETIMEDOUT' ? 'the build timed out' : (e instanceof Error ? e.message.split('\n')[0] : String(e)) };
+    if (!out) out = { built: false, ms: 0, meta: null, error: /TIMEDOUT$/.test(String(e?.code ?? '')) ? 'the build timed out' : (e instanceof Error ? e.message.split('\n')[0] : String(e)) };
   }
   if (out.line) say(out.line);
   else if (out.error) say(notBuilt(out.error, cli));
