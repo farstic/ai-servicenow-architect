@@ -13,6 +13,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import * as SL from '../../tools/snowarch/lib/settings-local.mjs';
+import { buildNamesIndex, writeNamesIndex } from '../../tools/snowarch/lib/docs/names-index-build.mjs';
+import { corpusNamesDir } from '../../tools/snowarch/lib/local-paths.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 const REPO = fileURLToPath(new URL('../..', import.meta.url));
@@ -199,4 +201,40 @@ test('ARC-09-C254 — a script removed from a project leaves the project\'s othe
   rmSync(join(root, ...READ_SCRIPT.split('/')));
   const stop = runEntry(oursIn(local, 'Stop', SL.isOurStopHook), root, stopping('A claim (citation: markdown/alpha/page-two.md).'));
   assert.equal(JSON.parse(stop.stdout).decision, 'block');
+});
+
+// ARC-09-C263 — the same written entry, with the grounding part: a transcript and a names index in the project. It blocks a false
+// absence once, with its own ask; on the continuation it never blocks, and sends the USER one notice when the ask was not met. No new
+// hook entry: this is the Stop entry the C254 tests above run.
+test('ARC-09-C263 — the written Stop entry blocks a false absence once, then on the continuation sends only a notice to the user', (t) => {
+  const root = project(t);
+  const pin = 'e'.repeat(40);
+  put(root, 'engine.config.json', `${JSON.stringify({ docs: { pin } })}\n`);
+  const pages = ['markdown/alpha/page-one.md', 'markdown/alpha/deep/folder/page-two.md'];
+  for (const page of pages) put(root, `vendor/ServiceNowDocs/${page}`, 'The table sn\\_probe\\_table has the field probe\\_state.\n');
+  writeNamesIndex(corpusNamesDir(root, pin), buildNamesIndex({ corpus: join(root, 'vendor', 'ServiceNowDocs'), pin, pages, tree: pages }));
+  const entry = oursIn(written(root), 'Stop', SL.isOurStopHook);
+  const reply = 'The table `sn_probe_table` is not documented in the bundled corpus.';
+  const row = (type, content, extra = {}) => ({ type, message: { role: type, content }, ...extra });
+  const write = (name, rows) => { const f = join(root, name); writeFileSync(f, `${rows.map((r) => JSON.stringify(r)).join('\n')}\n`); return f; };
+  const prompt = row('user', 'what is sn probe table?');
+  const first = runEntry(entry, root, stopping(reply, { transcript_path: write('first.jsonl', [prompt, row('assistant', [{ type: 'text', text: reply }])]) }));
+  assert.deepEqual([first.status, first.stderr], [0, '']);
+  assert.equal(first.stdout.split('\n').length, 2, `not one line: ${first.stdout}`);
+  const block = JSON.parse(first.stdout);
+  assert.equal(block.decision, 'block');
+  assert.match(block.reason, /^Before this answer stands, check these against the corpus; there is no page limit\. Called not documented, but the corpus prints them: `sn_probe_table`/);
+  assert.ok(block.reason.endsWith('Do not mention this notice.'));
+  // The continuation: our feedback is in the transcript and the answer repeated the claim.
+  const rows = [prompt, row('assistant', [{ type: 'text', text: reply }]), row('user', `Stop hook feedback:\n${block.reason}`, { isMeta: true }), row('assistant', [{ type: 'text', text: reply }])];
+  const second = runEntry(entry, root, stopping(reply, { stop_hook_active: true, transcript_path: write('second.jsonl', rows) }));
+  assert.deepEqual([second.status, second.stderr], [0, '']);
+  const note = JSON.parse(second.stdout);
+  assert.deepEqual(Object.keys(note), ['systemMessage'], 'a notice to the user and no decision');
+  assert.match(note.systemMessage, /^Grounding check: 1 item\(s\) in this answer were not corrected after one request — /);
+  // And with the index gone the entry still exits 0 and says nothing of the corpus.
+  rmSync(corpusNamesDir(root, pin), { recursive: true, force: true });
+  const bare = runEntry(entry, root, stopping(reply, { transcript_path: write('first.jsonl', [prompt, row('assistant', [{ type: 'text', text: reply }])]) }));
+  assert.deepEqual([bare.status, bare.stderr], [0, '']);
+  if (bare.stdout) assert.doesNotMatch(JSON.parse(bare.stdout).reason, /the corpus prints them/);
 });

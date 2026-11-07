@@ -22,10 +22,12 @@
 // pin is given, another pin: a hook that gets `null` runs the checks that need no index and says nothing else.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { MODE } from './sync.mjs';
 
 export const NAMES_INDEX_VERSION = 1;
 export const FILES = Object.freeze({ meta: 'meta.json', pages: 'pages.txt', names: 'names.tsv' });
-export const COVERAGE = Object.freeze({ full: 'full', disk: 'disk' });
+// `full` is the docs mode's own word for "the whole corpus is on disk" (sync.mjs MODE.full, ARC-09-C244): one spelling, not two.
+export const COVERAGE = Object.freeze({ full: MODE.full, disk: 'disk' });
 
 const lines = (text) => {
   const out = text.split('\n');

@@ -45,7 +45,8 @@ test('ARC-09-C263 M4 — every capture of every version parses, is one version, 
   for (const c of MANIFEST.captures) {
     const t = readTurnSources(join(FIXTURES, c.file), { options: OPTIONS });
     assert.ok(t, `${c.file}: not read`);
-    assert.equal(t.rows, c.rows, `${c.file}: every row of a main file is a main-thread row`);
+    assert.equal(t.rowCount, c.rows, `${c.file}: every row of a main file is a main-thread row`);
+    assert.equal(t.rows.length, c.rows, `${c.file}: readTurnSources hands back the rows`);
     const versions = [...new Set(parseTranscript(readFileSync(join(FIXTURES, c.file), 'utf8')).rows.map((r) => r.version).filter(Boolean))];
     assert.deepEqual(versions, [c.claudeCode], `${c.file}: the rows say ${versions}, the manifest ${c.claudeCode}`);
     assert.equal(t.badLines, 0, `${c.file}: lines that do not parse`);
@@ -156,7 +157,7 @@ test('ARC-09-C263 M4 — sub-agent rows are dropped whatever the caller passes: 
     { ...use('rx', 'Read', { file_path: PAGE.replace('c_Example', 'c_Agent') }), parent_tool_use_id: 'toolu_agent' },
   ];
   const t = turnSources(rows, OPTIONS);
-  assert.equal(t.rows, 3, 'three main-thread rows');
+  assert.equal(t.rowCount, 3, 'three main-thread rows');
   assert.deepEqual([...t.pagesRead], ['markdown/itsm/c_Example.md']);
   assert.ok(t.names.read.has('sn_main_table') && !t.names.read.has('sn_agent_page_name'));
   assert.equal(isMainRow({ isSidechain: true }), false);

@@ -138,9 +138,10 @@ export function turnSources(rows, options = {}) {
   main.forEach((r, i) => { if (r.type === 'system' && r.subtype === 'compact_boundary') boundary = i; });
   const live = main.slice(boundary + 1);
   const out = {
-    rows: main.length, boundary, compacted: main.filter((r) => r.type === 'system' && r.subtype === 'compact_boundary').length,
+    rowCount: main.length, live, boundary, compacted: main.filter((r) => r.type === 'system' && r.subtype === 'compact_boundary').length,
     request: [],                 // the user's prompts after the boundary
     replyBlocks: [],             // the assistant text blocks of the current turn that the file holds
+    finalBlocks: [],             // those after the turn's last tool result: what the user reads last
     turnStart: -1,               // index into `live` of the row that began the current turn
     startedBy: null,             // 'prompt' | 'task-notification' | null
     pagesRead: new Set(),        // `markdown/<area>/….md`, distinct, after the boundary
@@ -155,7 +156,9 @@ export function turnSources(rows, options = {}) {
 
   // Pass 1 — the tool calls, by id; and where the current turn begins.
   const uses = new Map();
+  let lastResult = -1;
   live.forEach((r, i) => {
+    if (r.type === 'user' && blocksOf(r).some((b) => b.type === 'tool_result')) lastResult = i;
     if (r.type === 'assistant') {
       for (const b of blocksOf(r)) if (b.type === 'tool_use' && b.id) uses.set(b.id, { name: b.name, input: b.input ?? {}, at: i });
     } else if (r.type === 'user') {
@@ -175,7 +178,13 @@ export function turnSources(rows, options = {}) {
 
   live.forEach((r, i) => {
     if (r.type === 'assistant') {
-      if (i > out.turnStart) for (const b of blocksOf(r)) if (b.type === 'text' && typeof b.text === 'string' && b.text) out.replyBlocks.push(b.text);
+      if (i > out.turnStart && i > (options.replyAfter ?? -1)) {
+        for (const b of blocksOf(r)) {
+          if (b.type !== 'text' || typeof b.text !== 'string' || !b.text) continue;
+          out.replyBlocks.push(b.text);
+          if (i > lastResult) out.finalBlocks.push(b.text);
+        }
+      }
       for (const b of blocksOf(r)) {
         if (b.type !== 'tool_use') continue;
         const input = b.input ?? {};
@@ -246,19 +255,25 @@ export function turnSources(rows, options = {}) {
 }
 
 /**
- * The transcript at `transcriptPath`, parsed, and the sources in it; or `null` when there is nothing to read (a missing or unreadable
- * file, an unknown format, a file over MAX_TRANSCRIPT_BYTES). `onDebug` is told why, once. Never throws.
+ * The rows of the transcript at `transcriptPath` (`{ rows, badLines, crlf, bytes }`), or `null` when there is nothing to read: a
+ * missing or unreadable file, an unknown format, a file over MAX_TRANSCRIPT_BYTES. `onDebug` is told why, once. Never throws.
  */
-export function readTurnSources(transcriptPath, { options = {}, read = readFileSync, stat = statSync, maxBytes = MAX_TRANSCRIPT_BYTES, onDebug = () => {} } = {}) {
+export function readTranscriptRows(transcriptPath, { read = readFileSync, stat = statSync, maxBytes = MAX_TRANSCRIPT_BYTES, onDebug = () => {} } = {}) {
   try {
     if (typeof transcriptPath !== 'string' || !transcriptPath) { onDebug('no transcript path'); return null; }
     const size = stat(transcriptPath).size;
     if (size > maxBytes) { onDebug(`transcript is ${size} bytes, over the ${maxBytes} limit: reply-only checks`); return null; }
     const parsed = parseTranscript(read(transcriptPath, 'utf8'));
     if (!looksLikeTranscript(parsed)) { onDebug('transcript format not recognised'); return null; }
-    return { ...parsed, bytes: size, ...turnSources(parsed.rows, options) };
+    return { ...parsed, bytes: size };
   } catch (e) {
     onDebug(`transcript unreadable: ${e instanceof Error ? e.message : String(e)}`);
     return null;
   }
+}
+
+/** The transcript's rows and the sources in them (`readTranscriptRows` + `turnSources`), or `null`. The architect's replay calls this. */
+export function readTurnSources(transcriptPath, { options = {}, ...io } = {}) {
+  const t = readTranscriptRows(transcriptPath, io);
+  return t ? { ...t, ...turnSources(t.rows, options) } : null;
 }
