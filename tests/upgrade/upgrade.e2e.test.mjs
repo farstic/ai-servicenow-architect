@@ -59,7 +59,7 @@ test('AC 1 — a release that moves one declared input re-runs exactly that step
   // The PLAN said which step, before the tree moved.
   assert.match(r.text, /steps that will re-run: B02 the documentation corpus \(vendor\/docs-areas\.txt changed\)/);
   assert.match(r.text, /store: schema v1 → v1 \(no migration\)/);
-  assert.match(r.text, /credentials: untouched/);
+  assert.match(r.text, /credentials: no instance, credential or flag in \.local\/instances\.json is changed/);
 
   // …and the run did exactly that. B02 re-ran; the four cacheable steps whose inputs did not move
   // printed `ok (cached)` and kept their entries, which is the assertion that survives a runner
