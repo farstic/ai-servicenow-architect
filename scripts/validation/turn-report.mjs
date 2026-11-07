@@ -42,16 +42,40 @@ function events(streamText) {
 
 const blocks = (e) => (e?.type === 'assistant' && Array.isArray(e.message?.content) ? e.message.content : []);
 
+const textOf = (content) => (typeof content === 'string' ? content
+  : (Array.isArray(content) ? content.filter((c) => c?.type === 'text').map((c) => c.text ?? '').join('\n') : ''));
+/** A Stop hook's feedback row, known by its text and not by a flag: `isSynthetic` in the stream, `isMeta` on disk, either one or neither. */
+const isFeedback = (e) => e?.type === 'user' && textOf(e.message?.content).trimStart().startsWith('Stop hook feedback:');
+const hasResult = (e) => e?.type === 'user' && Array.isArray(e.message?.content) && e.message.content.some((c) => c?.type === 'tool_result');
+const textAfterLastResult = (events) => events.slice(events.findLastIndex(hasResult) + 1).flatMap(blocks)
+  .filter((b) => b?.type === 'text').map((b) => b.text).join('\n');
+
 /**
- * What the main thread wrote after its last tool result: the reply, and the line after it when a Stop hook sent the turn
- * on for a correction (ARC-09-C254). The stream's `result` row is only the last message, so it is the correction alone then.
- * Text written before a tool call is narration, and a sub-agent's text (`parent_tool_use_id`) is not the main thread's.
+ * What the main thread wrote after its last tool result: the reply. Text written before a tool call is narration, and a sub-agent's text
+ * (`parent_tool_use_id`) is not the main thread's.
+ *
+ * ARC-09-C263 (M7) — and a turn a Stop hook sent on is TWO segments, not one. The stream's `result` row is only the last message, and the
+ * text after the last tool result is only the continuation's when the continuation made tool calls (it Reads the page it was asked to
+ * read): the Envelope was gone from the report, and a grader read the correction alone. So the turn is the text after the last tool
+ * result BEFORE the first `Stop hook feedback:` row, plus the continuation's text after ITS last tool result; and the corpus pages the
+ * continuation Read are listed.
  */
-function finalText(evs) {
+function turnText(evs) {
   const main = evs.filter((e) => !e?.parent_tool_use_id);
-  const last = main.findLastIndex((e) => e?.type === 'user' && Array.isArray(e.message?.content)
-    && e.message.content.some((c) => c?.type === 'tool_result'));
-  return main.slice(last + 1).flatMap(blocks).filter((b) => b?.type === 'text').map((b) => b.text).join('\n');
+  const fb = main.findIndex(isFeedback);
+  if (fb < 0) return { answer: textAfterLastResult(main), blocked: false, beforeBlock: null, continuation: null, continuationReads: [] };
+  const beforeBlock = textAfterLastResult(main.slice(0, fb));
+  const post = main.slice(fb + 1);
+  const continuation = textAfterLastResult(post);
+  const reads = new Set();
+  for (const e of post) {
+    for (const b of blocks(e)) {
+      if (b?.type !== 'tool_use' || b.name !== 'Read') continue;
+      const page = corpusRelative(b.input?.file_path);
+      if (page) reads.add(page);
+    }
+  }
+  return { answer: [beforeBlock, continuation].filter(Boolean).join('\n'), blocked: true, beforeBlock, continuation, continuationReads: [...reads] };
 }
 
 /** `markdown/...` for a path that names a corpus page by any of its spellings, else null. */
@@ -99,7 +123,8 @@ export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, '
   // The answer: what the model wrote after its last tool result when there is a result event (the result row alone is the last
   // message, which is a correction line when a Stop hook asked for one), else all that the assistant said.
   const result = [...evs].reverse().find((e) => e?.type === 'result' && typeof e.result === 'string');
-  const answer = result ? (finalText(evs) || result.result)
+  const turn = turnText(evs);
+  const answer = result ? (turn.answer || result.result)
     : evs.flatMap(blocks).filter((b) => b?.type === 'text').map((b) => b.text).join('\n');
 
   // The finder's output: the tool result of a Bash call that ran finding.mjs and printed the review list (the --next-name run prints a path
@@ -171,7 +196,8 @@ export function reportTurn(streamText, { repoRoot, corpusRoot = join(repoRoot, '
       else citations.push({ cited, status: 'missing', resolved: null });
     }
   }
-  return { skills, corpusReads: [...reads], corpusSearches: searches, citations, findingCopy };
+  return { skills, corpusReads: [...reads], corpusSearches: searches, citations, findingCopy,
+    stopBlock: { blocked: turn.blocked, continuationReads: turn.continuationReads } };
 }
 
 export function formatReport(r) {
@@ -180,6 +206,7 @@ export function formatReport(r) {
     + ` · corpus pages read: ${r.corpusReads.length}${r.corpusSearches ? ` (+${r.corpusSearches} searches)` : ''}`
     + ` · citations: ${r.citations.length}`
     + (r.citations.length ? ` (ok ${n('ok')} · bare ${n('bare')} · ambiguous ${n('ambiguous')} · missing ${n('missing')})` : '')
+    + (r.stopBlock?.blocked ? ` · stop block: 1 (the continuation read ${r.stopBlock.continuationReads.length} corpus page${r.stopBlock.continuationReads.length === 1 ? '' : 's'}${r.stopBlock.continuationReads.length ? `: ${r.stopBlock.continuationReads.join(', ')}` : ''})` : '')
     + (r.findingCopy ? ` · finding copy: ${!r.findingCopy.verbatim ? 'NOT in the reply as printed (only in the tool result, or changed)'
       : r.findingCopy.fenced ? 'in the reply, but in a code fence' : 'in the reply, verbatim, unfenced'}` : '');
   const detail = r.citations.filter((c) => c.status !== 'ok').map((c) => {
