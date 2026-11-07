@@ -12,8 +12,9 @@ All notable changes to this project are documented in this file. Everything hand
 **The Architect reads with no page limit, and the machine checks what it read.** The grounding rule no longer stops at twelve
 pages: the Architect reads the corpus pages for the constructs in play until each is cited from a page it read, or an escape-safe
 search did not find it, and ends Part 2 of every Envelope with `Pages read: <n>`. At the end of each turn the Stop hook compares
-the answer's names and citations with the pages the session actually read and the names the corpus prints, and asks the Architect
-once to correct what does not match.
+the answer's names and citations with the pages the session actually read and the names the corpus prints. It asks the Architect
+once, and only about a page the answer cites and the session never read; the other comparisons are computed and do not ask,
+pending a measured second stage.
 
 ### Changed
 
@@ -24,10 +25,13 @@ once to correct what does not match.
   is for a construct an escape-safe search did not find; only names the request, the skill, a page read or an instance read gives
   are printed; two pages that disagree are both cited and the difference is an OPEN QUESTION; and a field a page creates in an
   example belongs to that example, not to baseline. A co-fired Envelope states its own count (ARC-09-C263).
-- The Stop hook has a second part. It reads the session transcript and a names index of the corpus and asks, once, about a name
-  called "not documented" that the corpus prints, a name nothing the session read gives, a page cited and never read, "unverified"
-  or "not opened" in the final reply, and a page count above the pages read. What stayed open after that one ask is shown to you,
-  as a line beginning "Grounding check:", never to the model. It never prints a name the corpus does not print (ARC-09-C263).
+- The Stop hook has a second part. It reads the session transcript and a names index of the corpus and asks, once, about a page
+  the answer cites and the session never read. What stayed open after that one ask is shown to you, as a line beginning
+  "Grounding check:", never to the model. It never prints a name the corpus does not print. It also computes, and does not ask
+  about, a name called "not documented" that the corpus prints, a name nothing the session read gives, "unverified" or "not
+  opened" in the final reply, and a page count above the pages read: in a replay of recorded sittings only the check on a page
+  cited and never read cleared the bar (39 of 40 judged flags right, against a bar of 0.90), so which checks may ask is a file
+  of data (`lib/docs/grounding-classes.json`) that the measurement sets (ARC-09-C263).
 
 ### Added
 
