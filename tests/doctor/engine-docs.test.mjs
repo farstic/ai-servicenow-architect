@@ -8,7 +8,7 @@
 // the only way to assert the absent-corpus cases without deleting the developer's own checkout.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
@@ -30,6 +30,8 @@ import { docsFor, engineDocsChecks } from '../../tools/snowarch/lib/doctor/check
 import { E12_ABSENT } from '../../tools/snowarch/lib/docs/status.mjs';
 import { KINDS } from '../../tools/snowarch/lib/doctor/fix.mjs';
 import { contextFor, greenTree, runById } from './helpers/tree.mjs';
+import { corpusNamesDir } from '../../tools/snowarch/lib/local-paths.mjs';
+import { buildNamesIndex, writeNamesIndex } from '../../tools/snowarch/lib/docs/names-index-build.mjs';
 
 const checks = engineDocsChecks();
 const PIN = 'a'.repeat(40);
@@ -253,4 +255,53 @@ test('the other corpus checks defer to E-12 rather than repeating its diagnosis'
     assert.equal(r.status, 'skip');
     assert.match(r.detail, /see E-12/);
   }
+});
+
+// ARC-09-C263 (M8) — E-33, the grounding names index of the docs pin: ok / missing / stale, and the repair it offers.
+const indexFor = (c, pin = PIN, pages = ['markdown/itsm/a.md', 'markdown/csm/b.md']) => {
+  const corpus = join(c.root, 'idx-corpus');
+  for (const page of pages) { mkdirSync(join(corpus, page, '..'), { recursive: true }); writeFileSync(join(corpus, page), 'sys_user and task_sla\n'); }
+  writeNamesIndex(corpusNamesDir(c.root, pin), buildNamesIndex({ corpus, pin, pages, tree: pages }));
+};
+
+test('ARC-09-C263 — E-33 is ok when the index loads for the pin, and says what it holds', async (t) => {
+  const c = ctx(t);
+  indexFor(c);
+  const r = await runById(checks, 'E-33', c);
+  assert.equal(r.status, 'ok', r.detail);
+  assert.equal(r.detail, `${PIN.slice(0, 12)} · 2 names · 2 pages · coverage full`);
+  assert.deepEqual(r.data, { state: 'ok', pin: PIN.slice(0, 12), names: 2, pages: 2, coverage: 'full' });
+});
+
+test('ARC-09-C263 — E-33 warns when there is no index, names the repair, and offers --fix a kind the whitelist knows', async (t) => {
+  const r = await run(t, 'E-33');
+  assert.equal(r.status, 'warn');
+  assert.match(r.detail, /^not built — the reply checks run without it; run .+ doctor --fix$/);
+  assert.equal(r.remedy, `run ${SPELLED_CLI} doctor --fix`);
+  assert.equal(r.command, `${SPELLED_CLI} doctor --fix`);
+  assert.equal(checks.find((x) => x.id === 'E-33').fixable, true);
+  assert.equal(r.data.fix.kind, 'names-index');
+  assert.ok(KINDS.includes(r.data.fix.kind));
+});
+
+test('ARC-09-C263 — E-33 calls an index built for another pin stale, not current', async (t) => {
+  const c = ctx(t);
+  indexFor(c, 'b'.repeat(40));
+  const r = await runById(checks, 'E-33', c);
+  assert.equal(r.status, 'warn');
+  assert.match(r.detail, /^built for another docs pin — /);
+  assert.equal(r.data.state, 'stale');
+  // ...and a corrupt file is "not built", never a crash.
+  const d = corpusNamesDir(c.root, PIN);
+  mkdirSync(d, { recursive: true });
+  writeFileSync(join(d, 'meta.json'), '{ broken');
+  const again = await runById(checks, 'E-33', c);
+  assert.equal(again.status, 'warn');
+});
+
+test('ARC-09-C263 — E-33 defers to E-12 when the corpus is absent, and is out of --quick (it reads the shared docsStatus)', async (t) => {
+  const r = await run(t, 'E-33', { status: { present: false, mode: 'skip' } });
+  assert.equal(r.status, 'skip');
+  assert.match(r.detail, /see E-12/);
+  assert.equal(checks.find((x) => x.id === 'E-33').quick, false);
 });

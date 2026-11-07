@@ -21,13 +21,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { planContext, planForMove, planSteps, rerunAtTag } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { hashFor } from '../../tools/snowarch/lib/inputs.mjs';
 import { checkoutKey } from '../../tools/snowarch/lib/state.mjs';
+import { corpusNamesDir } from '../../tools/snowarch/lib/local-paths.mjs';
+import { buildNamesIndex, writeNamesIndex } from '../../tools/snowarch/lib/docs/names-index-build.mjs';
 import { STEPS } from '../../tools/snowarch/lib/steps/index.mjs';
 import { LONGPATHS, git } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -111,6 +113,9 @@ function recordCurrent(root, ctx) {
   mkdirSync(join(root, '.local'), { recursive: true });
   writeFileSync(join(root, '.local', 'bootstrap-state.json'),
     `${JSON.stringify(state, null, 2)}\n`);
+  // ARC-09-C263 — "current" includes B02's OUTPUT: the names index of the pin, which the runner asks for whatever B02's inputs say.
+  const pin = ctx.config.docs.pin;
+  writeNamesIndex(corpusNamesDir(root, pin), buildNamesIndex({ corpus: '/nowhere', pin, pages: ['markdown/itsm/a.md'], tree: null, read: () => 'sys_user\n' }));
   return state.steps;
 }
 
@@ -198,6 +203,28 @@ test('ARC-09-C140 — B01 is in the plan when its release manifest is not held, 
   const checkedOut = planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync, manifestWritten: true });
   assert.deepEqual(checkedOut.steps.map((s) => s.step), [],
     `U5 writes the manifest, yet the plan promises to re-run ${checkedOut.steps.map((s) => s.step).join(', ')}`);
+});
+
+test('ARC-09-C263 — B02 is in the plan when the names index of the pin is not held, and not when it is', { timeout: 120_000 }, (t) => {
+  const root = clone(t);
+  const ctx = ctxFor(root);
+  checkoutTag(root, 'v9.9.9-target');
+  recordCurrent(root, ctx);                                     // the state, and the index
+  const state = JSON.parse(readFileSync(join(root, '.local', 'bootstrap-state.json'), 'utf8'));
+  const held = planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync });
+  assert.deepEqual(held.steps.map((s) => s.step), [], `the index is held, yet the plan promises ${held.steps.map((s) => s.step).join(', ')}`);
+
+  // An install made before the index existed: the corpus at an unchanged pin, B02's inputs unmoved, no index.
+  rmSync(corpusNamesDir(root, ctx.config.docs.pin), { recursive: true, force: true });
+  const missing = planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync });
+  assert.deepEqual(missing.steps.map((s) => [s.step, s.why]), [['B02', 'the names index is not held']]);
+  assert.equal(missing.estimate, false);
+
+  // The file-diff estimate does not read `.local/`: a plan that cannot make the worktree says nothing of the index (ARC-09-C196).
+
+  // A corpus the install skipped has no index to want.
+  const skipped = planSteps(root, 'v9.9.9-target', { ctx: { ...ctx, docs: 'skip' }, state: { ...state, docs: { mode: 'skip' } }, run: spawnSync });
+  assert.ok(!skipped.steps.some((x) => x.step === 'B02' && x.why === 'the names index is not held'), 'a skipped corpus planned B02 for its index');
 });
 
 test('the plan says so when it could not make the runner\'s comparison', { timeout: 120_000 }, (t) => {
