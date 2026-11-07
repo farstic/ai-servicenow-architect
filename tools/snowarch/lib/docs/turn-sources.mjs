@@ -25,11 +25,12 @@
 //
 // PURE where it can be: `turnSources(rows, options)` does no I/O and reads no clock. `readTurnSources(path)` reads the file.
 import { readFileSync, statSync } from 'node:fs';
+import { MB } from '../size.mjs';
 import { pageNames } from './name-rules.mjs';
 import { corpusRelative } from './resolve.mjs';
 
 /** Over this many bytes a transcript is not read: the check runs on the reply alone. */
-export const MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024;
+export const MAX_TRANSCRIPT_BYTES = 64 * MB;
 
 /** The prefixes by which a user row is known, in the order tried. A flag never decides; the prefix does. */
 const PREFIXES = Object.freeze([

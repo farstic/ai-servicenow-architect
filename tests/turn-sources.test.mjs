@@ -296,7 +296,7 @@ test('ARC-09-C263 M4 — readTurnSources: null, with one reason, for a missing, 
   assert.equal(readTurnSources(join(dir, 'ok.jsonl'), { onDebug, maxBytes: 5 }), null, 'over the size limit: reply-only checks');
   assert.ok(reasons.some((r) => /over the 5 limit/.test(r)));
   assert.ok(readTurnSources(join(dir, 'ok.jsonl'), { options: OPTIONS }), 'control: the same file under the limit reads');
-  assert.ok(MAX_TRANSCRIPT_BYTES >= 64 * 1024 * 1024);
+  assert.equal(MAX_TRANSCRIPT_BYTES, 64 * 1_000_000, '64 MB, in the one decimal unit the product uses (size.mjs)');
   assert.equal(readTurnSources(join(dir, 'ok.jsonl'), { read: () => { throw new Error('EIO'); }, onDebug }), null, 'a read that throws');
   assert.ok(reasons.length >= 7, 'each null said why');
 });
