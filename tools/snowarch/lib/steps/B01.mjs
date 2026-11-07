@@ -10,7 +10,7 @@
 // edit, and the S01 rules — re-evaluated here rather than only at commit time — catch one that was
 // committed.
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { localDir } from '../local-paths.mjs';
 import { manifestSays, manifestSource, refreshManifest } from '../licence/fetch.mjs';
@@ -61,6 +61,28 @@ export function ensureLocalDir(root, plat = process.platform) {
   return { existed, modes: '0700' };
 }
 
+/** Where a client's work goes. `.gitignore` keeps it out of git: it stays on the machine. */
+export const CLIENTS_DIR = 'clients';
+
+/**
+ * ARC-09-C265 — `clients/` EXISTS AFTER THE FIRST BOOTSTRAP: empty, made only when nothing is there, never touched when something is.
+ *
+ * The user types `Status` in a fresh install and the Architect looks for the engagement; a listing of a folder that is not there
+ * prints `ls: clients: No such file or directory` before any engagement exists. An empty folder reads as "no engagement folder yet".
+ * `lstat`, not `exists`: a symlink the user pointed somewhere else (dangling or not) and a file called `clients` are theirs, and are
+ * left alone. A folder that cannot be made is a warning with its reason, not a failed bootstrap.
+ */
+export function ensureClientsDir(root) {
+  const dir = join(root, CLIENTS_DIR);
+  try { lstatSync(dir); return { existed: true, error: null }; } catch { /* nothing there */ }
+  try {
+    mkdirSync(dir, { recursive: true });
+    return { existed: false, error: null };
+  } catch (e) {
+    return { existed: false, error: e?.code ?? String(e?.message ?? e) };
+  }
+}
+
 /** Does the working tree still hold what was committed? */
 export function committedFilesUnchanged(root, files, run = defaultRun) {
   try {
@@ -82,10 +104,12 @@ const defaultRun = (args, cwd) =>
 export const run = async (ctx) => {
   const plat = ctx.plat ?? process.platform;
   const dir = ensureLocalDir(ctx.root, plat);
+  const clients = ensureClientsDir(ctx.root);
   ctx.state.writer = 'node';
   if (plat === 'win32') ctx.state.fileModes = 'acl-inherited';
 
-  const data = { localDir: dir.existed ? 'reused' : 'created', modes: dir.modes };
+  const data = { localDir: dir.existed ? 'reused' : 'created', modes: dir.modes,
+    clientsDir: clients.error ? 'not made' : clients.existed ? 'present' : 'created' };
 
   // The cloud-sync warning is recorded as well as printed, so B09 can repeat it at the end — the
   // one line a user most needs to see again is the one that scrolled past ten steps ago.
@@ -126,9 +150,10 @@ export const run = async (ctx) => {
     data.manifest = { outcome: manifest.outcome, tag, files: manifest.files ?? null };
     ctx.line?.(manifestSays(manifest));
   }
-  const warnings = [cloud, manifest && manifest.outcome !== 'fetched' ? manifestSays(manifest) : null].filter(Boolean);
+  const warnings = [cloud, manifest && manifest.outcome !== 'fetched' ? manifestSays(manifest) : null,
+    clients.error ? `${CLIENTS_DIR}/ could not be made (${clients.error}); make it by hand, or the first engagement will` : null].filter(Boolean);
 
   return warnings.length > 0
     ? { status: 'warn', detail: warnings.join(' · '), data }
-    : { status: 'ok', detail: `.local/ ${data.localDir} (${dir.modes})${manifest ? ` · ${manifestSays(manifest)}` : ''}`, data };
+    : { status: 'ok', detail: `.local/ ${data.localDir} (${dir.modes})${clients.existed ? '' : ` · ${CLIENTS_DIR}/ created`}${manifest ? ` · ${manifestSays(manifest)}` : ''}`, data };
 };

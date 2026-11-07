@@ -9,6 +9,16 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A fresh install has a `clients/` folder.** The bootstrap now makes an empty `clients/` (git ignores it, as before), so a first
+`Status` finds an empty engagement folder instead of a missing one. An existing `clients/`, a link or a file of that name is never
+touched, and an upgrade neither names nor moves it.
+
+### Fixed
+
+- `Status` in a fresh install no longer meets `ls: clients: No such file or directory`: the workspace step of the bootstrap makes an
+  empty `clients/` when none is there, and an install made before this release makes it at its next bootstrap or upgrade. The wording
+  of the Status steps is unchanged (ARC-09-C265).
+
 ## 2.2.5 — 2026-11-02
 
 ### Notes

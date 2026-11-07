@@ -11,12 +11,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { humanDuration, withoutDuration } from '../lib/steps/format.mjs';
 import { version as engineVersionOf } from '../lib/config.mjs';
-import { INPUTS, KINDS, STEP_IDS, alwaysRuns, hashFor, storeStamp, storeVersion } from '../lib/inputs.mjs';
+import { FILE, INPUTS, KINDS, STEP_IDS, TEXT, alwaysRuns, hashFor, hashInputs, storeStamp, storeVersion } from '../lib/inputs.mjs';
 import { checkoutKey, staleSteps, explainStale, emptyState } from '../lib/state.mjs';
 import { STEPS, runSteps } from '../lib/steps/index.mjs';
 import { loadConfig } from '../lib/config.mjs';
@@ -371,6 +371,34 @@ test('AC 4 — the hash is a function of the inputs alone, not of when it was ta
     utimesSync(join(root, f), now, now);
   }
   assert.deepEqual(STEP_IDS.map((id) => hashFor(id, ctx)), once);
+});
+
+// ─── ARC-09-C265: the folder B01 makes is one of its inputs, so an install made before it makes it at the next bootstrap ─────────
+
+test('ARC-09-C265 — an install an older release made: B01 is stale once, the next bootstrap makes clients/, and the one after leaves it cached', async (t) => {
+  const root = makeCheckout({}, t);
+  const ctx = ctxFor(root);
+  const state = fresh(root, ctx);
+  // What the older release recorded for B01: the hash of the three inputs it declared then.
+  state.steps.B01.inputsHash = hashInputs(root, [FILE('.mcp.json'), FILE('.claude/settings.json'), TEXT('mode=design-only')]);
+  assert.deepEqual(staleIds(state, ctx), ['B01'], 'the release that makes the folder moves exactly B01');
+  assert.equal(existsSync(join(root, 'clients')), false, 'the older install has none');
+
+  const bootstrapOnce = async () => {
+    const ran = [];
+    const steps = STEPS.map((s) => ({ ...s, run: async (c) => { ran.push(s.id); return s.run(c); } }));
+    await runSteps({
+      root,
+      ctx: { ...ctx, env: process.env, mode: 'design-only', docs: 'sparse', cwd: root, areaCount: 2,
+        skipClaudeCheck: true, probe: async () => ({ ok: true }), state },
+      state, steps, last: 'B09', onLine: () => {}, save: () => {},
+    });
+    return ran;
+  };
+  assert.deepEqual(await bootstrapOnce(), ['B00', 'B01', 'B09'], 'the next bootstrap re-runs B01 and nothing else of the cached steps');
+  assert.ok(existsSync(join(root, 'clients')), 'and it made the folder');
+  assert.deepEqual(readdirSync(join(root, 'clients')), []);
+  assert.deepEqual(await bootstrapOnce(), ['B00', 'B09'], 'once: the bootstrap after that finds B01 cached');
 });
 
 // ─── AC 3: what a resume on an unchanged checkout actually runs ─────────────────────────────────
