@@ -288,7 +288,7 @@ read the other areas then. Every release re-measures all three platforms and att
 
 Nothing is touched before the plan is printed and accepted: it names the release, the steps that
 will re-run, whether the store's schema moves (a migration, with a 0600 backup, announced first),
-and `credentials: untouched` — `.local/instances.json` is never read or written by an upgrade.
+and your instances: apart from that migration, the only field it writes is each one's `lastProbe`.
 Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a specific release and
 prints how to return to your branch; a diverged branch is reported, and a file in the release's way is named; a failed
 fetch prints git's error and a [proxy](TROUBLESHOOTING.md#proxy_unreachable) or [TLS](TROUBLESHOOTING.md#tls_ca_untrusted)

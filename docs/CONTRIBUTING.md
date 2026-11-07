@@ -2391,11 +2391,15 @@ generated file that does not match its source.
 skips the question, never the plan: it is still printed, because a transcript that does not say
 what was about to happen is a transcript nobody can debug.
 
-**The credential store is not part of an upgrade.** `.local/instances.json` is opened by exactly one
-thing in the whole sequence: S06's migration, in B06, when the release changes the schema — with its
-0600 backup, announced in the plan before the user agrees. The plan says `credentials: untouched`
-because that is a property of the code, and `tests/upgrade/upgrade.e2e.test.mjs` compares the file's
-sha256 across an upgrade to keep it one.
+**No instance, credential or flag is changed by an upgrade.** `.local/instances.json` is written by two
+things in the whole sequence: S06's migration, in B06, when the release changes the schema — with its
+0600 backup, announced in the plan before the user agrees — and the probes of B08, which sign in to each
+configured instance with its stored credentials and record the result as its `lastProbe` (the closing
+doctor probes the same way and writes nothing). The plan's `credentials:` line says exactly that
+(ARC-09-C264; it used to promise the file was left alone, which B08 made untrue), and
+`tests/upgrade/upgrade-unit.test.mjs` ties the line to the code: B08 is the only step that runs
+`instance test`, the CLI command documented as writing only `lastProbe`. The sha256 comparison in
+`tests/upgrade/upgrade.e2e.test.mjs` holds for an upgrade in which B08 does not re-run.
 
 **A failure leaves the tree at the new tag**, with the state file recording which step stopped.
 Re-running `./snowarch upgrade` continues from there rather than reporting `up to date` — the tree

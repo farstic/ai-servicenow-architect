@@ -12,9 +12,13 @@
  *
  * Three promises hold whatever happens after it:
  *
- *   **Credentials are never read or written by this command.** `.local/instances.json` is opened by
- *   exactly one thing in an upgrade: S06's migration, in B06, when the release changes the store's
- *   schema — announced in the plan, with its 0600 backup, before the user says yes.
+ *   **No instance, credential or flag is changed by this command.** `.local/instances.json` is written by
+ *   exactly two things in an upgrade: S06's migration, in B06, when the release changes the store's
+ *   schema — announced in the plan, with its 0600 backup, before the user says yes — and the probes of B08,
+ *   which sign in to each configured instance with its stored credentials and record the result as that
+ *   instance's `lastProbe` (ARC-09-C264). The closing doctor probes the same way and writes nothing. The
+ *   plan says so on its `credentials:` line: it used to promise the file was never read or written, which
+ *   B08 made untrue.
  *
  *   **A failure leaves the tree at the new tag with the state file saying which step stopped.**
  *   Re-running finishes the job; that is the resume rule (S05), not a special path here.
@@ -916,7 +920,11 @@ export function renderPlan({ from, to, commits, date, tagInfo, floor, steps, sto
   // ARC-09-C195 — and when the runner that decided was this release's rather than the target's.
   if (installedBecause) lines.push(`  (computed by the installed release — ${installedBecause})`);
   lines.push(`  ${store.line}`);
-  lines.push('  credentials: untouched (.local/instances.json is never read or written by the upgrade)');
+  // ARC-09-C264 — what is true. Step B08 probes each configured instance with its stored credentials and records the result as that
+  // instance's `lastProbe`; the closing doctor probes the same way and writes nothing. The line used to promise that the file is never
+  // read or written, which B08 makes untrue, so it says what is NOT changed and names the one field that is.
+  lines.push('  credentials: no instance, credential or flag in .local/instances.json is changed; apart from the migration announced above, '
+    + "the only field written is each instance's lastProbe (when it was probed and what the probe saw), by step B08 when it re-runs");
   if (restart) lines.push(`  after the upgrade: ${restart}`);
   return lines.join('\n');
 }
