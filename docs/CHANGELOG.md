@@ -15,9 +15,9 @@ touched, and an upgrade neither names nor moves it.
 
 ### Fixed
 
-- `Status` in a fresh install no longer meets `ls: clients: No such file or directory`: the workspace step of the bootstrap makes an
-  empty `clients/` when none is there, and an install made before this release makes it at its next bootstrap or upgrade. The wording
-  of the Status steps is unchanged (ARC-09-C265).
+- `Status` in a fresh install no longer meets `ls: clients: No such file or directory`: the bootstrap makes an empty `clients/` when
+  none is there, and an install made before this release gets it at its next bootstrap or upgrade, without any step running again
+  for it. The wording of the Status steps is unchanged (ARC-09-C265).
 
 ## 2.2.5 — 2026-11-02
 

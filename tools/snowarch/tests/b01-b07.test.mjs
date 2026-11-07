@@ -605,8 +605,7 @@ test('ARC-11-C7 — B01 fetches nothing on a development version, or with no lic
   for (const r of [dev, bare]) {
     assert.equal(r.status, 'ok', r.detail);
     assert.equal(r.data.manifest, undefined);
-    // ARC-09-C265 — and, on a first run, the folder it also made: `· clients/ created`.
-    assert.match(r.detail, /^\.local\/ \w+ \([^)]+\)( · clients\/ created)?$/);
+    assert.match(r.detail, /^\.local\/ \w+ \([^)]+\)$/);
   }
 });
 
