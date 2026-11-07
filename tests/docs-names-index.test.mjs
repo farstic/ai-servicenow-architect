@@ -4,13 +4,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { loadNamesIndex, namesIndexState } from '../tools/snowarch/lib/docs/names-index.mjs';
 import { buildNamesIndex, ensureNamesIndex, writeNamesIndex } from '../tools/snowarch/lib/docs/names-index-build.mjs';
 import { pageNames, qualifiesWhole } from '../tools/snowarch/lib/docs/name-rules.mjs';
 import { indexAfterSync } from '../tools/snowarch/lib/docs/sync-index.mjs';
+import { spellings } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { SPARSE, sparseOf } from '../tools/snowarch/lib/docs/status.mjs';
 import { corpusNamesDir } from '../tools/snowarch/lib/local-paths.mjs';
 
@@ -176,7 +177,12 @@ function graphOf(entry, seen = new Set()) {
   for (const next of importsOf(entry)) graphOf(next, seen);
   return seen;
 }
-const walkFiles = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walkFiles(join(d, e.name)) : (e.name.endsWith('.mjs') ? [join(d, e.name)] : [])));
+// `tests` directories are left out of the walk: a test is never loaded by a hook or by a session, and tools/snowarch/tests/ builds
+// an index on purpose, as a fixture (input-hash.test.mjs holds the output B02 owes). Everything a session can load is walked.
+const walkFiles = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => {
+  if (e.isDirectory()) return e.name === 'tests' ? [] : walkFiles(join(d, e.name));
+  return e.name.endsWith('.mjs') ? [join(d, e.name)] : [];
+});
 
 test('ARC-09-C263 M3 — nothing a hook loads can build the index: no hook, no grounding module and no static import reaches the builder', () => {
   const builder = join(ROOT, 'tools/snowarch/lib/docs/names-index-build.mjs');
@@ -189,7 +195,7 @@ test('ARC-09-C263 M3 — nothing a hook loads can build the index: no hook, no g
     assert.doesNotMatch(readFileSync(join(hooksDir, f), 'utf8'), /names-index-build|sync-index/, `${f}: a hook names the index builder`);
   }
   // Who names the builder in code at all, in any spelling (an import, a dynamic import, a URL to it): the child's caller, and nobody else.
-  const namers = walkFiles(join(ROOT, 'tools')).filter((f) => /(?:from\s+|import\s*\(\s*|new URL\(\s*)['"][^'"]*names-index-build\.mjs['"]/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(ROOT.length + 1)).sort();
+  const namers = walkFiles(join(ROOT, 'tools')).filter((f) => /(?:from\s+|import\s*\(\s*|new URL\(\s*)['"][^'"]*names-index-build\.mjs['"]/.test(readFileSync(f, 'utf8'))).map((f) => f.slice(ROOT.length + 1).split(sep).join('/')).sort();
   assert.deepEqual(namers, ['tools/snowarch/lib/docs/sync-index.mjs'],
     'a new module names the index builder: decide in review whether it may run in a session (it may not)');
   // The control: the policy module the three callers use does reach the builder's path, and the callers use it.
@@ -209,10 +215,13 @@ test('ARC-09-C263 M3 — the build runs in a child: indexAfterSync passes the pi
   assert.equal(lines.length, 1);
   // The seam: a child that fails, one that times out, one that prints nonsense.
   const said = [];
-  const boom = indexAfterSync({ root, corpus, pin: PIN, cli: './snowarch', say: (l) => said.push(l), run: () => { throw new Error('spawn failed\nmore'); } });
+  const CLI = spellings().cli;
+  const boom = indexAfterSync({ root, corpus, pin: PIN, cli: CLI, say: (l) => said.push(l), run: () => { throw new Error('spawn failed\nmore'); } });
   assert.equal(boom.built, false);
   assert.equal(boom.error, 'spawn failed');
-  assert.match(said[0], /^\[docs\] note: the names index was not built \(spawn failed\) — the reply checks that need it are off; run \.\/snowarch doctor --fix$/);
+  // The launcher is the one the product derives (`spellings().cli`, handed in), so it is checked by position, never typed here.
+  assert.ok(said[0].startsWith('[docs] note: the names index was not built (spawn failed) — the reply checks that need it are off; run '));
+  assert.ok(said[0].endsWith(' doctor --fix') && said[0].includes(CLI), said[0]);
   const late = indexAfterSync({ root, corpus, pin: PIN, say: () => {}, run: () => { throw Object.assign(new Error('x'), { code: 'ETIMEDOUT' }); } });
   assert.equal(late.error, 'the build timed out');
   const junk = indexAfterSync({ root, corpus, pin: PIN, say: () => {}, run: () => 'not json' });
