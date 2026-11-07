@@ -346,12 +346,13 @@ sentence is built, not on the way to the terminal.
 
 ### B01 workspace and B07 Claude settings — what the bootstrap writes
 
-Four files, all of them gitignored, and **nothing outside the checkout**: `~/.claude.json` and
+Four files and an empty folder, all of them gitignored, and **nothing outside the checkout**: `~/.claude.json` and
 `~/.claude/settings.json` are never touched.
 
 | File | Written by | What goes in it |
 |---|---|---|
 | `.local/` (+ `logs/`) | B01 | 0700 on POSIX — an existing directory is chmodded, so a checkout bootstrapped before this rule stays private too. Windows records `fileModes: acl-inherited`. |
+| `clients/` | the bootstrap command, not a step | empty, made only when nothing is there and never touched when something is (a link or a file of that name is left alone; ARC-09-C265). It is the user's: an upgrade neither moves nor names it. |
 | `.local/bootstrap-state.json` | the runner | S03's schema v1 |
 | `.claude/settings.local.json` | B07 | **two array members and one hook entry, merged** |
 | `.local/config.json` | B07 | `{ version, mode, defaultInstance, registration, updatedAt }` |

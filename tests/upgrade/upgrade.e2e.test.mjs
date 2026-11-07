@@ -94,6 +94,54 @@ test('AC 1 — a release that moves one declared input re-runs exactly that step
   assert.match(snowarch(w.user, ['version'], { bin: w.bin }).stdout, /tag:\s+v9\.1\.0 \(exact\)/);
 }, MINUTES);
 
+// ARC-09-C265 — clients/ is the user's. The bootstrap makes it, empty, so that a listing of it is not an error; an upgrade neither
+// names it in the plan nor moves it, with an engagement's work in it or without.
+const treeDigest = (dir) => {
+  const out = [];
+  const walk = (d, rel) => {
+    for (const e of readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) { out.push(`${rel}/${e.name}/`); walk(p, `${rel}/${e.name}`); } else out.push(`${rel}/${e.name} ${sha256(p)}`);
+    }
+  };
+  walk(dir, '');
+  return out;
+};
+
+test("ARC-09-C265 — a fresh install's empty clients/ goes through an upgrade where it was, and the plan never names it", async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const clients = join(w.user, 'clients');
+  assert.ok(existsSync(clients), 'the bootstrap made it');
+  assert.deepEqual(readdirSync(clients), [], 'and left it empty');
+  const before = statSync(clients);
+
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(r.status, 0, r.text);
+  assert.match(r.text, /Upgrade plan: v9\.0\.0 → v9\.1\.0/, 'the plan was printed');
+  assert.doesNotMatch(r.text, /clients\//, 'the plan or the run names the folder');
+  assert.ok(existsSync(clients), 'the upgrade removed it');
+  assert.deepEqual(readdirSync(clients), []);
+  if (!isWindows) assert.equal(statSync(clients).ino, before.ino, 'the upgrade replaced the folder');
+  assert.equal(git(w.user, ['status', '--porcelain']).includes('clients'), false, 'git sees the folder');
+}, MINUTES);
+
+test("ARC-09-C265 — an engagement's work in clients/ is byte-identical after an upgrade, and the plan never names it", async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const clients = join(w.user, 'clients');
+  mkdirSync(join(clients, 'acme', 'designs'), { recursive: true });
+  mkdirSync(join(clients, 'acme', 'empty-for-now'), { recursive: true });
+  writeFileSync(join(clients, 'acme', 'acme-engagement-state.md'), '# acme\n');
+  writeFileSync(join(clients, 'acme', 'designs', 'hld.md'), 'line one\r\nline two\n');
+  const before = treeDigest(clients);
+
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
+  assert.equal(r.status, 0, r.text);
+  assert.doesNotMatch(r.text, /clients\//, 'the plan or the run names the folder');
+  assert.deepEqual(treeDigest(clients), before, 'the upgrade changed what a client\'s work holds');
+}, MINUTES);
+
 test('ARC-09-C195 — a release that changes what a step depends on: the plan names the step the run re-runs',
   async (t) => {
     // U4 runs in the installed release's process. Here v9.1.0 adds a literal to B07's inputs, which v9.0.0's tables
