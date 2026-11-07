@@ -488,6 +488,16 @@ export function stepsThatWillRun(root, tag, { ctx, opts = {} }) {
 }
 
 /**
+ * Why a step runs although its inputs did not move: its OUTPUT is not held (`outputMissing` in the step). ARC-09-C263 added B02's
+ * — the names index of the pin. Only the runner's own comparison (`rerunAtTag`) knows it; the file-diff estimate does not read
+ * `.local/`, so a plan that cannot make the worktree still says "up to date" at the tag itself (ARC-09-C196).
+ */
+const OUTPUT_MISSING = Object.freeze({
+  B01: 'the release manifest is not held',
+  B02: 'the names index is not held',
+});
+
+/**
  * ARC-08-C29 — THE SET THE RUNNER WILL DECIDE, computed before the user says Y.
  *
  * `stepsThatWillRun` below answers a DIFFERENT question from the one the bootstrap asks. It maps
@@ -616,7 +626,7 @@ export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktre
       if (hash === null) { out.set(step.id, 'inputs could not be read'); continue; }
       if (hash !== recorded.inputsHash) { out.set(step.id, 'inputs changed'); continue; }
       if (!(manifestWritten && step.id === 'B01') && outputMissingOf(step, tagCtx)) {
-        out.set(step.id, 'the release manifest is not held');
+        out.set(step.id, OUTPUT_MISSING[step.id] ?? 'its output is not held');
       }
     }
     return out;
