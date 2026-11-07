@@ -1,0 +1,117 @@
+{
+  "_about": "ARC-09-C263 stage 0 (P0) captures of Claude Code session transcripts (the file transcript_path names), one set per version: the floor 2.1.214, the measured 2.1.309 and the current 2.1.318. Sanitised BY KEY: accountUuid, organizationUuid and userEmail are replaced by registered placeholders whatever their value; every string has the home directory, the user name, the account e-mail and the scratch paths rewritten; system-prompt bulk and thinking signatures are replaced. tests/transcript-fixtures-identity.test.mjs holds this. Kept as captured: row types, flags, order, and the session, request and tool-use ids and content digests (correlation ids, not account data). A hook probe, not the product, ran in the capturing session. The Windows (CRLF, back-slash) variants are derived from these by the tests and are synthetic.",
+  "captures": [
+    {
+      "file": "v2.1.214/block-continuation.jsonl",
+      "claudeCode": "2.1.214",
+      "mode": "claude -p",
+      "rows": 18,
+      "covers": "claude -p: one Read, a Stop block, the continuation",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.214/many-tools.jsonl",
+      "claudeCode": "2.1.214",
+      "mode": "claude -p",
+      "rows": 37,
+      "covers": "claude -p: offset Read, failed Read, Grep, Skill, Agent; later /compact (d3)",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.214/async-agent.jsonl",
+      "claudeCode": "2.1.214",
+      "mode": "interactive",
+      "rows": 51,
+      "covers": "interactive: async Agent, task-notification turn, /compact",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.214/corpus-reads.jsonl",
+      "claudeCode": "2.1.214",
+      "mode": "claude -p",
+      "rows": 20,
+      "covers": "claude -p: corpus page Read in full and with offset/limit, Grep in the corpus, a saved Envelope, a roster skill file",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.309/block-continuation.jsonl",
+      "claudeCode": "2.1.309",
+      "mode": "claude -p",
+      "rows": 42,
+      "covers": "claude -p: one Read, a Stop block, the continuation",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.309/many-tools.jsonl",
+      "claudeCode": "2.1.309",
+      "mode": "claude -p",
+      "rows": 60,
+      "covers": "claude -p: offset Read, failed Read, Grep, Skill, async Agent and its task-notification",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.309/resume-compact.jsonl",
+      "claudeCode": "2.1.309",
+      "mode": "claude -p",
+      "rows": 98,
+      "covers": "claude -p: text/Read/text/Read, resumed turn, /compact, turn after",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.309/async-agent.jsonl",
+      "claudeCode": "2.1.309",
+      "mode": "interactive",
+      "rows": 78,
+      "covers": "interactive: async Agent, task-notification turn, /compact",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.309/corpus-reads.jsonl",
+      "claudeCode": "2.1.309",
+      "mode": "claude -p",
+      "rows": 43,
+      "covers": "claude -p: corpus page Read in full and with offset/limit, Grep in the corpus, a saved Envelope, a roster skill file",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.318/block-continuation.jsonl",
+      "claudeCode": "2.1.318",
+      "mode": "claude -p",
+      "rows": 46,
+      "covers": "claude -p: one Read, a Stop block, the continuation",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.318/many-tools.jsonl",
+      "claudeCode": "2.1.318",
+      "mode": "claude -p",
+      "rows": 57,
+      "covers": "claude -p: offset Read, failed Read, Grep, Skill, sync Agent",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.318/resume-compact.jsonl",
+      "claudeCode": "2.1.318",
+      "mode": "claude -p",
+      "rows": 110,
+      "covers": "claude -p: text/Read/text/Read, resumed turn, /compact, turn after",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.318/async-agent.jsonl",
+      "claudeCode": "2.1.318",
+      "mode": "interactive",
+      "rows": 104,
+      "covers": "interactive: async Agent, task-notification turn, /compact",
+      "sanitised": true
+    },
+    {
+      "file": "v2.1.318/corpus-reads.jsonl",
+      "claudeCode": "2.1.318",
+      "mode": "claude -p",
+      "rows": 47,
+      "covers": "claude -p: corpus page Read in full and with offset/limit, Grep in the corpus, a saved Envelope, a roster skill file",
+      "sanitised": true
+    }
+  ]
+}
