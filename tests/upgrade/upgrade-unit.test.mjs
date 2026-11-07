@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -356,7 +356,7 @@ test('the plan block says the five things a reader has to decide from', () => {
   assert.match(text, /tag verified: contract aaaaaaa… · docs-pin bbbbbbb · claude-floor 2\.1\.214/);
   assert.match(text, /steps that will re-run: B02 the documentation corpus \(vendor\/docs-areas\.txt changed\)/);
   assert.match(text, /store: schema v1 → v1 \(no migration\)/);
-  assert.match(text, /credentials: untouched/);
+  assert.match(text, /credentials: no instance, credential or flag in \.local\/instances\.json is changed; apart from the migration announced above, the only field written is each instance's lastProbe/);
   // The sha is SHORTENED, never printed whole: a plan is read, and 64 characters of hex in the
   // middle of a sentence is a line nobody finishes.
   assert.equal(text.includes('a'.repeat(64)), false);
@@ -368,6 +368,60 @@ test('the plan block says the five things a reader has to decide from', () => {
   assert.match(nothing, /steps that will re-run: none \(only the preflight and the summary\)/);
   assert.match(nothing, /\(1 commit\)/, 'one commit is not "1 commits"');
   assert.match(nothing, /claude-floor not stated/);
+});
+
+
+// ARC-09-C264 — the plan promised that `.local/instances.json` is never read or written. Step B08 (the doctor, bootstrap's verify) probes
+// each configured instance with its stored credentials and records the result as that instance's `lastProbe`, so the line says what is
+// NOT changed and names the one field that is, and these tests tie the sentence to the code that makes it true.
+test('ARC-09-C264 — the credentials line names the one field the upgrade writes, and no longer promises "never read or written"', () => {
+  const text = renderPlan({
+    from: 'v2.0.0', to: 'v2.1.0', commits: 12, date: '2026-10-14',
+    tagInfo: { contract: 'a'.repeat(64), docsPin: 'b'.repeat(40) },
+    floor: { line: 'claude-floor 2.1.214 (installed 2.1.260 ok)', below: false },
+    steps: [{ step: 'B08', title: 'the doctor', files: ['packages/snowarch/dist/contract.json'] }],
+    store: { line: 'store: schema v1 → v1 (no migration)' },
+    restart: 'restart claude',
+  });
+  const line = text.split('\n').find((l) => l.includes('credentials:'));
+  assert.ok(line, 'the plan has a credentials line');
+  assert.match(line, /no instance, credential or flag in \.local\/instances\.json is changed/);
+  assert.match(line, /only field written is each instance's lastProbe/);
+  assert.match(line, /by step B08 when it re-runs/);
+  assert.doesNotMatch(text, /never read or written|untouched/, 'a promise B08 breaks must not come back');
+});
+
+test('ARC-09-C264 — the line is tied to the code: B08 is the only step that runs `instance test`, which the CLI documents as writing only lastProbe', async () => {
+  const stepsDir = join(REPO, 'tools/snowarch/lib/steps');
+  const runners = readdirSync(stepsDir).filter((f) => /^B\d\d\.mjs$/.test(f))
+    .filter((f) => /'instance', 'test'/.test(readFileSync(join(stepsDir, f), 'utf8')));
+  assert.deepEqual(runners, ['B08.mjs'], 'a second step that probes would write lastProbe under a plan that names only B08');
+  assert.doesNotMatch(readFileSync(join(REPO, 'tools/snowarch/lib/commands/upgrade.mjs'), 'utf8'), /'instance', 'test'/,
+    'the upgrade command itself runs no probe');
+  assert.match(readFileSync(join(REPO, 'tools/snowarch/lib/instance.mjs'), 'utf8'), /test\s+re-probe one instance[^\n]*writes only lastProbe/);
+  // ...and what B08 runs, with its CLI stubbed: `instance test <label> --json` for every configured label, and nothing else of the store's.
+  const { runProbes } = await import('../../tools/snowarch/lib/steps/B08.mjs');
+  const calls = [];
+  const run = (_node, args) => {
+    calls.push(args.slice(1));
+    const out = args.includes('--help') ? 'usage: instance <add|list|test>'
+      : args.includes('list') ? JSON.stringify({ instances: [{ label: 'one' }, { label: 'two' }] }) : '{}';
+    return { status: 0, stdout: out, stderr: '' };
+  };
+  const r = runProbes(REPO, { run });
+  assert.equal(r.status, 'ok');
+  assert.deepEqual(calls.map((c) => c.join(' ')),
+    ['instance --help', 'instance list --json', 'instance test one --json', 'instance test two --json']);
+});
+
+test('ARC-09-C264 — the install page, the README and CONTRIBUTING say the same as the plan', () => {
+  for (const f of ['docs/INSTALL.md', 'README.md', 'docs/CONTRIBUTING.md']) {
+    const text = readFileSync(join(REPO, f), 'utf8');
+    assert.doesNotMatch(text, /never read or written|credentials: untouched/, `${f} still promises what B08 makes untrue`);
+  }
+  for (const f of ['docs/INSTALL.md', 'README.md']) {
+    assert.match(readFileSync(join(REPO, f), 'utf8').replace(/\s+/g, ' '), /apart from that migration, the only field it writes is each one's `lastProbe`/, f);
+  }
 });
 
 test('ARC-11-C6 — U4 says what a release that enforces refuses, and E-31\'s remedy alone', () => {
