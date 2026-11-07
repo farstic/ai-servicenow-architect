@@ -193,6 +193,50 @@ test('C87 (c) — a cited page is resolved: full path, bare name, ambiguous name
   assert.match(line, /MISSING .*nowhere\.md/);
 });
 
+// ARC-09-C263 (M7) — a turn a Stop hook sent on is two segments. The stream's `result` row is the last message, and the text after the
+// last tool result is only the continuation's when the continuation made tool calls (it Reads the page it was asked to): the Envelope
+// was gone from the report and a grader read the correction alone. The turn is the text after the last tool result BEFORE the first
+// "Stop hook feedback:" row plus the continuation's text after its own last tool result, and the continuation's Reads are listed.
+test('ARC-09-C263 M7 — a Stop block whose continuation made tool calls: the report holds the Envelope before it and the correction after, and lists the continuation\'s Reads', (t) => {
+  const dir = corpus(t);
+  const REAL = 'markdown/it-service-management/incident/real-page.md';
+  const OTHER = 'markdown/customer-service-management/only-here.md';
+  const toolResult = (id) => ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] } });
+  const feedback = { type: 'user', isSynthetic: true, message: { content: [{ type: 'text', text: 'Stop hook feedback:\nBefore this answer stands, check these. Do not mention this notice.' }] } };
+  const events = (fb) => [
+    assistant(use('Read', { file_path: `vendor/ServiceNowDocs/${REAL}` })), toolResult('a'),
+    assistant(text(`ENVELOPE: the flow holds (citation: ${REAL}).`)),
+    ...(fb ? [fb] : []),
+    assistant(use('Grep', { pattern: 'x', path: 'vendor/ServiceNowDocs/markdown' })), toolResult('b'),
+    assistant(use('Read', { file_path: `vendor/ServiceNowDocs/${OTHER}` })), toolResult('c'),
+    assistant(text(`Correction: documented in ${OTHER}.`)),
+    { type: 'result', result: `Correction: documented in ${OTHER}.` },
+  ];
+  const blocked = reportTurn(stream(events(feedback)), { repoRoot: dir });
+  assert.deepEqual(blocked.citations.map((c) => c.cited).sort(), [OTHER, REAL].sort(), 'the Envelope\'s citation and the correction\'s are both in the turn');
+  assert.deepEqual(blocked.stopBlock, { blocked: true, continuationReads: [OTHER] });
+  assert.deepEqual(blocked.corpusReads.sort(), [OTHER, REAL].sort());
+  assert.match(formatReport(blocked), /stop block: 1 \(the continuation read 1 corpus page: markdown\/customer-service-management\/only-here\.md\)/);
+  // The control: the same stream without the feedback row is the old reading, the correction alone.
+  const plain = reportTurn(stream(events(null)), { repoRoot: dir });
+  assert.deepEqual(plain.citations.map((c) => c.cited), [OTHER], 'without the block, the text after the last tool result is the correction');
+  assert.deepEqual(plain.stopBlock, { blocked: false, continuationReads: [] });
+  assert.doesNotMatch(formatReport(plain), /stop block/);
+  // The feedback row is known by its text, whichever flag the capture carries (on disk isMeta and a string; in the stream isSynthetic and a block).
+  for (const row of [{ type: 'user', isMeta: true, message: { content: 'Stop hook feedback:\nreason. Do not mention this notice.' } },
+    { type: 'user', message: { content: 'Stop hook feedback:\nreason. Do not mention this notice.' } }]) {
+    assert.equal(reportTurn(stream(events(row)), { repoRoot: dir }).stopBlock.blocked, true);
+  }
+  // A continuation with no tool call: both segments are text after the last tool result.
+  const talk = reportTurn(stream([assistant(use('Read', { file_path: `vendor/ServiceNowDocs/${REAL}` })), toolResult('a'),
+    assistant(text(`ENVELOPE ${REAL}`)), feedback, assistant(text(`Correction: also ${OTHER}`)), { type: 'result', result: `Correction: also ${OTHER}` }]), { repoRoot: dir });
+  assert.deepEqual(talk.citations.map((c) => c.cited).sort(), [OTHER, REAL].sort());
+  assert.deepEqual(talk.stopBlock, { blocked: true, continuationReads: [] });
+  // A sub-agent\'s feedback row is not the main thread\'s.
+  const sub = reportTurn(stream([...events(null).slice(0, 3), { ...feedback, parent_tool_use_id: 'toolu_x' }, ...events(null).slice(3)]), { repoRoot: dir });
+  assert.equal(sub.stopBlock.blocked, false);
+});
+
 test('C87 (c) — a turn with nothing to report says so, and never throws on a ragged stream', (t) => {
   const dir = corpus(t);
   const r = reportTurn('not json\n{"type":"assistant"}\n{"type":"assistant","message":{"content":"plain"}}\n', { repoRoot: dir });
