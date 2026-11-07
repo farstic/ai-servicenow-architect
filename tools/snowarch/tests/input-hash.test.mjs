@@ -21,6 +21,8 @@ import { checkoutKey, staleSteps, explainStale, emptyState } from '../lib/state.
 import { STEPS, runSteps } from '../lib/steps/index.mjs';
 import { loadConfig } from '../lib/config.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
+import { buildNamesIndex, writeNamesIndex } from '../lib/docs/names-index-build.mjs';
+import { corpusNamesDir } from '../lib/local-paths.mjs';
 
 /** The store lives in `.local/`, which a fresh checkout has not created yet. */
 const putStore = (root, body) => {
@@ -52,8 +54,14 @@ const ctxFor = (root, over = {}) => ({
   ...over,
 });
 
-/** Every step recorded ok with the hash it has right now — the "nothing to do" baseline. */
+/**
+ * Every step recorded ok with the hash it has right now — the "nothing to do" baseline.
+ * ARC-09-C263 — and B02's OUTPUT held: the names index of the docs pin, which the runner asks for (`outputMissing`) whatever B02's
+ * inputs say, as it asks for B01's manifest. A checkout in which nothing is left to do has both.
+ */
 const fresh = (root, ctx) => {
+  const pin = ctx.config.docs.pin;
+  writeNamesIndex(corpusNamesDir(root, pin), buildNamesIndex({ corpus: join(root, 'none'), pin, pages: ['markdown/a/p.md'], tree: null, read: () => 'a_b\n' }));
   const s = emptyState({ engineVersion: '2.0.0-test', platform: 'darwin' });
   for (const step of STEP_IDS) {
     s.steps[step] = { status: 'ok', inputsHash: hashFor(step, ctx), durationMs: 1 };
