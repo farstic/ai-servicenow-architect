@@ -48,7 +48,7 @@ const CONNECTED = '✔ Connected';
 
 /** The transcript a real `claude mcp get` prints, in the S-01 record's exact shape. */
 function transcript(statusLine, scope = 'Project config (shared via .mcp.json)') {
-  const word = /^local/i.test(scope) ? 'local' : 'project';
+  const word = /^(local|user)/i.exec(scope)?.[1].toLowerCase() ?? 'project';
   return ['servicenow:', `  Scope: ${scope}`, `  Status: ${statusLine}`, '  Type: stdio',
     '  Command: node', '', `To remove this server, run: claude mcp remove servicenow -s ${word}`]
     .join('\n');
@@ -358,6 +358,77 @@ test('E-27 treats pending approval in design-only as the toggle not being in for
   const r = await run('E-27', root, over);
   assert.equal(r.status, 'warn');
   assert.equal(r.data.approved, false);
+});
+
+// ARC-09-C266 — a fresh install, before `claude` has been started in the folder. Claude Code's own word for that state is
+// `Pending approval (run \`claude\` to approve)`, in both modes, and the remedy the doctor printed for it could not clear it:
+// `mode design` and `mode live` write the toggles, which Claude Code does not read before it has been started in the folder.
+test('ARC-09-C266 — claude not started here yet, design-only: the remedy is to start claude and answer No, not to run mode design again', async (t) => {
+  const { root, over } = withClaude(t, { statusLine: PENDING, mode: 'design' });
+  const r = await run('E-27', root, over);
+  assert.equal(r.status, 'warn');
+  assert.match(r.detail, /not disabled in Claude Code although the recorded mode is design-only/);
+  assert.equal(r.remedy, `start claude in this folder once and answer No to its question about the project's MCP server, then run ${SPELLED_CLI} doctor again`);
+  assert.doesNotMatch(r.remedy, /mode design/, 'a command that cannot change this state must not be the remedy');
+  assert.equal(r.command, undefined);
+  assert.match(r.data.statusLine, /Pending approval/, 'the raw status survives in --json');
+});
+
+test('ARC-09-C266 — claude not started here yet, live: the remedy is to start claude and answer Yes, not to run mode live again', async (t) => {
+  const { root, over } = withClaude(t, { statusLine: PENDING, mode: 'live' });
+  const r = await run('E-27', root, over);
+  assert.equal(r.status, 'warn');
+  assert.match(r.detail, /unapproved in Claude Code although the recorded mode is live/);
+  assert.equal(r.remedy, `start claude in this folder once and answer Yes to its question about the project's MCP server, then run ${SPELLED_CLI} doctor again`);
+  assert.doesNotMatch(r.remedy, /mode live/);
+  assert.equal(r.command, undefined, 'there is no command that clears a pending approval');
+});
+
+// Every state E-27 can be in, with its verdict and its remedy, in ONE table: the mode the install records, what Claude Code says
+// about the server, and the scope of the entry. Only the two `pending` rows differ from what this check said before C266; the rest
+// pin what it still says. (The three states outside the matrix follow the table.)
+test('ARC-09-C266 — E-27, every state: its verdict, its detail and its remedy', async (t) => {
+  const KEY = JSON.parse(readFileSync(join(repoRoot, 'engine.config.json'), 'utf8')).mcp.serverKey;
+  const CLI = SPELLED_CLI;
+  const START = (answer) => `start claude in this folder once and answer ${answer} to its question about the project's MCP server, then run ${CLI} doctor again`;
+  const NOT_DISABLED = 'server is not disabled in Claude Code although the recorded mode is design-only';
+  const rows = [
+    // design-only
+    ['design · rejected · project', { mode: 'design', statusLine: REJECTED }, { status: 'ok', detail: /^project entry present, disabled in design mode \(expected\) · read by running claude/ }],
+    ['design · connected · project', { mode: 'design', statusLine: CONNECTED }, { status: 'warn', detail: NOT_DISABLED, remedy: `${CLI} mode design` }],
+    ['design · connected · local', { mode: 'design', statusLine: CONNECTED, scope: 'local' }, { status: 'fail', detail: 'design-only is not in force: a local-scope entry keeps the server loaded',
+      remedy: `${CLI} mode design   (removes an entry snowarch created), or: claude mcp remove ${KEY} -s local` }],
+    ['design · connected · user', { mode: 'design', statusLine: CONNECTED, scope: 'user' }, { status: 'fail', detail: 'design-only is not in force: a user-scope entry keeps the server loaded in every project on this machine',
+      remedy: `${CLI} mode design   (removes an entry snowarch created), or: claude mcp remove ${KEY} -s user` }],
+    ['design · pending · project  (claude not started here yet)', { mode: 'design', statusLine: PENDING }, { status: 'warn', detail: NOT_DISABLED, remedy: START('No') }],
+    ['design · pending · local  (unchanged: still the failure)', { mode: 'design', statusLine: PENDING, scope: 'local' }, { status: 'fail', detail: 'design-only is not in force: a local-scope entry keeps the server loaded',
+      remedy: `${CLI} mode design   (removes an entry snowarch created), or: claude mcp remove ${KEY} -s local` }],
+    // live
+    ['live · connected · project', { mode: 'live', statusLine: CONNECTED }, { status: 'ok', detail: /^✔ Connected · read by running claude/ }],
+    ['live · connected · local', { mode: 'live', statusLine: CONNECTED, scope: 'local' }, { status: 'ok', detail: /^✔ Connected · scope local \(/ }],
+    ['live · rejected · project', { mode: 'live', statusLine: REJECTED }, { status: 'warn', detail: 'server is rejected in Claude Code although the recorded mode is live',
+      remedy: `${CLI} mode live, then answer Yes once in claude (S-01)`, command: `${CLI} mode live` }],
+    ['live · pending · project  (claude not started here yet)', { mode: 'live', statusLine: PENDING }, { status: 'warn', detail: 'server is unapproved in Claude Code although the recorded mode is live', remedy: START('Yes') }],
+  ];
+  for (const [name, input, want] of rows) {
+    const { root, over } = withClaude(t, input);
+    const r = await run('E-27', root, over);
+    assert.equal(r.status, want.status, `${name}: ${r.status} — ${r.detail}`);
+    if (want.detail instanceof RegExp) assert.match(r.detail, want.detail, name); else assert.equal(r.detail, want.detail, name);
+    assert.equal(r.remedy, want.remedy, `${name}: remedy`);
+    assert.equal(r.command, want.command, `${name}: command`);
+  }
+  // ...and the three states outside the matrix.
+  assert.equal((await run('E-27', greenTree(t, { mode: 'design' }), { claudePath: null })).status, 'skip', 'claude is not installed');
+  const unknown = withClaude(t, { statusLine: 'Status: a wording nobody has seen', mode: 'design' });
+  const u = await run('E-27', unknown.root, unknown.over);
+  assert.equal(u.status, 'warn');
+  assert.equal(u.remedy, `check it by hand: claude mcp get ${KEY}`);
+  const unreadable = withClaude(t, { statusLine: PENDING, mode: 'live' });
+  writeFileSync(join(unreadable.root, '.local', 'bootstrap-state.json'), '{ this is not json');
+  const x = await run('E-27', unreadable.root, unreadable.over);
+  assert.equal(x.status, 'warn');
+  assert.match(x.remedy, /bootstrap --reset/, 'a mode that cannot be read is the state file\'s problem, not the registration\'s, even when the status is pending');
 });
 
 test('E-27 reports a wording nobody has seen as "could not read", never as a failure', async (t) => {

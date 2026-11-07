@@ -13,6 +13,10 @@ All notable changes to this project are documented in this file. Everything hand
 read or written, which was not true for an install with an instance: it says that no instance, credential or flag is changed, and
 names the one field written, each instance's last probe.
 
+**The doctor tells a fresh install what to do.** Before `claude` has been started in the folder, E-27 now says to start `claude` once
+and answer its question about the project's MCP server, instead of telling you to run `mode live` or `mode design` again, which
+cannot change that state.
+
 ### Fixed
 
 - The upgrade plan's `credentials:` line said that `.local/instances.json` is never read or written by the upgrade. The verify step of
@@ -20,6 +24,11 @@ names the one field written, each instance's last probe.
   that instance's `lastProbe`, so the line was not true for an install with an instance. It now says what is: no instance, credential
   or flag is changed, and apart from a migration announced above the only field written is each instance's `lastProbe`, by step B08
   when it re-runs. The install page and the README say the same (ARC-09-C264).
+- On a fresh install, before `claude` has been started in the folder, the doctor's E-27 said the server was unapproved (live) or not
+  disabled (design-only) and told you to run `mode live` or `mode design` again, which cannot change it: Claude Code does not read
+  those settings before it has been started in the folder. For Claude Code's own `Pending approval (run `claude` to approve)` the
+  remedy is now to start `claude` in the folder once, answer its question about the project's MCP server (No for design-only, Yes for
+  live) and run the doctor again. Every other E-27 state and its remedy is unchanged (ARC-09-C266).
 
 ## 2.2.5 — 2026-11-02
 
