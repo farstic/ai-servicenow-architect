@@ -113,6 +113,14 @@ const C254_ANSWER = {
 };
 const C254_DEAD_IN_FINDING = 'markdown/australia/application-development/collaboration-permissions.md';
 
+/**
+ * ARC-09-C263 — stage 1a's cases. T-47 reads past twelve pages; T-48 to T-53 are the check's classes on prompts built for them (a false
+ * absence on tables the corpus prints, a name no page gives, two pages that disagree, an instance deferral, a saved Envelope, a builder's
+ * return); T-55 is the guard cases run unchanged. T-54 is the stage 1b post-write check, reserved. T-26 gains the readers-under-the-check items.
+ */
+const C263_CASES = 'ARC-09-C263 — T-47 to T-53 and T-55: no page limit, each class of the check, and the guards; T-54 is reserved; T-26 gains the readers items';
+const C263_IDS = ['T-47', 'T-48', 'T-49', 'T-50', 'T-51', 'T-52', 'T-53', 'T-55'];
+
 /** Named so the negatives can run exactly the code the positives run. */
 const CHECKS = {
   'criterion 1a — the file is under tests/, and not at the root': () => {
@@ -195,7 +203,7 @@ const CHECKS = {
     assert.equal(new Set(ids).size, ids.length, `duplicate id in ${ids.join(', ')}`);
     assert.equal(numbers[0], 1, 'the first test is not T-01');
 
-    const declared = new Set([...t.matchAll(/^- \*\*(T-\d\d) — reserved for (ARC-\d\d-S\d\d)\*\*/gm)]
+    const declared = new Set([...t.matchAll(/^- \*\*(T-\d\d) — reserved for (ARC-\d\d-[SC]\d+)\*\*/gm)]
       .map((m) => m[1]));
     const gaps = [];
     for (let n = 1; n <= (numbers.at(-1) ?? 0); n += 1) {
@@ -394,6 +402,34 @@ const CHECKS = {
     const row1 = t.split('\n').find((l) => l.startsWith('| 1 | macOS'));
     for (const id of [...Object.keys(C254_READ), ...Object.keys(C254_ANSWER), 'T-46']) assert.ok(row1.includes(`\`${id}\``), `the cutover list's first row lacks ${id}`);
   },
+
+  [C263_CASES]: (t) => {
+    const row1 = t.split('\n').find((l) => l.startsWith('| 1 | macOS'));
+    for (const id of C263_IDS) {
+      assert.ok(row1.includes(`\`${id}\``), `the cutover list's first row lacks ${id}`);
+      const s = sectionsOf(t, id);
+      assert.ok(s.whole.includes('ARC-09-C263'), `${id} does not name the row it covers`);
+      assert.ok(s.prompt.includes('```') || s.setup.length > 0, `${id} has neither a prompt nor a setup`);
+    }
+    // T-47: past twelve, and a count that is checked against the report.
+    const t47 = sectionsOf(t, 'T-47');
+    assert.ok(t47.pass.includes('The report lists 13 or more corpus pages read'), 'T-47 does not ask for more than twelve pages');
+    assert.ok(t47.pass.includes('`Pages read: <n>` appears once per Envelope and n is no greater than the report\'s count.'), 'T-47 does not hold the count to the report');
+    assert.ok(t47.fail.includes('Exactly twelve pages read'), 'T-47 does not fail the old ceiling');
+    // T-48 to T-53: each caps the feedback at one.
+    for (const id of ['T-48', 'T-49', 'T-52', 'T-53']) assert.match(sectionsOf(t, id).pass, /At most one Stop hook feedback/, `${id} does not cap the feedback`);
+    assert.match(sectionsOf(t, 'T-49').pass, /contains no complete name the corpus does not print/, 'T-49 does not hold the reason to print no unheld name');
+    assert.match(sectionsOf(t, 'T-51').fail, /drop or rewrite the instance check/, 'T-51 does not fail a block that removes the deferral');
+    assert.match(sectionsOf(t, 'T-55').pass, /No "Stop hook feedback:" event and no "Grounding check:" line/, 'T-55 does not ask for no block');
+    for (const id of ['T-10', 'T-17', 'T-36', 'T-38']) assert.ok(sectionsOf(t, 'T-55').setup.includes(id), `T-55 does not name ${id}`);
+    // T-54 is declared, not forgotten.
+    assert.match(t, /^- \*\*T-54 — reserved for ARC-09-C263\*\*/m, 'T-54 is not declared as reserved');
+    // T-26 keeps its "a cap appears" fail signal and gains the readers items.
+    const t26 = sectionsOf(t, 'T-26');
+    assert.ok(t26.fail.includes('A cap appears'), 'T-26 lost its cap signal');
+    assert.ok(t26.expected.includes('Readers under the check (ARC-09-C263)'), 'T-26 does not say what the check does to a reader\'s names');
+    assert.ok(t26.fail.includes('A name or a citation that only a reader gave'), 'T-26 does not fail a reader\'s name left unopened');
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -532,7 +568,15 @@ const NEGATIVES = [
     (t) => t.replace('- No Stop hook feedback in any of the four turns, unless the session wrote the dead path outside the copy.\n', '')],
   ['T-46 stops failing a correction after the copy', C254_CASES,
     (t) => t.replace('- A "Correction:" line after the copy, or a Stop hook feedback event, for a path that stands only inside the copy.\n', '')],
-  ['the cutover list forgets the new cases', C254_CASES, (t) => t.replace(' `T-45` `T-46` |', ' |')],
+  ['the cutover list forgets the new cases', C254_CASES, (t) => t.replace(' `T-45` `T-46` ', ' ')],
+  ['the cutover list forgets the C263 cases', C263_CASES, (t) => t.replace(' `T-47` `T-48`', ' ')],
+  ['T-47 stops asking for more than twelve pages', C263_CASES, (t) => t.replace('- The report lists 13 or more corpus pages read, and the Envelope cites pages it read.\n', '')],
+  ['T-47 stops failing the old ceiling', C263_CASES, (t) => t.replace('- Exactly twelve pages read, then a statement of what is still unverified (the old ceiling).\n', '')],
+  ['T-49 lets the feedback print the name', C263_CASES, (t) => t.replace('contains no complete name the corpus does not print', 'may name it')],
+  ['T-51 stops failing a block that removes the deferral', C263_CASES, (t) => t.replace('- A Stop hook feedback that asks the session to drop or rewrite the instance check.\n', '')],
+  ['T-55 stops asking for no block', C263_CASES, (t) => t.replace('- No "Stop hook feedback:" event and no "Grounding check:" line in any turn of these sessions.\n', '')],
+  ['T-54 is no longer declared reserved', C263_CASES, (t) => t.replace('- **T-54 — reserved for ARC-09-C263**', '- **T-54 — dropped**')],
+  ['T-26 loses its cap signal', C263_CASES, (t) => t.replace('- A cap appears (a reader or page limit, or a time ceiling): the owner ruled C114 uncapped.\n', '')],
   ['a test is added without updating the header count', 'the stated test count is the number of tests',
     (t) => `${t}\n## T-26 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];

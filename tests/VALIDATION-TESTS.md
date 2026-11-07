@@ -1,6 +1,6 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
-**Last updated:** 2026-10-29
+**Last updated:** 2026-11-07
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
 > post-build hooks behave correctly after any change to `CLAUDE.md`, `governance/`, a `SKILL.md` or
@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 46 tests, T-01 through T-46, no number reserved. The count is asserted by
+> **How many.** 54 tests, T-01 through T-55, T-54 reserved (see Reserved numbers). The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -909,7 +909,9 @@ A number is reserved when the story that fills it is agreed but not yet written.
 declared here so it reads as a reservation rather than as a mistake, and the shape test enforces
 exactly that: ascending, no duplicates, and every gap named below.
 
-No number is reserved right now. T-19 was, for ARC-08-S10, and that story wrote it.
+- **T-54 — reserved for ARC-09-C263**: the grounding check on a saved Envelope file as it is written (stage 1b of that row, a PostToolUse check), when it is built. T-47 to T-53 and T-55 are stage 1a.
+
+T-19 was reserved for ARC-08-S10, and that story wrote it.
 
 ---
 
@@ -1493,6 +1495,10 @@ For acme: the technical design for the FNOL intake — the claim created from th
    `clients/_unfiled/`.
 4. **Turn 2, a new session:** the reply says it read `clients/acme/acme-engagement-state.md` and the
    Envelope listed there. It cites that Envelope's path and its `OQ-EV-<n>` ids, and starts from its verdict.
+5. **Readers under the check (ARC-09-C263), turn 1:** a name or a citation taken from a parallel reader is a
+   claim the Architect itself has not read until it opens the page: the Stop hook counts a reader's text as no
+   source, so such a name is asked about once. After a Stop hook feedback, the report lists which cited
+   constructs the continuation kept and which it dropped.
 
 ### Pass criteria
 
@@ -1508,6 +1514,9 @@ For acme: the technical design for the FNOL intake — the claim created from th
   - the Envelope's path and at least one `OQ-EV-<n>` are cited;
   - no corpus page the Envelope already cites is opened again (`scripts/validation/turn-report.mjs` lists a
     turn's corpus reads).
+- **Turn 1, under the check:** every name and every citation in the Envelope that came from a reader is one the
+  Architect opened itself; where a Stop hook feedback came, the turn report names the continuation's reads and the
+  constructs kept and dropped.
 
 ### Fail signals
 
@@ -1516,6 +1525,7 @@ For acme: the technical design for the FNOL intake — the claim created from th
 - The Envelope is saved under `clients/_unfiled/` or a scratchpad, or is not listed in the state file.
 - Turn 2 re-grounds the same constructs from the corpus, or does not mention the Envelope.
 - A cap appears (a reader or page limit, or a time ceiling): the owner ruled C114 uncapped.
+- A name or a citation that only a reader gave stands in the final Envelope, never opened by the Architect, with no Stop hook feedback asking about it.
 
 ---
 
@@ -2461,6 +2471,302 @@ Is the copy safe to send?
 
 ---
 
+## T-47 — grounding has no page limit: an Envelope that needs more than twelve pages reads past twelve, and says how many
+
+**Covers:** ARC-09-C263 (`CLAUDE.md` §1's grounding rule and the six gateways' Part 2, `tools/snowarch/hooks/stop-citations.mjs`, `scripts/validation/turn-report.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin, and the names index built (`./snowarch doctor` shows E-33 ok). The prompt names ten constructs across ITSM, more than the twelve pages the earlier rule allowed. Run it four times on each tree (the release before and the one under test).
+
+### Prompt
+
+```
+Design the major-incident communication for ITSM: who is notified and how, how the major incident relates to the problem and change records it leads to, how the on-call schedule is used, and how the SLA timers behave while it is open. Design-only, grounded in the docs. No engagement is loaded.
+```
+
+### Expected behaviour
+
+1. The ITSM gateway fires and the Envelope is written with its five parts.
+2. The session reads the corpus pages for the constructs in play and does not stop at a number: `scripts/validation/turn-report.mjs` lists more than twelve corpus pages read.
+3. Part 2 ends with `Pages read: <n>`, n no greater than the pages the report lists.
+4. No construct the corpus documents is called "not documented in the bundled corpus", "unverified" or "not opened", and no page budget is mentioned or declared spent.
+
+### Pass criteria
+
+- The report lists 13 or more corpus pages read, and the Envelope cites pages it read.
+- `Pages read: <n>` appears once per Envelope and n is no greater than the report's count.
+- No "unverified", "not opened" or "budget" wording about a corpus construct. Every "not documented in the bundled corpus" is for a name an escape-safe corpus search did not find.
+- At most one Stop hook feedback; where there is one, each item after it is 300 characters or fewer and names no hook, notice or feedback.
+
+### Fail signals
+
+- Exactly twelve pages read, then a statement of what is still unverified (the old ceiling).
+- `Pages read: <n>` above the pages read, or an Envelope with no `Pages read` line.
+- A documented construct called not documented.
+- A second Stop hook feedback event.
+
+---
+
+## T-48 — a false absence is caught: the CSM escalation tables are in the corpus, and the session says so after one request
+
+**Covers:** ARC-09-C263 (falseAbsent in `tools/snowarch/lib/docs/grounding-check.mjs`; the Stop hook; the CSM gateway) · **Modes:** design-only ✅ · live ✅ (no instance call)
+
+One fresh session at the checkout root, the corpus at the pin, the names index built. `sn_customerservice_escalation` is printed on ten pages, among them `markdown/customer-service-management/case-escalation-components.md`; a search that does not escape the underscores finds none, which is how a session comes to call it "not documented". Run it four times on each tree.
+
+### Prompt
+
+```
+In Customer Service Management, which baseline tables record a case escalation, its severity and its activity? Design-only, grounded in the docs. No engagement is loaded.
+```
+
+### Expected behaviour
+
+1. The CSM gateway fires. The Envelope names `sn_customerservice_escalation` as a baseline table the corpus documents and cites a page it read that prints it.
+2. If a first reply calls a table the corpus prints "not documented in the bundled corpus", the Stop hook sends the turn back once, and the continuation reads the page the request names (or searches escape-safe), cites it, and starts its correction line with "Correction:".
+3. The turn report lists the continuation's reads; the final answer no longer carries the false absence.
+
+### Pass criteria
+
+- The final answer names `sn_customerservice_escalation` as documented and cites a corpus page that prints it (`grep -l 'sn\\_customerservice\\_escalation' <page>` finds it).
+- No table the corpus prints is left called not documented.
+- At most one Stop hook feedback in the turn. The lines after it are 600 characters or fewer, repeat no sentence of the reply, apologise for nothing, and name no hook, notice or feedback.
+- If there was feedback, the page it asked for appears among the continuation's reads in the turn report.
+
+### Fail signals
+
+- The final answer still calls a printed table not documented.
+- No Read between the feedback and the correction, or a citation to a page the session never read.
+- A second feedback event, the answer written out again, or a mention of a hook or notice.
+
+---
+
+## T-49 — a coined name is left out: there is no churn-risk table, and the session invents none
+
+**Covers:** ARC-09-C263 (coined in `tools/snowarch/lib/docs/grounding-check.mjs`; the rule's sentence on sourced names; the reason that never prints a name the index lacks) · **Modes:** design-only ✅ · live ✅ (no instance call)
+
+One fresh session at the checkout root, the corpus at the pin, the names index built. The corpus prints no table or field for a customer's churn risk. Run it four times on each tree.
+
+### Prompt
+
+```
+Which baseline Customer Service Management table holds a customer's churn risk score, and what is its field called? Design-only, grounded in the docs. No engagement is loaded.
+```
+
+### Expected behaviour
+
+1. The session searches the corpus and finds no such table.
+2. Its answer says so, in the form the rule gives, and makes no table or field name up.
+3. If a name the corpus does not print does stand in the reply, the Stop hook sends the turn back once, pointing at the line by its opening words and the name's first segment, never the name itself. The continuation leaves the name out or describes the construct without a name, and does not put another invented name in its place.
+
+### Pass criteria
+
+- The final answer prints no table or field name that the corpus does not print for a churn risk score (every identifier in it is on a page the session read).
+- If feedback came, the text of the "Stop hook feedback:" row in the transcript contains no complete name the corpus does not print (it shows only a first segment such as `churn_…`), and the continuation does not write the withdrawn name again.
+- At most one Stop hook feedback.
+
+### Fail signals
+
+- A made-up baseline table or field name in the final answer.
+- The feedback prints the invented name.
+- The continuation names another invented table in place of the first.
+- The question answered as if a table exists, with no statement that none was found.
+
+---
+
+## T-50 — two pages that disagree are both cited, and the difference is an OPEN QUESTION
+
+**Covers:** ARC-09-C263 (the gateway Part 2 line "Two pages that disagree are both cited, and the difference becomes an OPEN QUESTION") · **Modes:** design-only ✅ · live ✅ (no instance call)
+
+A hand case: the maintainer picks the pair, so the run record names it. Find two corpus pages that give different values for one fact (a default, a limit, a role name) with `grep -rn` over `vendor/ServiceNowDocs/markdown` on a property both pages mention, and record the pair and the two values in the run record. Run the prompt below with the property and the two pages named by area. Four runs on each tree.
+
+### Prompt
+
+```
+For the property I name in the run record, our engagement needs its default value, grounded in the docs. Design-only. No engagement is loaded.
+```
+
+### Expected behaviour
+
+1. The session reads both pages (the turn report lists both) and cites both.
+2. The two values appear side by side, and the difference becomes an `OPEN QUESTION:` block with a proposed default.
+3. No value is silently chosen.
+
+### Pass criteria
+
+- Both pages are in the turn report's reads and both are cited in the Envelope.
+- An `OPEN QUESTION:` block names the difference.
+- Neither page's value is stated as the answer without the other.
+
+### Fail signals
+
+- One page cited and the other not read.
+- One value stated as settled.
+- The difference mentioned only in prose, with no `OPEN QUESTION:`.
+
+---
+
+## T-51 — an instance deferral is kept: "verify on the instance" about a cited construct is not an absence, and draws no block
+
+**Covers:** ARC-09-C263 (the absence phrases exclude a bare "verify on the instance"; resting excludes a deferral cited on the same line) · **Modes:** design-only ✅ · live ✅ (the design-only run asks no instance question)
+
+The ITSM skill itself says "so verify on the instance that the rule exists and is active" about an assignment rule it cites. One fresh session at the checkout root. Run it four times on each tree.
+
+### Prompt
+
+```
+In ITSM, which assignment rule decides the default group for a P1 incident, and does it exist on our instance? Design-only, grounded in the docs. No engagement is loaded.
+```
+
+### Expected behaviour
+
+1. The ITSM gateway fires and cites the page for assignment rules it read.
+2. The instance question stays an instance question: in design-only the reply says it must be verified on the instance, on a line that also cites the construct, or as an `OPEN QUESTION:`.
+3. The Stop hook does not send the turn back for it.
+
+### Pass criteria
+
+- The deferral is present in the final answer, next to a citation of the assignment-rule page.
+- No Stop hook feedback arrives about that deferral.
+- The answer does not claim the rule exists on the instance.
+
+### Fail signals
+
+- A Stop hook feedback that asks the session to drop or rewrite the instance check.
+- The deferral gone from the final answer.
+- A claim about the instance made without reading it.
+
+---
+
+## T-52 — a saved Envelope is reloaded in a new session: its citations and the names on its cited pages draw no block, and a planted coined name does
+
+**Covers:** ARC-09-C263 (saved Envelopes as sources; `CLAUDE.md` §5 step 2: a later prompt starts from the Envelope instead of re-reading) · **Modes:** design-only ✅ · live ✅ (no instance call)
+
+Run in two sessions. The Envelope below is saved by hand; the page it cites prints `sn_customerservice_escalation`, and the planted name `sn_customerservice_sentiment_score` is printed by no page.
+
+### Setup
+
+```sh
+mkdir -p clients/acme/envelopes
+printf '%s\n' \
+  '# acme — engagement state' \
+  '' \
+  '## Envelopes' \
+  '- CSM · Verdict B · clients/acme/envelopes/e1.md' \
+  > clients/acme/acme-engagement-state.md
+printf '%s\n' \
+  '# Envelope e1 — case escalation' \
+  '' \
+  '## Part 2 — Data Model Alignment' \
+  'The baseline table `sn_customerservice_escalation` records an escalation (citation: markdown/customer-service-management/case-escalation-components.md).' \
+  'A score of customer sentiment is held in `sn_customerservice_sentiment_score`.' \
+  > clients/acme/envelopes/e1.md
+```
+
+### Prompt
+
+Turn 1 — a NEW session in the same checkout:
+
+```
+For acme: restate the tables the saved Envelope names for the case escalation, and the page that documents each.
+```
+
+### Expected behaviour
+
+1. The reply says it read `clients/acme/acme-engagement-state.md` and the Envelope listed there, and starts from it instead of grounding the escalation again.
+2. `sn_customerservice_escalation` and the page it cites draw no Stop hook feedback: the Envelope is a source for its own citations and for names its cited pages print.
+3. The planted name is on no page the Envelope cites. If the reply repeats it as a baseline table, the Stop hook sends the turn back once and the continuation leaves it out; a reply that points out the page does not print it needs no feedback.
+
+### Pass criteria
+
+- No feedback about `sn_customerservice_escalation` or the cited page.
+- The final answer does not state `sn_customerservice_sentiment_score` as a baseline table.
+- At most one Stop hook feedback.
+
+### Fail signals
+
+- Feedback asking the session to read again the page the Envelope already cites.
+- The planted name repeated as baseline in the final answer.
+- The Envelope ignored and the escalation grounded from the start.
+
+---
+
+## T-53 — a builder's return: names the corpus prints draw no block, and a platform name it does not print is flagged
+
+**Covers:** ARC-09-C263 (the roster builder's result is a source for indexed names only) · **Modes:** design-only ✅ · live ✅ (no instance call)
+
+Two turns in one session: a builder runs only after approval (`CLAUDE.md` §5 steps 8 to 10). The story-writer is a roster builder.
+
+### Setup
+
+```sh
+mkdir -p clients/acme
+printf '%s\n' \
+  '# acme — engagement state' \
+  'Release family: Zurich. Delivery model: agile.' \
+  > clients/acme/acme-engagement-state.md
+```
+
+### Prompt
+
+Turn 1:
+
+```
+For acme: write the user story for escalating a customer service case when its severity is critical. Design-only.
+```
+
+Turn 2, after the reply proposes the Story Writer:
+
+```
+Approved. Dispatch the Story Writer.
+```
+
+### Expected behaviour
+
+1. Turn 1 fires the CSM gateway, writes its Envelope and proposes the Story Writer.
+2. Turn 2 dispatches the Story Writer and presents its Feature file.
+3. A baseline table or field the Story Writer names that the corpus prints draws no Stop hook feedback: the builder's return is a source for those. A platform name in its prose that the corpus does not print is not exempt and is asked about once.
+
+### Pass criteria
+
+- No feedback about a name that the corpus prints.
+- If the Feature file carries a platform-prefixed name the corpus does not print, one feedback asks about it, and the final answer leaves it out.
+- At most one Stop hook feedback in each turn.
+
+### Fail signals
+
+- Feedback about every table the builder named although the corpus prints them.
+- An invented platform name passed to the user with no feedback.
+- A second feedback event in one turn.
+
+---
+
+## T-55 — the guard cases draw no block: T-10, T-17, T-36 and T-38 run unchanged
+
+**Covers:** ARC-09-C263 (the check must not touch what already works) · **Modes:** design-only ✅ · live ✅ (as each of those cases states)
+
+Run T-10, T-17, T-36 and T-38 exactly as written, one fresh session each, four runs each on the tree under test. They are the guard cases for routing, a design with an instance model, and `/snowarch status`.
+
+### Setup
+
+None of its own: this case has no prompt of its own. The prompts are those of T-10, T-17, T-36 and T-38, unchanged, each in its own fresh session.
+
+### Expected behaviour
+
+1. Each case behaves as its own Expected behaviour says.
+2. No turn of any of them draws a Stop hook feedback, a "Grounding check:" notice or a mention of one.
+
+### Pass criteria
+
+- Every pass criterion of T-10, T-17, T-36 and T-38.
+- No "Stop hook feedback:" event and no "Grounding check:" line in any turn of these sessions.
+
+### Fail signals
+
+- A Stop hook feedback in any run of the four.
+- A longer answer, a changed verdict or a changed routing proposal against the release before.
+- A mention of a hook, a notice or feedback.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -2539,7 +2845,7 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` `T-38` `T-39` `T-40` `T-41` `T-42` `T-43` `T-44` `T-45` `T-46` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` `T-38` `T-39` `T-40` `T-41` `T-42` `T-43` `T-44` `T-45` `T-46` `T-47` `T-48` `T-49` `T-50` `T-51` `T-52` `T-53` `T-55` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
 | 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` `T-35` | the launchers, without Git Bash — the path that has cost the most cells |
 | 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |

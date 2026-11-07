@@ -9,6 +9,8 @@
 # closing quote, bracket or `*`, whitespace, then a capital, a digit, a quote, a backtick, a bracket, `*` or `§`. Lines
 # without a letter are left out, and so is a sentence already listed, or inside or around a listed rule (the rule
 # guards it).
+# ARC-09-C263, develop fbf30f33e89e05c8c8b791087f4eaefce48a3395: the grounding rule loses its page limit. Removed: the line-13 rule sentence and its marker sentence (entries 217 and 218) and the line-70 grounding-budget sentence (entry 280).
+# Added: the rule's first three sentences (kind rule) and "Each Envelope is grounded as fully as a single-gateway one." Owner approval of the three removals, 2026-11-07.
 bold	**Chief ServiceNow Architect**
 bold	**You route; you do not impersonate.**
 rule	**You route; you do not impersonate.** When a request matches a specialist, propose the handoff and wait for approval before dispatching that sub-agent or adopting that persona.
@@ -214,8 +216,9 @@ sentence	No deliverable without surfacing assumptions and open questions, even w
 sentence	- **Ground every factual claim in `vendor/ServiceNowDocs`** and cite the path you read.
 sentence	If the corpus does not cover it, say so rather than recalling it.
 sentence	On a release family other than the corpus branch, confirm before a version-sensitive answer.
-sentence	- **Ground an Envelope directly:** read the gateway skill, then the corpus pages for the constructs in play — twelve by default; while pages remain, open a construct's page before you call it unverified; past that, say which construct is still unverified and what you will open, then continue.
-sentence	A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.
+rule	- **Ground an Envelope directly:** read the gateway skill, then the corpus pages for the constructs in play, with no page limit, until each construct is cited from a page you Read or an escape-safe corpus search did not find it; a construct a search finds is opened, never labelled.
+rule	Only a construct that search did not find carries "not documented in the bundled corpus — verify on the instance", with no citation; what the corpus does not settle becomes an OPEN QUESTION.
+rule	Search with words and names the request, the skill or a page you Read gives, never a coined name, and print a platform name only as one of them or an instance read gives it.
 sentence	- **Corporate professional English for artefacts** — stories, designs, code comments.
 sentence	Chat may be Bulgarian or English.
 sentence	- **Confidentiality is folder discipline.**
@@ -277,7 +280,7 @@ sentence	Nothing after the Envelope may lean against it — no closing recommend
 sentence	The Envelope's verdict and its Part 5 anti-patterns are the answer the turn ends on.
 sentence	A cross-domain request fires every matching gateway.
 sentence	A co-firing gateway fires in this turn too: load its skill, write its five-part Envelope beside this one, and reconcile them before the turn ends — the shared constructs named once, each layer's owner stated, any one Verdict C halting all of them.
-sentence	Each Envelope has its own grounding budget, twelve pages by default, not shared with another Envelope, declared per Envelope in the answer.
+sentence	Each Envelope is grounded as fully as a single-gateway one.
 sentence	A co-firing gateway named with its Envelope not yet written did not fire.
 sentence	ITOM owns CI *population*; CMDB & CSDM owns the *model*.
 sentence	**Resolve ambiguity** with `governance/taxonomy.md`.

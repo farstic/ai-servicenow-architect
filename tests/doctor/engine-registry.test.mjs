@@ -21,8 +21,8 @@ import { licensedEnv } from '../../tools/snowarch/tests/helpers/licence-hook/ind
 const checks = engineChecks();
 const ids = checks.map((c) => c.id);
 
-test('E-00 … E-32 and SV-00 … SV-09, once each, in section order', () => {
-  assert.equal(checks.length, 43);
+test('E-00 … E-33 and SV-00 … SV-09, once each, in section order', () => {
+  assert.equal(checks.length, 44);
   // ARC-08-C30 — THE SET, NOT THE ORDER, and the difference is a decision worth stating.
   //
   // This asserted `deepEqual` against an ASCENDING list, which held because every check until now
@@ -40,7 +40,7 @@ test('E-00 … E-32 and SV-00 … SV-09, once each, in section order', () => {
   // below. What is no longer asserted is that definition order happens to be numeric — which was
   // never a property anyone relied on, only one that had not yet been contradicted.
   assert.deepEqual([...ids.filter((id) => id.startsWith('E-'))].sort(),
-    Array.from({ length: 33 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
+    Array.from({ length: 34 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
   assert.deepEqual(ids.filter((id) => id.startsWith('SV-')),
     Array.from({ length: 10 }, (_, i) => `SV-${String(i).padStart(2, '0')}`));
   assert.equal(new Set(ids).size, ids.length);
@@ -98,7 +98,7 @@ test('two checks touch the network, and each says which question it is asking', 
 
 test('only the checks with a repair declare fixable, and each carries a fix hint or a null', () => {
   assert.deepEqual(checks.filter((c) => c.fixable).map((c) => c.id),
-    ['E-10', 'E-11', 'E-32', 'E-12', 'E-13', 'E-15', 'SV-01', 'SV-02', 'SV-03']);
+    ['E-10', 'E-11', 'E-32', 'E-12', 'E-13', 'E-15', 'E-33', 'SV-01', 'SV-02', 'SV-03']);
 });
 
 test('--section selects exactly one section\'s checks', () => {
@@ -125,7 +125,8 @@ test('the detectors warn and the capability packs inform — only the engine\'s 
   // at ARC-11-C6 step 5: from 2.0.13 nothing runs without a licence in force, so a refused state is the one FAIL a
   // doctor names for it. An expiring licence, which is in force, is still a warning.
   assert.deepEqual(checks.filter((c) => c.severity === 'warn').map((c) => c.id),
-    ['E-23', 'E-24', 'E-30', 'E-25', 'E-26', 'E-27', 'E-28', 'SV-04']);
+    // E-33 (ARC-09-C263) is the grounding names index: the install works without it, and the doctor says so and offers --fix.
+    ['E-33', 'E-23', 'E-24', 'E-30', 'E-25', 'E-26', 'E-27', 'E-28', 'SV-04']);
   assert.deepEqual(checks.filter((c) => c.severity === 'info').map((c) => c.id), ['E-04']);
 });
 
@@ -224,7 +225,8 @@ test('--quick membership is the same set in the registry and in a real run', () 
     // `stat` against a network mount that is not up blocks for the mount's timeout — which the
     // session-start path must never inherit. It sits between E-22 and E-27 because this list is in
     // DEFINITION order and E-30 is defined at the end of the legacy block, after E-24.
-    .map((c) => c.id), ['E-00', 'E-03', 'E-04', 'E-09', 'E-12', 'E-13', 'E-14', 'E-15', 'E-16',
+    // E-33 (ARC-09-C263) reads the shared `docsStatus` like the rest of the docs group, so it is out of --quick for their reason.
+    .map((c) => c.id), ['E-00', 'E-03', 'E-04', 'E-09', 'E-12', 'E-13', 'E-14', 'E-15', 'E-16', 'E-33',
     'E-19', 'E-20', 'E-21', 'E-22', 'E-30', 'E-27', 'E-28',
     'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-04', 'SV-05', 'SV-06', 'SV-07', 'SV-08', 'SV-09']);
 });

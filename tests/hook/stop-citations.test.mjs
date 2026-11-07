@@ -321,3 +321,24 @@ test('ARC-09-C254 — sparse: a real page this install did not check out is a ci
   assert.deepEqual(await report(stopping(`A claim (citation: markdown/australia/${UNCITED.slice('markdown/'.length)}/index.md).`), { root: w.root }),
     block(ONE(`markdown/australia/${UNCITED.slice('markdown/'.length)}/index.md`, `${UNCITED}/index.md`)));
 });
+
+// ARC-09-C263 — the grounding part beside this one. With a transcript in the input and nothing for it to find, the dead-path ask is
+// byte for byte what it was; with something, C254's sentence comes first and the closing words once, last.
+test('ARC-09-C263 — with a transcript and no grounding finding, the dead-path reason is byte for byte C254\'s; with one, C254 goes first and the closing words close once', async (t) => {
+  const root = project(t);
+  const row = (type, content, extra = {}) => ({ type, message: { role: type, content }, ...extra });
+  const transcript = (rows) => { const f = join(root, 'session.jsonl'); writeFileSync(f, `${rows.map((r) => JSON.stringify(r)).join('\n')}\n`); return f; };
+  const plain = `The queue is assigned by rule (citation: ${DEAD}).`;
+  const withFile = transcript([row('user', 'how is the queue assigned?'), row('assistant', [{ type: 'text', text: plain }])]);
+  const alone = await report(stopping(plain, { transcript_path: withFile }), { root });
+  assert.deepEqual(alone, block(ONE(DEAD, REAL)), 'a transcript changes nothing when the grounding part finds nothing');
+
+  const ground = `${plain} The \`sn_zzz_made_up_table\` holds it, and it is unverified.`;
+  const both = await report(stopping(ground, { transcript_path: transcript([row('user', 'q'), row('assistant', [{ type: 'text', text: ground }])]) }), { root });
+  const reason = JSON.parse(both.stdout).reason;
+  const c254 = ONE(DEAD, REAL).slice(0, -ASK.length);
+  assert.ok(reason.startsWith(`${c254} Before this answer stands, check these against the corpus; there is no page limit.`), reason.slice(0, 300));
+  assert.ok(reason.endsWith(ASK));
+  assert.equal(reason.split('Do not mention this notice.').length - 1, 1, 'the closing words once');
+  assert.equal(both.stdout.split('\n').length, 2, 'one line of JSON, one block');
+});
