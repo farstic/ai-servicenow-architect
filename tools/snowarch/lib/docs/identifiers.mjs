@@ -44,29 +44,15 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { loadContract, toolNames } from '../../../../packages/contract/lib/contract.mjs';
 import { SPARSE, sparseOf } from './status.mjs';
+import {
+  MARKER, PROPOSED, DECLARED, PLATFORM_PREFIXES, NAMESPACE_MIN, TOKEN, DOTTED, CUSTOM, PLACEHOLDER, bare, dotted, candidate,
+  pageNames, qualifiesWhole,
+} from './name-rules.mjs';
 
-/** The one phrase that marks a platform name the corpus does not document. Checked on the line. */
-export const MARKER = 'not documented in the bundled corpus — verify on the instance';
+// ARC-09-C263 — the definitions moved to name-rules.mjs, a leaf; what this file exported it still does.
+export { MARKER, PROPOSED, PLATFORM_PREFIXES, NAMESPACE_MIN };
 
-/**
- * The phrase that declares an example's own proposal under a platform name — a table proposed in a
- * module's baseline scope, which the platform would name `sn_<module>_…`. It declares only the name
- * it is attached to — the one written immediately before it, with at most a closing backtick, spaces
- * and an opening parenthesis between (`` `sn_x_y` (proposed — not baseline) ``) — and that one
- * declaration covers the name's other sites in the file. Another name on the line gets nothing.
- */
-export const PROPOSED = 'proposed — not baseline';
-const DECLARED = new RegExp(`([A-Za-z0-9]+(?:_[A-Za-z0-9]+)+)\`?\\s*\\(?\\s*${PROPOSED}`, 'gi');
 
-/** First segments that make an absent name a claim about the platform. Each must begin a corpus name. */
-export const PLATFORM_PREFIXES = Object.freeze([
-  'change', 'chg', 'cmdb', 'cmn', 'csm', 'customer', 'em', 'hr', 'incident', 'kb', 'mid', 'service',
-  'sla', 'sn', 'snow', 'sys',
-  // The abbreviated namespaces. Each begins corpus tables (`sc_req_item`, `sa_pattern`, `ecc_agent`,
-  // `ast_contract`, `sysrule_assignment`), so a name that starts with one reads as a platform object.
-  'sc', 'sa', 'ecc', 'ast', 'alm', 'pa', 'wf', 'fm', 'ais', 'awa', 'asmt', 'm2m', 'imp', 'sp', 'oauth',
-  'sysapproval', 'sysevent', 'sysauto', 'syslog', 'sysrule',
-]);
 
 /** Why a tier-2 name may be absent from the corpus. Closed: a new reason is a change to this file. */
 export const REASONS = Object.freeze({
@@ -78,22 +64,11 @@ export const REASONS = Object.freeze({
   'example-name': 'any other name the example invents: a group, a metric, an index, a file, a value',
 });
 
-/**
- * A left part with fewer distinct dotted names in the corpus is a table written with a field
- * (`sn_hr_core_case.state`), not a namespace. Measured 2026-10-04: the tables the roster writes that
- * way reach 2 (`sn_hr_core_case`); `sn_si.` has 7; and four insurance scopes sit in the gap below the
- * line and are not looked up whole — `sn_ins_underwrite` (4), `sn_ins_uw_b2b`, `sn_ins_indiv_uw` and
- * `sn_ins_group_uw` (3 each).
- */
-export const NAMESPACE_MIN = 5;
 
 /** A `<stem>_*` site names a family: the corpus must hold this many names beginning `<stem>_`. A family of one is a name. */
 export const FAMILY_MIN = 2;
 
 const ALLOWLIST = new URL('./identifier-allowlist.json', import.meta.url);
-const TOKEN = /[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+/g;
-const DOTTED = /[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+/g;
-const CUSTOM = /^(x|u)_/;
 const CAMEL_NAME = /^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+$/;
 // Two or more humps: `ChangeSchedule`, not `Account` or `ITSM`.
 const CAMEL = /\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+\b/g;
@@ -117,12 +92,6 @@ const BASELINE_LINE = /baseline|out[- ]of[- ]the[- ]box|\boob\b|\bships\b|built-
 const NOT_A_NAME = new Set(['md', 'json', 'mjs', 'js', 'ts', 'yml', 'html', 'css', 'csv', 'txt', 'png', 'svg', 'drawio', 'xml',
   'sh', 'pdf', 'docx', 'py', 'io', 'net', 'ink', 'com', 'org']);
 const FENCE = /^\s*```/;
-// The roster's placeholder prefix, one or more angle-bracket segments: `x_<vendor>_<app>_`.
-const PLACEHOLDER = /x_(?:<[^<>\s]+>_)+$/;
-// Leading and trailing underscores are markdown emphasis (`_sn_hr_core_`), not part of the name.
-const bare = (t) => t.toLowerCase().replace(/^_+|_+$/g, '');
-const dotted = (t) => t.toLowerCase().split('.').map((p) => p.replace(/^_+|_+$/g, '')).filter(Boolean).join('.');
-const candidate = (left) => left === 'com' || left === 'glide' || /^sn_[a-z0-9_]+$/.test(left);
 const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
   e.isDirectory() ? walk(join(d, e.name)) : (e.name.endsWith('.md') ? [join(d, e.name)] : []));
 
@@ -266,22 +235,20 @@ export function corpusIndex(corpus, { words = new Set(), dotted: wantDotted = ne
   const spacedRe = wantSpaced.size ? new RegExp([...wantSpaced].sort((a, b) => b.length - a.length)
     .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g') : null;
   for (const f of walk(join(corpus, 'markdown'))) {
-    const text = readFileSync(f, 'utf8').replace(/\\_/g, '_');
-    for (const m of text.matchAll(/[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*/g)) {
-      const parts = m[0].split('.');
-      for (const p of parts) {
-        const t = bare(p);
-        if (t.includes('_')) tokens.add(t);
-        else if (words.has(t)) seen.add(t);
-      }
-      if (parts.length > 1) {
-        const d = dotted(m[0]);
-        if (d.includes('.') && candidate(d.split('.')[0])) names.add(d);
-        if (wantDotted.has(d)) foundDotted.add(d);
-      }
+    const raw = readFileSync(f, 'utf8');
+    // ARC-09-C263 — the page's names come from the tokeniser in name-rules.mjs, the one the names index calls too.
+    const page = pageNames(raw, words);
+    for (const t of page.tokens) tokens.add(t);
+    for (const t of page.plain) seen.add(t);
+    for (const d of page.dotted) {
+      if (candidate(d.split('.')[0])) names.add(d);
+      if (wantDotted.has(d)) foundDotted.add(d);
     }
-    if (wantCamel.size) for (const m of text.matchAll(CAMEL)) if (wantCamel.has(m[0])) foundCamel.add(m[0]);
-    if (spacedRe) for (const m of spacedText(text).matchAll(spacedRe)) foundSpaced.add(m[0]);
+    if (wantCamel.size || spacedRe) {
+      const text = raw.replace(/\\_/g, '_');
+      if (wantCamel.size) for (const m of text.matchAll(CAMEL)) if (wantCamel.has(m[0])) foundCamel.add(m[0]);
+      if (spacedRe) for (const m of spacedText(text).matchAll(spacedRe)) foundSpaced.add(m[0]);
+    }
   }
   const namespaces = new Map();
   for (const d of names) {
@@ -414,10 +381,7 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
   // Names only, to excuse a mention of a tool. Whether the contract matches its pin is the contract
   // gate's question; this check must not fail on it.
   const toolSet = tools ?? new Set(toolNames(loadContract({ verifyPin: false })));
-  const qualifies = (whole) => {
-    const left = whole.split('.')[0];
-    return left === 'com' || left === 'glide' || (idx.namespaces.get(left) ?? 0) >= NAMESPACE_MIN;
-  };
+  const qualifies = (whole) => qualifiesWhole(whole, idx.namespaces);
   const families = new Map();
   const family = (stem) => {
     if (!families.has(stem)) families.set(stem, [...idx.tokens].filter((t) => t.startsWith(`${stem}_`)).length);
