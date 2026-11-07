@@ -1381,6 +1381,31 @@ than by a list, so a new printing script is covered the day it appears. `tools/s
 in the sweep as a guard over something already correct: the banner hook has never called
 `process.exit`, which is why a 12 KB `additionalContext` reaches the model whole.
 
+## The Stop hook's promises, and what keeps each
+
+`tools/snowarch/hooks/stop-citations.mjs` runs at the end of every turn (ARC-09-C254, ARC-09-C263), so a change to it or to what it
+imports is a change to every session. Each promise is pinned by a test, and a change that breaks one edits the test in the same
+pull request, where a reviewer sees it.
+
+- **It asks once.** One `decision: "block"` per turn, and never when `stop_hook_active` is true; on that continuation it may send
+  the user a `systemMessage`, never the model a second ask. `tests/hook/stop-grounding.test.mjs`, `tests/hook/hook-entry-c254.test.mjs`.
+- **The citation ask is byte for byte what it was** when it fires alone; with a grounding finding, its sentence comes first and the
+  closing words close once. `tests/hook/stop-citations.test.mjs`.
+- **It never prints a name the corpus does not print.** The grounding reason points at a line by its opening words and a name by its
+  first segment; `assertNoUnheldNames` in the test runs over the reason of every case. A new clause is held to the same rule.
+- **It fails open.** Its own `try`/`catch`, a 6 s soft deadline, and nothing on stderr unless `SNOWARCH_HOOK_DEBUG` is set. A
+  transcript over 64 MB is not read; a 5 MB transcript with a 9 MB index is checked in well under 5 s, and the test prints the time.
+- **No hook can build the names index.** `lib/docs/names-index-build.mjs` is named by one module, `sync-index.mjs`, which runs it in a
+  child process; `tests/docs-names-index.test.mjs` follows the import graph of every hook. The index is built at `docs sync`, by
+  bootstrap B02 and by `doctor --fix`, never in a session.
+- **No new hook entry.** The Stop entry is the one B07 writes (`tests/hook/hook-entry-c254.test.mjs`).
+- **What it counts as read is measured, not assumed.** `tests/fixtures/transcripts/` holds sanitised captures of real sessions at the
+  floor Claude Code, the version the measurement pins and the current one, `claude -p` and interactive. A new Claude Code version that
+  changes the transcript is a new capture and a failing `tests/turn-sources.test.mjs`, not a silent loss of the check.
+- **The measurement's two values are data.** `lib/docs/grounding-classes.json` says which of the seven classes may block and the
+  page count above which a name is too common to ask about; the hook reads it on every turn, and an option given to
+  `groundingFindings` overrides it, for the offline replay.
+
 ## Reporting an install problem
 
 **The product sends nothing; reports are pasted by people.** There is no telemetry, no crash

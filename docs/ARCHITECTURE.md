@@ -1302,7 +1302,7 @@ about one registry rather than several:
 | `SV-09` | server | store schema | — | — |
 <!-- /generated:doctor-checks -->
 
-**`--fix` repairs a closed list of seven drifts** (ARC-08-S06), and the list being closed is the
+**`--fix` repairs a closed list of drifts** (ARC-08-S06), and the list being closed is the
 feature: every entry is a class of drift with exactly one correct resolution and no information in
 it a human would supply differently. It prints the plan before it touches anything (principle 10),
 applies in the order below so a later repair sees an earlier one, reports each as `applied`,
@@ -1354,6 +1354,31 @@ anything itself.
 The root comes from the hook's own file location, never from `cwd` or `CLAUDE_PROJECT_DIR`: inside
 a session that variable is the SESSION's project, and a banner describing another checkout would be
 worse than none.
+
+**The Stop hook and the grounding check** (ARC-09-C254, ARC-09-C263). `tools/snowarch/hooks/stop-citations.mjs` runs at the end of
+every turn, from the one Stop entry B07 writes, and asks the model for a correction at most once. It has two parts. The citation
+part (C254) finds a dead corpus path whose page the resolver knows. The grounding part (C263) compares the answer's names and
+corpus citations with what the session actually read, which it takes from the session transcript Claude Code keeps
+(`transcript_path`) and from the corpus's names index. Seven classes: a name called "not documented" that the corpus prints; a name
+the corpus prints that no page, skill, request or roster builder of the session gave; a name in no source where the index is whole
+(a coined name); the same where it is not (no claim about the corpus); a page cited and never read; "unverified" or "not opened"
+left in the final reply; and a `Pages read: <n>` above the pages read. The rule it checks is the grounding rule in `CLAUDE.md`:
+no page limit, until each construct is cited from a page the Architect read or an escape-safe search did not find it.
+
+Four promises shape it, after the banner's. It asks once: on the continuation (`stop_hook_active`) it never blocks, and when its
+own block was not met it tells the USER, as a `systemMessage`, what stayed open, never the model. It never fails a turn: the
+grounding part has its own `try`/`catch` and a 6 s soft deadline inside the entry's 10 s, and a missing, ragged, oversize or foreign
+transcript, or a missing index, leaves the checks that need them off. It is fast: a reply with no backtick, corpus path, absence or
+resting phrase and no `Pages read` exits having imported nothing. And it never prints a name the index lacks: a name the corpus
+does not print is pointed at by the opening words of its line and its first segment, because said back to the model it would become
+a row of the transcript the next reader takes for a source.
+
+The names index (`.local/corpus-names/<pin>/`, `lib/docs/names-index.mjs`) is built at `docs sync`, by bootstrap B02 and by
+`doctor --fix` (E-33, fixer F9), in a child process (`lib/docs/sync-index.mjs`); no hook can load the builder. B02 declares the index as
+its output, as it does for B01's manifest, so an install made before it existed builds it at the next bootstrap or upgrade, and
+the upgrade's plan says "the names index is not held". Which classes may block, and the page count above which a name is too
+common to ask about, are data in `lib/docs/grounding-classes.json`, read by the hook on every turn; a missing or garbage file means
+the defaults.
 
 **Every check the old `doctor.sh` made is accounted for** — see
 [Appendix: the old doctor's checks](#appendix-the-old-doctors-checks) at the end of this document.
