@@ -10,6 +10,7 @@
 // checks that need the index are simply off until `doctor --fix` builds it.
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { spellings } from '../launcher-spelling.mjs';
 
 const BUILDER = fileURLToPath(new URL('./names-index-build.mjs', import.meta.url));
 
@@ -20,7 +21,7 @@ export const notBuilt = (error, cli) => `[docs] note: the names index was not bu
  * Builds (or confirms) the index of `corpus` for `pin`. `say` prints the lines; `cli` is the launcher's spelling for the remedy.
  * `run` is the seam a test gives; `timeoutMs` bounds a build that hangs (the real one takes under a minute).
  */
-export function indexAfterSync({ root, corpus, pin, say = () => {}, cli = './snowarch', force = false, run = execFileSync, timeoutMs = 600_000 }) {
+export function indexAfterSync({ root, corpus, pin, say = () => {}, cli = spellings().cli, force = false, run = execFileSync, timeoutMs = 600_000 }) {
   let out;
   try {
     const stdout = run(process.execPath, [BUILDER, '--root', root, '--corpus', corpus, '--pin', pin, ...(force ? ['--force'] : [])],
