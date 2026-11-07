@@ -238,3 +238,53 @@ test('ARC-09-C263 — the written Stop entry blocks a false absence once, then o
   assert.deepEqual([bare.status, bare.stderr], [0, '']);
   if (bare.stdout) assert.doesNotMatch(JSON.parse(bare.stdout).reason, /the corpus prints them/);
 });
+
+// ARC-09-C263 — the measurement sets two values, which classes may block and the ubiquity threshold, and the pre-registration freezes
+// the code: so they are a DATA file the hook reads (tools/snowarch/lib/docs/grounding-classes.json). A one-file diff changes what the
+// written entry asks; a missing or garbage file means the defaults, and the entry exits 0 either way.
+test('ARC-09-C263 — the classes that block and the ubiquity threshold are data the written entry reads; a missing or garbage file means the defaults', (t) => {
+  const root = project(t);
+  const pin = 'f'.repeat(40);
+  put(root, 'engine.config.json', `${JSON.stringify({ docs: { pin } })}\n`);
+  const pages = ['markdown/alpha/page-one.md', 'markdown/alpha/two.md', 'markdown/alpha/three.md'];
+  for (const page of pages) put(root, `vendor/ServiceNowDocs/${page}`, 'The task\\_sla table.\n');
+  writeNamesIndex(corpusNamesDir(root, pin), buildNamesIndex({ corpus: join(root, 'vendor', 'ServiceNowDocs'), pin, pages, tree: pages }));
+  mkdirSync(join(root, '.claude', 'skills', 'csm-specialist'), { recursive: true });
+  const entry = oursIn(written(root), 'Stop', SL.isOurStopHook);
+  const classes = join(root, 'tools', 'snowarch', 'lib', 'docs', 'grounding-classes.json');
+  const row = (type, content) => ({ type, message: { role: type, content } });
+  const skill = [row('assistant', [{ type: 'tool_use', id: 's', name: 'Skill', input: { skill: 'csm-specialist' } }]), row('user', [{ type: 'tool_result', tool_use_id: 's', content: 'Launching skill: csm-specialist' }])];
+  const ask = (reply) => {
+    const f = join(root, 'session.jsonl');
+    writeFileSync(f, `${[row('user', 'q'), ...skill, row('assistant', [{ type: 'text', text: reply }])].map((r) => JSON.stringify(r)).join('\n')}\n`);
+    const r = runEntry(entry, root, stopping(reply, { transcript_path: f }));
+    assert.deepEqual([r.status, r.stderr], [0, ''], 'exit 0 with nothing on stderr, whatever the file says');
+    return r.stdout ? JSON.parse(r.stdout) : null;
+  };
+  const coined = 'The `sn_zzz_made_up_table` holds it.';
+  const common = 'The `task_sla` table holds it.';
+
+  // The committed file: all seven kinds, 500 pages. The defaults ask about both replies.
+  const committed = JSON.parse(readFileSync(classes, 'utf8'));
+  assert.deepEqual(committed.blocking, ['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced', 'citedUnread', 'resting', 'overclaim']);
+  assert.equal(committed.ubiquityPages, 500);
+  assert.equal(ask(coined)?.decision, 'block');
+  assert.equal(ask(common)?.decision, 'block', 'on 3 pages a name is not common');
+
+  // A one-file diff: only citations block, and a name on 2 or more pages is common. Nothing else changed.
+  writeFileSync(classes, `${JSON.stringify({ blocking: ['citedUnread'], ubiquityPages: 2 })}\n`);
+  assert.equal(ask(coined), null, 'coined is computed and not asked');
+  writeFileSync(classes, `${JSON.stringify({ blocking: ['coined', 'unsourcedPrinted'], ubiquityPages: 2 })}\n`);
+  assert.equal(ask(coined)?.decision, 'block');
+  assert.equal(ask(common), null, 'on 3 pages, with the threshold at 2, the name is too common to ask about');
+  writeFileSync(classes, `${JSON.stringify({ blocking: ['coined', 'unsourcedPrinted'], ubiquityPages: 4 })}\n`);
+  assert.equal(ask(common)?.decision, 'block', 'the same name, the threshold at 4');
+
+  // Garbage, wrong types and a missing file: the defaults, and the entry fails open as it always has.
+  for (const text of ['{ not json', '[]', '"blocking"', '{"blocking":"coined","ubiquityPages":"many"}']) {
+    writeFileSync(classes, text);
+    assert.equal(ask(coined)?.decision, 'block', `defaults for ${text}`);
+  }
+  rmSync(classes);
+  assert.equal(ask(coined)?.decision, 'block', 'a missing file means the defaults');
+});

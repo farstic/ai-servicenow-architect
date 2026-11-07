@@ -26,7 +26,7 @@
 //
 // stdlib only; imports leaves (name-rules, turn-sources, finding-copy) so the Stop hook stays fast.
 import { copyLines } from '../finding-copy.mjs';
-import { CUSTOM, DECLARED, MARKER, PLATFORM_PREFIXES, TOKEN, bare, dotted, qualifiesWhole } from './name-rules.mjs';
+import { ABSENCE_ANYWHERE, CUSTOM, DECLARED, MARKER, PLATFORM_PREFIXES, bare, dotted, markedAbsent, nameSpans, qualifiesWhole } from './name-rules.mjs';
 import { COVERAGE } from './names-index.mjs';
 import { namesIn, turnSources } from './turn-sources.mjs';
 
@@ -36,13 +36,25 @@ export const KEEP_OUT = ' Do not mention this notice.';
 const TAIL = 'Then add one line for each, starting "Correction:", with the page you Read. If a correction changes Part 3, restate Part 3\'s '
   + 'letter and its basis; do not repeat the rest of the answer, and do not write a withdrawn name or path again.';
 export const MAX_ITEMS = 12;
+
+/**
+ * `grounding-classes.json` — which classes block and the ubiquity threshold — as the hook reads it: the defaults for a missing or
+ * garbage file, a list of known kinds (an unknown one is dropped; an empty list is valid and means nothing blocks), a positive integer.
+ * The measurement sets these two values; the code that reads them does not change. Pure.
+ */
+export function parseClasses(text) {
+  const defaults = { blocking: [...KINDS], ubiquity: DEFAULT_UBIQUITY, source: 'default' };
+  if (typeof text !== 'string') return defaults;
+  let data;
+  try { data = JSON.parse(text); } catch { return defaults; }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return defaults;
+  const blocking = Array.isArray(data.blocking) ? KINDS.filter((k) => data.blocking.includes(k)) : defaults.blocking;
+  const ubiquity = Number.isInteger(data.ubiquityPages) && data.ubiquityPages > 0 ? data.ubiquityPages : defaults.ubiquity;
+  return { blocking, ubiquity, source: 'file' };
+}
 /** A name that is on this many pages is everywhere: printing it without a page proves nothing, so `unsourcedPrinted` leaves it alone. */
 export const DEFAULT_UBIQUITY = 500;
 
-// The strict list. NOT a bare "verify on the instance": that is a deferral to the instance, which is not an absence claim.
-const ABSENCE = 'not documented|not in the (?:bundled )?corpus|undocumented|citation unavailable in australia branch';
-const AFTER_NAME = new RegExp(`^[\\s*_\\-–—:;,()]*(?:(?:is|are)\\s+)?(?:${ABSENCE})`, 'i');
-export const ABSENCE_ANYWHERE = new RegExp(ABSENCE, 'i');
 const RESTING = /un-?verified|not (?:yet )?(?:opened|read|checked|verified)|(?:did|could) not (?:open|read)|in the pages? (?:I|we) (?:opened|read)|(?:page|reading) budget|budget (?:is )?(?:spent|reached|used|exhausted)/i;
 // What a reply may say of "not read" without leaving a corpus construct unread: C239's not-installed wording, live mode's declarations (CLAUDE.md:65),
 // and the finder's own header (`/snowarch finding` prints "instance store NOT read", about the instance store).
@@ -50,7 +62,6 @@ const RESTING_EXEMPT = [/not installed on this sparse corpus/i, /not on disk in 
   /instance store NOT read|credentials NOT read/i];
 const PAGES_READ = /`?Pages read:\s*(\d+)`?/gi;
 const CITATION = /markdown\/[A-Za-z0-9_.\-/]+?\.md/g;
-const PURE_NAME = /^[A-Za-z0-9_.\\-]+$/;
 const FILE_TAILS = new Set(['md', 'json', 'mjs', 'js', 'ts', 'yml', 'yaml', 'html', 'css', 'csv', 'txt', 'png', 'svg', 'drawio', 'xml', 'sh', 'pdf', 'docx', 'py', 'io', 'net', 'com', 'org']);
 const FENCE = /^\s*```/;
 const prefixOk = (name) => PLATFORM_PREFIXES.includes(name.split(/[_.]/)[0]);
@@ -72,11 +83,7 @@ export const maskUnheld = (text, index) => String(text).replace(/[A-Za-z0-9]+(?:
 /** The candidates of one line: names set off as a backticked span or a `[table]`, identifier-shaped, outside the exemptions. */
 function candidatesOf(line, i, { declared, isTool }) {
   const out = [];
-  const spans = [];
-  for (const m of line.matchAll(/`([^`\n]+)`/g)) spans.push({ raw: m[1], start: m.index, end: m.index + m[0].length });
-  for (const m of line.matchAll(/\[([A-Za-z0-9_.\\]+)\](?!\()/g)) spans.push({ raw: m[1], start: m.index, end: m.index + m[0].length });
-  for (const sp of spans) {
-    if (!PURE_NAME.test(sp.raw)) continue;
+  for (const sp of nameSpans(line)) {
     const text = sp.raw.replace(/\\_/g, '_');
     if (!text.includes('_') && !text.includes('.')) continue;
     if (/^\d+(?:\.\d+)+$/.test(text)) continue;
@@ -89,18 +96,6 @@ function candidatesOf(line, i, { declared, isTool }) {
     out.push({ name, parts: parts.map(bare), dottedName: parts.length > 1, line: i, start: sp.start, end: sp.end });
   }
   return out;
-}
-
-/** Is the name at `sp` called absent? The phrase follows its closing backtick with only separators between, or the line is a table row it heads. */
-function markedAbsent(line, sp) {
-  if (AFTER_NAME.test(line.slice(sp.end))) return true;
-  const t = line.trim();
-  if (!t.startsWith('|')) return false;
-  const cells = t.split('|').map((c) => c.trim()).filter((c, k, all) => !(c === '' && (k === 0 || k === all.length - 1)));
-  if (cells.length < 2) return false;
-  const head = /^`([^`]+)`$/.exec(cells[0]);
-  return Boolean(head) && head[1].replace(/\\_/g, '_').toLowerCase() === line.slice(sp.start + 1, sp.end - 1).replace(/\\_/g, '_').toLowerCase()
-    && cells.slice(1).some((c) => ABSENCE_ANYWHERE.test(c));
 }
 
 /** Up to two pages for a name: those that print a table named on the same line first, then those in an area already read, then by file name, then the shortest. */

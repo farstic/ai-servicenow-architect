@@ -137,7 +137,7 @@ function checkoutFacts(root) {
 async function grounding(input, message, { root, dead, started, seams = {}, debug }) {
   const stop = () => Date.now() - started > (seams.deadlineMs ?? DEADLINE_MS);
   try {
-    const { groundingFindings, residualFindings, LEAD } = await import('../lib/docs/grounding-check.mjs');
+    const { groundingFindings, residualFindings, parseClasses, LEAD } = await import('../lib/docs/grounding-check.mjs');
     const { readTranscriptRows } = await import('../lib/docs/turn-sources.mjs');
     const { loadNamesIndex } = await import('../lib/docs/names-index.mjs');
     const { corpusNamesDir } = await import('../lib/local-paths.mjs');
@@ -146,7 +146,12 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
     const transcript = typeof input.transcript_path === 'string' ? read(input.transcript_path, { onDebug: debug }) : null;
     const pin = facts.pin();
     const index = pin ? (seams.loadIndex ?? loadNamesIndex)(corpusNamesDir(root, pin), { pin }) : null;
-    const options = { builders: facts.builders, rosterSkills: facts.rosterSkills, isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD, ...(seams.options ?? {}) };
+    // Which classes block and the ubiquity threshold are DATA (grounding-classes.json), so the measurement changes them without a code diff.
+    let classesText = null;
+    try { classesText = readFileSync(fileURLToPath(new URL('../lib/docs/grounding-classes.json', import.meta.url)), 'utf8'); } catch { /* missing: the defaults */ }
+    const classes = parseClasses(classesText);
+    const options = { blocking: classes.blocking, ubiquity: classes.ubiquity, builders: facts.builders, rosterSkills: facts.rosterSkills,
+      isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD, ...(seams.options ?? {}) };
     if (input.stop_hook_active) {
       const r = residualFindings({ rows: transcript?.rows ?? null, reply: message, index, coverage: index?.coverage ?? null, options });
       return stop() ? null : { residual: r };
