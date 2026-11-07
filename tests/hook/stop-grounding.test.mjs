@@ -9,7 +9,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
-import { KEEP_OUT, KINDS, LEAD, candidatePages, groundingFindings, opening, residualFindings } from '../../tools/snowarch/lib/docs/grounding-check.mjs';
+import { DEFAULT_UBIQUITY, KEEP_OUT, KINDS, LEAD, candidatePages, groundingFindings, opening, parseClasses, residualFindings } from '../../tools/snowarch/lib/docs/grounding-check.mjs';
 import { report } from '../../tools/snowarch/hooks/stop-citations.mjs';
 import { buildNamesIndex, writeNamesIndex } from '../../tools/snowarch/lib/docs/names-index-build.mjs';
 import { loadNamesIndex } from '../../tools/snowarch/lib/docs/names-index.mjs';
@@ -478,6 +478,31 @@ test('ARC-09-C263 M5 hook — no new hook entry, and no hook imports the index b
   const hooks = readFileSync(join(ROOT, 'tools/snowarch/hooks/stop-citations.mjs'), 'utf8');
   assert.doesNotMatch(hooks, /names-index-build|sync-index/);
   assert.match(hooks, /DEADLINE_MS = 6000/);
+});
+
+// ---- the data file the measurement sets -----------------------------------------------------------------------------------------
+test('ARC-09-C263 M5 — parseClasses: the committed file is the seven kinds and 500; unknown kinds drop; garbage means the defaults', () => {
+  const committed = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
+  assert.deepEqual(committed, { blocking: [...KINDS], ubiquity: DEFAULT_UBIQUITY, source: 'file' });
+  assert.equal(DEFAULT_UBIQUITY, 500);
+  assert.deepEqual(parseClasses('{"blocking":["coined","nonsense","falseAbsent"],"ubiquityPages":50}'),
+    { blocking: ['falseAbsent', 'coined'], ubiquity: 50, source: 'file' }, 'known kinds only, in the check\'s own order');
+  assert.deepEqual(parseClasses('{"blocking":[],"ubiquityPages":1}'), { blocking: [], ubiquity: 1, source: 'file' }, 'an empty list is valid: nothing blocks');
+  for (const bad of [null, undefined, '', '{ nope', '[]', 'null', '"x"', '42']) {
+    assert.deepEqual(parseClasses(bad), { blocking: [...KINDS], ubiquity: 500, source: 'default' }, String(bad));
+  }
+  assert.deepEqual(parseClasses('{"blocking":"coined","ubiquityPages":0}'), { blocking: [...KINDS], ubiquity: 500, source: 'file' }, 'a wrong type is the default for that field');
+  assert.deepEqual(parseClasses('{"ubiquityPages":-3.5}').ubiquity, 500);
+});
+
+test('ARC-09-C263 M5 — options given to groundingFindings override the data (the offline replay sets its own)', () => {
+  const reply = 'Uses `sensor_reading_x` and `task_sla`.';
+  const dataAsRead = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
+  const withData = check(reply, { options: { blocking: dataAsRead.blocking, ubiquity: dataAsRead.ubiquity } });
+  assert.deepEqual(withData.blocks, ['unsourcedPrinted', 'coined']);
+  const replay = check(reply, { options: { blocking: ['coined'], ubiquity: 0 } });
+  assert.deepEqual(replay.blocks, ['coined'], 'the replay\'s blocking set wins');
+  assert.equal(replay.findings.unsourcedPrinted.length, 0, 'the replay\'s ubiquity wins: ubiquity 0 means every name is common');
 });
 
 // ---- time ----------------------------------------------------------------------------------------------------------------------------
