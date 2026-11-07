@@ -23,7 +23,8 @@ const MARKER = /^\*\*Version:\*\* /;
 test('criterion 1 — the budget, in the state a release cut writes', () => {
   assert.ok(lines.length <= 200, `${lines.length} lines, cap 200`);
   // ARC-09-C250 — the owner's decision (2026-10-24): CLAUDE.md gains W1 and W2 and loses nothing, and the cap rises
-  // from 20,000 to 20,400 bytes to hold them.
+  // from 20,000 to 20,400 bytes to hold them; ARC-09-C256 (2026-10-29) raised it to 20,600 for the twelve-page grounding
+  // rule. ARC-09-C263 (2026-11-07) takes the number out of that rule inside the same cap.
   assert.ok(Buffer.byteLength(doc) <= 20_600, `${Buffer.byteLength(doc)} bytes, cap 20,600`);
   // ARC-09-C185a — a release cut rewrites the Version marker (writers.mjs writeMarker), and the file the cut leaves
   // is the one the release's own suite reads. A -dev tree at the cap went green while `release.mjs 2.2.1-rc.99`
@@ -233,13 +234,15 @@ test('ARC-09-C250 — the guard names a deleted rule, and only that rule', () =>
 // still removes what works: the list holds every sentence of CLAUDE.md at develop, so either is named. The first case is
 // C217c's variant B, which rewrites line 13's marker sentence and which the rule-word list did not notice.
 test('ARC-09-C250 — a rewritten sentence is named: C217c variant B\'s line 13', () => {
-  const old = 'A name neither printed in the skill nor opened in this turn carries "not documented in the bundled corpus — '
-    + 'verify on the instance" and no citation; what the corpus does not settle becomes an OPEN QUESTION.';
+  // ARC-09-C263 rewrote this sentence with the owner's approval (2026-11-07): it is now the rule's second sentence, and the
+  // marker attaches to a construct a search did not find, not to a name "not opened in this turn".
+  const old = 'Only a construct that search did not find carries "not documented in the bundled corpus — verify on the instance", '
+    + 'with no citation; what the corpus does not settle becomes an OPEN QUESTION.';
   const rewrite = 'Only a name a corpus search misses carries "not documented in the bundled corpus — verify on the '
     + 'instance", no citation; one found but unopened is cited by path as unverified; what the corpus does not settle is '
     + 'an OPEN QUESTION.';
   assert.ok(doc.includes(old), 'the sentence the rewrite replaces is not in CLAUDE.md');
-  assert.deepEqual(named(removedFrom(doc.replace(old, rewrite))), [`sentence: ${old}`]);
+  assert.deepEqual(named(removedFrom(doc.replace(old, rewrite))), [`rule: ${old}`]);
 });
 
 test('ARC-09-C250 — a sentence one word shorter is named', () => {
