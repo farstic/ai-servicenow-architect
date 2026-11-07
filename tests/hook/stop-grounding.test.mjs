@@ -10,7 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { DEFAULT_UBIQUITY, KEEP_OUT, KINDS, LEAD, candidatePages, groundingFindings, opening, parseClasses, residualFindings } from '../../tools/snowarch/lib/docs/grounding-check.mjs';
-import { report } from '../../tools/snowarch/hooks/stop-citations.mjs';
+import { report as shippedReport } from '../../tools/snowarch/hooks/stop-citations.mjs';
 import { buildNamesIndex, writeNamesIndex } from '../../tools/snowarch/lib/docs/names-index-build.mjs';
 import { loadNamesIndex } from '../../tools/snowarch/lib/docs/names-index.mjs';
 import { corpusNamesDir } from '../../tools/snowarch/lib/local-paths.mjs';
@@ -373,6 +373,12 @@ function install(t, { rows = null, raw = null, indexed = true } = {}) {
 const stopInput = (message, transcript, extra = {}) => ({ hook_event_name: 'Stop', last_assistant_message: message, transcript_path: transcript, stop_hook_active: false, ...extra });
 const decision = (out) => (out.stdout ? JSON.parse(out.stdout) : null);
 
+// The hook tests below drive the machinery (one ask, the order of the two asks, failing open, the continuation) with a false absence, a
+// class that Phase 0 left grader-only in the committed data (tools/snowarch/lib/docs/grounding-classes.json). They name the classes they
+// rely on through the hook's own seam, so they test the hook and not the measurement; the one test of the file as shipped is "the
+// shipped data" below, and it calls shippedReport.
+const report = (input, args = {}) => shippedReport(input, { ...args, seams: { ...args.seams, options: { blocking: [...KINDS], ...args.seams?.options } } });
+
 test('ARC-09-C263 M5 hook — a false absence blocks once with the grounding ask; the same input with stop_hook_active never blocks', async (t) => {
   const reply = '`sn_customerservice_escalation` — not documented in the bundled corpus.';
   const { root, transcript } = install(t, { rows: [U('how does a case escalate?'), A(reply)] });
@@ -481,9 +487,11 @@ test('ARC-09-C263 M5 hook — no new hook entry, and no hook imports the index b
 });
 
 // ---- the data file the measurement sets -----------------------------------------------------------------------------------------
-test('ARC-09-C263 M5 — parseClasses: the committed file is the seven kinds and 500; unknown kinds drop; garbage means the defaults', () => {
+test('ARC-09-C263 M5 — parseClasses: the committed file is what Phase 0 set (citedUnread blocks, 500 pages); unknown kinds drop; garbage means all seven kinds', () => {
   const committed = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
-  assert.deepEqual(committed, { blocking: [...KINDS], ubiquity: DEFAULT_UBIQUITY, source: 'file' });
+  // Phase 0 (C263, R6): citedUnread was judged right 39 times in 40, 0.975 against the registered bar of 0.90, and no other class reached
+  // it. A change to this list is a measured decision, made in the file and here together.
+  assert.deepEqual(committed, { blocking: ['citedUnread'], ubiquity: DEFAULT_UBIQUITY, source: 'file' });
   assert.equal(DEFAULT_UBIQUITY, 500);
   assert.deepEqual(parseClasses('{"blocking":["coined","nonsense","falseAbsent"],"ubiquityPages":50}'),
     { blocking: ['falseAbsent', 'coined'], ubiquity: 50, source: 'file' }, 'known kinds only, in the check\'s own order');
@@ -499,10 +507,35 @@ test('ARC-09-C263 M5 — options given to groundingFindings override the data (t
   const reply = 'Uses `sensor_reading_x` and `task_sla`.';
   const dataAsRead = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
   const withData = check(reply, { options: { blocking: dataAsRead.blocking, ubiquity: dataAsRead.ubiquity } });
-  assert.deepEqual(withData.blocks, ['unsourcedPrinted', 'coined']);
+  assert.deepEqual(withData.blocks, [], 'the data blocks citedUnread only, and this reply cites no page');
+  assert.deepEqual(kinds(withData), ['unsourcedPrinted', 'coined'], 'the two classes it raises are still computed, for a replay or a grader');
+  const everyKind = check(reply, { options: { blocking: [...KINDS], ubiquity: dataAsRead.ubiquity } });
+  assert.deepEqual(everyKind.blocks, ['unsourcedPrinted', 'coined'], 'an option that names every kind asks about both');
   const replay = check(reply, { options: { blocking: ['coined'], ubiquity: 0 } });
   assert.deepEqual(replay.blocks, ['coined'], 'the replay\'s blocking set wins');
   assert.equal(replay.findings.unsourcedPrinted.length, 0, 'the replay\'s ubiquity wins: ubiquity 0 means every name is common');
+});
+
+test('ARC-09-C263 M5 hook — the shipped data, as Phase 0 set it: a page cited and never read is asked about; a false absence and a coined name are computed and not asked', async (t) => {
+  const skill = [use('sk', 'Skill', { skill: 'csm-specialist' }), res('sk', 'Launching skill: csm-specialist')];
+  const ask = async (reply) => {
+    const { root, transcript } = install(t, { rows: [U('how does a case escalate?'), ...skill, A(reply)] });
+    const out = await shippedReport(stopInput(reply, transcript), { root });
+    assert.deepEqual([out.code, out.stderr], [0, '']);
+    return decision(out);
+  };
+  const absent = '`sn_customerservice_escalation` — not documented in the bundled corpus.';
+  const coined = 'The `sn_zzz_made_up_table` holds it.';
+  const cited = 'The escalation is described in (citation: markdown/csm/c_Esc.md).';
+  assert.equal(await ask(absent), null, 'falseAbsent is grader-only');
+  assert.equal(await ask(coined), null, 'coined is grader-only');
+  const alone = await ask(cited);
+  assert.equal(alone?.decision, 'block', 'a page cited and never read is asked about');
+  assert.ok(alone.reason.includes('markdown/csm/c_Esc.md'), alone.reason);
+  const both = await ask(`${cited}\n${absent}`);
+  assert.equal(both?.decision, 'block');
+  assert.ok(both.reason.includes('markdown/csm/c_Esc.md'), both.reason);
+  assert.ok(!both.reason.includes('sn_customerservice_escalation'), 'the false absence is not in the ask: it is computed and reported, never asked');
 });
 
 // ---- time ----------------------------------------------------------------------------------------------------------------------------

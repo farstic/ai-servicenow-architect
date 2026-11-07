@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import * as SL from '../../tools/snowarch/lib/settings-local.mjs';
+import { KINDS } from '../../tools/snowarch/lib/docs/grounding-check.mjs';
 import { buildNamesIndex, writeNamesIndex } from '../../tools/snowarch/lib/docs/names-index-build.mjs';
 import { corpusNamesDir } from '../../tools/snowarch/lib/local-paths.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -35,6 +36,12 @@ function project(t) {
   for (const page of ['markdown/alpha/page-one.md', 'markdown/alpha/deep/folder/page-two.md']) put(root, `vendor/ServiceNowDocs/${page}`, '# page\n');
   return root;
 }
+
+/**
+ * This project's copy of the classes file, asking about every class. The scenarios that use it drive the written entry with a false
+ * absence, a class that the committed data (Phase 0) leaves grader-only: they test the entry, not the measurement.
+ */
+const askAboutEveryClass = (root) => put(root, 'tools/snowarch/lib/docs/grounding-classes.json', `${JSON.stringify({ blocking: [...KINDS], ubiquityPages: 500 })}\n`);
 
 /** `.claude/settings.local.json` as the writer wrote it into `root`. */
 function written(root) {
@@ -208,6 +215,7 @@ test('ARC-09-C254 — a script removed from a project leaves the project\'s othe
 // hook entry: this is the Stop entry the C254 tests above run.
 test('ARC-09-C263 — the written Stop entry blocks a false absence once, then on the continuation sends only a notice to the user', (t) => {
   const root = project(t);
+  askAboutEveryClass(root);
   const pin = 'e'.repeat(40);
   put(root, 'engine.config.json', `${JSON.stringify({ docs: { pin } })}\n`);
   const pages = ['markdown/alpha/page-one.md', 'markdown/alpha/deep/folder/page-two.md'];
@@ -264,10 +272,15 @@ test('ARC-09-C263 — the classes that block and the ubiquity threshold are data
   const coined = 'The `sn_zzz_made_up_table` holds it.';
   const common = 'The `task_sla` table holds it.';
 
-  // The committed file: all seven kinds, 500 pages. The defaults ask about both replies.
+  // The committed file, as Phase 0 set it: only citedUnread blocks, 500 pages. Neither reply cites a page, so neither is asked about.
   const committed = JSON.parse(readFileSync(classes, 'utf8'));
-  assert.deepEqual(committed.blocking, ['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced', 'citedUnread', 'resting', 'overclaim']);
+  assert.deepEqual(committed.blocking, ['citedUnread']);
   assert.equal(committed.ubiquityPages, 500);
+  assert.equal(ask(coined), null, 'coined is computed and not asked');
+  assert.equal(ask(common), null, 'unsourcedPrinted is computed and not asked');
+
+  // A one-file diff back to every kind: both replies are asked about again.
+  writeFileSync(classes, `${JSON.stringify({ blocking: [...KINDS], ubiquityPages: 500 })}\n`);
   assert.equal(ask(coined)?.decision, 'block');
   assert.equal(ask(common)?.decision, 'block', 'on 3 pages a name is not common');
 

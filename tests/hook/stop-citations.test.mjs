@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { report } from '../../tools/snowarch/hooks/stop-citations.mjs';
+import { KINDS } from '../../tools/snowarch/lib/docs/grounding-check.mjs';
 import { renderFinding } from '../../tools/snowarch/lib/finding.mjs';
 import { loadIndex } from '../../tools/snowarch/lib/docs/resolve.mjs';
 import { CORPUS_DIR, syncCorpus } from '../../tools/snowarch/lib/docs/sync.mjs';
@@ -334,7 +335,10 @@ test('ARC-09-C263 — with a transcript and no grounding finding, the dead-path 
   assert.deepEqual(alone, block(ONE(DEAD, REAL)), 'a transcript changes nothing when the grounding part finds nothing');
 
   const ground = `${plain} The \`sn_zzz_made_up_table\` holds it, and it is unverified.`;
-  const both = await report(stopping(ground, { transcript_path: transcript([row('user', 'q'), row('assistant', [{ type: 'text', text: ground }])]) }), { root });
+  // `ground` holds a coined name and an "unverified", classes that the committed data (Phase 0) leaves grader-only: the seam names the
+  // classes this case relies on, so it tests how the two asks combine and not the measurement.
+  const both = await report(stopping(ground, { transcript_path: transcript([row('user', 'q'), row('assistant', [{ type: 'text', text: ground }])]) }),
+    { root, seams: { options: { blocking: [...KINDS] } } });
   const reason = JSON.parse(both.stdout).reason;
   const c254 = ONE(DEAD, REAL).slice(0, -ASK.length);
   assert.ok(reason.startsWith(`${c254} Before this answer stands, check these against the corpus; there is no page limit.`), reason.slice(0, 300));
