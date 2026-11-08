@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { corpusRelative } from '../tools/snowarch/lib/docs/resolve.mjs';
 import {
   MAX_TRANSCRIPT_BYTES, classifyUserText, flagsOf, isMainRow, namesIn, pagesOfCommand, pagesOfInput, parseTranscript, readTurnSources,
   shellWords, turnSources,
@@ -337,6 +338,26 @@ test('ARC-09-C267 — a Read, a Bash and an MCP read of one page are one page; a
   assert.deepEqual([...t.pagesRead], [REL]);
   assert.deepEqual(['sn_read_name', 'sn_bash_name', 'sn_mcp_name'].map((n) => heldBy(t, n)), [['read'], ['read'], ['read']]);
   assert.deepEqual(heldBy(t, 'sn_sub_name'), []);
+});
+
+test('ARC-09-C267 — the real captures, with each corpus Read rewritten as a sed or an MCP path call, read the same pages and the same names', () => {
+  let pages = 0;
+  for (const c of MANIFEST.captures) {
+    const rows = parseTranscript(readFileSync(join(FIXTURES, c.file), 'utf8')).rows;
+    const base = turnSources(rows, OPTIONS);
+    pages += base.pagesRead.size;
+    const rewritten = (rewrite) => rows.map((r) => (r.type !== 'assistant' || !Array.isArray(r.message?.content) ? r : {
+      ...r, message: { ...r.message, content: r.message.content.map((b) => (b?.type === 'tool_use' && b.name === 'Read' && corpusRelative(b.input?.file_path) ? rewrite(b) : b)) },
+    }));
+    const viaBash = rewritten((b) => ({ ...b, name: 'Bash', input: { command: `sed -n '1,200p' "${b.input.file_path}"`, description: 'read it' } }));
+    const viaMcp = rewritten((b) => ({ ...b, name: CTX_FILE, input: { path: b.input.file_path, language: 'shell', code: 'print' } }));
+    for (const [how, changed] of [['Bash', viaBash], ['MCP', viaMcp]]) {
+      const t = turnSources(changed, OPTIONS);
+      assert.deepEqual([...t.pagesRead].sort(), [...base.pagesRead].sort(), `${c.file} via ${how}: the pages`);
+      assert.deepEqual([...t.names.read].sort(), [...base.names.read].sort(), `${c.file} via ${how}: the names`);
+    }
+  }
+  assert.ok(pages > 0, 'the captures read at least one corpus page, or this proves nothing');
 });
 
 test('ARC-09-C267 — shellWords: the simple commands of a line, quotes taken off, cut only at an unquoted separator; nothing throws', () => {
