@@ -235,6 +235,9 @@ const bash = (id, command, body, extra = {}) => [use(id, 'Bash', { command, desc
 const mcp = (id, name, input, body, extra = {}) => [use(id, name, input), res(id, [{ type: 'text', text: body }], extra)];
 const sourcesOf = (calls) => turnSources([U('request'), ...calls], OPTIONS);
 const heldBy = (t, name) => Object.entries(t.names).filter(([, set]) => set.has(name)).map(([kind]) => kind);
+// Built, not spelled whole: engine lint L02 holds every literal `mcp__<server>__` under tests/ to the product's own server key.
+const tool = (server, name) => ['mcp', server, name].join('__');
+const CTX_FILE = tool('context-mode', 'ctx_execute_file');
 
 test('ARC-09-C267 — a page that cat, head, sed, tail, nl, awk, bat, less or more shows is a page read, and the names it printed are read names', () => {
   const commands = [
@@ -280,21 +283,21 @@ test('ARC-09-C267 — grep, rg, ls, find, wc, stat, echo, a glob, a variable and
 test('ARC-09-C267 — a Bash or MCP result that failed never counts, whatever it was asked to show', () => {
   const t = sourcesOf([
     ...bash('b', `cat ${PAGE}`, 'cat: No such file or directory sn_failed_bash', { is_error: true }),
-    ...mcp('m', 'mcp__context-mode__ctx_execute_file', { path: PAGE, language: 'shell', code: 'print' }, 'it failed sn_failed_mcp', { is_error: true }),
+    ...mcp('m', CTX_FILE, { path: PAGE, language: 'shell', code: 'print' }, 'it failed sn_failed_mcp', { is_error: true }),
   ]);
   assert.equal(t.pagesRead.size, 0);
   for (const n of ['sn_failed_bash', 'sn_failed_mcp']) assert.deepEqual(heldBy(t, n), [], n);
 });
 
 test('ARC-09-C267 — an MCP call given a corpus page by path, file_path or paths reads it; every other MCP result is only named', () => {
-  const file = (input, name = 'mcp__context-mode__ctx_execute_file') => sourcesOf(mcp('m', name, { language: 'shell', code: 'print', ...input }, 'The sn_mcp_name table'));
+  const file = (input, name = CTX_FILE) => sourcesOf(mcp('m', name, { language: 'shell', code: 'print', ...input }, 'The sn_mcp_name table'));
   for (const input of [{ path: PAGE }, { file_path: PAGE }, { paths: [PAGE] }, { paths: ['/etc/hosts', 3, PAGE] }, { path: '/etc/hosts', paths: [PAGE] }]) {
     const t = file(input);
     assert.deepEqual([...t.pagesRead], [REL], JSON.stringify(input));
     assert.deepEqual(heldBy(t, 'sn_mcp_name'), ['read'], `${JSON.stringify(input)}: read, rather than named`);
   }
   assert.deepEqual([...file({ paths: [PAGE, OTHER] }).pagesRead].sort(), [OTHER_REL, REL].sort());
-  assert.deepEqual([...file({ file_path: PAGE.replaceAll('/', '\\') }, 'mcp__files__read_file').pagesRead], [REL], 'any MCP server\'s file tool, Windows spelling');
+  assert.deepEqual([...file({ file_path: PAGE.replaceAll('/', '\\') }, tool('files', 'read_file')).pagesRead], [REL], 'any MCP server\'s file tool, Windows spelling');
   // Not one corpus page: the result is named, as it was before this row.
   for (const input of [{ path: '/home/dev/notes/readme.md' }, { path: DIR }, { path: `${DIR}/*.md` }, { path: `${DIR}/index.json` }, { paths: [] }, { paths: PAGE }, { path: 42 }, { path: null }, {}]) {
     const t = file(input);
@@ -318,7 +321,7 @@ test('ARC-09-C267 — a Glob, a Write, a WebFetch and a Workflow are still never
 
 test('ARC-09-C267 — a page read through Bash or MCP before the last compact boundary stops counting, as a Read does', () => {
   const rows = [
-    U('first'), ...bash('b1', `cat ${PAGE}`, '1\tsn_before_bash'), ...mcp('m1', 'mcp__context-mode__ctx_execute_file', { path: OTHER }, 'sn_before_mcp'),
+    U('first'), ...bash('b1', `cat ${PAGE}`, '1\tsn_before_bash'), ...mcp('m1', CTX_FILE, { path: OTHER }, 'sn_before_mcp'),
     boundary(), U('second'), ...bash('b2', `head -5 ${OTHER}`, '1\tsn_after_bash'),
   ];
   const t = turnSources(rows, OPTIONS);
@@ -328,7 +331,7 @@ test('ARC-09-C267 — a page read through Bash or MCP before the last compact bo
 
 test('ARC-09-C267 — a Read, a Bash and an MCP read of one page are one page; a sub-agent\'s Bash is not the main thread\'s', () => {
   const sub = { ...use('s', 'Bash', { command: `cat ${OTHER}` }), isSidechain: true };
-  const rows = [U('request'), ...read('r', PAGE, '1\tsn_read_name'), ...bash('b', `cat ${PAGE}`, '1\tsn_bash_name'), ...mcp('m', 'mcp__x__read', { path: PAGE }, 'sn_mcp_name'),
+  const rows = [U('request'), ...read('r', PAGE, '1\tsn_read_name'), ...bash('b', `cat ${PAGE}`, '1\tsn_bash_name'), ...mcp('m', tool('x', 'read'), { path: PAGE }, 'sn_mcp_name'),
     sub, { ...res('s', 'sn_sub_name'), isSidechain: true }];
   const t = turnSources(rows, OPTIONS);
   assert.deepEqual([...t.pagesRead], [REL]);

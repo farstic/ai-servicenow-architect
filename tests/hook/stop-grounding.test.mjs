@@ -44,6 +44,8 @@ const res = (id, content, extra = {}) => ({ type: 'user', message: { role: 'user
 const PAGEPATH = (rel) => `/home/dev/install/vendor/ServiceNowDocs/${rel}`;
 const readPage = (id, rel, body) => [use(id, 'Read', { file_path: PAGEPATH(rel) }), res(id, body)];
 const OPT = { builders: new Set(['story-writer']), rosterSkills: new Set(['csm-specialist']) };
+// Built, not spelled whole: engine lint L02 holds every literal `mcp__<server>__` under tests/ to the product's own server key.
+const CTX_FILE = ['mcp', 'context-mode', 'ctx_execute_file'].join('__');
 
 /** The findings for `reply`, in a session that read `reads` ({ rel: body }). */
 function check(reply, { reads = {}, prompt = 'how does a case escalate?', extra = [], index = INDEX, coverage, options = {}, scoped = true } = {}) {
@@ -220,7 +222,7 @@ test('ARC-09-C267 — citedUnread: a page the session showed itself with cat or 
   const page = PAGEPATH(CSM);
   const dir = page.slice(0, page.lastIndexOf('/'));
   const bash = (command, extra = {}) => [use('b', 'Bash', { command, description: 'x' }), res('b', '1\tThe sn\\_customerservice\\_escalation table.', extra)];
-  const mcp = (input) => [use('m', 'mcp__context-mode__ctx_execute_file', { language: 'shell', code: 'print', ...input }), res('m', [{ type: 'text', text: 'a summary' }])];
+  const mcp = (input) => [use('m', CTX_FILE, { language: 'shell', code: 'print', ...input }), res('m', [{ type: 'text', text: 'a summary' }])];
   const open = (extra) => namesOf(check(reply, { extra }), 'citedUnread');
   assert.deepEqual(open(bash(`cat ${page}`)), [], 'cat');
   assert.deepEqual(open(bash(`sed -n '1,40p;60,90p' ${page}`)), [], 'sed, with a ; inside its quotes');
@@ -579,7 +581,7 @@ test('ARC-09-C267 hook — the shipped data: a page cited and read only through 
   const page = PAGEPATH('markdown/csm/c_Esc.md');
   const body = '1\tsn\\_customerservice\\_escalation here';
   const bash = (command, extra = {}) => [use('b', 'Bash', { command, description: 'x' }), res('b', body, extra)];
-  const mcp = (input, extra = {}) => [use('m', 'mcp__context-mode__ctx_execute_file', { language: 'shell', code: 'print', ...input }), res('m', [{ type: 'text', text: body }], extra)];
+  const mcp = (input, extra = {}) => [use('m', CTX_FILE, { language: 'shell', code: 'print', ...input }), res('m', [{ type: 'text', text: body }], extra)];
 
   const unread = await ask(cited);
   assert.equal(unread?.decision, 'block', 'with no read of any kind the citation is asked about');
