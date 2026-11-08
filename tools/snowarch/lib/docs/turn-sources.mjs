@@ -17,12 +17,13 @@
 //   - compaction writes a `system` row `compact_boundary`; every source before the LAST one stops grounding, whatever the trigger.
 //
 // WHAT COUNTS (the architect's table). read: a successful Read of a corpus page (only the lines returned, so offset and limit are
-// honoured); and, since ARC-09-C267, the same page shown by a Bash `cat`, `head`, `tail`, `sed`, `nl`, `less`, `more`, `awk` or `bat`,
-// or named by the `path`, `file_path` or `paths` of an MCP call (the file tool of the context-mode server takes a `path`). skill: a
+// honoured); and, since ARC-09-C267, the same page shown by a Bash `cat`, `head`, `tail`, `sed`, `nl`, `less`, `more`, `awk` or `bat`, by
+// PowerShell's `Get-Content`, `gc` or `type`, or by the shell lines of an MCP call (its `command`, each `commands[].command`, its `code` in
+// shell), or named by the `path`, `file_path` or `paths` of an MCP call (the file tool of the context-mode server takes a `path`). skill: a
 // loaded skill body, a Read of a roster SKILL.md or EXAMPLES.md. named: the user's prompts, the always-loaded rules and governance read
 // from the checkout (given by the caller, never from api-request or prompt_snapshot rows), MCP results, Reads of client inputs.
 // builder: the result of a roster builder sub-agent. A saved Envelope: its own citations, and the names its cited pages print. NEVER a
-// source: assistant text, a non-roster agent's result, a Workflow result, a failed Read or a failed Bash, a Glob, a Grep line, a Bash
+// source: assistant text, a non-roster agent's result, a Workflow result, a failed Read, Bash or PowerShell, a Glob, a Grep line, a shell
 // command that finds, lists or counts (`grep`, `rg`, `ls`, `find`, `wc`, `stat`) instead of showing a page, every row of our own hooks.
 //
 // PURE where it can be: `turnSources(rows, options)` does no I/O and reads no clock. `readTurnSources(path)` reads the file.
@@ -126,31 +127,42 @@ const pathKind = (p) => {
 
 const CITATION = /markdown\/[A-Za-z0-9_./-]+?\.md/g;
 
-// ---- a page read through Bash or an MCP file tool (ARC-09-C267) ---------------------------------------------------------------
-// The Read tool is not the only way a page reaches the model. In auto mode Claude Code's own prompt says to read files with `cat`,
-// `head` and `sed` in Bash, and the context-mode server's `ctx_execute_file` takes the file as `path`. Counting only Read made the
-// check ask about a page the session had read. Each reader below answers one question, from the call alone, with no I/O: which
-// corpus pages did this command or this call show?
+// ---- a page read through a shell or an MCP tool (ARC-09-C267) -----------------------------------------------------------------
+// The Read tool is not the only way a page reaches the model. In auto mode Claude Code's own prompt says to read files with `cat`, `head`
+// and `sed` in Bash; where Git Bash is missing, or `CLAUDE_CODE_USE_POWERSHELL_TOOL` is set, the shell is the PowerShell tool (`Get-Content`,
+// in 2.1.309 and 2.1.318 alike); and the context-mode server's `ctx_execute_file` takes the file as `path` while `ctx_batch_execute` and
+// `ctx_execute` run shell lines. Counting only Read made the check ask about a page the session had read. Each reader below answers one
+// question, from the call alone, with no I/O: which corpus pages did this command or this call show?
 
 /** The commands that print the lines of the files they are given. `grep`, `rg`, `ls`, `find`, `wc`, `stat` find, list or count: they show no page. */
 const READING_VERBS = new Set(['cat', 'head', 'tail', 'sed', 'nl', 'less', 'more', 'awk', 'bat']);
 
-/** What no single page path holds: a glob, a brace list, a variable, a command substitution. Which pages it stands for cannot be told from the call. */
-const NOT_ONE_PAGE = /[*?[\]{}$`]/;
+/** PowerShell's, compared in lower case: `Get-Content` and its aliases `gc`, `type` and `cat`. `Select-String` and `Get-ChildItem` find and list. */
+const POWERSHELL_VERBS = new Set([...READING_VERBS, 'get-content', 'gc', 'type']);
+
+/**
+ * What a path to one corpus page looks like once `corpusRelative` has cut it at the corpus folder. The characters are the ones a citation holds
+ * (CITATION above); none of the 51,657 pages of the corpus, measured on 2026-11-08, holds another. So a glob, a brace list, a variable, a
+ * comma, a space or a directory is not one page, and which pages it stands for cannot be told from the call.
+ */
+const PAGE_PATH = /^markdown\/[A-Za-z0-9_./-]+\.md$/;
 
 /** `markdown/<area>/….md` for a path that names exactly one corpus page, in any spelling a Read would be given; otherwise `null`. */
 const pageAt = (file) => {
   const rel = corpusRelative(file);
-  return rel && rel.endsWith('.md') && !NOT_ONE_PAGE.test(rel) ? rel : null;
+  return rel && PAGE_PATH.test(rel) ? rel : null;
 };
 
 /**
- * The simple commands of a shell command line, each as its words with the quotes taken off. The line is cut at an unquoted `|`, `||`,
- * `&`, `&&`, `;` or newline, so a `;` inside `sed -n '1,40p;50,60p'` cuts nothing. It is not a shell: nothing is expanded, a here-document
- * is read as lines, and an unbalanced quote runs to the end. Pure.
+ * The simple commands of a command line, each as its words with the quotes taken off. The line is cut at an unquoted `|`, `;`, `&`, `(`, `)`
+ * or newline, so a `;` inside `sed -n '1,40p;50,60p'` cuts nothing and `x=$(cat f)` has a `cat` in it; for sh a back-tick cuts too. It is not
+ * a shell: nothing is expanded, a here-document is read as lines, and an unbalanced quote runs to the end. With `powershell` the line is
+ * read as PowerShell reads it: a back-slash is a letter (it parts a Windows path), the back-tick escapes the next character, a quote is
+ * written twice to be itself, and a comma parts the items of a list. Pure.
  */
-export function shellWords(command) {
+export function shellWords(command, { powershell = false } = {}) {
   const s = String(command ?? '');
+  const escape = powershell ? '`' : '\\';
   const segments = [];
   let words = [];
   let word = '';
@@ -162,15 +174,17 @@ export function shellWords(command) {
     const c = s[i];
     const next = s[i + 1];
     if (quote) {
-      if (c === quote) quote = '';
-      else if (c === '\\' && quote === '"' && next !== undefined && '"\\$`'.includes(next)) { word += next; i += 1; }
+      if (c === quote) {
+        if (powershell && next === quote) { word += c; i += 1; }                                   // '' and "" are one quote
+        else quote = '';
+      } else if (c === escape && next !== undefined && (powershell ? quote === '"' : quote === '"' && '"\\$`'.includes(next))) { word += next; i += 1; }
       else word += c;
     } else if (c === "'" || c === '"') { quote = c; started = true; }
-    else if (c === '\\') {
+    else if (c === escape) {
       if (next === '\n') i += 1;                                  // a line continuation joins the lines
       else if (next !== undefined) { word += next; started = true; i += 1; }
-    } else if (c === '|' || c === ';' || c === '&' || c === '\n') endSegment();
-    else if (c === ' ' || c === '\t' || c === '\r') endWord();
+    } else if (c === '|' || c === ';' || c === '&' || c === '\n' || c === '(' || c === ')' || (!powershell && c === '`')) endSegment();
+    else if (c === ' ' || c === '\t' || c === '\r' || (powershell && c === ',')) endWord();
     else { word += c; started = true; }
   }
   endSegment();
@@ -178,32 +192,44 @@ export function shellWords(command) {
 }
 
 /**
- * The corpus pages a Bash command line shows: every file argument of a `cat`, `head`, `tail`, `sed`, `nl`, `less`, `more`, `awk` or `bat`
- * in it, whether the command comes first, after a `&&`, or at the head of a pipe. A command whose verb is anything else shows none, and
- * neither does an argument that is an option, a glob or a variable. Pure.
+ * The corpus pages a command line shows: every file argument of a reading command in it, whether it comes first, after a `&&`, at the head of
+ * a pipe or inside `$(…)`. For sh those are `cat`, `head`, `tail`, `sed`, `nl`, `less`, `more`, `awk` and `bat`; with `powershell`, also
+ * `Get-Content`, `gc` and `type`, in any case. A command whose verb is anything else shows none, and neither does an argument that is an
+ * option, a glob, a variable or a directory. Pure.
  */
-export function pagesOfCommand(command) {
+export function pagesOfCommand(command, { powershell = false } = {}) {
+  const verbs = powershell ? POWERSHELL_VERBS : READING_VERBS;
   const pages = new Set();
-  for (const words of shellWords(command)) {
+  for (const words of shellWords(command, { powershell })) {
     let at = 0;
-    while (at < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[at])) at += 1;      // FOO=1 cat page.md
-    if (!READING_VERBS.has(String(words[at] ?? '').replace(/^.*[\\/]/, ''))) continue;       // /bin/cat is cat
+    if (!powershell) while (at < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[at])) at += 1;   // FOO=1 cat page.md
+    const verb = String(words[at] ?? '').replace(/^.*[\\/]/, '');                                          // /bin/cat is cat
+    if (!verbs.has(powershell ? verb.toLowerCase() : verb)) continue;
     for (const word of words.slice(at + 1)) {
-      if (word.startsWith('-')) continue;                                                    // an option, or `--`
-      const page = pageAt(word.replace(/^<+/, ''));                                          // cat <page.md
+      if (word.startsWith('-')) continue;                                                                  // an option, or `--`
+      const page = pageAt(powershell ? word : word.replace(/^<+/, ''));                                    // cat <page.md
       if (page) pages.add(page);
     }
   }
   return pages;
 }
 
-/** The corpus pages an MCP call names: its `path`, its `file_path`, and each entry of its `paths`. Pure. */
+/**
+ * The corpus pages an MCP call's input shows: the file it names by `path`, `file_path` or `paths`, and what the shell in it shows, run through
+ * `pagesOfCommand`: a `command` string, the `command` of each of `commands` (`ctx_batch_execute`), and `code` when `language` is `shell`
+ * (`ctx_execute`, `ctx_execute_file`). Code in any other language may open a file; the call does not say so in a form this reads. Pure.
+ */
 export function pagesOfInput(input) {
   const files = [];
   for (const key of ['path', 'file_path']) if (typeof input?.[key] === 'string') files.push(input[key]);
   if (Array.isArray(input?.paths)) for (const f of input.paths) if (typeof f === 'string') files.push(f);
   const pages = new Set();
   for (const f of files) { const page = pageAt(f); if (page) pages.add(page); }
+  const lines = [];
+  if (typeof input?.command === 'string') lines.push(input.command);
+  if (Array.isArray(input?.commands)) for (const c of input.commands) if (typeof c?.command === 'string') lines.push(c.command);
+  if (input?.language === 'shell' && typeof input?.code === 'string') lines.push(input.code);
+  for (const line of lines) for (const page of pagesOfCommand(line)) pages.add(page);
   return pages;
 }
 
@@ -326,8 +352,8 @@ export function turnSources(rows, options = {}) {
         case 'Grep':
           out.searches.push({ pattern: String(use.input.pattern ?? ''), path: posix(use.input.path ?? ''), result: body });
           break;
-        case 'Bash': {
-          const shown = pagesOfCommand(use.input.command);                    // a `cat`, `head`, `sed`… of a page reads it; any other command is never a source
+        case 'Bash': case 'PowerShell': {
+          const shown = pagesOfCommand(use.input.command, { powershell: use.name === 'PowerShell' });   // a `cat`, `sed`, `Get-Content`… of a page reads it; any other command is never a source
           for (const page of shown) out.pagesRead.add(page);
           if (shown.size) addAll(out.names.read, namesIn(body));
           break;
