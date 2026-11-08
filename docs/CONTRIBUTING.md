@@ -1404,10 +1404,13 @@ pull request, where a reviewer sees it.
   floor Claude Code, the version the measurement pins and the current one, `claude -p` and interactive. A new Claude Code version that
   changes the transcript is a new capture and a failing `tests/turn-sources.test.mjs`, not a silent loss of the check.
 - **A page is read when a tool showed it.** A `Read` of the page; a Bash `cat`, `head`, `tail`, `sed`, `nl`, `less`, `more`, `awk` or
-  `bat` given its path (the command line is first cut at an unquoted pipe, `;`, `&` or newline); or an MCP call given it as `path`,
-  `file_path` or `paths`. `grep`, `rg`, `ls`, `find` and `wc` find, list or count and show no page; a call that failed, and a glob or a
-  variable in place of a path, count for nothing. A wider list is a change to `turn-sources.mjs` with a positive and a negative fixture
-  in `tests/turn-sources.test.mjs` and a case in `tests/hook/stop-grounding.test.mjs`, never a looser pattern (ARC-09-C267).
+  `bat` given its path, or a PowerShell `Get-Content`, `gc` or `type` (the line is first cut at an unquoted pipe, `;`, `&`, parenthesis
+  or newline, and the PowerShell tool's line is read as PowerShell reads it); an MCP call given the page as `path`, `file_path` or
+  `paths`; or the shell in an MCP call, which is its `command`, each `commands[].command` and its `code` when `language` is `shell`.
+  `grep`, `rg`, `ls`, `find`, `wc` and `Select-String` find, list or count and show no page; a call that failed, code in another
+  language, and a glob, a variable or a directory in place of a path count for nothing. A wider list is a change to `turn-sources.mjs`
+  with a positive and a negative fixture in `tests/turn-sources.test.mjs` and a case in `tests/hook/stop-grounding.test.mjs`, never a
+  looser pattern (ARC-09-C267).
 - **The measurement's two values are data.** `lib/docs/grounding-classes.json` says which of the seven classes may block and the
   page count above which a name is too common to ask about; the hook reads it on every turn, and an option given to
   `groundingFindings` overrides it, for the offline replay.

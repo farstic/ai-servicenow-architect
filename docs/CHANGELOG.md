@@ -32,11 +32,12 @@ pending a measured second stage.
   opened" in the final reply, and a page count above the pages read: in a replay of recorded sittings only the check on a page
   cited and never read cleared the bar (39 of 40 judged flags right, against a bar of 0.90), so which checks may ask is a file
   of data (`lib/docs/grounding-classes.json`) that the measurement sets (ARC-09-C263).
-- A page counts as read, for that ask, when the session read it with `Read`, when a Bash `cat`, `head`, `tail`, `sed`, `nl`,
-  `less`, `more`, `awk` or `bat` showed it, or when an MCP file tool was given it as `path`, `file_path` or `paths`, so a session
-  that reads files through Bash or through such a tool is not asked about a page it read. A command that only finds, lists or
-  counts (`grep`, `rg`, `ls`, `find`, `wc`), a command or call that failed, and a glob or a variable in place of a path do not
-  count (ARC-09-C267).
+- A page counts as read, for that ask, when the session read it with `Read`; when a Bash `cat`, `head`, `tail`, `sed`, `nl`, `less`,
+  `more`, `awk` or `bat`, or a PowerShell `Get-Content`, `gc` or `type`, showed it; when an MCP file tool was given it as `path`,
+  `file_path` or `paths`; or when a shell line of an MCP call showed it (its `command`, each `commands[].command`, or `code` written
+  in shell). A session that reads through any of them is not asked about a page it read. A command that only finds, lists or counts
+  (`grep`, `rg`, `ls`, `find`, `wc`, `Select-String`), a call that failed, code in another language, and a glob or a variable in
+  place of a path do not count (ARC-09-C267).
 
 ### Added
 
