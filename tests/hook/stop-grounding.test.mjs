@@ -215,6 +215,35 @@ test('ARC-09-C263 M5 — citedUnread: a corpus page cited that the session never
   assert.deepEqual(namesOf(check('See `markdown/hrsd/c_Missing.md`.', {}), 'citedUnread'), ['markdown/hrsd/c_Missing.md']);
 });
 
+test('ARC-09-C267 — citedUnread: a page the session showed itself with cat or sed, or read through an MCP file tool, is read; a grep, an ls and a failed cat of it are not', () => {
+  const reply = `The escalation is described in (citation: ${CSM}).`;
+  const page = PAGEPATH(CSM);
+  const dir = page.slice(0, page.lastIndexOf('/'));
+  const bash = (command, extra = {}) => [use('b', 'Bash', { command, description: 'x' }), res('b', '1\tThe sn\\_customerservice\\_escalation table.', extra)];
+  const mcp = (input) => [use('m', 'mcp__context-mode__ctx_execute_file', { language: 'shell', code: 'print', ...input }), res('m', [{ type: 'text', text: 'a summary' }])];
+  const open = (extra) => namesOf(check(reply, { extra }), 'citedUnread');
+  assert.deepEqual(open(bash(`cat ${page}`)), [], 'cat');
+  assert.deepEqual(open(bash(`sed -n '1,40p;60,90p' ${page}`)), [], 'sed, with a ; inside its quotes');
+  assert.deepEqual(open(bash(`head -50 ${page} | grep -n escalation`)), [], 'head at the head of a pipe');
+  assert.deepEqual(open(bash(`cd ${dir} && cat ${page}`)), [], 'after a &&');
+  assert.deepEqual(open(mcp({ path: page })), [], 'an MCP file tool given the page as path');
+  assert.deepEqual(open(mcp({ paths: [page] })), [], 'or in paths');
+  // What does not show the page does not clear its citation.
+  assert.deepEqual(open(bash(`grep -l escalation ${page}`)), [CSM], 'grep');
+  assert.deepEqual(open(bash(`ls ${dir}`)), [CSM], 'ls');
+  assert.deepEqual(open(bash(`wc -l ${page}`)), [CSM], 'wc');
+  assert.deepEqual(open(bash(`cat ${page}`, { is_error: true })), [CSM], 'a cat that failed');
+  assert.deepEqual(open(bash('cat /home/dev/notes/other.md')), [CSM], 'a cat of another file');
+  assert.deepEqual(open(mcp({ path: '/home/dev/notes/other.md' })), [CSM], 'an MCP file tool given another file');
+  assert.deepEqual(open([]), [CSM], 'no read of any kind');
+  // A different page shown does not stand in for the cited one.
+  assert.deepEqual(open(bash(`cat ${PAGEPATH(ITSM)}`)), [CSM], 'another page');
+  // The names such a read printed are read names, and `Pages read: 1` is not an overclaim.
+  const printed = check('The `sn_customerservice_escalation` table, Pages read: 1.', { extra: bash(`cat ${page}`) });
+  assert.deepEqual(kinds(printed), [], 'sourced by the page cat showed; one page read');
+  assert.deepEqual(kinds(check('The `sn_customerservice_escalation` table, Pages read: 3.', { extra: bash(`cat ${page}`) })), ['overclaim']);
+});
+
 test('ARC-09-C263 M5 — resting: unverified / not opened / a spent budget in the final reply; the marker, C239, live mode and an instance deferral with a citation are not', () => {
   const flagged = (line) => check(`Part 2 done.\n${line}`).findings.resting.length;
   for (const line of ['The escalation matrix is unverified.', 'I have not opened the HR pages.', 'The page budget is spent, so the rest is open.',
@@ -536,6 +565,42 @@ test('ARC-09-C263 M5 hook — the shipped data, as Phase 0 set it: a page cited 
   assert.equal(both?.decision, 'block');
   assert.ok(both.reason.includes('markdown/csm/c_Esc.md'), both.reason);
   assert.ok(!both.reason.includes('sn_customerservice_escalation'), 'the false absence is not in the ask: it is computed and reported, never asked');
+});
+
+test('ARC-09-C267 hook — the shipped data: a page cited and read only through Bash or an MCP file tool is not asked about; read by nothing, or only grepped, it still is', async (t) => {
+  const skill = [use('sk', 'Skill', { skill: 'csm-specialist' }), res('sk', 'Launching skill: csm-specialist')];
+  const ask = async (reply, calls = []) => {
+    const { root, transcript } = install(t, { rows: [U('how does a case escalate?'), ...skill, ...calls, A(reply)] });
+    const out = await shippedReport(stopInput(reply, transcript), { root });
+    assert.deepEqual([out.code, out.stderr], [0, '']);
+    return decision(out);
+  };
+  const cited = 'The escalation is described in (citation: markdown/csm/c_Esc.md).';
+  const page = PAGEPATH('markdown/csm/c_Esc.md');
+  const body = '1\tsn\\_customerservice\\_escalation here';
+  const bash = (command, extra = {}) => [use('b', 'Bash', { command, description: 'x' }), res('b', body, extra)];
+  const mcp = (input, extra = {}) => [use('m', 'mcp__context-mode__ctx_execute_file', { language: 'shell', code: 'print', ...input }), res('m', [{ type: 'text', text: body }], extra)];
+
+  const unread = await ask(cited);
+  assert.equal(unread?.decision, 'block', 'with no read of any kind the citation is asked about');
+  assert.ok(unread.reason.includes('markdown/csm/c_Esc.md'), unread.reason);
+  assert.equal(await ask(cited, bash(`cat ${page}`)), null, 'cat');
+  assert.equal(await ask(cited, bash(`sed -n '1,40p' ${page}`)), null, 'sed');
+  assert.equal(await ask(cited, bash(`head -50 ${page} | grep -n escalation`)), null, 'head, at the head of a pipe');
+  assert.equal(await ask(cited, mcp({ path: page })), null, 'an MCP file tool given the page as path');
+  assert.equal(await ask(cited, mcp({ paths: [page] })), null, 'an MCP file tool given it in paths');
+  for (const [what, calls] of [
+    ['grep', bash(`grep -l escalation ${page}`)],
+    ['ls', bash(`ls ${page.slice(0, page.lastIndexOf('/'))}`)],
+    ['a cat that failed', bash(`cat ${page}`, { is_error: true })],
+    ['a cat of another file', bash('cat /home/dev/notes/other.md')],
+    ['an MCP call that failed', mcp({ path: page }, { is_error: true })],
+    ['an MCP call given another file', mcp({ path: '/home/dev/notes/other.md' })],
+  ]) {
+    const d = await ask(cited, calls);
+    assert.equal(d?.decision, 'block', `${what} does not clear the citation`);
+    assert.ok(d.reason.includes('markdown/csm/c_Esc.md'), `${what}: ${d.reason}`);
+  }
 });
 
 // ---- time ----------------------------------------------------------------------------------------------------------------------------

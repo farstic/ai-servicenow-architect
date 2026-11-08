@@ -12,7 +12,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import {
-  MAX_TRANSCRIPT_BYTES, classifyUserText, flagsOf, isMainRow, namesIn, parseTranscript, readTurnSources, turnSources,
+  MAX_TRANSCRIPT_BYTES, classifyUserText, flagsOf, isMainRow, namesIn, pagesOfCommand, pagesOfInput, parseTranscript, readTurnSources,
+  shellWords, turnSources,
 } from '../tools/snowarch/lib/docs/turn-sources.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -219,6 +220,137 @@ test('ARC-09-C263 M4 — a failed Read is not a source and not a page; a Glob an
   assert.equal(t.searches.length, 1);
   assert.match(t.searches[0].result, /sn_grep_name/);
   assert.equal(t.scope.corpus, true, 'a Grep under the corpus is the corpus touched');
+});
+
+// ---- ARC-09-C267: a page read through Bash or an MCP file tool ------------------------------------------------------------------
+// The Read tool is not the only way a page reaches the model: in auto mode Claude Code says to read with `cat`, `head` and `sed`, and the
+// context-mode server's `ctx_execute_file` takes the file as `path`. The shapes below are the real ones (a Bash input is
+// { command, description }, its result a string; an MCP result is a list of text blocks, with no `is_error` unless it failed). Phase 0's
+// five batteries used Read 1,709 times, Grep 1,209, Bash 0 and MCP 0, so nothing here can move a number measured on them.
+const REL = 'markdown/itsm/c_Example.md';
+const DIR = PAGE.slice(0, PAGE.lastIndexOf('/'));
+const OTHER = '/home/dev/install/vendor/ServiceNowDocs/markdown/hrsd/c_Other.md';
+const OTHER_REL = 'markdown/hrsd/c_Other.md';
+const bash = (id, command, body, extra = {}) => [use(id, 'Bash', { command, description: 'read it' }), res(id, body, extra)];
+const mcp = (id, name, input, body, extra = {}) => [use(id, name, input), res(id, [{ type: 'text', text: body }], extra)];
+const sourcesOf = (calls) => turnSources([U('request'), ...calls], OPTIONS);
+const heldBy = (t, name) => Object.entries(t.names).filter(([, set]) => set.has(name)).map(([kind]) => kind);
+
+test('ARC-09-C267 — a page that cat, head, sed, tail, nl, awk, bat, less or more shows is a page read, and the names it printed are read names', () => {
+  const commands = [
+    `cat ${PAGE}`, `sed -n '1,40p' ${PAGE}`, `head -50 ${PAGE} | grep -n sn_shown_name`, `tail -n +10 ${PAGE}`, `nl ${PAGE}`,
+    `awk 'NR<=40' ${PAGE}`, `bat -p ${PAGE}`, `less ${PAGE}`, `more ${PAGE}`,
+  ];
+  for (const command of commands) {
+    const t = sourcesOf(bash('b', command, '1\tThe sn_shown_name table'));
+    assert.deepEqual([...t.pagesRead], [REL], command);
+    assert.deepEqual(heldBy(t, 'sn_shown_name'), ['read'], `${command}: what it printed is read, and neither named nor skill`);
+  }
+});
+
+test('ARC-09-C267 — the command line is cut at | ; && || & and a newline, and a quote hides its separators', () => {
+  const shown = [
+    `cd /home/dev/install && cat ${PAGE}`, `echo start; cat ${PAGE}`, `cat ${PAGE} | head -3`, `false || cat ${PAGE}`, `sleep 1 & cat ${PAGE}`,
+    `echo a\ncat ${PAGE}`, `cat \\\n  ${PAGE}`, `sed -n '1,40p;50,60p' ${PAGE}`, `sed -n "1,40p;50,60p" ${PAGE}`, `awk 'NR>1; END {print}' ${PAGE}`,
+    `FOO=1 BAR=2 /bin/cat ${PAGE}`, `cat < ${PAGE}`, `cat <${PAGE}`, `cat "${PAGE}"`, `cat '${PAGE}'`, `cat -n ${PAGE} 2>&1`,
+    `cat '${PAGE.replaceAll('/', '\\')}'`, 'cat "C:\\Users\\dev\\vendor\\ServiceNowDocs\\markdown\\itsm\\c_Example.md"',
+    `cat -- ${PAGE}`, `cat ../../vendor/ServiceNowDocs/${REL}`, `cat vendor/ServiceNowDocs/${REL}`, `cat $HOME/work/vendor/ServiceNowDocs/${REL}`,
+  ];
+  for (const command of shown) assert.deepEqual([...pagesOfCommand(command)], [REL], JSON.stringify(command));
+  assert.deepEqual([...pagesOfCommand(`cat ${PAGE} ${OTHER}`)].sort(), [OTHER_REL, REL].sort(), 'every file argument of a cat');
+  assert.deepEqual([...pagesOfCommand(`nl ${PAGE}; head -3 ${OTHER}`)].sort(), [OTHER_REL, REL].sort(), 'and of each command');
+  assert.deepEqual([...pagesOfCommand(`cat ${PAGE} ${PAGE}`)], [REL], 'a page once');
+});
+
+test('ARC-09-C267 — grep, rg, ls, find, wc, stat, echo, a glob, a variable and a cat of any other file show no page', () => {
+  const hidden = [
+    `grep -l sn_shown_name ${PAGE}`, `grep -n '' ${PAGE}`, `rg sn_shown_name ${PAGE}`, `ls ${DIR}`, `ls -l ${PAGE}`, `find ${DIR} -name c_Example.md`,
+    `wc -l ${PAGE}`, `stat ${PAGE}`, `echo "cat ${PAGE}"`, `printf '%s' ${PAGE}`, `git log -3 -- ${PAGE}`,
+    'cat /home/dev/notes/readme.md', `cat ${DIR}/*.md`, `cat ${DIR}/c_{Example,Other}.md`, `cat ${DIR}/c_Exampl?.md`, `cat ${DIR}/c_[E]xample.md`,
+    'cat "$PAGE"', 'cat $(git rev-parse --show-toplevel)/vendor/x.md', `cat ${DIR}/index.json`, `cat ${DIR}`, `cat vendor/ServiceNowDocs/README.md`,
+    'cat --help', 'cat', 'cat ""', '', '   ',
+  ];
+  for (const command of hidden) {
+    const t = sourcesOf(bash('b', command, '1\tThe sn_shown_name table'));
+    assert.equal(t.pagesRead.size, 0, JSON.stringify(command));
+    assert.deepEqual(heldBy(t, 'sn_shown_name'), [], `${JSON.stringify(command)}: a command that shows no page is no source`);
+  }
+});
+
+test('ARC-09-C267 — a Bash or MCP result that failed never counts, whatever it was asked to show', () => {
+  const t = sourcesOf([
+    ...bash('b', `cat ${PAGE}`, 'cat: No such file or directory sn_failed_bash', { is_error: true }),
+    ...mcp('m', 'mcp__context-mode__ctx_execute_file', { path: PAGE, language: 'shell', code: 'print' }, 'it failed sn_failed_mcp', { is_error: true }),
+  ]);
+  assert.equal(t.pagesRead.size, 0);
+  for (const n of ['sn_failed_bash', 'sn_failed_mcp']) assert.deepEqual(heldBy(t, n), [], n);
+});
+
+test('ARC-09-C267 — an MCP call given a corpus page by path, file_path or paths reads it; every other MCP result is only named', () => {
+  const file = (input, name = 'mcp__context-mode__ctx_execute_file') => sourcesOf(mcp('m', name, { language: 'shell', code: 'print', ...input }, 'The sn_mcp_name table'));
+  for (const input of [{ path: PAGE }, { file_path: PAGE }, { paths: [PAGE] }, { paths: ['/etc/hosts', 3, PAGE] }, { path: '/etc/hosts', paths: [PAGE] }]) {
+    const t = file(input);
+    assert.deepEqual([...t.pagesRead], [REL], JSON.stringify(input));
+    assert.deepEqual(heldBy(t, 'sn_mcp_name'), ['read'], `${JSON.stringify(input)}: read, rather than named`);
+  }
+  assert.deepEqual([...file({ paths: [PAGE, OTHER] }).pagesRead].sort(), [OTHER_REL, REL].sort());
+  assert.deepEqual([...file({ file_path: PAGE.replaceAll('/', '\\') }, 'mcp__files__read_file').pagesRead], [REL], 'any MCP server\'s file tool, Windows spelling');
+  // Not one corpus page: the result is named, as it was before this row.
+  for (const input of [{ path: '/home/dev/notes/readme.md' }, { path: DIR }, { path: `${DIR}/*.md` }, { path: `${DIR}/index.json` }, { paths: [] }, { paths: PAGE }, { path: 42 }, { path: null }, {}]) {
+    const t = file(input);
+    assert.equal(t.pagesRead.size, 0, JSON.stringify(input));
+    assert.deepEqual(heldBy(t, 'sn_mcp_name'), ['named'], `${JSON.stringify(input)}: an MCP result is named`);
+  }
+  assert.deepEqual(heldBy(sourcesOf(mcp('m', 'mcp__servicenow__snow_core_records_query', { table: 'incident' }, 'The sn_mcp_name table')), 'sn_mcp_name'), ['named'], 'a live-mode read');
+});
+
+test('ARC-09-C267 — a Glob, a Write, a WebFetch and a Workflow are still never a source, even when their input names a corpus page', () => {
+  const t = sourcesOf([
+    use('g', 'Glob', { pattern: '*.md', path: DIR }), res('g', `${PAGE}\nsn_glob_name`),
+    use('w', 'Write', { file_path: PAGE, content: 'sn_write_name' }), res('w', 'File written sn_write_result'),
+    use('f', 'WebFetch', { url: 'https://docs.invalid/page', path: PAGE }), res('f', 'sn_fetch_name'),
+    use('k', 'Workflow', { script: 'x', path: PAGE }), res('k', 'sn_workflow_name'),
+    use('e', 'Edit', { file_path: PAGE, old_string: 'a', new_string: 'b' }), res('e', 'sn_edit_name'),
+  ]);
+  assert.equal(t.pagesRead.size, 0);
+  for (const n of ['sn_glob_name', 'sn_write_name', 'sn_write_result', 'sn_fetch_name', 'sn_workflow_name', 'sn_edit_name']) assert.deepEqual(heldBy(t, n), [], n);
+});
+
+test('ARC-09-C267 — a page read through Bash or MCP before the last compact boundary stops counting, as a Read does', () => {
+  const rows = [
+    U('first'), ...bash('b1', `cat ${PAGE}`, '1\tsn_before_bash'), ...mcp('m1', 'mcp__context-mode__ctx_execute_file', { path: OTHER }, 'sn_before_mcp'),
+    boundary(), U('second'), ...bash('b2', `head -5 ${OTHER}`, '1\tsn_after_bash'),
+  ];
+  const t = turnSources(rows, OPTIONS);
+  assert.deepEqual([...t.pagesRead], [OTHER_REL]);
+  assert.ok(!t.names.read.has('sn_before_bash') && !t.names.read.has('sn_before_mcp') && t.names.read.has('sn_after_bash'));
+});
+
+test('ARC-09-C267 — a Read, a Bash and an MCP read of one page are one page; a sub-agent\'s Bash is not the main thread\'s', () => {
+  const sub = { ...use('s', 'Bash', { command: `cat ${OTHER}` }), isSidechain: true };
+  const rows = [U('request'), ...read('r', PAGE, '1\tsn_read_name'), ...bash('b', `cat ${PAGE}`, '1\tsn_bash_name'), ...mcp('m', 'mcp__x__read', { path: PAGE }, 'sn_mcp_name'),
+    sub, { ...res('s', 'sn_sub_name'), isSidechain: true }];
+  const t = turnSources(rows, OPTIONS);
+  assert.deepEqual([...t.pagesRead], [REL]);
+  assert.deepEqual(['sn_read_name', 'sn_bash_name', 'sn_mcp_name'].map((n) => heldBy(t, n)), [['read'], ['read'], ['read']]);
+  assert.deepEqual(heldBy(t, 'sn_sub_name'), []);
+});
+
+test('ARC-09-C267 — shellWords: the simple commands of a line, quotes taken off, cut only at an unquoted separator; nothing throws', () => {
+  assert.deepEqual(shellWords('a \'b c\' "d \\" e" f\\ g | h ;; i && j & k\nl'), [['a', 'b c', 'd " e', 'f g'], ['h'], ['i'], ['j'], ['k'], ['l']]);
+  assert.deepEqual(shellWords("sed -n '1,2p;3p' f"), [['sed', '-n', '1,2p;3p', 'f']], 'a ; inside quotes cuts nothing');
+  assert.deepEqual(shellWords('echo "a | b" \'c && d\''), [['echo', 'a | b', 'c && d']]);
+  assert.deepEqual(shellWords('echo "a\\nb" "c\\$d"'), [['echo', 'a\\nb', 'c$d']], 'inside double quotes a back-slash escapes only " \\ $ and a back-tick');
+  assert.deepEqual(shellWords('x "unclosed ; y'), [['x', 'unclosed ; y']], 'an unbalanced quote runs to the end');
+  assert.deepEqual(shellWords('x ""'), [['x', '']], 'an empty quoted string is a word');
+  assert.deepEqual(shellWords('x\r\ny'), [['x'], ['y']], 'CRLF');
+  for (const odd of [undefined, null, '', '   ', '\\', '\\\n', '"\\', "'", '|||', '&&&&', ';', '\n\n']) assert.ok(Array.isArray(shellWords(odd)), String(odd));
+  assert.deepEqual(shellWords('\\'), [], 'a lone back-slash is nothing');
+  for (const odd of [undefined, null, 42, {}, [], true]) {
+    assert.equal(pagesOfCommand(odd).size, 0, String(odd));
+    assert.equal(pagesOfInput(odd).size, 0, String(odd));
+  }
+  assert.equal(pagesOfInput({ path: [PAGE], paths: { 0: PAGE } }).size, 0, 'only a string path, and only an array of paths');
 });
 
 test('ARC-09-C263 M4 — compaction is keyed on the LAST boundary row: a Read before it stops grounding, a Read after it counts, whatever the trigger', () => {
