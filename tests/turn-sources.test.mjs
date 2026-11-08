@@ -239,6 +239,11 @@ const heldBy = (t, name) => Object.entries(t.names).filter(([, set]) => set.has(
 // Built, not spelled whole: engine lint L02 holds every literal `mcp__<server>__` under tests/ to the product's own server key.
 const tool = (server, name) => ['mcp', server, name].join('__');
 const CTX_FILE = tool('context-mode', 'ctx_execute_file');
+const CTX_BATCH = tool('context-mode', 'ctx_batch_execute');
+const CTX_EXEC = tool('context-mode', 'ctx_execute');
+const ps = (id, command, body, extra = {}) => [use(id, 'PowerShell', { command, description: 'read it' }), res(id, body, extra)];
+const WIN = `C:${PAGE.replaceAll('/', '\\')}`;                    // C:\home\dev\install\vendor\ServiceNowDocs\markdown\itsm\c_Example.md
+const WIN_OTHER = `C:${OTHER.replaceAll('/', '\\')}`;
 
 test('ARC-09-C267 — a page that cat, head, sed, tail, nl, awk, bat, less or more shows is a page read, and the names it printed are read names', () => {
   const commands = [
@@ -340,7 +345,7 @@ test('ARC-09-C267 — a Read, a Bash and an MCP read of one page are one page; a
   assert.deepEqual(heldBy(t, 'sn_sub_name'), []);
 });
 
-test('ARC-09-C267 — the real captures, with each corpus Read rewritten as a sed or an MCP path call, read the same pages and the same names', () => {
+test('ARC-09-C267 — the real captures, with each corpus Read rewritten as a Bash, PowerShell, MCP path, batch-command or shell-code read, read the same pages and the same names', () => {
   let pages = 0;
   for (const c of MANIFEST.captures) {
     const rows = parseTranscript(readFileSync(join(FIXTURES, c.file), 'utf8')).rows;
@@ -351,13 +356,115 @@ test('ARC-09-C267 — the real captures, with each corpus Read rewritten as a se
     }));
     const viaBash = rewritten((b) => ({ ...b, name: 'Bash', input: { command: `sed -n '1,200p' "${b.input.file_path}"`, description: 'read it' } }));
     const viaMcp = rewritten((b) => ({ ...b, name: CTX_FILE, input: { path: b.input.file_path, language: 'shell', code: 'print' } }));
-    for (const [how, changed] of [['Bash', viaBash], ['MCP', viaMcp]]) {
+    const viaPowerShell = rewritten((b) => ({ ...b, name: 'PowerShell', input: { command: `Get-Content "${b.input.file_path}"`, description: 'read it' } }));
+    const viaBatch = rewritten((b) => ({ ...b, name: CTX_BATCH, input: { commands: [{ label: 'page', command: `cat "${b.input.file_path}"` }], queries: ['q'] } }));
+    const viaShellCode = rewritten((b) => ({ ...b, name: CTX_EXEC, input: { language: 'shell', code: `head -200 "${b.input.file_path}"` } }));
+    for (const [how, changed] of [['Bash', viaBash], ['MCP path', viaMcp], ['PowerShell', viaPowerShell], ['a batch of commands', viaBatch], ['shell code', viaShellCode]]) {
       const t = turnSources(changed, OPTIONS);
       assert.deepEqual([...t.pagesRead].sort(), [...base.pagesRead].sort(), `${c.file} via ${how}: the pages`);
       assert.deepEqual([...t.names.read].sort(), [...base.names.read].sort(), `${c.file} via ${how}: the names`);
     }
   }
   assert.ok(pages > 0, 'the captures read at least one corpus page, or this proves nothing');
+});
+
+test('ARC-09-C267 — the shell inside an MCP call (its command, each of its commands, its code in shell) shows a page as Bash does', () => {
+  const via = (name, input, body = 'The sn_mcp_shell table', extra = {}) => sourcesOf(mcp('m', name, input, body, extra));
+  const shown = [
+    ['a command string', tool('x', 'shell'), { command: `cat ${PAGE}` }],
+    ['a batch of commands', CTX_BATCH, { commands: [{ label: 'list', command: 'ls' }, { label: 'page', command: `sed -n '1,40p' ${PAGE}` }], queries: ['q'] }],
+    ['shell code', CTX_EXEC, { language: 'shell', code: `echo start\nhead -50 ${PAGE} | grep -n sn_` }],
+    ['shell code that processes another file', CTX_FILE, { path: '/home/dev/notes/readme.md', language: 'shell', code: `cat ${PAGE}` }],
+    ['a command that reads in a subshell', tool('x', 'shell'), { command: `x=$(cat ${PAGE}); echo done` }],
+  ];
+  for (const [what, name, input] of shown) {
+    const t = via(name, input);
+    assert.deepEqual([...t.pagesRead], [REL], what);
+    assert.deepEqual(heldBy(t, 'sn_mcp_shell'), ['read'], `${what}: read, rather than named`);
+  }
+  assert.deepEqual([...via(CTX_BATCH, { commands: [{ label: 'a', command: `cat ${PAGE}` }, { label: 'b', command: `cat ${OTHER}` }], queries: ['q'] }).pagesRead].sort(), [OTHER_REL, REL].sort(), 'every command of a batch');
+  assert.deepEqual([...via(CTX_FILE, { path: PAGE, language: 'shell', code: `head -3 ${OTHER}` }).pagesRead].sort(), [OTHER_REL, REL].sort(), 'the path and the code');
+  // Not a page shown: a command that finds or counts, code in another language, input of another shape, and a failure.
+  const hidden = [
+    ['grep in a batch', CTX_BATCH, { commands: [{ label: 'a', command: `grep -l x ${PAGE}` }], queries: ['q'] }],
+    ['ls in a batch', CTX_BATCH, { commands: [{ label: 'a', command: `ls ${DIR}` }], queries: ['q'] }],
+    ['shell code that lists and counts', CTX_EXEC, { language: 'shell', code: `ls ${DIR}; wc -l ${PAGE}` }],
+    ['python code that opens the page', CTX_EXEC, { language: 'python', code: `print(open('${PAGE}').read())` }],
+    ['javascript code that opens the page', CTX_EXEC, { language: 'javascript', code: `console.log(require('fs').readFileSync('${PAGE}', 'utf8'))` }],
+    ['code with no language', CTX_EXEC, { code: `cat ${PAGE}` }],
+    ['a command that is not a string', tool('x', 'shell'), { command: [`cat ${PAGE}`] }],
+    ['commands that are strings', CTX_BATCH, { commands: [`cat ${PAGE}`], queries: ['q'] }],
+    ['commands that are not a list', CTX_BATCH, { commands: { command: `cat ${PAGE}` }, queries: ['q'] }],
+    ['a command with no page', tool('x', 'shell'), { command: 'git status' }],
+  ];
+  for (const [what, name, input] of hidden) {
+    const t = via(name, input);
+    assert.equal(t.pagesRead.size, 0, what);
+    assert.deepEqual(heldBy(t, 'sn_mcp_shell'), ['named'], `${what}: an MCP result is named`);
+  }
+  const failed = via(CTX_BATCH, { commands: [{ label: 'a', command: `cat ${PAGE}` }], queries: ['q'] }, 'failed sn_mcp_shell', { is_error: true });
+  assert.equal(failed.pagesRead.size, 0);
+  assert.deepEqual(heldBy(failed, 'sn_mcp_shell'), []);
+});
+
+test('ARC-09-C267 — the PowerShell tool shows a page with Get-Content, gc, type or cat, in PowerShell\'s own quoting and with Windows paths; Bash does not know those verbs', () => {
+  const POWERSHELL = (command) => [...pagesOfCommand(command, { powershell: true })];
+  const shown = [
+    `Get-Content ${WIN}`, `gc ${WIN}`, `type ${WIN}`, `cat ${WIN}`, `GET-CONTENT ${WIN}`, `Cat ${WIN}`, `Get-Content ${PAGE}`,
+    `Get-Content -Path ${WIN} -TotalCount 40`, `Get-Content -LiteralPath '${WIN}' -Tail 5`, `Get-Content "${WIN}"`,
+    `Get-Content '${WIN}' | Select-Object -First 40`, `(Get-Content ${WIN})[0..40]`, `Write-Output (gc ${WIN})`, `Set-Location C:\\x; Get-Content ${WIN}`,
+    `Get-Content .\\vendor\\ServiceNowDocs\\${REL.replaceAll('/', '\\')}`, `Get-Content ..\\..\\vendor\\ServiceNowDocs\\${REL.replaceAll('/', '\\')} -Raw`,
+    `Get-Content 'C:\\Users\\Dev User\\install\\vendor\\ServiceNowDocs\\${REL.replaceAll('/', '\\')}'`, `Get-Content 'C:\\Users\\O''Neil\\install\\vendor\\ServiceNowDocs\\${REL.replaceAll('/', '\\')}'`, `Get-Content "C:\\Users\\Dev User\\install\\vendor\\ServiceNowDocs\\${REL.replaceAll('/', '\\')}"`,
+    `Get-Content \`\n  ${WIN}`, `cd C:\\x && Get-Content ${WIN}`,
+  ];
+  for (const command of shown) assert.deepEqual(POWERSHELL(command), [REL], JSON.stringify(command));
+  assert.deepEqual(POWERSHELL(`Get-Content ${WIN},${WIN_OTHER}`).sort(), [OTHER_REL, REL].sort(), 'a list of paths');
+  assert.deepEqual(POWERSHELL(`gc ${WIN}; type ${WIN_OTHER}`).sort(), [OTHER_REL, REL].sort(), 'and each command');
+  const hidden = [
+    `Select-String -Path ${WIN} -Pattern x`, `sls x ${WIN}`, `Get-ChildItem ${WIN.slice(0, WIN.lastIndexOf('\\'))}`, `ls ${WIN.slice(0, WIN.lastIndexOf('\\'))}`,
+    `dir ${WIN.slice(0, WIN.lastIndexOf('\\'))}`, `Test-Path ${WIN}`, `(Get-Item ${WIN}).Length`, `Measure-Object ${WIN}`, `Write-Host "Get-Content ${WIN}"`,
+    `Get-Content ${WIN.slice(0, WIN.lastIndexOf('\\'))}\\*.md`, `Get-Content ${WIN.slice(0, WIN.lastIndexOf('\\'))}\\c_[E]xample.md`, 'Get-Content $env:CORPUS\\markdown\\itsm\\c_Example.md',
+    'Get-Content C:\\notes\\readme.md', `Get-Content ${WIN}.txt`, 'Get-Content', `Get-Content -Path`, '',
+  ];
+  for (const command of hidden) assert.deepEqual(POWERSHELL(command), [], JSON.stringify(command));
+  // The tool itself, with its result.
+  const t = sourcesOf(ps('p', `Get-Content "${WIN}"`, '1\tThe sn_ps_name table'));
+  assert.deepEqual([...t.pagesRead], [REL]);
+  assert.deepEqual(heldBy(t, 'sn_ps_name'), ['read']);
+  const failed = sourcesOf(ps('p', `Get-Content "${WIN}"`, 'Get-Content : Cannot find path sn_ps_failed', { is_error: true }));
+  assert.equal(failed.pagesRead.size, 0);
+  assert.deepEqual(heldBy(failed, 'sn_ps_failed'), []);
+  assert.equal(sourcesOf(ps('p', `Select-String -Path "${WIN}" -Pattern x`, '1\tsn_ps_name')).pagesRead.size, 0);
+  // Bash knows none of the three PowerShell verbs (`type` in bash says what a name is), and a back-slash there is an escape.
+  for (const verb of ['Get-Content', 'gc', 'type']) {
+    assert.equal(pagesOfCommand(`${verb} ${PAGE}`).size, 0, `${verb} in Bash`);
+    assert.equal(sourcesOf(bash('b', `${verb} ${PAGE}`, '1\tsn_shown_name')).pagesRead.size, 0, `${verb} in a Bash call`);
+  }
+  assert.equal(pagesOfCommand(`cat ${WIN}`).size, 0, 'an unquoted back-slash path in bash is not a path');
+  // A Bash call never gets PowerShell's reading: the tool name decides the dialect.
+  assert.equal(sourcesOf([use('b', 'Bash', { command: `Get-Content "${WIN}"` }), res('b', 'sn_x_name')]).pagesRead.size, 0);
+});
+
+test('ARC-09-C267 — shellWords reads a line as the shell does: sh cuts at ( ) and a back-tick, PowerShell takes a back-slash as a letter, doubles a quote, escapes with the back-tick and splits a list at the comma', () => {
+  assert.deepEqual(shellWords('x=$(cat f) y'), [['x=$'], ['cat', 'f'], ['y']], 'a command substitution is a command');
+  assert.deepEqual(shellWords('echo `cat f`'), [['echo'], ['cat', 'f']], 'and so is a back-tick pair');
+  assert.deepEqual(shellWords('(cat f; ls)'), [['cat', 'f'], ['ls']], 'and a subshell');
+  assert.deepEqual(shellWords('echo "$(cat f)" \'(a)\''), [['echo', '$(cat f)', '(a)']], 'quoted, none of them cuts');
+  assert.deepEqual(shellWords('a\\b'), [['ab']], 'sh: a back-slash escapes');
+  assert.deepEqual(shellWords('a,b'), [['a,b']], 'sh: a comma is a letter');
+  const ps = (line) => shellWords(line, { powershell: true });
+  assert.deepEqual(ps('a\\b C:\\x\\y.md'), [['a\\b', 'C:\\x\\y.md']], 'PowerShell: a back-slash is a letter');
+  assert.deepEqual(ps("a 'b''c' \"d\"\"e\" 'f g'"), [['a', "b'c", 'd"e', 'f g']], 'a doubled quote is one quote');
+  assert.deepEqual(ps('a `;b `` c'), [['a', ';b', '`', 'c']], 'the back-tick escapes the next character');
+  assert.deepEqual(ps('"a`"b" "c`nd"'), [['a"b', 'cnd']], 'and inside double quotes');
+  assert.deepEqual(ps('a b,c'), [['a', 'b', 'c']], 'a comma parts the items of a list');
+  assert.deepEqual(ps("'a,b'"), [['a,b']], 'unless it is quoted');
+  assert.deepEqual(ps('gc a | select -First 2; ls (Get-Item b)'), [['gc', 'a'], ['select', '-First', '2'], ['ls'], ['Get-Item', 'b']]);
+  assert.deepEqual(ps('a `\nb'), [['a', 'b']], 'a back-tick at the end of a line joins the lines');
+  assert.deepEqual(ps('x `'), [['x']], 'a lone back-tick is nothing');
+  for (const odd of [undefined, null, '', '`', '\'', '"', "''", '""', '\'\'\'', '(((', ')))', ',,,']) {
+    assert.ok(Array.isArray(shellWords(odd, { powershell: true })) && Array.isArray(shellWords(odd)), String(odd));
+  }
 });
 
 test('ARC-09-C267 — shellWords: the simple commands of a line, quotes taken off, cut only at an unquoted separator; nothing throws', () => {

@@ -46,6 +46,8 @@ const readPage = (id, rel, body) => [use(id, 'Read', { file_path: PAGEPATH(rel) 
 const OPT = { builders: new Set(['story-writer']), rosterSkills: new Set(['csm-specialist']) };
 // Built, not spelled whole: engine lint L02 holds every literal `mcp__<server>__` under tests/ to the product's own server key.
 const CTX_FILE = ['mcp', 'context-mode', 'ctx_execute_file'].join('__');
+const CTX_BATCH = ['mcp', 'context-mode', 'ctx_batch_execute'].join('__');
+const CTX_EXEC = ['mcp', 'context-mode', 'ctx_execute'].join('__');
 
 /** The findings for `reply`, in a session that read `reads` ({ rel: body }). */
 function check(reply, { reads = {}, prompt = 'how does a case escalate?', extra = [], index = INDEX, coverage, options = {}, scoped = true } = {}) {
@@ -217,7 +219,7 @@ test('ARC-09-C263 M5 — citedUnread: a corpus page cited that the session never
   assert.deepEqual(namesOf(check('See `markdown/hrsd/c_Missing.md`.', {}), 'citedUnread'), ['markdown/hrsd/c_Missing.md']);
 });
 
-test('ARC-09-C267 — citedUnread: a page the session showed itself with cat or sed, or read through an MCP file tool, is read; a grep, an ls and a failed cat of it are not', () => {
+test('ARC-09-C267 — citedUnread: a page that cat, a batch command, shell code or PowerShell showed, or an MCP file tool read, is read; a grep, an ls and a failed read of it are not', () => {
   const reply = `The escalation is described in (citation: ${CSM}).`;
   const page = PAGEPATH(CSM);
   const dir = page.slice(0, page.lastIndexOf('/'));
@@ -230,10 +232,23 @@ test('ARC-09-C267 — citedUnread: a page the session showed itself with cat or 
   assert.deepEqual(open(bash(`cd ${dir} && cat ${page}`)), [], 'after a &&');
   assert.deepEqual(open(mcp({ path: page })), [], 'an MCP file tool given the page as path');
   assert.deepEqual(open(mcp({ paths: [page] })), [], 'or in paths');
+  const batch = (command, extra = {}) => [use('c', CTX_BATCH, { commands: [{ label: 'page', command }], queries: ['q'] }), res('c', [{ type: 'text', text: 'a section' }], extra)];
+  const code = (language, source) => [use('e', CTX_EXEC, { language, code: source }), res('e', [{ type: 'text', text: 'a summary' }])];
+  const powershell = (command, extra = {}) => [use('p', 'PowerShell', { command, description: 'x' }), res('p', '1\tThe table.', extra)];
+  const winPage = `C:${page.replaceAll('/', '\\')}`;
+  assert.deepEqual(open(batch(`cat ${page}`)), [], 'a command of a batch');
+  assert.deepEqual(open(code('shell', `head -50 ${page}`)), [], 'shell code');
+  assert.deepEqual(open(powershell(`Get-Content "${winPage}" -TotalCount 40`)), [], 'PowerShell Get-Content, with a Windows path');
+  assert.deepEqual(open(powershell(`gc ${page}`)), [], 'PowerShell gc');
   // What does not show the page does not clear its citation.
   assert.deepEqual(open(bash(`grep -l escalation ${page}`)), [CSM], 'grep');
   assert.deepEqual(open(bash(`ls ${dir}`)), [CSM], 'ls');
   assert.deepEqual(open(bash(`wc -l ${page}`)), [CSM], 'wc');
+  assert.deepEqual(open(batch(`grep -l escalation ${page}`)), [CSM], 'grep in a batch');
+  assert.deepEqual(open(code('python', `print(open('${page}').read())`)), [CSM], 'python code that opens it');
+  assert.deepEqual(open(powershell(`Select-String -Path "${winPage}" -Pattern escalation`)), [CSM], 'PowerShell Select-String');
+  assert.deepEqual(open(powershell(`Get-Content "${winPage}"`, { is_error: true })), [CSM], 'a Get-Content that failed');
+  assert.deepEqual(open(bash(`Get-Content ${page}`)), [CSM], 'Get-Content in a Bash call');
   assert.deepEqual(open(bash(`cat ${page}`, { is_error: true })), [CSM], 'a cat that failed');
   assert.deepEqual(open(bash('cat /home/dev/notes/other.md')), [CSM], 'a cat of another file');
   assert.deepEqual(open(mcp({ path: '/home/dev/notes/other.md' })), [CSM], 'an MCP file tool given another file');
@@ -569,7 +584,7 @@ test('ARC-09-C263 M5 hook — the shipped data, as Phase 0 set it: a page cited 
   assert.ok(!both.reason.includes('sn_customerservice_escalation'), 'the false absence is not in the ask: it is computed and reported, never asked');
 });
 
-test('ARC-09-C267 hook — the shipped data: a page cited and read only through Bash or an MCP file tool is not asked about; read by nothing, or only grepped, it still is', async (t) => {
+test('ARC-09-C267 hook — the shipped data: a page cited and read only through Bash, PowerShell or an MCP tool is not asked about; read by nothing, or only grepped, it still is', async (t) => {
   const skill = [use('sk', 'Skill', { skill: 'csm-specialist' }), res('sk', 'Launching skill: csm-specialist')];
   const ask = async (reply, calls = []) => {
     const { root, transcript } = install(t, { rows: [U('how does a case escalate?'), ...skill, ...calls, A(reply)] });
@@ -591,6 +606,13 @@ test('ARC-09-C267 hook — the shipped data: a page cited and read only through 
   assert.equal(await ask(cited, bash(`head -50 ${page} | grep -n escalation`)), null, 'head, at the head of a pipe');
   assert.equal(await ask(cited, mcp({ path: page })), null, 'an MCP file tool given the page as path');
   assert.equal(await ask(cited, mcp({ paths: [page] })), null, 'an MCP file tool given it in paths');
+  const batch = (command) => [use('c', CTX_BATCH, { commands: [{ label: 'page', command }], queries: ['q'] }), res('c', [{ type: 'text', text: body }])];
+  const code = (language, source) => [use('e', CTX_EXEC, { language, code: source }), res('e', [{ type: 'text', text: body }])];
+  const powershell = (command, extra = {}) => [use('p', 'PowerShell', { command, description: 'x' }), res('p', body, extra)];
+  const winPage = `C:${page.replaceAll('/', '\\')}`;
+  assert.equal(await ask(cited, batch(`cat ${page}`)), null, 'a command of a batch');
+  assert.equal(await ask(cited, code('shell', `head -50 ${page}`)), null, 'shell code');
+  assert.equal(await ask(cited, powershell(`Get-Content "${winPage}"`)), null, 'PowerShell Get-Content');
   for (const [what, calls] of [
     ['grep', bash(`grep -l escalation ${page}`)],
     ['ls', bash(`ls ${page.slice(0, page.lastIndexOf('/'))}`)],
@@ -598,6 +620,10 @@ test('ARC-09-C267 hook — the shipped data: a page cited and read only through 
     ['a cat of another file', bash('cat /home/dev/notes/other.md')],
     ['an MCP call that failed', mcp({ path: page }, { is_error: true })],
     ['an MCP call given another file', mcp({ path: '/home/dev/notes/other.md' })],
+    ['a grep in a batch', batch(`grep -l escalation ${page}`)],
+    ['python code that opens it', code('python', `print(open('${page}').read())`)],
+    ['a PowerShell Select-String', powershell(`Select-String -Path "${winPage}" -Pattern escalation`)],
+    ['a PowerShell read that failed', powershell(`Get-Content "${winPage}"`, { is_error: true })],
   ]) {
     const d = await ask(cited, calls);
     assert.equal(d?.decision, 'block', `${what} does not clear the citation`);
