@@ -2,16 +2,18 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DISK_FULL, DISK_SPARSE, checkClaudeCode, checkDisk, checkGit, checkNetwork, checkNode,
-  checkPlatform, checkRoot, checkLine, samePath, run as runB00,
+  checkPlatform, checkRoot, checkLine, makeExec, samePath, run as runB00,
 } from '../lib/steps/B00.mjs';
+import { TIMED_OUT } from '../lib/probe-net.mjs';
 import { CHECK_IDS, TABLE, remedyFor } from '../lib/remedies.mjs';
 import { compareVersion, formatVersion, meetsFloor, parseVersion } from '../lib/versions.mjs';
 import { which } from '../lib/which.mjs';
+import { tempDir } from './helpers/temp.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
 
 /** The upstream `engine.config.json` ships, shared by every network case below. */
@@ -196,6 +198,150 @@ test('AC 6 — --skip-claude-check is a WARN, and asks the CLI nothing', () => {
   assert.equal(r.status, 'warn');
   assert.equal(r.detail, 'Claude Code check skipped (--skip-claude-check)');
   assert.equal(checkLine(r), 'WARN B00: Claude Code check skipped (--skip-claude-check)');
+});
+
+// ── ARC-09-C269 — "not found" was three cases: not on PATH, there and silent, there and failed ─────────────────────
+//
+// A Windows end user's first `upgrade` printed `installed: not found — install Claude Code` and refused, and 0.18 s later
+// `claude --version` printed 2.1.319. Node's own shape for the child it killed at the budget is `code` ETIMEDOUT, a signal,
+// and no status (measured on this Mac, and by the real-child case in tests/doctor/engine-prereqs.test.mjs on every CI OS).
+// Every `exec` below is the tests' own: no case spawns a `claude`.
+
+/** Where the fake Claude Code is, the way the platform spells a path: the words quote it, so the expectations take it from here. */
+const CLAUDE_FILE = process.platform === 'win32' ? 'claude.cmd' : 'claude';
+const CLAUDE_BIN = resolve('/', 'snowarch-c269', CLAUDE_FILE);
+const NOT_ON_PATH = { found: false, ok: false, stdout: '', stderr: '' };
+const silentAt = (bin = CLAUDE_BIN) => ({ found: true, ok: false, stdout: '', stderr: '', bin, timedOut: true, status: null });
+const exitedAt = (status, stderr, bin = CLAUDE_BIN) => ({ found: true, ok: false, stdout: '', stderr, bin, timedOut: false, status });
+const answeredAt = (stdout, bin = CLAUDE_BIN) => ({ found: true, ok: true, stdout, stderr: '', bin });
+
+/** An `exec` whose successive `claude --version` answers are the list (the last one repeats); the rest comes from the table. */
+function claudeSays(answers, rest = {}) {
+  const asked = [];
+  let n = 0;
+  const exec = (name, args) => {
+    asked.push(`${name} ${args.join(' ')}`);
+    return name === 'claude' && args[0] === '--version' ? answers[Math.min(n++, answers.length - 1)] : execWith(rest)(name, args);
+  };
+  return Object.assign(exec, { asked });
+}
+const REST = { 'claude --help': 'commands: auth, mcp', 'claude auth status': 'Logged in' };
+const claudeCheck = (exec, plat = 'darwin') => checkClaudeCode({ exec, floors: FLOORS, plat, skip: false });
+
+test('ARC-09-C269 — a Claude Code that is not on PATH keeps its words and is asked once', () => {
+  const exec = claudeSays([NOT_ON_PATH]);
+  const r = claudeCheck(exec);
+  assert.equal(r.status, 'fail');
+  assert.equal(r.detail, 'Claude Code not found on PATH — install it from https://code.claude.com/docs/en/setup, then re-run');
+  assert.equal(r.remedy, remedyFor('claudeCode', { platform: 'darwin' }));
+  assert.deepEqual(exec.asked, ['claude --version'], 'there is nothing to ask a second time');
+});
+
+test('ARC-09-C269 — a Claude Code that is on PATH and gave no answer twice is named with its path, the budget and a remedy that is not to install it', () => {
+  const exec = claudeSays([silentAt()], REST);
+  const r = claudeCheck(exec);
+  assert.equal(r.status, 'fail', 'found but silent still stops the preflight');
+  assert.ok(r.detail.includes(CLAUDE_BIN), `the path it was found at is not in: ${r.detail}`);
+  assert.match(r.detail, /\b10 s\b/, 'the budget is said');
+  assert.match(r.detail, /twice/, 'and that it was asked twice');
+  assert.match(r.detail, /`claude --version`/);
+  assert.equal(r.remedy, 'run `claude --version` once, then re-run');
+  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /\binstall\b|not found|\bPATH\b/i, 'it is installed: nothing here may tell the reader to install it');
+  assert.deepEqual(exec.asked, ['claude --version', 'claude --version'], 'twice, and not on to the help and the login');
+  assert.equal(checkLine(r).startsWith('FAIL B00: Claude Code'), true);
+});
+
+test('ARC-09-C269 — one silent start is absorbed by the retry: the second answer is judged, and the login is asked after it', () => {
+  const exec = claudeSays([silentAt(), answeredAt('2.1.319 (Claude Code)')], REST);
+  const r = claudeCheck(exec);
+  assert.equal(r.status, 'ok', r.detail);
+  assert.match(r.detail, /2\.1\.319 · login: ok/);
+  assert.deepEqual(exec.asked, ['claude --version', 'claude --version', 'claude --help', 'claude auth status']);
+  // The retry is for anything found that did not answer, an exit status included: a first run that fails and a second that works passes.
+  const flaky = claudeSays([exitedAt(1, 'EBUSY: resource busy or locked'), answeredAt('2.1.319 (Claude Code)')], REST);
+  assert.equal(claudeCheck(flaky).status, 'ok');
+  assert.equal(flaky.asked.filter((q) => q === 'claude --version').length, 2);
+});
+
+test('ARC-09-C269 — a Claude Code that exits with a code says the code and the first line it printed on stderr, and never to install it', () => {
+  const exec = claudeSays([exitedAt(1, 'Error: cannot load the module\n    at Object.<anonymous> (x.js:1:1)\n')], REST);
+  const r = claudeCheck(exec);
+  assert.equal(r.status, 'fail');
+  assert.ok(r.detail.includes(CLAUDE_BIN), r.detail);
+  assert.match(r.detail, /\bcode 1\b/);
+  assert.ok(r.detail.includes('Error: cannot load the module'), 'the first stderr line is quoted');
+  assert.ok(!r.detail.includes('at Object.<anonymous>'), 'and only the first');
+  assert.ok(!r.detail.includes('\n'), 'the detail is one line, as checkLine prints it');
+  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /\binstall\b|not found|\bPATH\b/i);
+  assert.equal(r.remedy, 'run `claude --version` once, then re-run');
+  assert.equal(exec.asked.length, 2, 'asked twice');
+  // No stderr at all: the code alone, with no dangling colon.
+  const bare = claudeCheck(claudeSays([exitedAt(3, '')], REST));
+  assert.match(bare.detail, /\bcode 3$/, bare.detail);
+  // A long line is cut, and colour codes and other control characters are not printed.
+  const long = claudeCheck(claudeSays([exitedAt(2, `${'x'.repeat(400)}\n`)], REST));
+  assert.ok(long.detail.length < 400, `${long.detail.length} characters`);
+  const coloured = claudeCheck(claudeSays([exitedAt(2, '\u001b[31mError: broke\u001b[0m\u0007\n')], REST));
+  assert.ok(coloured.detail.endsWith('code 2: Error: broke'), coloured.detail);
+});
+
+test('ARC-09-C269 — a Claude Code that could not be started says what Node said, and not a status it never had', () => {
+  const refused = { found: true, ok: false, stdout: '', stderr: 'spawnSync claude EACCES', bin: CLAUDE_BIN, timedOut: false, status: null, signal: null, code: 'EACCES' };
+  const r = claudeCheck(claudeSays([refused], REST));
+  assert.equal(r.status, 'fail');
+  assert.ok(r.detail.includes(CLAUDE_BIN), r.detail);
+  assert.ok(r.detail.includes('EACCES'), r.detail);
+  assert.doesNotMatch(r.detail, /code null|code undefined|no answer|\binstall\b|not found/i);
+  assert.equal(r.remedy, 'run `claude --version` once, then re-run');
+});
+
+test('ARC-09-C269 — a version that is not understood, and one below the floor, keep their words and are asked once', () => {
+  const odd = claudeSays([answeredAt('some build')], REST);
+  const r = claudeCheck(odd);
+  assert.equal(r.status, 'fail');
+  assert.equal(r.detail, 'Claude Code version not understood: some build');
+  assert.deepEqual(odd.asked, ['claude --version'], 'an answer is not asked for again');
+  const old = claudeSays([answeredAt('2.0.1 (Claude Code)')], REST);
+  assert.match(claudeCheck(old).detail, new RegExp(`Claude Code 2\\.0\\.1 found, ≥ ${FLOORS.claudeCode.replace(/\./g, '\\.')} required`));
+  assert.equal(old.asked.length, 1);
+});
+
+test('ARC-09-C269 — the recorded Claude Code version is never read out of a path or a stderr line', async () => {
+  // A native install keeps its builds under a version folder, so the path the words quote can hold a version.
+  const versioned = resolve('/', 'claude', 'versions', '2.1.319', CLAUDE_FILE);
+  for (const answer of [silentAt(versioned), exitedAt(1, 'cannot start 9.9.9 build', versioned)]) {
+    const r = await runB00({
+      root: '/repo', cwd: '/repo', config: { floors: FLOORS }, docs: 'sparse', mode: 'design-only',
+      env: {}, plat: 'darwin', line: () => {}, exec: claudeSays([answer], GOOD),
+      locate: (n) => `/usr/bin/${n}`,
+      statfs: () => ({ bavail: 1e9, bsize: 4096 }),
+      probe: async () => ({ ok: true, status: 200, proxy: null }),
+    });
+    assert.equal(r.status, 'fail');
+    assert.equal(r.data.checks.claudeCode, 'fail');
+    assert.equal(r.data.claudeCode, null, 'a version the tool did not state is not recorded');
+    assert.equal(r.data.git, '2.39.5', 'the other versions are still read');
+  }
+});
+
+test('ARC-09-C269 — on Windows the path in the words is the one the product resolved, from the same which() and the same extension rule', (t) => {
+  const dir = tempDir('snowarch-c269-', t);
+  // PATHEXT holds one entry and the file has exactly that spelling, so this resolves on a case-sensitive file system too.
+  writeFileSync(join(dir, 'claude.CMD'), '@echo off\r\n');
+  const env = { PATH: dir, PATHEXT: '.CMD', ComSpec: join(dir, 'cmd.exe') };
+  const hung = Object.assign(new Error('spawnSync cmd.exe ETIMEDOUT'), { code: TIMED_OUT, signal: 'SIGTERM', status: null, stdout: '', stderr: '' });
+  const asked = [];
+  const exec = makeExec({ env, plat: 'win32', exec: (file, args) => { asked.push([file, ...args]); throw hung; } });
+  const r = checkClaudeCode({ exec, floors: FLOORS, plat: 'win32', skip: false });
+  const resolved = which('claude', { env, platform: 'win32' });
+  assert.equal(resolved, join(dir, 'claude.CMD'), 'the fixture resolves where the product looks');
+  assert.equal(r.status, 'fail');
+  assert.ok(r.detail.includes(resolved), `the resolved path is not in: ${r.detail}`);
+  assert.match(r.detail, /\b10 s\b/);
+  assert.match(r.detail, /twice/);
+  assert.equal(asked.length, 2, 'the batch file was run twice, through cmd.exe');
+  assert.ok(asked.every(([file]) => file === env.ComSpec));
+  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /\binstall\b|not found|\bPATH\b/i);
 });
 
 test('check 4 — disk, with the full corpus asking for more than the sparse one', () => {

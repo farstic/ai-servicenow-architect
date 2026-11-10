@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import {
-  existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync,
+  chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -31,6 +31,7 @@ import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { bootstrapUser, buildWorld, fakeClaude, git, republishManifests, snowarch } from './harness.mjs';
 import { stage } from '../../scripts/lib/distribution.mjs';
 import { COVERAGE, isCovered } from '../../tools/snowarch/lib/licence/manifest.mjs';
+import { which } from '../../tools/snowarch/lib/which.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 const isWindows = process.platform === 'win32';
@@ -654,6 +655,40 @@ test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --for
     assert.match(forced.text, /Claude Code check skipped \(--skip-claude-check\)/, 'the bootstrap was not told to skip it');
     assert.doesNotMatch(forced.text, /the bootstrap stopped/, 'the forced move ended in a half state');
     assert.match(forced.text, /\[U7\/7\] doctor/, 'the forced move did not reach the doctor');
+  }, MINUTES);
+
+/**
+ * ARC-09-C269 — a Claude Code that is on PATH and does not answer was worded as absent. A Windows end user's first upgrade printed
+ * `installed: not found — install Claude Code` and refused, and `claude --version` printed 2.1.319 in 0.18 s right afterwards.
+ *
+ * The case here is a `claude` that fails at once, with an exit status and a line on stderr, so the retry costs nothing and the CLI,
+ * the plan and the refusal are the real ones. One that never answers takes the same path through the 10 s budget and is asserted on
+ * its sentences in upgrade-unit.test.mjs: waiting out two budgets here would be most of a minute of a CI cell for the same wiring.
+ */
+test('ARC-09-C269 — a Claude Code on PATH that fails --version is named, with its path, in the plan and the refusal, and moves nothing',
+  async (t) => {
+    const w = await buildWorld(t, { claudeFloor: '9.9.9' });
+    bootstrapUser(w.user);
+    const head = git(w.user, ['rev-parse', 'HEAD']);
+    const dir = join(w.scratch, 'failing-shim');
+    mkdirSync(dir, { recursive: true });
+    if (isWindows) {
+      writeFileSync(join(dir, 'claude.cmd'), '@echo off\r\necho cannot load the module 1>&2\r\nexit /b 3\r\n');
+    } else {
+      writeFileSync(join(dir, 'claude'), '#!/bin/sh\necho "cannot load the module" >&2\nexit 3\n');
+      chmodSync(join(dir, 'claude'), 0o755);
+    }
+    const env = { PATH: `${dir}${isWindows ? ';' : ':'}${process.env.PATH}` };
+    // The path the words must quote is the one the product resolves, from the same which() and the same PATHEXT.
+    const found = which('claude', { env: { PATH: dir, PATHEXT: process.env.PATHEXT }, platform: process.platform });
+    assert.ok(found, 'the shim does not resolve');
+
+    const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { env });
+    assert.equal(r.status, 2, r.text);
+    assert.ok(r.text.includes(`claude-floor 9.9.9 (installed: found at ${found}, but \`claude --version\` exited with code `), r.text);
+    assert.match(r.text, /Claude Code found at [^\n]*, but `claude --version` exited with code \d+: cannot load the module, and v9\.1\.0 wants 9\.9\.9 or later — run `claude --version` once, then re-run, or pass --force-floor; nothing was changed/);
+    assert.doesNotMatch(r.text, /installed: not found|install Claude Code|was not found/, 'it is installed: the run may not say to install it');
+    assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'the tree moved');
   }, MINUTES);
 
 test('a target that is not a release tag of this product is refused by name', async (t) => {

@@ -8,8 +8,10 @@
 // branches are provable from a POSIX machine by naming the platform.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { resolve } from 'node:path';
 
 import { makeExec } from '../../tools/snowarch/lib/steps/B00.mjs';
+import { TIMED_OUT } from '../../tools/snowarch/lib/probe-net.mjs';
 import { StateError } from '../../tools/snowarch/lib/state.mjs';
 import { capabilityPacks, DRAWIO_CANDIDATES, enginePrereqChecks, recordedMode,
   SOFFICE_CANDIDATES } from '../../tools/snowarch/lib/doctor/checks/engine-prereqs.mjs';
@@ -247,6 +249,88 @@ test('ARC-09-C67/C68 — a Windows .cmd goes through cmd.exe, quoted, and never 
   posix('npm', ['--version']);
   assert.equal(seen.at(-1).bin, '/usr/bin/npm', 'nothing on POSIX is a batch file');
   assert.equal(seen.at(-1).options.shell, undefined);
+});
+
+/**
+ * ARC-09-C269 — `makeExec` says WHY a tool that is on PATH did not answer. A Windows end user's first `upgrade` printed
+ * `installed: not found — install Claude Code` for a Claude Code that answered `--version` 0.18 s later: the call had overrun the 10 s
+ * budget, and `found && !ok` carried no reason, so every caller worded it as absent. The three shapes below are Node's own for a
+ * sync child (measured: a child killed at the budget has code ETIMEDOUT, signal SIGTERM and no status; one that exits has a status and
+ * no code; a file that cannot be started has a code, no status, and no stdout or stderr).
+ */
+test('ARC-09-C269 — makeExec reports a call that overran its budget, one that exited with a status and one that could not start', () => {
+  const bin = resolve('/', 'tools', 'bin', 'claude');
+  const thrown = (props) => () => { throw Object.assign(new Error('failed'), props); };
+  const ask = (props) => makeExec({ plat: 'linux', env: {}, resolve: () => bin, exec: thrown(props) })('claude', ['--version']);
+
+  const silent = ask({ code: TIMED_OUT, signal: 'SIGTERM', status: null, stdout: '', stderr: '' });
+  assert.equal(silent.found, true);
+  assert.equal(silent.ok, false);
+  assert.equal(silent.timedOut, true, 'the overrun is the one fact the callers need');
+  assert.equal(silent.status, null);
+  assert.equal(silent.bin, bin);
+
+  const exited = ask({ status: 1, signal: null, stdout: 'out', stderr: 'bad\nworse\n' });
+  assert.equal(exited.timedOut, false);
+  assert.equal(exited.status, 1);
+  assert.equal(exited.stderr, 'bad\nworse\n');
+  assert.equal(exited.stdout, 'out');
+  assert.equal(exited.bin, bin);
+
+  // Node gives a file that cannot be started a code and nothing else: no status, and no stdout or stderr to read.
+  const refused = ask({ code: 'EACCES', status: null, signal: null });
+  assert.equal(refused.timedOut, false);
+  assert.equal(refused.status, null);
+  assert.equal(refused.code, 'EACCES');
+  assert.equal(refused.found, true);
+  assert.equal(refused.ok, false);
+
+  // What did not change: the budget, the answer of a call that worked, and the answer for a tool that is not on PATH.
+  let options;
+  const worked = makeExec({ plat: 'linux', env: {}, resolve: () => bin, exec: (_file, _args, o) => { options = o; return '2.1.319\n'; } })('claude', ['--version']);
+  assert.deepEqual(worked, { found: true, ok: true, stdout: '2.1.319\n', stderr: '', bin });
+  assert.equal(options.timeout, 10_000, 'the budget stays 10 s');
+  const absent = makeExec({ plat: 'linux', env: {}, resolve: () => null, exec: () => { throw new Error('spawned a tool that is not on PATH'); } })('claude', ['--version']);
+  assert.deepEqual(absent, { found: false, ok: false, stdout: '', stderr: '' });
+});
+
+test('ARC-09-C269 — a real child that outlives the budget, and one that exits, come back in the shapes above on this platform', () => {
+  // Not a `claude`: the test runner's own node, so the shape is measured on every OS the CI runs, Windows included. The seam
+  // `timeoutMs` shortens the budget for the child that never answers; the default is what the product uses.
+  const hung = makeExec({ resolve: () => process.execPath, timeoutMs: 300 })('node', ['-e', 'setTimeout(() => {}, 20000)']);
+  assert.equal(hung.found, true);
+  assert.equal(hung.ok, false);
+  assert.equal(hung.timedOut, true, JSON.stringify({ ...hung, stdout: '', stderr: '' }));
+  assert.equal(hung.status, null);
+  assert.equal(hung.bin, process.execPath);
+
+  const failed = makeExec({ resolve: () => process.execPath })('node', ['-e', 'console.error("first line\\nsecond"); process.exitCode = 3']);
+  assert.equal(failed.ok, false);
+  assert.equal(failed.timedOut, false);
+  assert.equal(failed.status, 3);
+  assert.match(failed.stderr, /^first line/);
+});
+
+test('ARC-09-C269 — E-00 on a Claude Code that is there and did not answer names the path and the budget, and never says to install it', async (t) => {
+  const root = greenTree(t);
+  const asked = [];
+  const bin = resolve('/', 'tools', 'bin', 'claude');
+  const exec = (name, args) => {
+    asked.push(`${name} ${args.join(' ')}`);
+    return { found: true, ok: false, stdout: '', stderr: '', bin, timedOut: true, status: null };
+  };
+  const r = await runById(checks, 'E-00', ctx(root, { exec }));
+  assert.equal(r.status, 'fail');
+  assert.match(r.detail, /found at /);
+  assert.match(r.detail, /\b10 s\b/);
+  assert.match(r.detail, /twice/);
+  assert.equal(r.remedy, 'run `claude --version` once, then re-run');
+  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /\binstall\b|not found|\bPATH\b/i);
+  assert.deepEqual(asked, ['claude --version', 'claude --version'], 'the doctor asks twice too, through the same check');
+  // The absent case is the doctor's old sentence, unchanged.
+  const gone = await runById(checks, 'E-00', ctx(root, { exec: execFrom({}) }));
+  assert.equal(gone.status, 'fail');
+  assert.match(gone.detail, /^Claude Code not found on PATH — install it from /);
 });
 
 test('ARC-09-C68 — E-03 does not tell a machine with a working npm to reinstall Node', async (t) => {

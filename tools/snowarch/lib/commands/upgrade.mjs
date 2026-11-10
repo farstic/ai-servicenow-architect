@@ -43,7 +43,7 @@ import { loadConfig, root as defaultRoot, version as readVersion } from '../conf
 import { loadState, notHereReason, recordedHere } from '../state.mjs';
 // ARC-08-C29 — the runner's own step list, so the plan and the run are one computation.
 import { STEPS, outputMissingOf } from '../steps/index.mjs';
-import { checkGit, checkNode, makeExec } from '../steps/B00.mjs';
+import { checkGit, checkNode, makeExec, probeClaude } from '../steps/B00.mjs';
 import { nodeInfo, stepContext } from '../bootstrap.mjs';
 import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
@@ -851,12 +851,20 @@ export function storePlan(root, tag, { opts = {}, spell = spellings() } = {}) {
 export function floorCheck(tagInfo, { exec }) {
   const want = tagInfo?.floors?.claudeCode ?? null;
   if (!want) return { line: null, below: false };
-  const r = exec('claude', ['--version']);
+  // ARC-09-C269 — through B00's probe, so a Claude Code that is there and slow is asked again and told from one that is not on PATH.
+  const probe = probeClaude(exec);
+  const r = probe.r;
   // ARC-09-C194 — absent or unreadable is BELOW, not unknown-and-through: the target's B00 refuses both unless its
   // Claude Code check is skipped, which only --force-floor asks for.
-  if (!r.found || !r.ok) {
+  if (probe.kind === 'absent') {
     return { line: `claude-floor ${want} (installed: not found — install Claude Code, or pass `
       + '--force-floor)', below: true, unknown: true };
+  }
+  // ARC-09-C269 — found and silent is below as well (the target's B00 refuses it), but it is installed: the words say what the
+  // call did, and the remedy is to look at it, never to install it.
+  if (probe.kind === 'unanswered') {
+    return { line: `claude-floor ${want} (installed: ${probe.said} — ${probe.remedy}, or pass --force-floor)`,
+      below: true, unknown: true, said: probe.said, remedy: probe.remedy };
   }
   const { ok: passes, found } = meetsFloor(r.stdout, want);
   if (!found) return { line: `claude-floor ${want} (installed version not understood)`, below: true, unknown: true };
@@ -867,6 +875,23 @@ export function floorCheck(tagInfo, { exec }) {
     ? { line: `claude-floor ${want} (installed ${shown} ok)`, below: false }
     : { line: `claude-floor ${want} (installed ${shown} — BELOW the floor; upgrade Claude Code first)`,
       below: true };
+}
+
+/**
+ * The sentence U4 refuses with when the Claude Code floor is not met and --force-floor was not given. Three sentences were here
+ * before ARC-09-C269 and two of them are unchanged, byte for byte: not found or not understood, and below. The third is new: a
+ * Claude Code that is on PATH and did not answer (`floor.said`, from `floorCheck`) is named with where it was found and what it did.
+ */
+export function floorRefusal(floor, { target, want }) {
+  if (floor.said) {
+    return `upgrade: Claude Code ${floor.said}, and ${target} wants ${want} or later — ${floor.remedy}, `
+      + 'or pass --force-floor; nothing was changed';
+  }
+  return floor.unknown
+    ? `upgrade: Claude Code was not found, or its version not understood, and ${target} wants `
+      + `${want} or later — install or upgrade it first, or pass --force-floor; nothing was changed`
+    : 'upgrade: the installed Claude Code is below the floor this release wants — upgrade it '
+      + 'first, or pass --force-floor; nothing was changed';
 }
 
 /**
@@ -1229,11 +1254,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
     return EXIT_USAGE;
   }
   if (floor.below && !flags['force-floor']) {
-    log.fail(floor.unknown
-      ? `upgrade: Claude Code was not found, or its version not understood, and ${target} wants `
-        + `${tagInfo.floors.claudeCode} or later — install or upgrade it first, or pass --force-floor; nothing was changed`
-      : 'upgrade: the installed Claude Code is below the floor this release wants — upgrade it '
-        + 'first, or pass --force-floor; nothing was changed');
+    log.fail(floorRefusal(floor, { target, want: tagInfo.floors.claudeCode }));
     return EXIT_USAGE;
   }
   // ARC-11-C6 — said with --yes and without, before the question: the move is still the reader's to make.

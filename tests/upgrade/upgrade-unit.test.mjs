@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -215,6 +215,102 @@ test('ARC-09-C194 — a Claude Code that cannot be read is below the floor, not 
   assert.equal(floorCheck(TAG, { exec: versions({ claude: 'some build' }) }).below, true, 'unreadable');
   assert.equal(floorCheck(TAG, { exec: versions({ claude: '2.1.100 (Claude Code)' }) }).below, true, 'below');
   assert.equal(floorCheck(TAG, { exec: versions({ claude: '2.1.300 (Claude Code)' }) }).below, false, 'at or above');
+});
+
+// ── ARC-09-C269 — a Claude Code that is there and did not answer is not "not found" ──────────────────────────────
+//
+// A Windows end user's first `upgrade` printed `claude-floor 2.1.214 (installed: not found — install Claude Code, or pass
+// --force-floor)` and refused; `claude --version` printed 2.1.319 in 0.18 s right afterwards. The call had overrun makeExec's
+// 10 s budget, which `found && !ok` did not say. Each `exec` here is the test's own: no case runs a `claude`.
+
+const CLAUDE_AT = resolve('/', 'snowarch-c269', isWindows ? 'claude.cmd' : 'claude');
+const NOT_ON_PATH = { found: false, ok: false, stdout: '', stderr: '' };
+const SILENT = { found: true, ok: false, stdout: '', stderr: '', bin: CLAUDE_AT, timedOut: true, status: null };
+const EXITED = (status, stderr) => ({ found: true, ok: false, stdout: '', stderr, bin: CLAUDE_AT, timedOut: false, status });
+const ANSWERS = (stdout) => ({ found: true, ok: true, stdout, stderr: '', bin: CLAUDE_AT });
+/** The successive answers to `claude --version` (the last repeats), and what was asked. */
+const asking = (answers) => {
+  const asked = [];
+  let n = 0;
+  return Object.assign((cmd, args) => {
+    asked.push(`${cmd} ${args.join(' ')}`);
+    return answers[Math.min(n++, answers.length - 1)];
+  }, { asked });
+};
+const RUN_ONCE = 'run `claude --version` once, then re-run';
+
+test('ARC-09-C269 — the floor line: not on PATH keeps its words, found but silent says so, and neither is asked more than needed', async () => {
+  const { floorCheck } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+
+  const absent = asking([NOT_ON_PATH]);
+  const a = floorCheck(TAG, { exec: absent });
+  assert.equal(a.line, 'claude-floor 2.1.214 (installed: not found — install Claude Code, or pass --force-floor)');
+  assert.deepEqual([a.below, a.unknown], [true, true]);
+  assert.deepEqual(absent.asked, ['claude --version'], 'there is nothing to ask a second time');
+
+  const silent = asking([SILENT]);
+  const s = floorCheck(TAG, { exec: silent });
+  assert.deepEqual([s.below, s.unknown], [true, true], 'found but silent still refuses without --force-floor (C194)');
+  assert.ok(s.line.startsWith('claude-floor 2.1.214 (installed: '), s.line);
+  assert.ok(s.line.includes(CLAUDE_AT), `the path it was found at is not in: ${s.line}`);
+  assert.match(s.line, /\b10 s\b/);
+  assert.match(s.line, /twice/);
+  assert.ok(s.line.endsWith(`${RUN_ONCE}, or pass --force-floor)`), s.line);
+  assert.doesNotMatch(s.line, /\binstall\b|not found/i, 'it is installed: the line may not say to install it');
+  assert.equal(silent.asked.length, 2, 'asked twice');
+
+  // One slow start is absorbed: the second answer is judged, and the line is the ordinary one.
+  const slowThenFine = asking([SILENT, ANSWERS('2.1.300 (Claude Code)')]);
+  const ok = floorCheck(TAG, { exec: slowThenFine });
+  assert.deepEqual([ok.below, ok.line], [false, 'claude-floor 2.1.214 (installed 2.1.300 ok)']);
+  assert.equal(slowThenFine.asked.length, 2);
+  // ...and so is one that failed fast, then worked.
+  assert.equal(floorCheck(TAG, { exec: asking([EXITED(1, 'EBUSY'), ANSWERS('2.1.300 (Claude Code)')]) }).below, false);
+
+  // Found with an exit status: the code and the first stderr line.
+  const exited = floorCheck(TAG, { exec: asking([EXITED(1, 'Error: cannot load the module\n    at stack frame\n')]) });
+  assert.deepEqual([exited.below, exited.unknown], [true, true]);
+  assert.ok(exited.line.includes(CLAUDE_AT), exited.line);
+  assert.match(exited.line, /\bcode 1\b/);
+  assert.ok(exited.line.includes('Error: cannot load the module'));
+  assert.ok(!exited.line.includes('stack frame'));
+  assert.doesNotMatch(exited.line, /\binstall\b|not found/i);
+
+  // Unchanged: an answer that is no version, and a version below the floor, asked once.
+  const odd = asking([ANSWERS('some build')]);
+  const u = floorCheck(TAG, { exec: odd });
+  assert.equal(u.line, 'claude-floor 2.1.214 (installed version not understood)');
+  assert.deepEqual([u.below, u.unknown], [true, true]);
+  assert.equal(odd.asked.length, 1);
+  const old = floorCheck(TAG, { exec: asking([ANSWERS('2.1.100 (Claude Code)')]) });
+  assert.equal(old.line, 'claude-floor 2.1.214 (installed 2.1.100 — BELOW the floor; upgrade Claude Code first)');
+  assert.deepEqual([old.below, old.unknown], [true, undefined]);
+});
+
+test('ARC-09-C269 — the refusal names what was found; the sentences of the cases that did not change are byte for byte what they were', async () => {
+  const { floorCheck, floorRefusal } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const refusal = (...answers) => floorRefusal(floorCheck(TAG, { exec: asking(answers) }), { target: 'v2.2.6', want: TAG.floors.claudeCode });
+
+  assert.equal(refusal(NOT_ON_PATH), 'upgrade: Claude Code was not found, or its version not understood, and v2.2.6 wants 2.1.214 or later — '
+    + 'install or upgrade it first, or pass --force-floor; nothing was changed');
+  assert.equal(refusal(ANSWERS('some build')), refusal(NOT_ON_PATH), 'an answer that is no version keeps the sentence it had');
+  assert.equal(refusal(ANSWERS('2.1.100 (Claude Code)')), 'upgrade: the installed Claude Code is below the floor this release wants — upgrade it '
+    + 'first, or pass --force-floor; nothing was changed');
+
+  const silent = refusal(SILENT);
+  assert.ok(silent.startsWith('upgrade: Claude Code '), silent);
+  assert.ok(silent.includes(CLAUDE_AT), `the path is not in: ${silent}`);
+  assert.match(silent, /\b10 s\b/);
+  assert.match(silent, /twice/);
+  assert.match(silent, /v2\.2\.6 wants 2\.1\.214 or later/);
+  assert.ok(silent.endsWith(`${RUN_ONCE}, or pass --force-floor; nothing was changed`), silent);
+  assert.doesNotMatch(silent, /\binstall\b|not found/i);
+
+  const exited = refusal(EXITED(1, 'Error: cannot load the module\n'));
+  assert.match(exited, /\bcode 1\b/);
+  assert.ok(exited.includes('Error: cannot load the module'));
+  assert.ok(exited.includes(CLAUDE_AT));
+  assert.ok(exited.endsWith(`${RUN_ONCE}, or pass --force-floor; nothing was changed`), exited);
 });
 
 test('the classifier names a remedy only for a shape it recognises', () => {
