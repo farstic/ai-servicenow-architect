@@ -31,7 +31,8 @@ pending a measured second stage.
   about, a name called "not documented" that the corpus prints, a name nothing the session read gives, "unverified" or "not
   opened" in the final reply, and a page count above the pages read: in a replay of recorded sittings only the check on a page
   cited and never read cleared the bar (39 of 40 judged flags right, against a bar of 0.90), so which checks may ask is a file
-  of data (`lib/docs/grounding-classes.json`) that the measurement sets (ARC-09-C263).
+  of data (`lib/docs/grounding-classes.json`) that the measurement sets. The notice asks for one short line per correction and a
+  closing line that begins "Part 3:", and a citation that says it was not read is not asked about (ARC-09-C263).
 
 ### Added
 
