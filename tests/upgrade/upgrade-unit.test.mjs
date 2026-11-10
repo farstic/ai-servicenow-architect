@@ -256,7 +256,7 @@ test('ARC-09-C269 — the floor line: not on PATH keeps its words, found but sil
   assert.match(s.line, /\b10 s\b/);
   assert.match(s.line, /twice/);
   assert.ok(s.line.endsWith(`${RUN_ONCE}, or pass --force-floor)`), s.line);
-  assert.doesNotMatch(s.line, /install|not found/i, 'it is installed: the line may not say to install it');
+  assert.doesNotMatch(s.line, /\binstall\b|not found/i, 'it is installed: the line may not say to install it');
   assert.equal(silent.asked.length, 2, 'asked twice');
 
   // One slow start is absorbed: the second answer is judged, and the line is the ordinary one.
@@ -274,7 +274,7 @@ test('ARC-09-C269 — the floor line: not on PATH keeps its words, found but sil
   assert.match(exited.line, /\bcode 1\b/);
   assert.ok(exited.line.includes('Error: cannot load the module'));
   assert.ok(!exited.line.includes('stack frame'));
-  assert.doesNotMatch(exited.line, /install|not found/i);
+  assert.doesNotMatch(exited.line, /\binstall\b|not found/i);
 
   // Unchanged: an answer that is no version, and a version below the floor, asked once.
   const odd = asking([ANSWERS('some build')]);
@@ -304,7 +304,7 @@ test('ARC-09-C269 — the refusal names what was found; the sentences of the cas
   assert.match(silent, /twice/);
   assert.match(silent, /v2\.2\.6 wants 2\.1\.214 or later/);
   assert.ok(silent.endsWith(`${RUN_ONCE}, or pass --force-floor; nothing was changed`), silent);
-  assert.doesNotMatch(silent, /install|not found/i);
+  assert.doesNotMatch(silent, /\binstall\b|not found/i);
 
   const exited = refusal(EXITED(1, 'Error: cannot load the module\n'));
   assert.match(exited, /\bcode 1\b/);

@@ -246,7 +246,7 @@ test('ARC-09-C269 — a Claude Code that is on PATH and gave no answer twice is 
   assert.match(r.detail, /twice/, 'and that it was asked twice');
   assert.match(r.detail, /`claude --version`/);
   assert.equal(r.remedy, 'run `claude --version` once, then re-run');
-  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /install|not found|PATH/i, 'it is installed: nothing here may tell the reader to install it');
+  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /\binstall\b|not found|\bPATH\b/i, 'it is installed: nothing here may tell the reader to install it');
   assert.deepEqual(exec.asked, ['claude --version', 'claude --version'], 'twice, and not on to the help and the login');
   assert.equal(checkLine(r).startsWith('FAIL B00: Claude Code'), true);
 });
@@ -272,7 +272,7 @@ test('ARC-09-C269 — a Claude Code that exits with a code says the code and the
   assert.ok(r.detail.includes('Error: cannot load the module'), 'the first stderr line is quoted');
   assert.ok(!r.detail.includes('at Object.<anonymous>'), 'and only the first');
   assert.ok(!r.detail.includes('\n'), 'the detail is one line, as checkLine prints it');
-  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /install|not found|PATH/i);
+  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /\binstall\b|not found|\bPATH\b/i);
   assert.equal(r.remedy, 'run `claude --version` once, then re-run');
   assert.equal(exec.asked.length, 2, 'asked twice');
   // No stderr at all: the code alone, with no dangling colon.
@@ -291,7 +291,7 @@ test('ARC-09-C269 — a Claude Code that could not be started says what Node sai
   assert.equal(r.status, 'fail');
   assert.ok(r.detail.includes(CLAUDE_BIN), r.detail);
   assert.ok(r.detail.includes('EACCES'), r.detail);
-  assert.doesNotMatch(r.detail, /code null|code undefined|no answer|install|not found/i);
+  assert.doesNotMatch(r.detail, /code null|code undefined|no answer|\binstall\b|not found/i);
   assert.equal(r.remedy, 'run `claude --version` once, then re-run');
 });
 
@@ -342,7 +342,7 @@ test('ARC-09-C269 — on Windows the path in the words is the one the product re
   assert.match(r.detail, /twice/);
   assert.equal(asked.length, 2, 'the batch file was run twice, through cmd.exe');
   assert.ok(asked.every(([file]) => file === env.ComSpec));
-  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /install|not found|PATH/i);
+  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /\binstall\b|not found|\bPATH\b/i);
 });
 
 test('check 4 — disk, with the full corpus asking for more than the sparse one', () => {

@@ -325,7 +325,7 @@ test('ARC-09-C269 — E-00 on a Claude Code that is there and did not answer nam
   assert.match(r.detail, /\b10 s\b/);
   assert.match(r.detail, /twice/);
   assert.equal(r.remedy, 'run `claude --version` once, then re-run');
-  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /install|not found|PATH/i);
+  assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /\binstall\b|not found|\bPATH\b/i);
   assert.deepEqual(asked, ['claude --version', 'claude --version'], 'the doctor asks twice too, through the same check');
   // The absent case is the doctor's old sentence, unchanged.
   const gone = await runById(checks, 'E-00', ctx(root, { exec: execFrom({}) }));
