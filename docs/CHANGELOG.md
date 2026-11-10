@@ -21,6 +21,13 @@ touched, and an upgrade neither names nor moves it.
 and answer its question about the project's MCP server, instead of telling you to run `mode live` or `mode design` again, which
 cannot change that state.
 
+**The upgrade and the preflight tell a Claude Code that is slow from one that is missing.** When `claude --version` gives no answer in
+10 seconds, or exits with an error, the upgrade plan, its refusal, the bootstrap's preflight and the doctor now say where Claude Code
+was found and what it did (no answer in 10 s, tried twice; or the exit code and the first line it printed), and ask you to run
+`claude --version` once and run again. They no longer say it was not found and tell you to install it. The command is asked a second
+time before it is given up on, so one slow start, such as a first start after an update or a virus scan, no longer stops an upgrade.
+A Claude Code that is not on PATH gets the words it had.
+
 ### Fixed
 
 - The upgrade plan's `credentials:` line said that `.local/instances.json` is never read or written by the upgrade. The verify step of
@@ -36,6 +43,13 @@ cannot change that state.
   those settings before it has been started in the folder. For Claude Code's own `Pending approval (run `claude` to approve)` the
   remedy is now to start `claude` in the folder once, answer its question about the project's MCP server (No for design-only, Yes for
   live) and run the doctor again. Every other E-27 state and its remedy is unchanged (ARC-09-C266).
+- A Claude Code that was installed but did not answer `claude --version` within 10 seconds was reported as `installed: not found — install
+  Claude Code` in the upgrade plan, in the refusal that follows it and in the bootstrap's preflight, and the upgrade stopped on a machine
+  where the command printed its version a moment later (a Windows first run from 2.2.4; the second run passed). `makeExec` now returns
+  why a tool on PATH did not answer, one helper asks `claude --version` a second time and names the path, the budget or the exit code and
+  the first line on stderr, with the remedy to run it once and run again, and found-but-silent still refuses without `--force-floor`.
+  The words for a Claude Code that is not on PATH, a version that is not understood and a version below the floor are unchanged. An
+  upgrade from 2.2.5 runs 2.2.5's own plan, so the new floor line appears from 2.2.6 on (ARC-09-C269).
 
 ## 2.2.5 — 2026-11-02
 

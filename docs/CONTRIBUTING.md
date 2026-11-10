@@ -713,6 +713,17 @@ other half of the same problem. Run the tool's own JS entry point with `process.
 pinned local copy rather than whatever `npx` would resolve. ARC-04-S13's first build script called
 `npx tsc` and was red on all three Windows cells while green on six others.
 
+### A tool that is on PATH and did not answer is not a tool that is missing
+
+`makeExec` (B00.mjs) answers a probe with three different facts, and a caller that tests only `found` and `ok` merges two of them: the
+tool is not on PATH (`found: false`); it is on PATH and did not answer inside the 10 s budget (`timedOut`), exited with a status
+(`status`) or could not be started (`code`); or it answered. A sentence for the second says where the tool was found and what it did,
+and never says to install it: a Windows end user's first `upgrade` printed `installed: not found — install Claude Code` for a Claude
+Code that printed its version 0.18 s later (ARC-09-C269). Ask `claude --version` through `probeClaude`, which asks twice when the tool
+is there and silent and returns the clause every caller quotes. A new probe of a tool on PATH reads `timedOut`, `status` and `code` the
+same way and takes a test for each, through the `resolve` and `exec` seams and never a real tool. The path in the words comes from the
+`which()` the product resolved with, so an expectation takes it from there and carries no POSIX literal.
+
 ### Never mutate a shared build artefact in a test
 
 A test that edits `dist/` — even one that restores it in a `finally` — cannot be isolated by cleaning
