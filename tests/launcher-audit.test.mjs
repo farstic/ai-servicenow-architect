@@ -486,9 +486,11 @@ test('C35b — the real file: b00-checks has no phantom site at :93 (item 1)', (
   const file = 'tools/snowarch/tests/b00-checks.test.mjs';
   const lines = assertedLaunchers(file, readFileSync(resolve(root, file), 'utf8')).map((s) => s.line);
   // ARC-11-C2 — two lines down, for the copyright header the file now opens with: the phantom that was at
-  // :93 would be at :95, and the two real sites moved from 102 and 111.
-  assert.deepEqual(lines, [104, 113],
-    `the phantom at :95 (once :93) is back or a real site moved: ${JSON.stringify(lines)}`);
+  // :93 would be at :95, and the two real sites moved from 102 and 111. ARC-09-C269 — two lines down again, for the two
+  // imports its cases need (the tracked temp-directory helper and the timeout code): the phantom would be at :97, and the
+  // two real sites are at 106 and 115.
+  assert.deepEqual(lines, [106, 115],
+    `the phantom at :97 (once :93) is back or a real site moved: ${JSON.stringify(lines)}`);
 });
 
 test('C35b — an inline pinned spelling call is a PINNED expectation (item 3)', () => {

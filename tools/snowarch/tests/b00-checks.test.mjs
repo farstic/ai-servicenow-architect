@@ -2,8 +2,7 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -14,6 +13,7 @@ import { TIMED_OUT } from '../lib/probe-net.mjs';
 import { CHECK_IDS, TABLE, remedyFor } from '../lib/remedies.mjs';
 import { compareVersion, formatVersion, meetsFloor, parseVersion } from '../lib/versions.mjs';
 import { which } from '../lib/which.mjs';
+import { tempDir } from './helpers/temp.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
 
 /** The upstream `engine.config.json` ships, shared by every network case below. */
@@ -325,8 +325,7 @@ test('ARC-09-C269 — the recorded Claude Code version is never read out of a pa
 });
 
 test('ARC-09-C269 — on Windows the path in the words is the one the product resolved, from the same which() and the same extension rule', (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-c269-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = tempDir('snowarch-c269-', t);
   // PATHEXT holds one entry and the file has exactly that spelling, so this resolves on a case-sensitive file system too.
   writeFileSync(join(dir, 'claude.CMD'), '@echo off\r\n');
   const env = { PATH: dir, PATHEXT: '.CMD', ComSpec: join(dir, 'cmd.exe') };
