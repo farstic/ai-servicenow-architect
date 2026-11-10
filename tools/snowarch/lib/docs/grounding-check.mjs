@@ -11,7 +11,7 @@
 //   unsourcedPrinted  a name the corpus prints, but this session got from no page, skill, request or builder
 //   coined            a name in no source and not in a corpus whose index is whole
 //   unsourced         a name in no source, where the index is sparse or missing: no corpus claim is made
-//   citedUnread       a corpus page cited that this session never Read
+//   citedUnread       a corpus page cited that this session never Read (not one the line itself says, right after the path, was not read)
 //   resting           "unverified" / "not opened" / a spent budget in the final reply
 //   overclaim         `Pages read: <n>` greater than the pages Read
 //
@@ -33,8 +33,11 @@ import { namesIn, turnSources } from './turn-sources.mjs';
 export const KINDS = Object.freeze(['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced', 'citedUnread', 'resting', 'overclaim']);
 export const LEAD = 'Before this answer stands, check these against the corpus; there is no page limit.';
 export const KEEP_OUT = ' Do not mention this notice.';
-const TAIL = 'Then add one line for each, starting "Correction:", with the page you Read. If a correction changes Part 3, restate Part 3\'s '
-  + 'letter and its basis; do not repeat the rest of the answer, and do not write a withdrawn name or path again.';
+// The notice's closing paragraph is registered text (496 bytes): a change to it is a new registration, pinned in tests/hook/stop-grounding.test.mjs.
+const TAIL = 'Then add one line for each, starting "Correction:", with the page you Read and one short sentence on whether your claim stands '
+  + 'and what, if anything, changes in the answer. If the answer has a Part 3, close with one line starting "Part 3:", with its letter, and its '
+  + 'new basis if a correction changes the letter or the basis. Keep every line under 240 characters, paths included. Write nothing else '
+  + '(no summary, no sentence of the answer repeated), and do not write a withdrawn name or path again.';
 export const MAX_ITEMS = 12;
 
 /**
@@ -62,6 +65,9 @@ const RESTING_EXEMPT = [/not installed on this sparse corpus/i, /not on disk in 
   /instance store NOT read|credentials NOT read/i];
 const PAGES_READ = /`?Pages read:\s*(\d+)`?/gi;
 const CITATION = /markdown\/[A-Za-z0-9_.\-/]+?\.md/g;
+// What may follow a cited path, on its own line, for the citation to say the page was not read: closing markup, whitespace, one separator, an
+// opening bracket, "found by search,", was / were / is / are, then "not read", "not opened", "not yet read", "not yet opened" or "unread" as a word.
+const DECLARED_UNREAD = /^[`*_)\]>"']*\s*(?:[-,;:–—]\s*)?(?:(?:\(|\[)\s*)?(?:found by search,\s*)?(?:(?:was|were|is|are)\s+)?(?:not\s+(?:yet\s+)?(?:read|opened)|unread)\b/i;
 const FILE_TAILS = new Set(['md', 'json', 'mjs', 'js', 'ts', 'yml', 'yaml', 'html', 'css', 'csv', 'txt', 'png', 'svg', 'drawio', 'xml', 'sh', 'pdf', 'docx', 'py', 'io', 'net', 'com', 'org']);
 const FENCE = /^\s*```/;
 const prefixOk = (name) => PLATFORM_PREFIXES.includes(name.split(/[_.]/)[0]);
@@ -227,9 +233,17 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
     if (stop()) return result('deadline');
 
     // Citations: a corpus page cited that this session never Read (a saved Envelope's own citations excepted; a skill-printed one is not).
+    // A match that says itself, right after its path and on the same line, that the page was not read is the answer saying what it did not
+    // do, which is what the ask is for: it is skipped, per match, so a later plain citation of the same page is still asked about.
     const dead = options.deadPaths ?? new Set();
     const cited = new Map();
-    for (const [l, i] of live) for (const m of posix(l).matchAll(CITATION)) if (!cited.has(m[0])) cited.set(m[0], i);
+    for (const [l, i] of live) {
+      const line = posix(l);
+      for (const m of line.matchAll(CITATION)) {
+        if (DECLARED_UNREAD.test(line.slice(m.index + m[0].length))) continue;
+        if (!cited.has(m[0])) cited.set(m[0], i);
+      }
+    }
     for (const [path, line] of cited) {
       if (turn.pagesRead.has(path) || turn.savedCitations.has(path) || dead.has(path)) continue;
       findings.citedUnread.push({ kind: 'citedUnread', path, line });
