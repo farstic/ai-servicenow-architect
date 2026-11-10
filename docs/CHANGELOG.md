@@ -27,6 +27,7 @@ was found and what it did (no answer in 10 s, tried twice; or the exit code and 
 `claude --version` once and run again. They no longer say it was not found and tell you to install it. The command is asked a second
 time before it is given up on, so one slow start, such as a first start after an update or a virus scan, no longer stops an upgrade.
 A Claude Code that is not on PATH gets the words it had.
+The upgrade from 2.2.5 to this release still runs 2.2.5's own check: if its plan says `installed: not found` while `claude --version` prints a version, run `claude --version` once and run the upgrade again.
 
 ### Fixed
 
