@@ -5,6 +5,7 @@
 // may print; one block per turn; and what the hook does when it cannot do its part.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -215,6 +216,40 @@ test('ARC-09-C263 M5 — citedUnread: a corpus page cited that the session never
   assert.deepEqual(namesOf(check('See `markdown/hrsd/c_Missing.md`.', {}), 'citedUnread'), ['markdown/hrsd/c_Missing.md']);
 });
 
+test('ARC-09-C263 — citedUnread: a citation that says, right after its path, that the page was not read is not asked about; any other citation is', () => {
+  const P = 'markdown/x/a.md';
+  const asked = (reply, options) => namesOf(check(reply, { options }), 'citedUnread');
+  // The answer says what it did not do, which is what the check asks it to say: there is nothing to ask.
+  assert.deepEqual(asked('*(see markdown/api-reference/rest-api-explorer/t_EnableOAuthWithREST.md, not read this turn)*'), [], 'a comma, then not read');
+  assert.deepEqual(asked('(citations: `t_ConfigureSLAProperties.md`, `markdown/it-service-management/service-level-management/t_AddCustomBusinessRulesToSLAs.md` — found by search, not opened)'), [],
+    'a closing backtick, a dash, found by search; the bare file name is no citation');
+  assert.deepEqual(asked(`${P} (not read this turn)`), [], 'an opening parenthesis');
+  assert.deepEqual(asked(`\`${P}\` was not opened`), [], 'a closing backtick, was');
+  // Any other citation is asked about, as before.
+  assert.deepEqual(asked(`(citation: ${P})`), [P], 'a plain citation');
+  assert.deepEqual(asked(`(citation: ${P}; markdown/x/b.md not read)`), [P], 'per match: the page before the declaration is asked about, the page it follows is not');
+  assert.deepEqual(asked(`${P} does not say this, and I did not read the sibling page`), [P], 'a "did not read" about something else is no declaration');
+  // Per match, on the line of the match: a plain citation of the same page on a later line is asked about, with that line.
+  const later = check(`${P} (not read this turn)\n\nThe escalation rule is in ${P}.`).findings.citedUnread;
+  assert.deepEqual(later.map((i) => [i.path, i.line]), [[P, 2]], 'the declared line is skipped, the plain one is not');
+  // With the classes as shipped (citedUnread alone blocks) an answer whose only citation says it was not read sends no notice at all.
+  const shipped = check(`The rule is in ${P} (not read this turn).`, { options: { blocking: ['citedUnread'] } });
+  assert.deepEqual([shipped.blocks, shipped.reason], [[], null]);
+  assert.equal(check(`The rule is in ${P}.`, { options: { blocking: ['citedUnread'] } }).blocks.join(), 'citedUnread');
+});
+
+test('ARC-09-C263 — citedUnread: what a declaration may look like (case, markup, one separator, the listed words) and what it may not', () => {
+  const P = 'markdown/x/a.md';
+  const asked = (line) => namesOf(check(line), 'citedUnread');
+  for (const line of [`${P}: unread`, `${P} - not yet read`, `${P} – not yet opened`, `${P} — NOT READ`, `**${P}** (Not Opened)`, `[${P}] found by search, were not opened`,
+    `${P}; is not read`, `(${P}, are not read)`, `(${P}) not read`, `${P}(unread)`, 'markdown\\x\\a.md (not read this turn)']) {
+    assert.deepEqual(asked(line), [], line);
+  }
+  for (const line of [`${P} is read`, `${P} not readable`, `${P} unreadable`, `${P}, — not read`, `${P} see the page, not read`, `not read: ${P}`, `${P}\nnot read this turn`]) {
+    assert.deepEqual(asked(line), [P], line.replace('\n', '\\n'));
+  }
+});
+
 test('ARC-09-C263 M5 — resting: unverified / not opened / a spent budget in the final reply; the marker, C239, live mode and an instance deferral with a citation are not', () => {
   const flagged = (line) => check(`Part 2 done.\n${line}`).findings.resting.length;
   for (const line of ['The escalation matrix is unverified.', 'I have not opened the HR pages.', 'The page budget is spent, so the rest is open.',
@@ -268,11 +303,31 @@ test('ARC-09-C263 M5 — the reason: the lead, one clause per kind, at most twel
   assert.ok(r.reason.startsWith(LEAD));
   assert.ok(r.reason.endsWith(`do not write a withdrawn name or path again.${KEEP_OUT}`));
   assert.equal(r.reason.split('Do not mention this notice.').length - 1, 1);
-  assert.match(r.reason, /Then add one line for each, starting "Correction:", with the page you Read\. If a correction changes Part 3, restate Part 3's letter and its basis/);
+  assert.match(r.reason, /Then add one line for each, starting "Correction:", with the page you Read and one short sentence on whether your claim stands and what, if anything, changes in the answer\. If the answer has a Part 3, close with one line starting "Part 3:", with its letter, and its new basis if a correction changes the letter or the basis\. Keep every line under 240 characters, paths included\./);
   // Only what is allowed to block blocks: with `blocking` limited, the others are computed and not asked.
   const some = check('Uses `sensor_reading_x` and `task_sla`.', { options: { blocking: ['coined'] } });
   assert.deepEqual(some.blocks, ['coined']);
   assert.ok(some.findings.unsourcedPrinted.length === 1 && !some.reason.includes('though the corpus prints them'));
+});
+
+// The notice's closing paragraph is registered text: the pilot showed the corrections ran too long, and R6 measures these bytes. A change to
+// it is a new registration, so the length and the hash are pinned beside the text.
+const REGISTERED_TAIL = 'Then add one line for each, starting "Correction:", with the page you Read and one short sentence on whether your claim stands '
+  + 'and what, if anything, changes in the answer. If the answer has a Part 3, close with one line starting "Part 3:", with its letter, and its '
+  + 'new basis if a correction changes the letter or the basis. Keep every line under 240 characters, paths included. Write nothing else '
+  + '(no summary, no sentence of the answer repeated), and do not write a withdrawn name or path again.';
+test('ARC-09-C263 — the notice ends with the registered tail (496 bytes, sha256 5c3e7055…): after the lead and the clauses, once, then our closing words', () => {
+  assert.equal(Buffer.byteLength(REGISTERED_TAIL), 496, 'the pin is the registered length');
+  assert.equal(createHash('sha256').update(REGISTERED_TAIL).digest('hex'), '5c3e7055f08c1d6b978cb580de74dc97ec90d54544f5f728e01a626293627800', 'and the registered hash');
+  const r = check('See `markdown/hrsd/c_Missing.md`.');
+  assert.deepEqual(namesOf(r, 'citedUnread'), ['markdown/hrsd/c_Missing.md']);
+  assert.equal(r.reasonBody, `${LEAD} Cited but not Read in this session: markdown/hrsd/c_Missing.md. Read each, and keep a citation only where the page says what you cite it for. ${REGISTERED_TAIL}`);
+  assert.equal(r.reason, `${r.reasonBody}${KEEP_OUT}`, 'our closing words follow the tail');
+  // Several kinds asking at once: the tail still comes once, last.
+  const many = check('Uses `sensor_reading_x` and `task_sla`; also `Pages read: 9`, unverified. See markdown/itsm/c_Missing.md.');
+  assert.ok(many.blocks.length >= 3, 'three kinds or more ask');
+  assert.ok(many.reason.endsWith(` ${REGISTERED_TAIL}${KEEP_OUT}`));
+  assert.equal(many.reason.split(REGISTERED_TAIL).length - 1, 1);
 });
 
 test('ARC-09-C263 M5 — candidate pages: those that print a table named on the same line first, then the segment in the file name, then the shortest', () => {
