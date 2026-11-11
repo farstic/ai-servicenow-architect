@@ -272,12 +272,19 @@ test('ARC-09-C263 — the classes that block and the ubiquity threshold are data
   const coined = 'The `sn_zzz_made_up_table` holds it.';
   const common = 'The `task_sla` table holds it.';
 
-  // The committed file, as Phase 0 set it: only citedUnread blocks, 500 pages. Neither reply cites a page, so neither is asked about.
+  // The committed file, as the pilot left it: no class blocks, 500 pages. So neither reply is asked about, and nor is a page that exists
+  // and that the session never read; a path that is not a page is C254's, and it is sent back as C254 alone sends it.
   const committed = JSON.parse(readFileSync(classes, 'utf8'));
-  assert.deepEqual(committed.blocking, ['citedUnread']);
+  assert.deepEqual(committed.blocking, []);
   assert.equal(committed.ubiquityPages, 500);
   assert.equal(ask(coined), null, 'coined is computed and not asked');
   assert.equal(ask(common), null, 'unsourcedPrinted is computed and not asked');
+  const unread = 'The escalation is described in (citation: markdown/alpha/two.md).';
+  assert.equal(ask(unread), null, 'a page that exists, cited and never read, is computed and not asked');
+  const dead = 'A claim (citation: markdown/alpha/page-two.md).';
+  const c254Alone = runEntry(entry, root, stopping(dead));
+  assert.equal(JSON.parse(c254Alone.stdout).decision, 'block', 'C254 alone sends the dead citation back');
+  assert.deepEqual(ask(dead), JSON.parse(c254Alone.stdout), 'with a transcript to read, the same reply is sent back byte for byte the same');
 
   // A one-file diff back to every kind: both replies are asked about again.
   writeFileSync(classes, `${JSON.stringify({ blocking: [...KINDS], ubiquityPages: 500 })}\n`);
@@ -287,6 +294,7 @@ test('ARC-09-C263 — the classes that block and the ubiquity threshold are data
   // A one-file diff: only citations block, and a name on 2 or more pages is common. Nothing else changed.
   writeFileSync(classes, `${JSON.stringify({ blocking: ['citedUnread'], ubiquityPages: 2 })}\n`);
   assert.equal(ask(coined), null, 'coined is computed and not asked');
+  assert.equal(ask(unread)?.decision, 'block', 'with citedUnread listed, the page that was not asked about above is asked about: the committed list is what silences it');
   writeFileSync(classes, `${JSON.stringify({ blocking: ['coined', 'unsourcedPrinted'], ubiquityPages: 2 })}\n`);
   assert.equal(ask(coined)?.decision, 'block');
   assert.equal(ask(common), null, 'on 3 pages, with the threshold at 2, the name is too common to ask about');

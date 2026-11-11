@@ -1362,7 +1362,8 @@ corpus citations with what the session actually read, which it takes from the se
 (`transcript_path`) and from the corpus's names index. Seven classes: a name called "not documented" that the corpus prints; a name
 the corpus prints that no page, skill, request or roster builder of the session gave; a name in no source where the index is whole
 (a coined name); the same where it is not (no claim about the corpus); a page cited and never read; "unverified" or "not opened"
-left in the final reply; and a `Pages read: <n>` above the pages read. The rule it checks is the grounding rule in `CLAUDE.md`:
+left in the final reply; and a `Pages read: <n>` above the pages read. In this release none of them asks: the committed data lists
+no blocking class, so each is computed and left to a replay or a grader. The rule it checks is the grounding rule in `CLAUDE.md`:
 no page limit, until each construct is cited from a page the Architect read or an escape-safe search did not find it.
 
 Four promises shape it, after the banner's. It asks once: on the continuation (`stop_hook_active`) it never blocks, and when its
@@ -1377,8 +1378,9 @@ The names index (`.local/corpus-names/<pin>/`, `lib/docs/names-index.mjs`) is bu
 `doctor --fix` (E-33, fixer F9), in a child process (`lib/docs/sync-index.mjs`); no hook can load the builder. B02 declares the index as
 its output, as it does for B01's manifest, so an install made before it existed builds it at the next bootstrap or upgrade, and
 the upgrade's plan says "the names index is not held". Which classes may block, and the page count above which a name is too
-common to ask about, are data in `lib/docs/grounding-classes.json`, read by the hook on every turn; a missing or garbage file means
-the defaults.
+common to ask about, are data in `lib/docs/grounding-classes.json`, read by the hook on every turn. The committed file lists no class:
+the registered pilot judged the one candidate, a page cited and never read, warranted on 22 of 25 flags (0.88) against a bar of
+0.90, so no class asks in this release. A missing or garbage file means the defaults, which are all seven classes and 500 pages.
 
 **Every check the old `doctor.sh` made is accounted for** — see
 [Appendix: the old doctor's checks](#appendix-the-old-doctors-checks) at the end of this document.

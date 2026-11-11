@@ -232,9 +232,9 @@ test('ARC-09-C263 — citedUnread: a citation that says, right after its path, t
   // Per match, on the line of the match: a plain citation of the same page on a later line is asked about, with that line.
   const later = check(`${P} (not read this turn)\n\nThe escalation rule is in ${P}.`).findings.citedUnread;
   assert.deepEqual(later.map((i) => [i.path, i.line]), [[P, 2]], 'the declared line is skipped, the plain one is not');
-  // With the classes as shipped (citedUnread alone blocks) an answer whose only citation says it was not read sends no notice at all.
-  const shipped = check(`The rule is in ${P} (not read this turn).`, { options: { blocking: ['citedUnread'] } });
-  assert.deepEqual([shipped.blocks, shipped.reason], [[], null]);
+  // When citedUnread blocks, an answer whose only citation says it was not read sends no notice at all.
+  const declared = check(`The rule is in ${P} (not read this turn).`, { options: { blocking: ['citedUnread'] } });
+  assert.deepEqual([declared.blocks, declared.reason], [[], null]);
   assert.equal(check(`The rule is in ${P}.`, { options: { blocking: ['citedUnread'] } }).blocks.join(), 'citedUnread');
 });
 
@@ -542,11 +542,12 @@ test('ARC-09-C263 M5 hook — no new hook entry, and no hook imports the index b
 });
 
 // ---- the data file the measurement sets -----------------------------------------------------------------------------------------
-test('ARC-09-C263 M5 — parseClasses: the committed file is what Phase 0 set (citedUnread blocks, 500 pages); unknown kinds drop; garbage means all seven kinds', () => {
+test('ARC-09-C263 M5 — parseClasses: the committed file is what the pilot set (nothing blocks, 500 pages); unknown kinds drop; garbage means all seven kinds', () => {
   const committed = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
-  // Phase 0 (C263, R6): citedUnread was judged right 39 times in 40, 0.975 against the registered bar of 0.90, and no other class reached
-  // it. A change to this list is a measured decision, made in the file and here together.
-  assert.deepEqual(committed, { blocking: ['citedUnread'], ubiquity: DEFAULT_UBIQUITY, source: 'file' });
+  // Phase 0 (C263, R6) judged citedUnread right 39 times in 40, 0.975 against the registered bar of 0.90, and no other class reached it.
+  // The registered pilot, at the final notice text, judged it warranted on 22 of 25 flags, 0.88: under the same bar, so nothing blocks in
+  // this release. A change to this list is a measured decision, made in the file and here together.
+  assert.deepEqual(committed, { blocking: [], ubiquity: DEFAULT_UBIQUITY, source: 'file' });
   assert.equal(DEFAULT_UBIQUITY, 500);
   assert.deepEqual(parseClasses('{"blocking":["coined","nonsense","falseAbsent"],"ubiquityPages":50}'),
     { blocking: ['falseAbsent', 'coined'], ubiquity: 50, source: 'file' }, 'known kinds only, in the check\'s own order');
@@ -562,7 +563,7 @@ test('ARC-09-C263 M5 — options given to groundingFindings override the data (t
   const reply = 'Uses `sensor_reading_x` and `task_sla`.';
   const dataAsRead = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
   const withData = check(reply, { options: { blocking: dataAsRead.blocking, ubiquity: dataAsRead.ubiquity } });
-  assert.deepEqual(withData.blocks, [], 'the data blocks citedUnread only, and this reply cites no page');
+  assert.deepEqual(withData.blocks, [], 'the data blocks nothing');
   assert.deepEqual(kinds(withData), ['unsourcedPrinted', 'coined'], 'the two classes it raises are still computed, for a replay or a grader');
   const everyKind = check(reply, { options: { blocking: [...KINDS], ubiquity: dataAsRead.ubiquity } });
   assert.deepEqual(everyKind.blocks, ['unsourcedPrinted', 'coined'], 'an option that names every kind asks about both');
@@ -571,7 +572,7 @@ test('ARC-09-C263 M5 — options given to groundingFindings override the data (t
   assert.equal(replay.findings.unsourcedPrinted.length, 0, 'the replay\'s ubiquity wins: ubiquity 0 means every name is common');
 });
 
-test('ARC-09-C263 M5 hook — the shipped data, as Phase 0 set it: a page cited and never read is asked about; a false absence and a coined name are computed and not asked', async (t) => {
+test('ARC-09-C263 M5 hook — the shipped data, as the pilot set it: nothing is asked about; a page cited and never read, a false absence and a coined name are computed and not asked', async (t) => {
   const skill = [use('sk', 'Skill', { skill: 'csm-specialist' }), res('sk', 'Launching skill: csm-specialist')];
   const ask = async (reply) => {
     const { root, transcript } = install(t, { rows: [U('how does a case escalate?'), ...skill, A(reply)] });
@@ -584,13 +585,12 @@ test('ARC-09-C263 M5 hook — the shipped data, as Phase 0 set it: a page cited 
   const cited = 'The escalation is described in (citation: markdown/csm/c_Esc.md).';
   assert.equal(await ask(absent), null, 'falseAbsent is grader-only');
   assert.equal(await ask(coined), null, 'coined is grader-only');
-  const alone = await ask(cited);
-  assert.equal(alone?.decision, 'block', 'a page cited and never read is asked about');
-  assert.ok(alone.reason.includes('markdown/csm/c_Esc.md'), alone.reason);
-  const both = await ask(`${cited}\n${absent}`);
-  assert.equal(both?.decision, 'block');
-  assert.ok(both.reason.includes('markdown/csm/c_Esc.md'), both.reason);
-  assert.ok(!both.reason.includes('sn_customerservice_escalation'), 'the false absence is not in the ask: it is computed and reported, never asked');
+  assert.equal(await ask(cited), null, 'citedUnread is grader-only: the pilot judged it warranted on 22 of 25 flags, under the bar of 0.90');
+  assert.equal(await ask(`${cited}\n${absent}`), null, 'a page cited and never read beside a false absence: still nothing is asked');
+  // Computed all the same, for a replay or a grader: the check still finds the page, and the file's own list lets none of it block.
+  const committed = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
+  const computed = check(cited, { options: { blocking: committed.blocking, ubiquity: committed.ubiquity } });
+  assert.deepEqual([computed.findings.citedUnread.map((i) => i.path), computed.blocks], [['markdown/csm/c_Esc.md'], []]);
 });
 
 // ---- time ----------------------------------------------------------------------------------------------------------------------------

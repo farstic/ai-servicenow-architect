@@ -1,6 +1,7 @@
 {
   "_about": "ARC-09-C263 — which classes of the grounding check may block, and the page count above which a name is too common to ask about. DATA, read by the Stop hook (tools/snowarch/hooks/stop-citations.mjs) on every turn, so the measurement can change them in a one-file diff while the code stays frozen. A class not listed in `blocking` is still computed and reported to a replay or a grader, and is never asked of the model. Until the Phase 0 replay and the pilot set them: all seven kinds, and 500 pages. A missing or unreadable file means exactly these defaults. Options given to groundingFindings override both.",
-  "_phase0": "ARC-09-C263 Phase 0 (the registered replay, two blind readers and an adjudicator; bar: precision 0.90) set `blocking` below: only citedUnread blocks (39 of 40 judged right, 0.975, kappa 1.00); every other class is computed and grader-only, pending the measured stage 2. `ubiquityPages` stays 500. A missing or unreadable file still means all seven kinds (the code is unchanged). Record: ~/.local/share/snowarch-verify/c263/r6/phase0/result.md.",
-  "blocking": ["citedUnread"],
+  "_phase0": "ARC-09-C263 Phase 0 (the registered replay, two blind readers and an adjudicator; bar: precision 0.90) set `blocking` to citedUnread alone (39 of 40 judged right, 0.975, kappa 1.00); every other class is computed and grader-only, pending the measured stage 2. `ubiquityPages` stays 500. A missing or unreadable file still means all seven kinds (the code is unchanged). Record: ~/.local/share/snowarch-verify/c263/r6/phase0/result.md.",
+  "_pilot": "ARC-09-C263 re-pilot (the registered pilot at the final notice text; two blind readers and an adjudicator; the bar is 0.90 on the pilot as well): citedUnread was judged warranted on 22 of 25 flags, 0.88, so no class blocks in this release. Every class is computed and grader-only, and a reply is never asked about it.",
+  "blocking": [],
   "ubiquityPages": 500
 }
