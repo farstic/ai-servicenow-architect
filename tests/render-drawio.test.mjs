@@ -19,7 +19,7 @@
  *   - a case that runs the script for real first asks that lookup, in the same environment, what it would run, and refuses to start
  *     anything unless the answer is its own stub;
  *   - the platform is a `uname` stub on PATH, so a draw.io on THIS machine cannot be found by a case that pretends to be another
- *     platform, and no case sets HOME.
+ *     platform, and HOME is the real one when there is one and is never made up.
  * The stubs are shell scripts, so the cases run on macOS and Linux; the step in ci.yml runs the same script in Git Bash against a
  * compiled draw.io.exe.
  */
@@ -65,21 +65,29 @@ const executable = (path, body) => { mkdirSync(dirname(path), { recursive: true 
 const drawioAt = (path) => executable(path, DRAWIO_STUB);
 /** The platform the script believes it is on. */
 const unameIs = (w, value) => executable(join(w.bin, 'uname'), `#!/bin/sh\necho '${value}'\n`);
-/** No HOME is set: nothing here reads it, and a fake one is the thing that must never reach a real app. */
-const environment = (w, env = {}) => ({ PATH: `${w.bin}:/usr/bin:/bin`, STUB_LOG: w.log, ...env });
+/**
+ * HOME is the real one, or absent when the machine has none, and never made up: a fake one is the thing that must never reach a real
+ * app. It is passed because the first macOS cell (macos-26-arm64) printed `Error: $HOME must be set to run brew.` from some process in
+ * every lookup run that had none; the hosted images are not the only machines where something in a shell's start-up expects it.
+ */
+const environment = (w, env = {}) => ({ PATH: `${w.bin}:/usr/bin:/bin`, STUB_LOG: w.log, ...(process.env.HOME ? { HOME: process.env.HOME } : {}), ...env });
+/** The shell is the system's, not whichever `bash` a PATH names first. */
+const BASH = '/bin/bash';
+/** What the script itself said on stderr: its `ERROR:` lines. Anything else on a machine's stderr is not the script's to answer for. */
+const errorLines = (stderr) => stderr.split('\n').filter((l) => l.startsWith('ERROR: '));
 
 /** What the script would run, asked of its own lookup. Nothing is started: the file is sourced and find_drawio only looks. */
 function lookup(w, env = {}) {
-  const r = spawnSync('bash', ['-c', 'source "$1" "$2"; find_drawio; code=$?; printf "%s\\n" "${DRAWIO:-}"; exit "$code"', 'lookup', script, w.empty],
+  const r = spawnSync(BASH, ['-c', 'source "$1" "$2"; find_drawio; code=$?; printf "%s\\n" "${DRAWIO:-}"; exit "$code"', 'lookup', script, w.empty],
     { encoding: 'utf8', env: environment(w, env) });
-  return { code: r.status, found: r.stdout.trim(), stderr: r.stderr };
+  return { code: r.status, found: r.stdout.trim(), stderr: r.stderr, errors: errorLines(r.stderr) };
 }
 
 /** Run the script for real, but only once its lookup has said it would run `stub` and nothing else. */
 function render(w, stub, env = {}, dir = w.diagrams) {
   const asked = lookup(w, env);
   assert.equal(asked.found, stub, `the lookup would run ${asked.found || 'nothing'}, not the stub: nothing was started`);
-  return spawnSync('bash', [script, dir], { encoding: 'utf8', env: environment(w, env) });
+  return spawnSync(BASH, [script, dir], { encoding: 'utf8', env: environment(w, env) });
 }
 const calls = (w) => readFileSync(w.log, 'utf8').trim().split('\n').filter(Boolean);
 
@@ -88,7 +96,7 @@ test('ARC-09-C273 — sourcing the script defines the lookup and runs nothing', 
   // The one case that hands a sourced file a folder WITH a diagram in it, to see that nothing is rendered — so its renderer is a stub, found
   // first on PATH: a script that did run its main part when sourced would call the stub, and this case would fail, with nothing real started.
   const stub = drawioAt(join(w.bin, 'drawio'));
-  const r = spawnSync('bash', ['-c', 'source "$1" "$2"; type -t find_drawio', 'lookup', script, w.diagrams], { encoding: 'utf8', env: environment(w) });
+  const r = spawnSync(BASH, ['-c', 'source "$1" "$2"; type -t find_drawio', 'lookup', script, w.diagrams], { encoding: 'utf8', env: environment(w) });
   assert.equal(r.status, 0, r.stderr);
   // Nothing on stdout but the answer to `type -t`: no "rendering …", no "done: …".
   assert.equal(r.stdout, 'function\n');
@@ -100,7 +108,8 @@ test('ARC-09-C273 — on PATH under any of the three names draw.io goes by', { s
   for (const name of ['drawio', 'draw.io', 'draw.io.exe']) {
     const w = world(t);
     const stub = drawioAt(join(w.bin, name));
-    assert.deepEqual(lookup(w), { code: 0, found: stub, stderr: '' }, name);
+    const r = lookup(w);
+    assert.deepEqual([r.code, r.found, r.errors], [0, stub, []], `${name}: ${r.stderr}`);
   }
 });
 
@@ -116,7 +125,8 @@ test('ARC-09-C273 — Windows: the zip, the per-user installer and Program Files
     // A space in the folder, as "Program Files" and many user names have.
     const folder = join(w.base, variable === 'PROGRAMFILES' ? 'Program Files' : 'Local App Data');
     const stub = drawioAt(join(folder, ...rel.split('/')));
-    assert.deepEqual(lookup(w, { [variable]: folder }), { code: 0, found: stub, stderr: '' }, what);
+    const r = lookup(w, { [variable]: folder });
+    assert.deepEqual([r.code, r.found, r.errors], [0, stub, []], `${what}: ${r.stderr}`);
   }
 });
 
@@ -126,7 +136,8 @@ test('ARC-09-C273 — Windows: Git Bash hands over C:\\ paths, and the place tha
   // cygpath is Git Bash's own; this one maps C:\… to a folder of the scratch world and does nothing else cygpath does.
   executable(join(w.bin, 'cygpath'), `#!/bin/sh\n[ "$1" = "-u" ] && shift\nprintf '%s\\n' "$1" | sed -e 's|\\\\|/|g' -e 's|^C:|${w.base}/c|'\n`);
   const stub = drawioAt(join(w.base, 'c', 'Users', 'Test User', 'AppData', 'Local', 'Programs', 'drawio', 'draw.io.exe'));
-  assert.deepEqual(lookup(w, { LOCALAPPDATA: 'C:\\Users\\Test User\\AppData\\Local' }), { code: 0, found: stub, stderr: '' });
+  const r = lookup(w, { LOCALAPPDATA: 'C:\\Users\\Test User\\AppData\\Local' });
+  assert.deepEqual([r.code, r.found, r.errors], [0, stub, []], r.stderr);
 });
 
 test('ARC-09-C273 — Windows: PATH wins over the places, as it does on the other platforms', { skip }, (t) => {
@@ -145,7 +156,8 @@ test('ARC-09-C273 — Windows: variables unset, empty or naming a folder with no
     const r = lookup(w, env(w));
     assert.equal(r.code, 3, `${name}: ${r.stderr}`);
     assert.equal(r.found, '', name);
-    assert.match(r.stderr, /^ERROR: draw\.io Desktop not found\. Without administrator rights/, name);
+    assert.equal(r.errors.length, 1, `${name}: ${r.stderr}`);
+    assert.match(r.errors[0], /^ERROR: draw\.io Desktop not found\. Without administrator rights/, name);
   };
   withNothing('unset', () => ({}));
   withNothing('empty', () => ({ LOCALAPPDATA: '', PROGRAMFILES: '' }));
@@ -166,7 +178,8 @@ function notFound(t, uname) {
   const r = lookup(w);
   assert.equal(r.code, 3, `${uname}: ${r.found}${r.stderr}`);
   assert.equal(r.found, '', uname);
-  return r.stderr;
+  assert.equal(r.errors.length, 1, `${uname}: ${r.stderr}`);
+  return `${r.errors[0]}\n`;
 }
 
 test('ARC-09-C273 — not found on Windows: the zip, the page it comes from and where to put it; no brew, no Linux packages', { skip: hostSkip }, (t) => {

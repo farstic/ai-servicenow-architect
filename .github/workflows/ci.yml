@@ -555,6 +555,8 @@ jobs:
               PROGRAMFILES) pf="$(cygpath -w "$folder")" ;;
               PATH) pa="$PATH:$folder" ;;
             esac
+            # The single quotes are for the inner bash, which expands $1 and $2 itself.
+            # shellcheck disable=SC2016
             asked="$(env "LOCALAPPDATA=$la" "PROGRAMFILES=$pf" "PATH=$pa" bash -c 'source "$1" "$2"; find_drawio; echo "$DRAWIO"' lookup scripts/render-drawio.sh "$w/empty")"
             echo "$1: the lookup says $asked"
             [ "${asked%.exe}" = "${dest%.exe}" ] || { echo "$1: expected $dest"; exit 1; }
