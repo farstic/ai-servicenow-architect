@@ -34,8 +34,10 @@ describe('ARC-09-C272 — storeLine on Windows', () => {
       .toBe('Saved to .local\\instances.json in this folder — readable only by you.');
     expect(storeLine(PROJECT, 'win32', PROJECT, { state: 'private' }))
       .toBe('Saved to .local\\instances.json in this folder — readable only by you.');
+    // Another store than this checkout's: the sentence takes a line and the path the next, whole. The permission phrase is in parentheses
+    // because the line ends in a colon, and `you:` is what the wizard's width rule (ARC-07-C41) reads as a field name with no value.
     expect(storeLine('C:\\Users\\someone\\AppData\\Roaming\\snowarch\\instances.json', 'win32', PROJECT, { state: 'created' }))
-      .toMatch(/^Saved to this file — readable only by you:\n/);
+      .toMatch(/^Saved to this file \(readable only by you\):\n/);
   });
 
   it('says what it changed when the file or its folder existed and was open, naming who could read it', () => {
@@ -68,6 +70,9 @@ describe('ARC-09-C272 — storeLine on Windows', () => {
   it('for a store the doctor\'s fixer may not touch, the failed note points to the line the doctor prints and not to --fix', () => {
     const out = storeLine('C:\\Users\\someone\\AppData\\Roaming\\snowarch\\instances.json', 'win32', PROJECT,
       { state: 'failed', reason: 'icacls exited 5: Access is denied.' }, {});
+    // No permission phrase to put in parentheses, so the sentence is the plain one. The wizard's width rule would flag this ending, and no
+    // wizard case produces it, so it is pinned here.
+    expect(lines(out)[0]).toBe('Saved to this file:');
     expect(flat(out)).toContain('The store is saved.');
     expect(flat(out)).toContain(' doctor gives a line to run by hand.');
     expect(flat(out)).not.toContain('--fix');

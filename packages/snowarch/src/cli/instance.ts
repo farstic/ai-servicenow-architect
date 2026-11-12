@@ -543,7 +543,12 @@ export const storeLine = (path: string, platform: NodeJS.Platform = process.plat
   // takes the next, whole. `--global` normally masks to `~/.config/snowarch/instances.json` and would
   // have fitted; the case used a real deep path instead of the short one, which is the only reason
   // this was found rather than shipped.
-  return `Saved to this file${modes ? ` — ${modes}` : ''}:\n${maskPath(path, { sepChar })}${tail}`;
+  // THE PLAIN "readable only by you" GOES IN PARENTHESES HERE, because this line ends in a colon and a colon after a letter is what the width rule
+  // (ARC-07-C41, on the wizard's own output) reads as a field name with no value. The POSIX line ends `(0600):` and passes for that reason alone;
+  // `you:` did not, on the first Windows run of C272. The line that carries no permission phrase (a lock that failed) stays `Saved to this file:`;
+  // the same rule would flag it, no wizard case produces it, so its text is pinned in store-line-acl.test.ts instead.
+  const lead = modes === 'readable only by you' ? `Saved to this file (${modes})` : `Saved to this file${modes ? ` — ${modes}` : ''}`;
+  return `${lead}:\n${maskPath(path, { sepChar })}${tail}`;
 };
 
 /**
