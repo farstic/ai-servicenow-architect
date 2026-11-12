@@ -425,9 +425,23 @@ test('nothing under lib/ opens ~/.claude.json, or anything else in the home dire
    * from the environment its caller hands in and asks `existsSync` about it, and the rule's other half holds for it as strictly as for the
    * detector: it never calls `homedir()`, never reads, lists, opens or writes anything, never mentions `.claude.json`, and `existsSync` is
    * the only file-system function in it.
+   *
+   * "The only file-system function" is checked from the IMPORTS, not only from the calls. A scan for `*Sync` names cannot see the async API
+   * (`import { stat } from 'node:fs/promises'`, or `readFile` from 'node:fs'), a namespace import reached as `fs.` or a dynamic `import()`
+   * or `require()`, and a later edit that added any of them would have passed it. So the module's imports from the file system are exactly
+   * `{ existsSync }`, it has no `fs/promises` import, no `fs.` member access, and no dynamic import or require; `fsImportsOf` is the reader
+   * of the first, and the control below proves it can see each shape the rule is about.
    */
   const NATIVE_INSTALL_FINDER = 'claude-install.mjs';
   assert.ok(files.some((f) => f.split('\\').join('/').endsWith(NATIVE_INSTALL_FINDER)), 'the finder is not among the scanned modules');
+  /** What each static import from `fs` or `node:fs` (or their `/promises`) brings in, as written, whitespace folded. */
+  const fsImportsOf = (src) => [...src.matchAll(/\bimport\b([^;]*?)\bfrom\s*['"](?:node:)?fs(\/promises)?['"]/g)]
+    .map((m) => `${m[1].replace(/\s+/g, ' ').trim()}${m[2] ?? ''}`);
+  assert.deepEqual(fsImportsOf("import { existsSync } from 'node:fs';\nimport { posix } from 'node:path';"), ['{ existsSync }']);
+  assert.deepEqual(fsImportsOf("import { existsSync, readFile } from 'node:fs';"), ['{ existsSync, readFile }'], 'the exactness would catch a second name');
+  assert.deepEqual(fsImportsOf("import { stat } from 'node:fs/promises';"), ['{ stat }/promises'], 'and the async API');
+  assert.deepEqual(fsImportsOf("import fs from 'fs';"), ['fs'], 'and a default import');
+  assert.deepEqual(fsImportsOf("import * as fs from 'node:fs';"), ['* as fs'], 'and a namespace import');
 
   for (const file of files) {
     const text = stripComments(readFileSync(file, 'utf8'));
@@ -436,6 +450,10 @@ test('nothing under lib/ opens ~/.claude.json, or anything else in the home dire
       assert.equal(/\bhomedir\b|\.claude\.json|readFileSync|readdirSync|opendirSync|createReadStream/.test(text), false,
         `${file} is the native-install finder and it reads more than the one file's existence`);
       assert.deepEqual([...new Set(text.match(/\b\w+Sync\b/g) ?? [])], ['existsSync'], `${file} uses a file-system call other than existsSync`);
+      assert.deepEqual(fsImportsOf(text), ['{ existsSync }'], `${file} imports something from the file system besides existsSync`);
+      assert.equal(/['"](?:node:)?fs\/promises['"]/.test(text), false, `${file} imports the async file-system API`);
+      assert.equal(/\bfs\./.test(text), false, `${file} reaches the file system as a member of a namespace`);
+      assert.equal(/\bimport\s*\(|\brequire\s*\(/.test(text), false, `${file} loads a module dynamically, which no import scan can see`);
       continue;
     }
     if (file.split('\\').join('/').endsWith(READ_ONLY_DETECTOR)) {
