@@ -417,9 +417,27 @@ test('nothing under lib/ opens ~/.claude.json, or anything else in the home dire
    * for the others: no write verb at all, anywhere in it.
    */
   const READ_ONLY_DETECTOR = 'doctor/checks/legacy.mjs';
+  /**
+   * ARC-09-C270 — the one other file that names a home variable, and what it may do with it.
+   *
+   * Claude Code's native installer puts the program at `%USERPROFILE%\.local\bin\claude.exe` or `~/.local/bin/claude`, and "installed, but PATH
+   * does not name its folder" can only be told from "not installed" by asking whether that one file is there. So this file builds that one path
+   * from the environment its caller hands in and asks `existsSync` about it, and the rule's other half holds for it as strictly as for the
+   * detector: it never calls `homedir()`, never reads, lists, opens or writes anything, never mentions `.claude.json`, and `existsSync` is
+   * the only file-system function in it.
+   */
+  const NATIVE_INSTALL_FINDER = 'claude-install.mjs';
+  assert.ok(files.some((f) => f.split('\\').join('/').endsWith(NATIVE_INSTALL_FINDER)), 'the finder is not among the scanned modules');
 
   for (const file of files) {
     const text = stripComments(readFileSync(file, 'utf8'));
+    if (file.split('\\').join('/').endsWith(NATIVE_INSTALL_FINDER)) {
+      assert.equal(WRITE_VERB.test(text), false, `${file} is the native-install finder and it writes something`);
+      assert.equal(/\bhomedir\b|\.claude\.json|readFileSync|readdirSync|opendirSync|createReadStream/.test(text), false,
+        `${file} is the native-install finder and it reads more than the one file's existence`);
+      assert.deepEqual([...new Set(text.match(/\b\w+Sync\b/g) ?? [])], ['existsSync'], `${file} uses a file-system call other than existsSync`);
+      continue;
+    }
     if (file.split('\\').join('/').endsWith(READ_ONLY_DETECTOR)) {
       assert.equal(WRITE_VERB.test(text), false,
         `${file} is the read-only detector and it writes something`);

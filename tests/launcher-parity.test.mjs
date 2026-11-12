@@ -168,13 +168,18 @@ test('the launcher is short — it is a launcher, not a second implementation', 
   // (DISK_FLOOR_BYTES, the same bytes as B00.mjs's DISK_SPARSE and bootstrap.ps1's $DiskFloorBytes, which tests/size-unit.test.mjs
   // reads in all three files), a name for the gigabyte it prints, two lines of comment saying so, and one `case` that keeps an
   // empty or non-numeric `df` answer a refusal, as the old `[ … ] 2>/dev/null` made it, now that the number is multiplied first.
-  assert.ok(lines - generated <= 214,
+  //
+  // Raised 214 → 220 (total 238 → 248) by ARC-09-C270. Six hand-written lines and four generated ones for a fact the launcher could not
+  // see: a Claude Code the native installer put in ~/.local/bin and PATH does not name was told to "install Claude Code", which the
+  // reader had just done. The hand-written lines are two of comment, the file's name (`.exe` on Git Bash), and the `if` that looks for
+  // it only when there is no `claude` on PATH at all; the generated ones are the fix for each of the three platforms and the sentence.
+  assert.ok(lines - generated <= 220,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
   // Raised 231 → 233 (total only; the hand-written count is unchanged) by ARC-09-C157: two GENERATED lines, the
   // folder slot MSG_ROOT_SLOT and the Next block's second line, because the line now names the folder `claude`
   // has to start in. The one hand-written line that prints it changed in place.
-  // Raised 233 → 238 by ARC-09-C259: the five hand-written lines above.
-  assert.ok(lines <= 238, `${lines} total lines`);
+  // Raised 233 → 238 by ARC-09-C259: the five hand-written lines above. Raised 238 → 248 by ARC-09-C270: its six and four.
+  assert.ok(lines <= 248, `${lines} total lines`);
 });
 
 test('the state and the cache bash writes are the ones Node reads', async () => {
@@ -426,7 +431,8 @@ test('a launcher that names a sentence the generator does not have is an error, 
   const dir = tempDir('launcher-gen-');
   try {
     mkdirSync(join(dir, 'tools/snowarch/lib'), { recursive: true });
-    for (const f of ['net-sentences.mjs', 'size.mjs', 'remedies.json', 'text.json']) {
+    // ARC-09-C270: claude-install.mjs is the generator's fifth input, the sentence for a Claude Code whose folder is not on PATH.
+    for (const f of ['net-sentences.mjs', 'size.mjs', 'remedies.json', 'text.json', 'claude-install.mjs']) {
       copyFileSync(join(root, 'tools/snowarch/lib', f), join(dir, 'tools/snowarch/lib', f));
     }
     copyFileSync(join(root, 'engine.config.json'), join(dir, 'engine.config.json'));
@@ -613,7 +619,10 @@ test('the Windows launcher is a launcher too — the budget, with the region rep
   // `rm -rf` takes one.
   // Raised 298 → 302 (total 322) by ARC-09-C259, for bootstrap.sh's 209 → 214 less the `case` PowerShell does not need: two lines of
   // comment, the floor as a named number of bytes and the gigabyte it prints, in place of 1073741824 written twice.
-  assert.ok(lines - generated <= 302,
+  // Raised 302 → 307 by ARC-09-C270, for bootstrap.sh's 214 → 220: two lines of comment, the one that names the file (`$env:USERPROFILE` may
+  // be unset, so the path is made only when it is), the `if` that looks for it only when there is no `claude` on PATH at all, and the
+  // line that used to be one `if` and is now two because the command it finds is kept for the second look.
+  assert.ok(lines - generated <= 307,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
 });
 

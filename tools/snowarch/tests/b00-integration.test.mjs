@@ -149,7 +149,9 @@ test('AC 6 — without --skip-claude-check on a runner that has none, B00 fails'
   const root = gitCheckout();
   const a = args(root, { 'skip-claude-check': undefined });
 
-  const code = await bootstrapCommand({ ...a, cwd: root, ...noNetwork });
+  // ARC-09-C270: HOME and USERPROFILE name the fixture, so a machine whose own ~/.local/bin holds a Claude Code that PATH does not name
+  // still takes the "not installed" branch this case is about; the installed-but-off-PATH words have their own cases (b00-checks).
+  const code = await bootstrapCommand({ ...a, cwd: root, ...noNetwork, env: { ...process.env, HOME: root, USERPROFILE: root } });
 
   // A machine that genuinely has Claude Code passes here, which is the correct outcome and not a
   // vacuous one — so the assertion is on the pair, not on the failure alone.
