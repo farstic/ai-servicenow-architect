@@ -271,6 +271,8 @@ jobs:
       # the folder is not on PATH, with the Windows fix, and must not say to install it. Then the same run with the file gone keeps the install
       # words. The launcher stops at the Claude check (exit 3) in both, before any step that writes. It runs WITHOUT --skip-claude-check: the
       # steps above skip the check, which is the one thing this step is about.
+      # `find`, not `findstr`: findstr reads a backslash in a /l search string as an escape (measured on this image, 2026-11-12: the line with
+      # `\.local\bin\claude.exe` was in the file and findstr /l /c:"…" did not find it; find, which is literal, did).
       - name: Claude Code installed but its folder not on PATH (Windows launcher)
         if: matrix.variant == 'no-node' && matrix.os == 'windows-latest'
         shell: cmd
@@ -285,17 +287,17 @@ jobs:
           set "CODE=%ERRORLEVEL%"
           type "%RUNNER_TEMP%\c270-off.txt"
           if not "%CODE%"=="3" exit /b 1
-          findstr /l /c:"FAIL B00: Claude Code is installed at %USERPROFILE%\.local\bin\claude.exe, but that folder is not on PATH" "%RUNNER_TEMP%\c270-off.txt" || exit /b 1
-          findstr /l /c:"Remedy: add that folder to your PATH with this PowerShell line" "%RUNNER_TEMP%\c270-off.txt" || exit /b 1
-          findstr /l /c:"[Environment]::SetEnvironmentVariable(" "%RUNNER_TEMP%\c270-off.txt" || exit /b 1
-          findstr /l /c:"install Claude Code" "%RUNNER_TEMP%\c270-off.txt" && exit /b 1
+          find "FAIL B00: Claude Code is installed at %USERPROFILE%\.local\bin\claude.exe, but that folder is not on PATH" "%RUNNER_TEMP%\c270-off.txt" >nul || exit /b 1
+          find "Remedy: add that folder to your PATH with this PowerShell line" "%RUNNER_TEMP%\c270-off.txt" >nul || exit /b 1
+          find "[Environment]::SetEnvironmentVariable(" "%RUNNER_TEMP%\c270-off.txt" >nul || exit /b 1
+          find "install Claude Code" "%RUNNER_TEMP%\c270-off.txt" >nul && exit /b 1
           del "%USERPROFILE%\.local\bin\claude.exe"
           call .\bootstrap.cmd --mode design --yes > "%RUNNER_TEMP%\c270-none.txt" 2>&1
           set "CODE=%ERRORLEVEL%"
           type "%RUNNER_TEMP%\c270-none.txt"
           if not "%CODE%"=="3" exit /b 1
-          findstr /l /c:"FAIL B00: Claude Code not found on PATH" "%RUNNER_TEMP%\c270-none.txt" || exit /b 1
-          findstr /l /c:"Remedy: install Claude Code from https://code.claude.com/docs/en/setup" "%RUNNER_TEMP%\c270-none.txt" || exit /b 1
+          find "FAIL B00: Claude Code not found on PATH" "%RUNNER_TEMP%\c270-none.txt" >nul || exit /b 1
+          find "Remedy: install Claude Code from https://code.claude.com/docs/en/setup" "%RUNNER_TEMP%\c270-none.txt" >nul || exit /b 1
           exit /b 0
 
       # ── no-gitbash ──────────────────────────────────────────────────────────────────────────
