@@ -105,11 +105,11 @@ and re-running resumes from that step rather than starting again.
 
 ### The licence
 
-From 2.0.13 the product checks for a licence from the author. Copy the file you were given to `.local/licence.json` in the checkout, under that name — a copy under its own name is not read — before or after the install, which runs without one, and restart Claude Code. From the checkout folder, with the file in Downloads (`LIC-2026-0002.json` stands for your file's name):
+From 2.0.13 the product checks for a licence from the author. Copy the file you were given to `.local/licence.json` in the checkout, under that name — a copy under its own name is not read — before or after the install, which runs without one, and restart Claude Code. From the checkout folder, with the file in Downloads (`LIC-2026-0000.json` stands for your file's name):
 
 ```
-cp ~/Downloads/LIC-2026-0002.json .local/licence.json                  # macOS or Linux
-Copy-Item "$HOME\Downloads\LIC-2026-0002.json" .local\licence.json     # Windows PowerShell
+cp ~/Downloads/LIC-2026-0000.json .local/licence.json                  # macOS or Linux
+Copy-Item "$HOME\Downloads\LIC-2026-0000.json" .local\licence.json     # Windows PowerShell
 ```
 
 `./snowarch licence check` shows its state, and names a licence it finds in `.local/` under another name with the command that renames it. Without a licence in force no tool runs, and no command but `licence`, `doctor`, `status`, `version`, `upgrade`, `bootstrap` and `mode design`.
