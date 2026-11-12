@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, posix, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DISK_FULL, DISK_SPARSE, checkClaudeCode, checkDisk, checkGit, checkNetwork, checkNode,
@@ -734,4 +734,122 @@ test('two spellings of one directory are one directory — the Windows half prov
 
   // And a path that does not exist still normalises rather than throwing.
   assert.equal(samePath('/no/such/path', '/no/such/path', 'linux'), true);
+});
+
+// ── ARC-09-C270 — Claude Code is installed, and its folder is not on PATH ──────────────────────────────────────────
+//
+// The owner's end-to-end install of v2.2.5 on Windows: the native installer put claude.exe in %USERPROFILE%\.local\bin and did not
+// add the folder to the user PATH, so `claude` was "not recognized", and every site that says "not found" said to install Claude
+// Code, which is what they had just done. Where the native installer puts the program is the installer's fact
+// (https://code.claude.com/docs/en/troubleshoot-install), so the paths are written out here and the product's finder is held to
+// them. No case runs a `claude`: the file system is a list of paths.
+
+/** The home variable each platform reads, the file the native installer makes there, and the folder that holds it. */
+const NATIVE = {
+  win32: { env: { USERPROFILE: 'C:\\Users\\someone' }, file: 'C:\\Users\\someone\\.local\\bin\\claude.exe', folder: 'C:\\Users\\someone\\.local\\bin' },
+  darwin: { env: { HOME: '/Users/someone' }, file: '/Users/someone/.local/bin/claude', folder: '/Users/someone/.local/bin' },
+  linux: { env: { HOME: '/home/someone' }, file: '/home/someone/.local/bin/claude', folder: '/home/someone/.local/bin' },
+};
+const TROUBLESHOOT = 'https://code.claude.com/docs/en/troubleshoot-install';
+/** The product's own exec: PATH holds nothing, and the file system is exactly `files`. */
+const withFiles = (plat, files) => makeExec({ env: NATIVE[plat].env, plat, resolve: () => null, exists: (p) => files.includes(p) });
+const offPathFix = (plat) => remedyFor('claudeCode', { platform: plat, variant: 'offPath' });
+
+test('ARC-09-C270 — the native install is looked for where the installer puts it, spelled the way the platform spells a path', () => {
+  for (const [plat, { file }] of Object.entries(NATIVE)) {
+    const exec = withFiles(plat, [file]);
+    assert.deepEqual(exec.nativeInstall('claude'), { path: file, plat }, plat);
+    assert.deepEqual(exec('claude', ['--version']), { found: false, ok: false, stdout: '', stderr: '' }, `${plat}: PATH holds nothing, so this is the not-on-PATH case`);
+    assert.equal(withFiles(plat, []).nativeInstall('claude'), null, `${plat}: no file, no install`);
+    assert.equal(exec.nativeInstall('git'), null, `${plat}: it is Claude Code's folder, not every tool's`);
+    assert.equal(makeExec({ env: {}, plat, resolve: () => null, exists: () => true }).nativeInstall('claude'), null,
+      `${plat}: with no home variable the product does not guess a home`);
+  }
+  // Each platform reads its own variable: the other's does not stand in for it.
+  const stray = (plat, env) => makeExec({ env, plat, resolve: () => null, exists: () => true }).nativeInstall('claude');
+  assert.equal(stray('win32', { HOME: '/home/someone' }), null);
+  assert.equal(stray('linux', { USERPROFILE: 'C:\\Users\\someone' }), null);
+});
+
+test('ARC-09-C270 — installed and not on PATH: the check says where it is and that its folder is not on PATH, offers that platform\'s fix, and never says to install it', () => {
+  for (const [plat, { file }] of Object.entries(NATIVE)) {
+    const real = withFiles(plat, [file]);
+    const asked = [];
+    const exec = Object.assign((name, args) => { asked.push(`${name} ${args.join(' ')}`); return real(name, args); }, { nativeInstall: real.nativeInstall });
+    const r = checkClaudeCode({ exec, floors: FLOORS, plat, skip: false });
+    assert.equal(r.status, 'fail', plat);
+    assert.equal(r.detail, `Claude Code is installed at ${file}, but that folder is not on PATH`, plat);
+    assert.equal(r.remedy, offPathFix(plat), plat);
+    assert.doesNotMatch(`${r.detail}\n${r.remedy}`, /install Claude Code|install it from|not found/i, `${plat}: it is installed, so nothing here may say to install it`);
+    assert.ok(r.remedy.includes(TROUBLESHOOT), `${plat}: the page the fix comes from is named`);
+    assert.deepEqual(asked, ['claude --version'], `${plat}: an empty PATH does not change between two looks`);
+    assert.deepEqual(r.data, { answered: false }, `${plat}: the words quote a path, so no version is read out of them`);
+    assert.equal(checkLine(r), `FAIL B00: ${r.detail}`, plat);
+  }
+});
+
+test('ARC-09-C270 — the fix is the troubleshoot page\'s, for the folder the finder looked in', () => {
+  // Windows: one PowerShell line that adds the folder to the USER path, so no administrator window is needed.
+  const win = offPathFix('win32');
+  assert.ok(win.includes('[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:USERPROFILE\\.local\\bin", "User")'), win);
+  assert.match(win, /new PowerShell window/, 'and a new window, because the open one keeps the PATH it started with');
+  // The folder that line adds is the folder the finder checks.
+  const added = /\$env:USERPROFILE(\\[^"]*)"/.exec(win)?.[1];
+  assert.equal(`${NATIVE.win32.env.USERPROFILE}${added}`, win32.dirname(NATIVE.win32.file));
+  // macOS and Linux: the line from the same page, for the shell that platform starts with, and the other shell's file named.
+  for (const [plat, rc, other] of [['darwin', '~/.zshrc', /bash.*~\/\.bash_profile/], ['linux', '~/.bashrc', /zsh.*~\/\.zshrc/]]) {
+    const text = offPathFix(plat);
+    assert.ok(text.includes(`echo 'export PATH="$HOME/.local/bin:$PATH"' >> ${rc}`), `${plat}: ${text}`);
+    assert.ok(text.includes(`source ${rc}`), `${plat}: the window the reader is in needs it too`);
+    assert.match(text, other, plat);
+    assert.ok(text.includes(TROUBLESHOOT), plat);
+    const folder = /\$HOME(\/[^:"]*)/.exec(text)?.[1];
+    assert.equal(`${NATIVE[plat].env.HOME}${folder}`, posix.dirname(NATIVE[plat].file), `${plat}: the folder the line adds is the folder the finder checks`);
+  }
+});
+
+test('ARC-09-C270 — nothing in the native folder keeps the install words, and a Claude Code that IS on PATH is not looked for there', () => {
+  for (const plat of Object.keys(NATIVE)) {
+    const r = checkClaudeCode({ exec: withFiles(plat, []), floors: FLOORS, plat, skip: false });
+    assert.equal(r.detail, 'Claude Code not found on PATH — install it from https://code.claude.com/docs/en/setup, then re-run', plat);
+    assert.equal(r.remedy, remedyFor('claudeCode', { platform: plat }), plat);
+  }
+  // On PATH, whether it answers, is silent, fails or says nothing readable, the folder is not what is wrong: the finder is not asked.
+  let looked = 0;
+  const finder = () => { looked += 1; return { path: NATIVE.darwin.file, plat: 'darwin' }; };
+  for (const exec of [execWith(GOOD), claudeSays([silentAt()], REST), claudeSays([exitedAt(1, 'broke')], REST), claudeSays([answeredAt('some build')], REST)]) {
+    const r = claudeCheck(Object.assign(exec, { nativeInstall: finder }));
+    assert.doesNotMatch(r.detail, /folder is not on PATH/);
+  }
+  assert.equal(looked, 0);
+});
+
+test('ARC-09-C270 — the second Claude Code remedy is data in the remedy file, one line per platform, and the check ids are still the seven', () => {
+  const cells = TABLE.claudeCode.offPath;
+  for (const plat of ['darwin', 'win32', 'linux', 'default']) {
+    assert.equal(typeof cells[plat], 'string', plat);
+    assert.ok(cells[plat].length > 0 && cells[plat].length < 400, `${plat}: ${cells[plat].length} characters`);
+    assert.doesNotMatch(cells[plat], /\{\w+\}|\n/, `${plat}: a placeholder nothing fills, or a second line`);
+  }
+  assert.deepEqual([...CHECK_IDS].sort(), ['claudeCode', 'disk', 'git', 'network', 'node', 'platform', 'root'], 'a variant is not a check');
+  assert.equal(remedyFor('claudeCode', { platform: 'freebsd', variant: 'offPath' }), cells.default, 'a platform with no row of its own gets the default');
+  assert.throws(() => remedyFor('git', { platform: 'darwin', variant: 'offPath' }), /no offPath remedy for check "git"/);
+});
+
+test('ARC-09-C270 — the recorded Claude Code version is none for an install that is not on PATH, and the other versions are still read', async () => {
+  const exec = Object.assign(claudeSays([NOT_ON_PATH], GOOD), { nativeInstall: () => ({ path: NATIVE.darwin.file, plat: 'darwin' }) });
+  const lines = [];
+  const r = await runB00({
+    root: '/repo', cwd: '/repo', config: { floors: FLOORS }, docs: 'sparse', mode: 'design-only',
+    env: {}, plat: 'darwin', line: (l) => lines.push(l), exec,
+    locate: (n) => `/usr/bin/${n}`,
+    statfs: () => ({ bavail: 1e9, bsize: 4096 }),
+    probe: async () => ({ ok: true, status: 200, proxy: null }),
+  });
+  assert.equal(r.status, 'fail');
+  assert.equal(r.data.checks.claudeCode, 'fail');
+  assert.equal(r.data.claudeCode, null, 'a version the tool did not state is not recorded');
+  assert.equal(r.data.git, '2.39.5');
+  assert.ok(lines.includes(`FAIL B00: Claude Code is installed at ${NATIVE.darwin.file}, but that folder is not on PATH`), lines.join('\n'));
+  assert.ok(lines.includes(`Remedy: ${offPathFix('darwin')}`), lines.join('\n'));
 });

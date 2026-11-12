@@ -55,6 +55,13 @@ test('every embedded sentence equals the file it was generated from', async () =
   assert.equal(shellVar('MSG_GIT_DARWIN'), remedies.git.darwin);
   assert.equal(shellVar('MSG_GIT_LINUX'), remedies.git.linux);
   assert.equal(shellVar('MSG_CLAUDE'), remedies.claudeCode.default);
+  // ARC-09-C270 — a Claude Code that is installed and whose folder is not on PATH: the fix for each platform bash can name, and
+  // the sentence that says where it is, with the path as a slot (`printf` takes `%s`).
+  const claudeInstall = await import(pathToFileURL(join(root, 'tools/snowarch/lib/claude-install.mjs')).href);
+  assert.equal(shellVar('MSG_CLAUDE_PATH_DARWIN'), remedies.claudeCode.offPath.darwin);
+  assert.equal(shellVar('MSG_CLAUDE_PATH_LINUX'), remedies.claudeCode.offPath.linux);
+  assert.equal(shellVar('MSG_CLAUDE_PATH_WIN'), remedies.claudeCode.offPath.win32);
+  assert.equal(shellVar('MSG_CLAUDE_PATH_FMT'), claudeInstall.offPathSentence('%s'));
   assert.equal(shellVar('MSG_NET'), remedies.network.default);
   // ARC-03's network vocabulary, not a second phrasing of it. ARC-09-C29: the host is a SLOT, so
   // the launcher fills in whichever corpus remote is configured — `printf` takes `%s`.
@@ -198,6 +205,10 @@ test('the Windows launcher carries the same sentences, in PowerShell syntax', as
   assert.equal(psVar('MSG_NODE_WIN'), remedies.node.win32);
   assert.equal(psVar('MSG_GIT_WIN'), remedies.git.win32);
   assert.equal(psVar('MSG_CLAUDE'), remedies.claudeCode.default);
+  // ARC-09-C270 — the Windows fix for an installed Claude Code whose folder is not on PATH, and the sentence with the path as a slot.
+  const claudeInstall = await import(pathToFileURL(join(root, 'tools/snowarch/lib/claude-install.mjs')).href);
+  assert.equal(psVar('MSG_CLAUDE_PATH_WIN'), remedies.claudeCode.offPath.win32);
+  assert.equal(psVar('MSG_CLAUDE_PATH_FMT'), claudeInstall.offPathSentence('{0}'));
   assert.equal(psVar('MSG_NET'), remedies.network.default);
   // PowerShell's `-f` takes `{0}` where printf takes `%s`: one sentence, two placeholder spellings.
   assert.equal(psVar('MSG_DNS_FMT'), sentences.dnsFailure('{0}'));
@@ -334,6 +345,58 @@ test('Git Bash gets the Windows remedies, and the region followed it back', () =
   const arms = launcher.match(/^\s*(darwin|win32|\*)\)\s+NODE_REMEDY="\$(\w+)" ; GIT_REMEDY="\$(\w+)"/gm) ?? [];
   assert.equal(arms.length, 3, `expected three platform arms, found ${arms.length}`);
   assert.equal(new Set(arms.map((a) => a.split('NODE_REMEDY=')[1])).size, 3);
+  // ARC-09-C270 — and the same three arms pick the Claude Code PATH fix, one each.
+  const claudeArms = launcher.match(/^\s*(?:darwin|win32|\*)\)[^\n]*CLAUDE_PATH_REMEDY="\$(MSG_CLAUDE_PATH_\w+)"/gm) ?? [];
+  assert.deepEqual(claudeArms.map((a) => a.match(/\$(MSG_CLAUDE_PATH_\w+)"/)[1]),
+    ['MSG_CLAUDE_PATH_DARWIN', 'MSG_CLAUDE_PATH_WIN', 'MSG_CLAUDE_PATH_LINUX']);
+});
+
+test('ARC-09-C270 — bootstrap.sh tells a Claude Code that is installed and not on PATH from one that is not there, and leaves one that is on PATH alone', {
+  // bootstrap.sh is the POSIX launcher; the .ps1 twin is proved by the Windows step in ci.yml, which runs the real file.
+  skip: process.platform === 'win32' ? 'POSIX launcher; the .ps1 is proved in CI' : false,
+}, () => {
+  const dir = tempDir('launcher-c270-');
+  const bin = join(dir, 'bin');
+  const home = join(dir, 'home');
+  const nativeFolder = join(home, '.local', 'bin');
+  const run = (path) => spawnSync('bash', [join(dir, 'bootstrap.sh'), '--mode', 'design', '--yes', '--docs', 'skip'],
+    { cwd: dir, encoding: 'utf8', env: { PATH: path, HOME: home, TERM: 'dumb' } });
+  const bare = `${bin}:/usr/bin:/bin`;
+  try {
+    mkdirSync(join(dir, 'tools/snowarch/launcher'), { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    mkdirSync(home, { recursive: true });
+    for (const f of ['bootstrap.sh', 'engine.config.json']) copyFileSync(join(root, f), join(dir, f));
+    copyFileSync(join(root, 'tools/snowarch/launcher/docs-recipe.sh'), join(dir, 'tools/snowarch/launcher/docs-recipe.sh'));
+    writeFileSync(join(bin, 'git'), '#!/bin/sh\necho "git version 2.44.0"\n', { mode: 0o755 });
+    // What both halves rest on: with this PATH there is no claude, and no node to hand the run over to.
+    for (const tool of ['claude', 'node']) {
+      assert.notEqual(spawnSync('sh', ['-c', `command -v ${tool}`], { env: { PATH: bare } }).status, 0, `a ${tool} on this PATH makes the case measure nothing`);
+    }
+    const plat = process.platform === 'darwin' ? 'darwin' : 'linux';
+
+    // Nothing in ~/.local/bin: the words the launcher has always had.
+    const none = run(bare);
+    assert.equal(none.status, 3, none.stdout + none.stderr);
+    assert.match(none.stdout, /^FAIL B00: Claude Code not found on PATH$/m);
+    assert.ok(none.stdout.includes(`Remedy: ${remedies.claudeCode.default}`), none.stdout);
+
+    // The native install is there and its folder is not on PATH.
+    mkdirSync(nativeFolder, { recursive: true });
+    writeFileSync(join(nativeFolder, 'claude'), '#!/bin/sh\necho "2.1.300 (Claude Code)"\n', { mode: 0o755 });
+    const off = run(bare);
+    assert.equal(off.status, 3, off.stdout + off.stderr);
+    assert.ok(off.stdout.includes(`FAIL B00: Claude Code is installed at ${join(nativeFolder, 'claude')}, but that folder is not on PATH`), off.stdout);
+    assert.ok(off.stdout.includes(`Remedy: ${remedies.claudeCode.offPath[plat]}`), off.stdout);
+    assert.doesNotMatch(off.stdout, /install Claude Code|not found on PATH/);
+
+    // With the folder on PATH it is Claude Code, and the launcher reads its version as it always did.
+    const on = run(`${nativeFolder}:${bare}`);
+    assert.match(on.stdout, /^ok B00 claudeCode: 2\.1\.300$/m, on.stdout + on.stderr);
+    assert.doesNotMatch(on.stdout, /folder is not on PATH/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('each launcher declares the sentences it uses, and only those', () => {

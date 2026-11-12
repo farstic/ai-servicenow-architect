@@ -11,6 +11,7 @@ import { CLAUDE_ABSENT, CREATED_BY_US, SHIM_UNRESOLVED, flagsChanged, get, isShi
   register, shimTarget, spawnClaude,
   unregister } from '../lib/registration-claude.mjs';
 import { EXIT_OK } from '../lib/exit.mjs';
+import { remedyFor } from '../lib/remedies.mjs';
 import { emptyState, loadState, saveState } from '../lib/state.mjs';
 import { tempDir } from './helpers/temp.mjs';
 import { makeCheckout, recorder } from './helpers/workspace.mjs';
@@ -222,6 +223,23 @@ test('no claude on PATH is a named prerequisite, not a stack trace', async () =>
     log, env: {}, cwd: root, claudePath: null });
   assert.notEqual(code, EXIT_OK);
   assert.equal(log.lines.join('\n').includes(CLAUDE_ABSENT), true);
+});
+
+test('ARC-09-C270 — --register with no claude on PATH says so when Claude Code is installed and only its folder is not on PATH', () => {
+  // The same fact B00 and the upgrade's floor line report: the native installer puts the program in ~/.local/bin and leaves PATH alone,
+  // and "install it, then re-run" sends a reader who has just installed it round again. The file system here is one path.
+  const home = '/Users/someone';
+  const file = `${home}/.local/bin/claude`;
+  const attempt = (exists) => register({ root: '/r', serverKey: 'servicenow', scope: 'local', entry: { type: 'stdio' },
+    claudePath: null, env: { HOME: home }, plat: 'darwin', exists });
+
+  const off = attempt((p) => p === file);
+  assert.equal(off.ok, false);
+  assert.equal(off.reason, `Claude Code is installed at ${file}, but that folder is not on PATH — ${remedyFor('claudeCode', { platform: 'darwin', variant: 'offPath' })}`);
+  assert.doesNotMatch(off.reason, /install it from|not on PATH — --register/);
+
+  // Nothing in the native folder: the words it has always had.
+  assert.equal(attempt(() => false).reason, CLAUDE_ABSENT);
 });
 
 test('a renamed flag is reported as a renamed flag, with the CLI version', () => {
