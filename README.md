@@ -73,7 +73,7 @@ Five preflight checks print a line each on every path — git, Claude Code, disk
 ```
 [B00/09] preflight … ok (0.7 s)
 Installing the AI ServiceNow Architect into this folder only — nothing else on the machine changes.
-Two choices below, then it runs on its own (about a minute; live adds a short wizard).
+Two choices below, then it runs on its own (a few minutes; live adds a short wizard).
 Plan — Enter runs it as shown · type a number to choose that line's value · "?" explains · q quits
   1  Mode   design-only          live needs a ServiceNow instance (wizard runs in this terminal); Node 24.16.0 found
   2  Docs   full                 full = whole corpus · skip = none (the doctor will report FAIL)
