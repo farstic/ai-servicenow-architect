@@ -30,3 +30,21 @@ export async function resolve(specifier, context, nextResolve) {
   }
   return resolved;
 }
+
+/**
+ * The same rule through `module.registerHooks()` (ARC-09-C271).
+ *
+ * Node 26 deprecates `module.register()` (DEP0205) and prints a warning on stderr at the call, in every process the hook is loaded into;
+ * seven cases that read a child's stderr or its JSON failed on it on the first run of this suite under Node 26. `registerHooks` runs its hooks
+ * in the same thread and synchronously, exists from Node 22.15 and 23.5, and prints nothing, so the helper uses it where it is there and keeps
+ * `register()` for Node 20 and earlier 22s. The rule is one: resolve the two keys modules to the fixture module and nothing else.
+ */
+export function install(registerHooks, fixtureKeysUrl) {
+  registerHooks({
+    resolve(specifier, context, nextResolve) {
+      const resolved = nextResolve(specifier, context);
+      if (KEYS_MODULES.some((re) => re.test(resolved.url))) return { url: fixtureKeysUrl, format: 'module', shortCircuit: true };
+      return resolved;
+    },
+  });
+}

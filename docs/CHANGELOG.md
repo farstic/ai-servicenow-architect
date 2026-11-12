@@ -84,7 +84,11 @@ commands and states.
   the 5.1 that every Windows has, and not `pwsh` (ARC-09-C271).
 - Node.js 26 is tested on Linux and Windows: `test` on ubuntu-latest and windows-latest, the Windows `bootstrap` cell and `windows-native`, four
   more checks (59 to 63), so the README can say that 20, 22 and 24 are tested on Linux, macOS and Windows and 26 on Linux and Windows. The
-  generator of the required contexts read an unquoted matrix value as empty; it reads all three forms now (ARC-09-C271).
+  generator of the required contexts read an unquoted matrix value as empty; it reads all three forms now. The first run of the suite under
+  Node 26 found one thing: the test-only licence hook was installed through `module.register()`, which Node 26 deprecates with a warning on
+  stderr in every process the hook is loaded into, and seven cases that read a child's stderr or its JSON failed on it. It installs through
+  `registerHooks` where Node has it (22.15 and later) and keeps `register()` for Node 20; nothing shipped is affected, and the guard that keeps
+  shipped code away from `register` holds it away from `registerHooks` too (ARC-09-C271).
 
 ## 2.2.5 — 2026-11-02
 

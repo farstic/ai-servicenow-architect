@@ -42,7 +42,8 @@
  * - one list per side: no other file declares PRODUCT_KEYS, imports it from anywhere but a keys module, or
  *   carries public-key armour;
  * - no shipped file names `NODE_OPTIONS`: it is the test hook's channel, and nothing shipped reads it;
- * - no shipped file reaches node:module's `register`, the API the test hook is installed through.
+ * - no shipped file reaches node:module's `register` or `registerHooks`, the two APIs the test hook is installed through (the second
+ *   since ARC-09-C271: Node 26 deprecates the first, and the hook uses the second where Node has it).
  *
  * `read` and `files` are parameters, so a planted source is fed to the same reader the repository is.
  */
@@ -60,6 +61,8 @@ export const DECLARED_MIN = 20;
 
 const CRYPTO = new Set(['node:crypto', 'crypto']);
 const MODULE = new Set(['node:module', 'module']);
+/** The two ways a module hook is installed: a file the loader thread runs, and a pair of functions run in this thread. */
+const HOOK_APIS = new Set(['register', 'registerHooks']);
 const CODE = /\.(mjs|js|cjs)$/;
 const LIST_METHODS = new Set(['map', 'filter', 'find', 'slice']);
 
@@ -514,7 +517,8 @@ export async function scanKeySources({ base, files, read = (rel) => readFileSync
         if (c.namedBindings && ts.isNamespaceImport(c.namedBindings)) moduleNs.add(c.namedBindings.name.text);
         if (c.namedBindings && ts.isNamedImports(c.namedBindings)) {
           for (const el of c.namedBindings.elements) {
-            if ((el.propertyName ?? el.name).text === 'register') flag(el, 'register', 'imports node:module\'s register');
+            const api = (el.propertyName ?? el.name).text;
+            if (HOOK_APIS.has(api)) flag(el, 'register', `imports node:module's ${api}`);
           }
         }
       }
@@ -525,11 +529,11 @@ export async function scanKeySources({ base, files, read = (rel) => readFileSync
 
     const visit = (n) => {
       // node:module's register, through a namespace, a dynamic import or a require.
-      if (ts.isPropertyAccessExpression(n) && n.name.text === 'register') {
+      if (ts.isPropertyAccessExpression(n) && HOOK_APIS.has(n.name.text)) {
         const on = n.expression;
         const loaded = ts.isCallExpression(on) && on.arguments[0] && ts.isStringLiteral(on.arguments[0])
           && MODULE.has(on.arguments[0].text);
-        if ((ts.isIdentifier(on) && moduleNs.has(on.text)) || loaded) flag(n, 'register', 'reaches node:module\'s register');
+        if ((ts.isIdentifier(on) && moduleNs.has(on.text)) || loaded) flag(n, 'register', `reaches node:module's ${n.name.text}`);
       }
       // A function with a positional keys parameter is only ever called directly, so every caller is held.
       if (ts.isIdentifier(n) && positionalNames.has(n.text) && !isCallee(n) && !isDeclarationName(n)) {

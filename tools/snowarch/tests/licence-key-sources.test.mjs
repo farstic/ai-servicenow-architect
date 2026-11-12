@@ -125,6 +125,9 @@ const CASES = [
   ['a shipped module names NODE_OPTIONS', 'node-options', use('export const a = () => process.env.NODE_OPTIONS;')],
   ['a shipped module imports node:module\'s register', 'register', use('export const a = () => register;', "import { register } from 'node:module';\n")],
   ['a shipped module reaches register through a namespace', 'register', use("export const a = () => m.register('x');", "import * as m from 'node:module';\n")],
+  // ARC-09-C271: the test hook installs through registerHooks where Node has it, so the shipped tree is held away from that one too.
+  ['a shipped module imports node:module\'s registerHooks', 'register', use('export const a = () => registerHooks;', "import { registerHooks } from 'node:module';\n")],
+  ['a shipped module reaches registerHooks through a namespace', 'register', use("export const a = () => m.registerHooks({});", "import * as m from 'node:module';\n")],
   // The declaration.
   ['a declaration that gives no reason', 'slot', use(
     '// owner key from path: x\nexport const a = (r) => licenceStatus(r, { keys: process.env.K });')],
