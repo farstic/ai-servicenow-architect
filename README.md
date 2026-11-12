@@ -255,6 +255,7 @@ Every preflight failure prints its own remedy. These are those sentences:
 .\bootstrap.cmd` |
 | git is missing or too old | `xcode-select --install (or: brew install git)` | `winget install Git.Git` |
 | Claude Code is missing or too old | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` |
+| Claude Code is installed, but its folder is not on PATH | `add ~/.local/bin to your PATH with this line, then re-run (bash on macOS: ~/.bash_profile instead; https://code.claude.com/docs/en/troubleshoot-install): echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc` | `add that folder to your PATH with this PowerShell line, then open a new PowerShell window and re-run (https://code.claude.com/docs/en/troubleshoot-install): [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:USERPROFILE\.local\bin", "User")` |
 | Not enough disk space | `free up {needed} on {mount}` | `free up {needed} on {mount}` |
 | github.com is unreachable | `check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run` | `check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run` |
 | Node.js is missing or too old (live mode only) | `brew install node@22` | `winget install OpenJS.NodeJS.LTS` |

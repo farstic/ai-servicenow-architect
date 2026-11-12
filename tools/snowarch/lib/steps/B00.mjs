@@ -21,6 +21,7 @@ import { existsSync, statfsSync } from 'node:fs';
 import { arch, platform, release } from 'node:os';
 import { join, resolve } from 'node:path';
 import { EXIT_PREREQ } from '../exit.mjs';
+import { findNativeClaude, offPathSentence } from '../claude-install.mjs';
 import { pathKey } from '../path-key.mjs';
 import { remedyFor } from '../remedies.mjs';
 import { formatVersion, meetsFloor, parseVersion } from '../versions.mjs';
@@ -64,6 +65,10 @@ export const PROBE_TIMEOUT_MS = 10_000;
  * ARC-09-C269 — a tool that is on PATH and does not answer says WHY: `timedOut` (killed at the budget, Node's code for it and no
  * status), `status` (the exit status, when it exited), `signal`, and `code` (what Node said when the file could not be started).
  * `found && !ok` alone made a Claude Code that overran the budget read as one that is not installed.
+ *
+ * ARC-09-C270 — and the function carries `nativeInstall(name)`: where Claude Code's native installer would have put it (its own folder,
+ * which PATH may not name), when the file is there. A caller whose tool was not found asks it before it says to install the tool. It
+ * answers from THIS exec's `env`, `plat` and `exists`, so a test that hands in its own exec gets no answer and keeps the old words.
  */
 export function makeExec({ env = process.env, plat = process.platform,
   // The two seams, with the real implementations as defaults. `plat` alone is not enough to test
@@ -71,8 +76,10 @@ export function makeExec({ env = process.env, plat = process.platform,
   // neither exists on the machines this suite mostly runs on.
   resolve: resolveBin = which, exec: run = execFileSync,
   // A third, for the one test that needs a real child to outlive the budget. The product never passes it.
-  timeoutMs = PROBE_TIMEOUT_MS } = {}) {
-  return (name, args) => {
+  timeoutMs = PROBE_TIMEOUT_MS,
+  // And the file system, for the native install's file (ARC-09-C270).
+  exists: fileExists = existsSync } = {}) {
+  const exec = (name, args) => {
     const bin = resolveBin(name, { env, platform: plat });
     if (!bin) return { found: false, ok: false, stdout: '', stderr: '' };
     try {
@@ -104,6 +111,8 @@ export function makeExec({ env = process.env, plat = process.platform,
         code: e.code ?? null };
     }
   };
+  exec.nativeInstall = (name) => (name === 'claude' ? findNativeClaude({ env, plat, exists: fileExists }) : null);
+  return exec;
 }
 
 const ok = (id2, detail, extra = {}) => ({ id: id2, status: 'ok', detail, ...extra });
@@ -176,13 +185,23 @@ function firstLine(text) {
  * answer the words say what happened and never say to install it. Not on PATH keeps its words and is not asked twice: an empty PATH
  * does not change between two looks. The price is at most one more budget (10 s) for a Claude Code that hangs outright.
  *
- * `kind` is `absent`, `answered` (the output is the caller's to judge), or `unanswered`, which has the clause every caller quotes
- * (`said`) and the one remedy (`remedy`). Whether the floor is met stays with the callers, and so does what each does about it.
+ * ARC-09-C270 — and "not on PATH" is itself two cases. When the native installer's file is there (`exec.nativeInstall`), Claude Code IS
+ * installed and only its folder is missing from PATH, which the installer does not always add; that is `offPath`, with the sentence every
+ * caller quotes (`cause`: where it is and that its folder is not on PATH) and the platform's fix (`remedy`), and it never says to install.
+ * Only when that file is not there either is it `absent`, with the words it has always had.
+ *
+ * `kind` is `absent`, `offPath`, `answered` (the output is the caller's to judge), or `unanswered`, which has the clause every caller
+ * quotes (`said`) and the one remedy (`remedy`). Whether the floor is met stays with the callers, and so does what each does about it.
  */
 export function probeClaude(exec) {
   let r = exec('claude', ['--version']);
   if (r.found && !r.ok) r = exec('claude', ['--version']);
-  if (!r.found) return { r, kind: 'absent' };
+  if (!r.found) {
+    const native = exec.nativeInstall?.('claude') ?? null;
+    if (!native) return { r, kind: 'absent' };
+    return { r, kind: 'offPath', path: native.path, cause: offPathSentence(native.path),
+      remedy: remedyFor('claudeCode', { platform: native.plat, variant: 'offPath' }) };
+  }
   if (r.ok) return { r, kind: 'answered' };
   const line = firstLine(r.stderr);
   const where = `found at ${r.bin ?? 'claude'}, but \`claude --version\``;
@@ -214,6 +233,11 @@ export function checkClaudeCode({ exec, floors, plat, skip }) {
     return fail('claudeCode',
       `Claude Code not found on PATH — install it from https://code.claude.com/docs/en/setup, `
       + 'then re-run', remedy);
+  }
+  // ARC-09-C270 — installed, and its folder is not on PATH: a failure (nothing can be asked of it), but one that says where it is and
+  // what to add to PATH. `answered: false` keeps `run` from reading a version out of the path the words quote.
+  if (probe.kind === 'offPath') {
+    return fail('claudeCode', probe.cause, probe.remedy, { data: { answered: false } });
   }
   // Found and silent: still a failure (a preflight that cannot read the version cannot judge the floor), but a failure that says what
   // happened. `answered: false` keeps `run` from reading a version out of the path or the stderr line the words quote.

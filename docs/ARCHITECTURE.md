@@ -582,7 +582,7 @@ every one of those and proves the grep is not vacuous.
 
 **Nothing is written twice.** The recipe is *sourced* from `tools/snowarch/launcher/docs-recipe.sh`;
 the sentences — remedies, the network vocabulary, the closing block — are generated into a marked
-region from `remedies.json`, `net-sentences.mjs` and `text.json`. `tests/launcher-parity.test.mjs`
+region from `remedies.json`, `net-sentences.mjs`, `claude-install.mjs` and `text.json`. `tests/launcher-parity.test.mjs`
 compares every one against its source, because this is the file that runs on machines with no Node
 to check it, and a drifted copy there would go unnoticed for a release.
 

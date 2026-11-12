@@ -724,6 +724,13 @@ is there and silent and returns the clause every caller quotes. A new probe of a
 same way and takes a test for each, through the `resolve` and `exec` seams and never a real tool. The path in the words comes from the
 `which()` the product resolved with, so an expectation takes it from there and carries no POSIX literal.
 
+"Not on PATH" is itself two facts (ARC-09-C270): Claude Code is not installed, or its native installer put it in `~/.local/bin` (`%USERPROFILE%\.local\bin`
+on Windows) and PATH does not name that folder, which the installer does not always add. A sentence for the second says where it is and what to add to
+PATH, and never says to install it, since the reader has just done that. `probeClaude` returns it as `offPath` from `exec.nativeInstall`, so a new site
+that reports "not found" asks through `probeClaude` and never tests `found` itself; the words and the fix for each platform are data in `remedies.json`
+(`claudeCode.offPath`) and are generated into both launchers. A test hands in its own `exec` or its own `exists`, so no case depends on what the machine
+it runs on has in `~/.local/bin`.
+
 ### A private folder is made by makePrivateDir
 
 A folder the product keeps private — `.local/`, its logs, the licence state, the doctor's cache, the store's own folder — is made with
@@ -1340,7 +1347,7 @@ a silent behaviour change — which is exactly what a line budget invites.
 ## Never edit the generated region of `bootstrap.sh`
 
 Everything between `# text-begin` and `# text-end` comes from `scripts/gen-launcher-text.mjs`, which
-reads `remedies.json`, `net-sentences.mjs` and `text.json`. Edit the source and run the generator;
+reads `remedies.json`, `net-sentences.mjs`, `claude-install.mjs` and `text.json`. Edit the source and run the generator;
 `npm run gen:check` fails otherwise, and `tests/launcher-parity.test.mjs` compares every sentence
 against its origin. The recipe is *sourced* from `tools/snowarch/launcher/docs-recipe.sh` — never
 pasted in.

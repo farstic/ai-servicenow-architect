@@ -860,6 +860,12 @@ export function floorCheck(tagInfo, { exec }) {
     return { line: `claude-floor ${want} (installed: not found — install Claude Code, or pass `
       + '--force-floor)', below: true, unknown: true };
   }
+  // ARC-09-C270 — installed, and its folder is not on PATH: below as well (B00 refuses it), and the words say where it is and what to
+  // add to PATH, never to install it. The fix is the last thing on the line, because it ends in a command that is copied from there.
+  if (probe.kind === 'offPath') {
+    return { line: `claude-floor ${want} (${probe.cause} — pass --force-floor to go on without the check, or ${probe.remedy})`,
+      below: true, unknown: true, offPath: true, cause: probe.cause, remedy: probe.remedy };
+  }
   // ARC-09-C269 — found and silent is below as well (the target's B00 refuses it), but it is installed: the words say what the
   // call did, and the remedy is to look at it, never to install it.
   if (probe.kind === 'unanswered') {
@@ -883,6 +889,11 @@ export function floorCheck(tagInfo, { exec }) {
  * Claude Code that is on PATH and did not answer (`floor.said`, from `floorCheck`) is named with where it was found and what it did.
  */
 export function floorRefusal(floor, { target, want }) {
+  // ARC-09-C270 — installed, folder not on PATH: where it is, then what to do, and the fix last (it ends in a command).
+  if (floor.offPath) {
+    return `upgrade: ${floor.cause}, and ${target} wants ${want} or later; nothing was changed. `
+      + `Pass --force-floor to go on without the check, or ${floor.remedy}`;
+  }
   if (floor.said) {
     return `upgrade: Claude Code ${floor.said}, and ${target} wants ${want} or later — ${floor.remedy}, `
       + 'or pass --force-floor; nothing was changed';
