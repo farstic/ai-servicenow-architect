@@ -296,6 +296,39 @@ test('ARC-09-C271 — what a reader is told about Node.js is what CI runs', () =
   }
 });
 
+test('ARC-09-C271 — each program the page downloads is one version: in the download, on PATH, on the check screen and in the record', () => {
+  // The first version of the page downloaded Node.js 22.23.5 and recorded an end-to-end run on 26.13.0 (the architect's review of #578): the Node.js a
+  // reader installed was not the one that had been run. The record (the closing paragraph) is what the run used, so each download the page pins must
+  // name the same version, and Node.js must name it in the places a reader meets it: the URL, the folder step 2b puts on PATH, and the check in 2e.
+  const record = page.split('\n').find((l) => l.startsWith('Tested end to end on ')) ?? '';
+  assert.ok(record, 'the page lost its record of the end-to-end run');
+  const one = (re, what) => {
+    const found = commands.filter((c) => re.test(c.line));
+    assert.equal(found.length, 1, `${what}: expected one command, found ${found.length}`);
+    return found[0].line;
+  };
+  // Node.js: `…/dist/v<V>/node-v<V>-win-x64.zip`, unpacked into Programs (the zip's top folder is named for the file), that folder added to PATH.
+  const download = one(/nodejs\.org\/dist\//, 'the Node.js download');
+  const n = /nodejs\.org\/dist\/v(\d+\.\d+\.\d+)\/node-v(\d+\.\d+\.\d+)-win-x64\.zip /.exec(download);
+  assert.ok(n && n[1] === n[2], `the Node.js download is not one versioned win-x64 zip: ${download}`);
+  const node = n[1];
+  const onPath = one(/^\[Environment\]::SetEnvironmentVariable\("Path", .*\\Programs\\node-v/, 'the Node.js folder on PATH');
+  assert.ok(onPath.includes(`\\Programs\\node-v${node}-win-x64;`), `the folder on PATH is not the one the download unpacks (node-v${node}-win-x64): ${onPath}`);
+  assert.ok(screens.some((b) => b.lines.includes(`v${node}`)), `the check in 2e does not show v${node}`);
+  assert.ok(record.includes(`Node.js ${node} `), `the record of the run does not name Node.js ${node}`);
+  // The size beside the download was measured on that version's zip (nodejs.org/dist, 2026-11-12: 41,157,375 bytes); a new version is measured again.
+  const MEASURED_MB = { '26.13.0': 41 };
+  assert.ok(node in MEASURED_MB, `measure node-v${node}-win-x64.zip (nodejs.org/dist/v${node}/) and add its size here`);
+  assert.match(page, new RegExp(`This is the zip version \\(${MEASURED_MB[node]} MB\\)`));
+  // Git and draw.io: the version in the download is the version in the record.
+  const git = /releases\/download\/v(\d+\.\d+\.\d+)\.windows\.1\/Git-(\d+\.\d+\.\d+)-64-bit\.exe/.exec(one(/git-for-windows\/git\/releases\/download\//, 'the Git download'));
+  assert.ok(git && git[1] === git[2], 'the Git download is not one versioned installer');
+  assert.ok(record.includes(`Git ${git[1]} `), `the record does not name Git ${git[1]}`);
+  const drawio = /drawio-desktop\/releases\/download\/v(\d+\.\d+\.\d+)\/draw\.io-(\d+\.\d+\.\d+)-windows\.zip/.exec(one(/jgraph\/drawio-desktop\/releases\/download\//, 'the draw.io download'));
+  assert.ok(drawio && drawio[1] === drawio[2], 'the draw.io download is not one versioned zip');
+  assert.ok(record.includes(`draw.io ${drawio[1]} `), `the record does not name draw.io ${drawio[1]}`);
+});
+
 test('ARC-09-C271 — the page is linked from where a Windows reader starts, and carries a release tag the release writes', () => {
   assert.match(read('README.md'), /\]\(docs\/INSTALL-WINDOWS\.md\)/);
   assert.match(read('docs/INSTALL.md'), /\]\(INSTALL-WINDOWS\.md\)/);

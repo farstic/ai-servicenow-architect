@@ -84,12 +84,12 @@ It installs into `%LOCALAPPDATA%\Programs\Git` and adds Git to your PATH.
 
 ### 2b · Node.js
 
-Runs the part of the AI Architect that talks to your ServiceNow instance. This is the zip version (36 MB), which needs no installer. Download it:
+Runs the part of the AI Architect that talks to your ServiceNow instance. This is the zip version (41 MB), which needs no installer. Download it:
 
 Run:
 
 ```
-$ProgressPreference = 'SilentlyContinue'; iwr -UseBasicParsing https://nodejs.org/dist/v22.23.5/node-v22.23.5-win-x64.zip -OutFile "$env:TEMP\snowarch-dl\node.zip"
+$ProgressPreference = 'SilentlyContinue'; iwr -UseBasicParsing https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-x64.zip -OutFile "$env:TEMP\snowarch-dl\node.zip"
 ```
 
 Unpack it into your user folder:
@@ -105,7 +105,7 @@ Tell Windows where Node.js is, and where npm keeps the tools it installs (your a
 Run:
 
 ```
-[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:LOCALAPPDATA\Programs\node-v22.23.5-win-x64;$env:APPDATA\npm", "User")
+[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:LOCALAPPDATA\Programs\node-v26.13.0-win-x64;$env:APPDATA\npm", "User")
 ```
 
 If your company blocks files in the Temp folder, use `$HOME\Downloads` in place of `$env:TEMP\snowarch-dl` in these commands.
@@ -165,14 +165,14 @@ On screen (the numbers on your computer may be higher):
 ```
 2.1.322 (Claude Code)
 git version 2.56.1.windows.1
-v22.23.5
+v26.13.0
 ```
 
 | Program | You need at least |
 |---|---|
 | Claude Code | 2.1.214 |
 | Git | 2.25 |
-| Node.js | v20. v22 is recommended and is what 2b installs. The AI Architect is tested with Node.js 20, 22 and 24 on Windows, macOS and Linux, and with 26 on Windows and Linux. |
+| Node.js | v20. Step 2b installs v26.13.0, the version this guide was tested with. The AI Architect is tested with Node.js 20, 22 and 24 on Windows, macOS and Linux, and with 26 on Windows and Linux. |
 | npm | Any version. It comes with Node.js. |
 
 If one of them answers *is not recognized*, see "If something goes wrong".
@@ -282,7 +282,7 @@ Run:
 Get-ChildItem $HOME\Downloads\LIC-*.json
 ```
 
-Look at the *Name* column, for example `LIC-2026-0014.json`.
+Look at the *Name* column, for example `LIC-2026-0000.json`.
 
 ### 5c · Copy it into place
 
@@ -581,7 +581,7 @@ You will see one workspace-trust dialog — answer Yes.
 Press any key to continue . . .
 ```
 
-- **Health check:** `0 fail` is what matters. A `warn` or a `fail` names the check it comes from. `E-31 the licence` warns in the last days before the licence ends, as it did in our test, where the licence ended that day. With a licence that runs for longer, this line shows no warning.
+- **Health check:** `0 fail` is what matters. A `warn` or a `fail` names the check it comes from. `E-31 the licence` warns in the last days before the licence ends. With a licence that runs for longer, this line shows no warning.
 - **Mode:** says live, with your instance label.
 - **Next:** names your folder. That is where you start Claude.
 
