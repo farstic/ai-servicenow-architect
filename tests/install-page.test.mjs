@@ -171,7 +171,7 @@ test('ARC-07-W8 — every clone command on a user page quiets the detached-HEAD 
   // A release tag is a TAG, so a correct clone earns fourteen lines of git advice about being in a
   // state the reader did not choose and cannot act on. The option is on every clone line, and the
   // page says once what the note means for anyone who clones another way.
-  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md']) {
+  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md']) {
     const clones = [...read(rel).matchAll(/git\b[^\n]*?\bclone --branch v\d/g)].map((m) => m[0]);
     assert.ok(clones.length > 0, `${rel} names no pinned clone`);
     for (const line of clones) {
@@ -316,7 +316,9 @@ test('the page stays a page, and the tail stays a tail', () => {
   // 320 since ARC-09-C270: one row of the remedies table, the words for a Claude Code that is installed and whose folder is not on PATH.
   // The table is the page's one place for what each preflight failure prints, and that failure now has two causes with two fixes; the row
   // is generated from the remedy file like its neighbours, so nothing on the page was written by hand or deleted to pay for it.
-  assert.ok(install <= 320, `${install} lines of install page (criterion: 320)`);
+  // 322 since ARC-09-C271: the Windows page (INSTALL-WINDOWS.md) is linked from the Windows lines, by one paragraph and the line before
+  // it. The page that explains every step is a page of its own, so the one paragraph that sends a reader there is all this one takes.
+  assert.ok(install <= 322, `${install} lines of install page (criterion: 322)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.
@@ -449,7 +451,7 @@ test('ARC-06-C17 — Uninstall states BOTH halves: the default writes nothing, l
 // form to primary AND gives it a writer, because a version in a page that no writer owns is a
 // version that goes stale — this page is the evidence.
 
-const USER_PAGES = ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md'];
+const USER_PAGES = ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md'];
 
 test('ARC-09-C60 — no user page tells a reader to clone without pinning a release', () => {
   const offenders = [];
@@ -509,7 +511,7 @@ test('ARC-09-C61 — the pinned clone names the newest release that exists', asy
     return;
   }
 
-  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md']) {
+  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md']) {
     const named = cloneTagsIn(read(rel));
     assert.ok(named.length > 0, `${rel} names no release tag in a clone command`);
     for (const tag of named) {

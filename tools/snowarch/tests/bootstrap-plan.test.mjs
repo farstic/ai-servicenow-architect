@@ -733,7 +733,7 @@ test('ARC-07-W13 — the two orientation lines come first, in order, above the h
   // it, and it writes Claude Code's settings per-checkout, which is why the sentence is true.
   assert.match(lines[0], /this folder only/);
   assert.match(lines[0], /nothing else on the machine changes/);
-  assert.match(lines[1], /about a minute/);
+  assert.match(lines[1], /a few minutes/);
   assert.match(lines[1], /live adds a short wizard/);
 });
 

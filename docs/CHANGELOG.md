@@ -37,6 +37,13 @@ on PATH, and give the line that adds it for your platform (one PowerShell line f
 `echo` line for zsh or bash on macOS and Linux) and Claude Code's troubleshooting page. They no longer say to install it. If nothing is
 there, the words are the ones they had.
 
+**There is a page for a Windows user who is not an administrator.** `docs/INSTALL-WINDOWS.md`, linked from the README and the install page,
+takes a Windows 10 or 11 computer with nothing installed to a working install: Git, Node.js, Claude Code and draw.io for your own user only,
+with no administrator rights and without `winget`, one command in each block, the plan screen and the seven wizard questions explained one by
+one, and the commands for changing an answer later, renewing the licence, upgrading and uninstalling. It was written from the first end-to-end
+install on such a computer, its clone command carries the release tag that the release writes, and tests hold it to the product's own words,
+commands and states.
+
 **The instance store is private on Windows.** It holds the basic-auth password. On macOS and Linux it is 0600 in a 0700 folder; on Windows
 it was whatever its folder inherited, and a folder made directly under `C:\` hands `BUILTIN\Users` read and `Authenticated Users` modify to
 everything made in it, so every other account on the computer could read it. The wizard said the permissions were "inherited from the folder",
@@ -80,6 +87,20 @@ itself. Nothing changes an existing store's permissions without saying so.
   is. The sentence (`Claude Code is installed at <path>, but that folder is not on PATH`) and the fix for each platform are data
   (`remedies.json`, under `claudeCode.offPath`) and are generated into both launchers, whose own B00 looks for the file the same way.
   A `claude` that is on PATH is never looked for there, and nothing in that folder keeps the words it had (ARC-09-C270).
+- Five things from that install. The plan screen said an install takes "about a minute"; it says
+  "a few minutes" (the documentation alone took 147 s). The closing health line names the licence in words, `1 warn (E-31 the licence)`, where it
+  said only `E-31`; no other line and no other id changed. On Windows the git and Node.js remedies name the way that needs no administrator
+  rights after the `winget` command, in the launchers and the tables (generated from `remedies.json`) and in the doctor's two hand-written
+  copies of the Node.js one. The troubleshooting page explains `0x8a15000f`, `The operation was canceled by the user` and `is not recognized`,
+  and the modes page says that `now-sdk` needs npm's folder, `%APPDATA%\npm`, on PATH. The Word converter's examples run under `powershell`,
+  the 5.1 that every Windows has, and not `pwsh` (ARC-09-C271).
+- Node.js 26 is tested on Linux and Windows: `test` on ubuntu-latest and windows-latest, the Windows `bootstrap` cell and `windows-native`, four
+  more checks (59 to 63), so the README can say that 20, 22 and 24 are tested on Linux, macOS and Windows and 26 on Linux and Windows. The
+  generator of the required contexts read an unquoted matrix value as empty; it reads all three forms now. The first run of the suite under
+  Node 26 found one thing: the test-only licence hook was installed through `module.register()`, which Node 26 deprecates with a warning on
+  stderr in every process the hook is loaded into, and seven cases that read a child's stderr or its JSON failed on it. It installs through
+  `registerHooks` where Node has it (22.15 and later) and keeps `register()` for Node 20; nothing shipped is affected, and the guard that keeps
+  shipped code away from `register` holds it away from `registerHooks` too (ARC-09-C271).
 - On Windows the instance store, which holds the basic-auth password, was readable by every account on the computer when it sat in a folder
   made directly under `C:\` (a folder such as `C:\work\…` or `C:\AI_Arch`): `BUILTIN\Users` read and
   `Authenticated Users` modify are inherited from the drive root (measured on a windows-latest runner, with a second local account denied the

@@ -375,6 +375,26 @@ test('ARC-07-W15 — the full doctor\'s own line is byte-identical, and the quic
     `Health check (quick): 13 ok · 1 warn (E-23) · 1 fail (E-29) · 26 more run with ${cli} doctor`);
 });
 
+test('ARC-09-C271 — the quick line says what E-31 is, and no other line does', async () => {
+  // A Windows end user's install ended `1 warn (E-31)`, and the id told them nothing: it is the licence, in its last days, and only they
+  // can ask for the renewal. Every other id's remedy is printed by the doctor, so only this one is followed by words — and only in B09's
+  // closing line, the one place a reader sees an id before they have ever seen the doctor.
+  const { summaryLine } = await import('../lib/doctor/report-text.mjs');
+  const { idsFor } = await import('../lib/doctor/check-ids.mjs');
+  const cli = spellings().cli;
+  const licence = [{ id: 'E-31', status: 'warn' }];
+  assert.equal(summaryLine({ ok: 16, warn: 1, fail: 0, skip: 26, notInQuick: 26 }, licence, { quick: true, cli }),
+    `Health check (quick): 16 ok · 1 warn (E-31 the licence) · 0 fail · 26 more run with ${cli} doctor`);
+  assert.equal(summaryLine({ ok: 15, warn: 0, fail: 1, skip: 26, notInQuick: 26 }, [{ id: 'E-31', status: 'fail' }], { quick: true, cli }),
+    `Health check (quick): 15 ok · 0 warn · 1 fail (E-31 the licence) · 26 more run with ${cli} doctor`);
+  // Beside another id: the words belong to the licence's id alone.
+  assert.equal(summaryLine({ ok: 14, warn: 2, fail: 0, skip: 26, notInQuick: 26 }, [{ id: 'E-23', status: 'warn' }, { id: 'E-31', status: 'warn' }],
+    { quick: true, cli }), `Health check (quick): 14 ok · 2 warn (E-23, E-31 the licence) · 0 fail · 26 more run with ${cli} doctor`);
+  // The doctor's own report line, and the status panel's helper, print the id as they always did.
+  assert.equal(summaryLine({ ok: 15, warn: 1, fail: 0, skip: 0, fixable: 0 }, licence, { cli }), 'DOCTOR: 15 ok, 1 warn (E-31), 0 fail');
+  assert.equal(idsFor(licence, 'warn'), ' (E-31)');
+});
+
 test('ARC-07-W15 — the quick line takes the launcher from its caller, never from this module', async () => {
   // NO CYCLE, BY CONSTRUCTION. `text.mjs` imports `report-text.mjs`, so `report-text.mjs` importing
   // `spellings` back would be a circular import — and a `const` evaluated inside a cycle is

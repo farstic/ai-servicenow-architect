@@ -53,6 +53,15 @@ the fourteen lines about "detached HEAD", which the clone
 command on the install page already quiets with `-c advice.detachedHead=false`. Neither needs anything
 done about it; `./snowarch doctor` is what tells you whether the install is actually wrong.
 
+**Three messages from installing on Windows without administrator rights.** On a computer where you are a standard user,
+`0x8a15000f : Data required by the source is missing` from `winget` means its package list is broken, and only an
+administrator can repair it; `The operation was canceled by the user` from an installer means it asked for an administrator
+password and none was given; and `'git' is not recognized` (or `'node'`, `'npm'`, `'now-sdk'`) for a program that is installed
+means the window was opened before the program's folder was added to `PATH`: open a new PowerShell window, or reload it in this one with
+`$env:Path = [Environment]::GetEnvironmentVariable("Path", "User") + ";" + [Environment]::GetEnvironmentVariable("Path", "Machine")`.
+None of the three is a fault in the product. [INSTALL-WINDOWS.md](INSTALL-WINDOWS.md) installs everything for your own user, without
+`winget` and without an installer that needs an administrator.
+
 75 codes.
 
 ### ATF_NOT_ENABLED

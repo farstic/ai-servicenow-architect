@@ -72,7 +72,7 @@ test('ARC-09-C206 — the cut refuses a final whose package source changed while
 
 test('ARC-09-C206 — applyWrites renames the package Unreleased at a final, and leaves it alone for a release candidate', () => {
   // Every other write is the real one, over this checkout's own files in memory; nothing runs and nothing is written.
-  const files = new Map(['CLAUDE.md', 'docs/README-head.md', 'docs/INSTALL.md', 'docs/MIGRATION.md',
+  const files = new Map(['CLAUDE.md', 'docs/README-head.md', 'docs/INSTALL.md', 'docs/MIGRATION.md', 'docs/INSTALL-WINDOWS.md',
     'docs/CHANGELOG.md'].map((p) => [p, readFileSync(join(REAL_ROOT, p), 'utf8')]));
   const cut = (version) => {
     const fs = new Map(files);

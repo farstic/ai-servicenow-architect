@@ -5,6 +5,9 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**The shipped list names the Windows install page (ARC-09-C271).** `docs/INSTALL-WINDOWS.md` joins the user's documentation in the
+release coverage (`licence/integrity.ts`), so a distribution carries it and its signed manifest covers it. Nothing else in the package changed.
+
 **The store is private on Windows (ARC-09-C272).** `saveStore` returns `{ acl }` and takes `{ acl?, lock? }`. On Windows it locks a folder it creates, and a file it creates in a
 folder that was there, to the account and SYSTEM (`icacls <path> /inheritance:r /grant:r *<SID>:… *S-1-5-18:…`, the account by SID from `whoami`); with
 `lock: 'always'` (`instance add`, `set-credentials`, `import --from-legacy`) it makes the file, and the folder when it is `.local` or `snowarch`, private

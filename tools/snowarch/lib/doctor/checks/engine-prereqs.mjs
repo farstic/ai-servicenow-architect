@@ -19,6 +19,7 @@ import { checkClaudeCode, checkGit, makeExec } from '../../steps/B00.mjs';
 import { loadState, loadStateOrReason } from '../../state.mjs';
 import { meetsFloor, formatVersion } from '../../versions.mjs';
 import { which } from '../../which.mjs';
+import { remedyFor } from '../../remedies.mjs';
 import { defineCheck } from '../registry.mjs';
 
 import { fail, fromStep, ok } from './result.mjs';
@@ -192,8 +193,10 @@ export function enginePrereqChecks() {
         return passes
           ? ok(`${formatVersion(found) ?? version} (floor ${floor})`, data)
           : fail(`Node ${version} is below the floor ${floor}`, {
+            // The Windows part is the sentence remedies.json holds (ARC-09-C271 added the way that needs no administrator rights),
+            // not a copy of it: the launchers and the tables print that one.
             remedy: 'install Node 20+ (macOS: brew install node@22 · '
-              + 'Windows: winget install OpenJS.NodeJS.LTS · Linux: your distribution or nvm)',
+              + `Windows: ${remedyFor('node', { platform: 'win32' })} · Linux: your distribution or nvm)`,
             data,
           });
       },

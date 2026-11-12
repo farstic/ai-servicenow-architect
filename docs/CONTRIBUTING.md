@@ -289,7 +289,7 @@ matrix is not as uniform as `[20, 22, 24]` suggests.
 **The Windows cell is not the "no Git Bash" proof.** The hosted image ships Git Bash. What that cell
 proves is narrower: no step calls a POSIX shell (Q-B). The genuine no-Git-Bash test needs a machine
 where the shell is absent — ARC-09-S08 built it, and there are now two: `bootstrap (no-gitbash,
-windows-latest)` and the three `windows-native` cells, which strip Git Bash from `PATH` and drive
+windows-latest)` and the four `windows-native` cells, which strip Git Bash from `PATH` and drive
 the product entirely through `.cmd`.
 
 **A test that starts Windows PowerShell 5.1 from node gives it an environment without `PSModulePath`.**
@@ -2736,8 +2736,8 @@ cloning: an installer that edited a tracked file, a state file that does not say
 toggle that is not S05's target, a credential-shaped key left in a config, a corpus that is not at
 the pin, a `.local` anyone can read, a second run that redid the work of the first.
 
-Thirteen cells, three questions. Nine ask whether the install works where Node is present (three
-operating systems × Node 20/22/24). Three ask whether the launcher finishes design-only ITSELF,
+Fourteen cells, three questions. Ten ask whether the install works where Node is present (three
+operating systems × Node 20/22/24, and Windows with Node 26). Three ask whether the launcher finishes design-only ITSELF,
 with no Node to hand over to — in `sh` on macOS and Linux, in PowerShell on Windows. One asks
 whether the Windows path works on a machine with no POSIX shell at all.
 

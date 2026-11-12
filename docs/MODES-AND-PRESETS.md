@@ -57,7 +57,9 @@ sub-command changes these two; edit the store entry if you need a different `max
   instance.
 - **FLUENT** (`FLUENT_ENABLED`) — the ServiceNow SDK (Fluent) build and deploy tools; needs `@servicenow/sdk` on `PATH`
   (install it globally: `npm i -g @servicenow/sdk` — the doctor checks `PATH`, so a checkout-local install does not
-  count; see `docs/TROUBLESHOOTING.md`), and deploys also need WRITE.
+  count; see `docs/TROUBLESHOOTING.md`), and deploys also need WRITE. On Windows npm puts a global tool in `%APPDATA%\npm`,
+  which has to be on `PATH` for `now-sdk` to be found, and a window sees a changed `PATH` only once it is reopened
+  ([INSTALL-WINDOWS.md](INSTALL-WINDOWS.md), Step 2b, adds the folder).
 
 **The dependency rule**, enforced in the wizard and again in the server: `SCRIPTING_ENABLED` and `CMDB_WRITE_ENABLED`
 are writes, so declaring either without `WRITE_ENABLED` is a contradiction, resolved towards *less* access — the

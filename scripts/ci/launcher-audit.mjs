@@ -253,6 +253,9 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ['tests/hook/session-start.test.mjs', [
     { at: '~~', kind: 'DERIVED', n: 1, why: 'the assertion is about the launcher alone' },
   ]],
+  ['tests/install-windows-guide.test.mjs', [
+    { at: '~ doctor --fix tries again', kind: 'PINNED', n: 1, why: 'the case drives a pinned shell in another statement' },
+  ]],
   ['tests/launcher-audit.test.mjs', [
     { at: '~', kind: 'PINNED', n: 1, why: 'the assertion is about the launcher alone' },
   ]],
@@ -335,6 +338,9 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ['tools/snowarch/tests/text.test.mjs', [
     { at: '2 more run with ~ doctor$', kind: 'EXPECTED_RENDERING', n: 1, why: 'regex syntax in the sentence' },
     { at: 'DOCTOR: 5 ok, 0 warn, 1 fail, 37 not in section (1 fixab', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs)' },
+    { at: 'Health check (quick): 14 ok · 2 warn (E-23, E-31 the lic', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs)' },
+    { at: 'Health check (quick): 15 ok · 0 warn · 1 fail (E-31 the ', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs)' },
+    { at: 'Health check (quick): 16 ok · 1 warn (E-31 the licence) ', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs)' },
     { at: 'Health check (quick): 13 ok · 1 warn (E-23) · 1 fail (E-', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs)' },
     { at: '~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion is about the launcher alone' },
     { at: '~ doctor$', kind: 'EXPECTED_RENDERING', n: 2, why: 'regex syntax in the sentence' },

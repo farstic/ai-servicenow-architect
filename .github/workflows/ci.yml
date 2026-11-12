@@ -34,9 +34,22 @@ jobs:
     name: test (${{ matrix.os }}, node ${{ matrix.node }})
     strategy:
       fail-fast: false
+      # Written out as rows and not as two axes, because 26 is not on every system (ARC-09-C271): 20, 22 and 24 run on all three, 26 on Linux and
+      # Windows. Node 26 is what a Windows user gets from winget today and what the first end-to-end install ran on; macOS has no cell for it because
+      # the macOS queue already cancels cells. The contexts generator reads rows or axes, never both, so this is the form it can read.
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [20, 22, 24]
+        include:
+          - { os: ubuntu-latest,  node: 20 }
+          - { os: ubuntu-latest,  node: 22 }
+          - { os: ubuntu-latest,  node: 24 }
+          - { os: ubuntu-latest,  node: 26 }
+          - { os: macos-latest,   node: 20 }
+          - { os: macos-latest,   node: 22 }
+          - { os: macos-latest,   node: 24 }
+          - { os: windows-latest, node: 20 }
+          - { os: windows-latest, node: 22 }
+          - { os: windows-latest, node: 24 }
+          - { os: windows-latest, node: 26 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4          # no submodules until ARC-03 adds vendor/ServiceNowDocs
@@ -192,8 +205,8 @@ jobs:
     # THE INSTALL PROMISE, as a job. When this is red the install is broken, not the test: every
     # assertion is something a user hits within a minute of cloning.
     #
-    # Thirteen cells, and each variant answers a different question. `node-cli` — does the install
-    # work where Node is present, on three operating systems and three Node majors? `no-node` — does
+    # Fourteen cells, and each variant answers a different question. `node-cli` — does the install
+    # work where Node is present, with Node 20, 22 and 24 on three operating systems and 26 on Windows? `no-node` — does
     # the launcher finish design-only ITSELF, in `sh` and in PowerShell, with no Node to hand over
     # to? `no-gitbash` — does the Windows path work on a machine that has no POSIX shell at all?
     #
@@ -214,6 +227,7 @@ jobs:
           - { label: 'windows-latest, node 20', os: windows-latest, variant: node-cli, node: '20', writer: node }
           - { label: 'windows-latest, node 22', os: windows-latest, variant: node-cli, node: '22', writer: node }
           - { label: 'windows-latest, node 24', os: windows-latest, variant: node-cli, node: '24', writer: node }
+          - { label: 'windows-latest, node 26', os: windows-latest, variant: node-cli, node: '26', writer: node }
           - { label: 'no-node, ubuntu-latest',  os: ubuntu-latest,  variant: no-node, writer: bash }
           - { label: 'no-node, macos-latest',   os: macos-latest,   variant: no-node, writer: bash }
           - { label: 'no-node, windows-latest', os: windows-latest, variant: no-node, writer: powershell }
@@ -618,7 +632,7 @@ jobs:
       # is already on disk), and the hook's phases from inside the hook, behind a flag whose absence
       # is the tested default.
       #
-      # The four Windows cells, because that is where the cost is, and ONE ubuntu cell for contrast:
+      # The five Windows cells, because that is where the cost is, and ONE ubuntu cell for contrast:
       # a table with nothing to compare against cannot say whether 900 ms is a platform or a bug.
       - name: C5 — where the doctor spends its time, quick and full
         if: >
@@ -1147,7 +1161,7 @@ jobs:
     #
     # This does NOT replace ARC-06-S14's `bootstrap (no-gitbash, windows-latest)` cell — that name
     # is a required context on `main` and stays exactly as it is. What this ADDS is everything that
-    # cell does not run: three Node majors instead of one, and the commands a user reaches for after
+    # cell does not run: four Node majors instead of one, and the commands a user reaches for after
     # the install — the wizard's `--password-stdin` door, the server's own handshake, the hook, the
     # version block, a store migration plan, and an upgrade check.
     #
@@ -1163,7 +1177,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['20', '22', '24']
+        node: ['20', '22', '24', '26']
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4

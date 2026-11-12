@@ -121,10 +121,14 @@ function contextsFor(job) {
       // comma in it, and a naive split turned every bootstrap cell into `bootstrap (ubuntu-latest)`
       // — thirteen names that no run produces, which is precisely the failure this file exists to
       // prevent. Caught by comparing the generated list against a real run rather than trusting it.
+      //
+      // The groups are the single-quoted, the double-quoted and the bare value, and all three are read: the bare one was dropped by the
+      // destructuring, so `{ os: ubuntu-latest, node: 20 }` read as two empty values and named a cell `test (, node )` (found by ARC-09-C271,
+      // whose `test` rows are the first with unquoted values that a name interpolates).
       const row = {};
-      for (const [, key, quoted, bare] of fields.matchAll(
+      for (const [, key, single, double, bare] of fields.matchAll(
         /([a-z][a-z0-9_-]*)\s*:\s*(?:'([^']*)'|"([^"]*)"|([^,}]*))/gi)) {
-        row[key] = (quoted ?? bare ?? '').trim();
+        row[key] = (single ?? double ?? bare ?? '').trim();
       }
       rows.push(row);
     }
