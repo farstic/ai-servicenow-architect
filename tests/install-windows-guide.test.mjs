@@ -327,6 +327,10 @@ test('ARC-09-C271 — each program the page downloads is one version: in the dow
   const drawio = /drawio-desktop\/releases\/download\/v(\d+\.\d+\.\d+)\/draw\.io-(\d+\.\d+\.\d+)-windows\.zip/.exec(one(/jgraph\/drawio-desktop\/releases\/download\//, 'the draw.io download'));
   assert.ok(drawio && drawio[1] === drawio[2], 'the draw.io download is not one versioned zip');
   assert.ok(record.includes(`draw.io ${drawio[1]} `), `the record does not name draw.io ${drawio[1]}`);
+  // The record also names what was on the machine and the page does not install: PowerShell 7. It says so, and no command of the page needs it, so a
+  // reader is not sent to look for a step (the architect's review of #578).
+  assert.ok(record.includes('PowerShell 7.7.0 (zip; present on the test machine, not needed by this guide)'), 'the record names PowerShell 7 without saying that the guide does not need it');
+  assert.equal(commands.some((c) => /\bpwsh\b|PowerShell-7/i.test(c.line)), false, 'a command of the page runs in PowerShell 7, so the record cannot say that the guide does not need it');
 });
 
 test('ARC-09-C271 — the page is linked from where a Windows reader starts, and carries a release tag the release writes', () => {
