@@ -876,6 +876,17 @@ Run:
 - The AI Architect asks *write approved?* before every change on your instance, and a prod instance is saved read-only.
 - Your licence file is issued to you. Do not share it.
 
+## What has not been tested
+
+This guide was written from one end-to-end install. Four things in it rest on something other than a run:
+
+- **Windows 10.** The test machine ran Windows 11. Windows 10 (version 1809 or later) has the same PowerShell 5.1 and takes the same commands.
+- **Claude Code's first-run screens on Windows** (Step 3). They are described in general terms because they change with Claude Code's releases.
+- **A folder name with a space in it, a folder on a network drive, and a folder that OneDrive or another sync tool manages** (Step 4).
+- **What the screens say after the licence has ended** (Step 7). The table is the product's own list of states, not a transcript of each one.
+
+If you meet a difference, `.\snowarch.cmd version` and `.\snowarch.cmd doctor` (see "Asking for help") are what to send.
+
 ---
 
 Tested end to end on 12 November 2026 on a company laptop: Windows 11 Enterprise (build 26200), a standard user without administrator rights. Git 2.56.1 (per user), Node.js 26.13.0 and npm 11.20.0 (zip), Claude Code 2.1.322, ServiceNow SDK 4.14.0, PowerShell 7.7.0 (zip), draw.io 32.6.10 (zip), Word 16.0.20527; the AI Architect release of that day, in live mode, on a ServiceNow instance.
