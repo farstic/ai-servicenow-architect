@@ -9,7 +9,7 @@
   "git": {
     "darwin": "xcode-select --install (or: brew install git)",
     "linux": "install git with your distribution's package manager (apt install git · dnf install git)",
-    "win32": "winget install Git.Git",
+    "win32": "winget install Git.Git, or without administrator rights: Git for Windows from git-scm.com, installed for your user only (docs/INSTALL-WINDOWS.md, step 2a)",
     "default": "install a newer git from https://git-scm.com/downloads"
   },
   "claudeCode": {
@@ -33,7 +33,7 @@
   "node": {
     "darwin": "brew install node@22",
     "linux": "install Node.js from your distribution's package manager, or use nvm",
-    "win32": "winget install OpenJS.NodeJS.LTS",
+    "win32": "winget install OpenJS.NodeJS.LTS, or without administrator rights: the Node.js zip from nodejs.org, in your user folder (docs/INSTALL-WINDOWS.md, step 2b)",
     "default": "install a newer Node.js from https://nodejs.org/en/download"
   },
   "platform": {

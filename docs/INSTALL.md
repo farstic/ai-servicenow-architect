@@ -245,11 +245,11 @@ Every preflight failure prints its own remedy. These are those sentences:
 |---|---|---|
 | You are not at the checkout root | `cd "{root}" && ./bootstrap.sh` | `pushd "{root}"
 .\bootstrap.cmd` |
-| git is missing or too old | `xcode-select --install (or: brew install git)` | `winget install Git.Git` |
+| git is missing or too old | `xcode-select --install (or: brew install git)` | `winget install Git.Git, or without administrator rights: Git for Windows from git-scm.com, installed for your user only (docs/INSTALL-WINDOWS.md, step 2a)` |
 | Claude Code is missing or too old | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` |
 | Not enough disk space | `free up {needed} on {mount}` | `free up {needed} on {mount}` |
 | github.com is unreachable | `check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run` | `check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run` |
-| Node.js is missing or too old (live mode only) | `brew install node@22` | `winget install OpenJS.NodeJS.LTS` |
+| Node.js is missing or too old (live mode only) | `brew install node@22` | `winget install OpenJS.NodeJS.LTS, or without administrator rights: the Node.js zip from nodejs.org, in your user folder (docs/INSTALL-WINDOWS.md, step 2b)` |
 | A 32-bit Node.js build | `a 64-bit build of Node.js is recommended` | `a 64-bit build of Node.js is recommended` |
 <!-- /generated:remedies -->
 

@@ -779,7 +779,10 @@ test('B09-02 — the Windows git remedy is the constant the CI step can only ass
   // string fails for a reason that has nothing to do with the launcher. Masking is a property of
   // the log, not of the source, so the exact constant is asserted here instead, and the two
   // together are the whole claim: the right sentence exists, and it is the one that gets printed.
-  assert.match(ps1, /^\$MSG_GIT_WIN = 'winget install Git\.Git'$/m);
+  // ARC-09-C271: the sentence goes on after the command (the way that needs no administrator rights), so the constant is the table's whole sentence,
+  // and it still STARTS with the command, which is what the CI step asserts.
+  assert.ok(ps1.split(/\r?\n/).includes(`$MSG_GIT_WIN = '${remedies.git.win32}'`), 'the launcher does not declare the table\'s Windows git sentence');
+  assert.match(remedies.git.win32, /^winget install Git\.Git(?:,| |$)/);
   // …and it is what the git branches actually pass, rather than a constant nothing uses.
   assert.match(ps1, /Die 'B00' 'git not found' \$MSG_GIT_WIN 3/);
   assert.match(ps1, /Die 'B00' \("git \$GitV found, >= " \+ \(Floor 'git'\) \+ ' required'\) \$MSG_GIT_WIN 3/);
