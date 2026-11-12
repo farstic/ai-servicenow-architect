@@ -84,9 +84,13 @@ scripts/render-pdf.sh clients/<client>/designs/MyDesign.docx
 On **Windows**, swap steps 3–4 for the PowerShell equivalents:
 
 ```powershell
-pwsh scripts/md-to-docx.ps1 -Src clients\<client>\designs\MyDesign.md -Out clients\<client>\designs\MyDesign.docx -FooterText "<Client> | Commercial in confidence"
-pwsh scripts/render-pdf-pages.ps1 clients\<client>\designs\MyDesign.docx
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\md-to-docx.ps1 -Src clients\<client>\designs\MyDesign.md -Out clients\<client>\designs\MyDesign.docx -FooterText "<Client> | Commercial in confidence"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\render-pdf-pages.ps1 clients\<client>\designs\MyDesign.docx
 ```
+
+`powershell` is the Windows PowerShell 5.1 that every Windows 10 and 11 has, so PowerShell 7 (`pwsh`) is not a requirement.
+`md-to-docx.ps1` was checked under 5.1 on 12 November 2026 (a 12 KB document written without error, and the same document under 7.7
+was 12,222 bytes against 12,331 under 5.1). `render-pdf-pages.ps1` needs Word and has not been tested under 5.1 yet.
 
 ---
 
