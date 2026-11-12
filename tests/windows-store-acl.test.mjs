@@ -220,8 +220,18 @@ test('ARC-09-C272 — the effect: another local account is denied the locked sto
   const openFile = join(openDir, 'instances.json');
   writeFileSync(openFile, 'OPEN-SECRET');
 
-  // TIMING lines say where the seconds go: the first logon of a new account builds its profile, and on a loaded hosted runner that has taken
-  // more than the 120 s this case first allowed (release-dryrun (windows-latest), 126.5 s, 2026-11-12, while the test cells made it in under).
+  // TIMING lines say where the seconds go. The case first allowed 120 s and was cut at 126.5 s (release-dryrun (windows-latest), 2026-11-12) when it started
+  // its children with Start-Process -Credential: the first logon of a new account that way builds its profile, 1,317 MB on the hosted image (ARC-09-C274).
+  // The limit is 300 s still, as a margin.
+  //
+  // THE SECOND ACCOUNT'S PROCESSES ARE STARTED WITH System.Diagnostics.Process, NOT Start-Process -Credential (ARC-09-C274). On hosted runners that cmdlet
+  // failed this case three times in about two hours (2026-11-12: develop's push run on node 20 and 22, #578 on node 24) with "Start-Process : Cannot
+  // process request because the process (N) has exited", on its first launch, right after the account was made. The cmdlet creates the child with
+  // CreateProcessWithLogonW and then looks it up by its id (PowerShell 7's Process.cs: Process.GetProcessById, then process.Handle; Windows PowerShell
+  // 5.1's own code is closed and was not read), and .NET throws that message for a process that has already exited; `cmd.exe /c type` of a small file is
+  // gone in milliseconds. Process.Start keeps the handle CreateProcessWithLogonW returned, so a child that is already gone is still waited for and its
+  // exit code read; its output comes back on a pipe, read to the end before the wait. It builds no profile either: 20 runs left no account, no profile and
+  // C: as free as before, where the old call left 1,317 MB a run, and a run takes about 1.3 s instead of about 17 s. docs/CONTRIBUTING.md has the numbers.
   const script = [
     "$ErrorActionPreference = 'Stop'",
     '$sw = [Diagnostics.Stopwatch]::StartNew()',
@@ -229,13 +239,21 @@ test('ARC-09-C272 — the effect: another local account is denied the locked sto
     '$pw = ConvertTo-SecureString $env:ACL_TEST_PW -AsPlainText -Force',
     "New-LocalUser -Name 'aclprobe' -Password $pw | Out-Null",
     "'TIMING|account|' + [math]::Round($sw.Elapsed.TotalSeconds, 1)",
-    "$cred = New-Object System.Management.Automation.PSCredential('.\\aclprobe', $pw)",
     `foreach ($f in '${locked}', '${openFile}') {`,
-    '  $n = [IO.Path]::GetRandomFileName()',
-    `  $o = Join-Path '${out}' ($n + '.txt')`,
-    '  $a = \'/c type "\' + $f + \'" > "\' + $o + \'" 2>&1\'',
-    `  $p = Start-Process -FilePath cmd.exe -ArgumentList $a -Credential $cred -WorkingDirectory '${out}' -Wait -PassThru -WindowStyle Hidden`,
-    '  "RESULT|$f|$($p.ExitCode)|" + ((Get-Content -LiteralPath $o -Raw) -replace "\\s+", " ").Trim()',
+    '  $psi = New-Object System.Diagnostics.ProcessStartInfo',
+    "  $psi.FileName = 'cmd.exe'",
+    '  $psi.Arguments = \'/c type "\' + $f + \'" 2>&1\'',
+    "  $psi.UserName = 'aclprobe'",
+    "  $psi.Domain = '.'",
+    '  $psi.Password = $pw',
+    '  $psi.UseShellExecute = $false',
+    '  $psi.RedirectStandardOutput = $true',
+    '  $psi.CreateNoWindow = $true',
+    `  $psi.WorkingDirectory = '${out}'`,
+    '  $p = [System.Diagnostics.Process]::Start($psi)',
+    '  $text = $p.StandardOutput.ReadToEnd()',
+    '  $p.WaitForExit()',
+    '  "RESULT|$f|$($p.ExitCode)|" + ($text -replace "\\s+", " ").Trim()',
     "  'TIMING|read|' + [math]::Round($sw.Elapsed.TotalSeconds, 1)",
     '}',
   ].join('\n');
