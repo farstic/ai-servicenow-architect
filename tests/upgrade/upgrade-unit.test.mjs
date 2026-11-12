@@ -313,6 +313,40 @@ test('ARC-09-C269 — the refusal names what was found; the sentences of the cas
   assert.ok(exited.endsWith(`${RUN_ONCE}, or pass --force-floor; nothing was changed`), exited);
 });
 
+// ── ARC-09-C270 — a Claude Code that is installed, and whose folder is not on PATH ─────────────────────────────────
+//
+// The owner's Windows install put claude.exe in %USERPROFILE%\.local\bin and did not add the folder to PATH; the floor line said
+// `installed: not found — install Claude Code`, which they had just done. The product's own exec (B00's makeExec) is used here with
+// a PATH that holds nothing and a file system that is one path, so the finder under test is the one the command runs.
+
+test('ARC-09-C270 — the floor line and the refusal name an install whose folder is not on PATH, with that platform\'s fix, and do not say to install it', async () => {
+  const { floorCheck, floorRefusal } = await import('../../tools/snowarch/lib/commands/upgrade.mjs');
+  const { makeExec } = await import('../../tools/snowarch/lib/steps/B00.mjs');
+  const { remedyFor } = await import('../../tools/snowarch/lib/remedies.mjs');
+  for (const [plat, env, file] of [
+    ['win32', { USERPROFILE: 'C:\\Users\\someone' }, 'C:\\Users\\someone\\.local\\bin\\claude.exe'],
+    ['darwin', { HOME: '/Users/someone' }, '/Users/someone/.local/bin/claude'],
+    ['linux', { HOME: '/home/someone' }, '/home/someone/.local/bin/claude'],
+  ]) {
+    const exec = makeExec({ env, plat, resolve: () => null, exists: (p) => p === file });
+    const fix = remedyFor('claudeCode', { platform: plat, variant: 'offPath' });
+    const floor = floorCheck(TAG, { exec });
+    assert.deepEqual([floor.below, floor.unknown], [true, true], `${plat}: still below the floor without --force-floor (C194)`);
+    // The fix is the LAST thing on each line: it ends in a command, and a command is copied from the end of a line it is not followed on.
+    assert.equal(floor.line, `claude-floor 2.1.214 (Claude Code is installed at ${file}, but that folder is not on PATH — pass --force-floor to go on without the check, or ${fix})`, plat);
+    assert.doesNotMatch(floor.line, /install Claude Code|not found/i, `${plat}: it is installed`);
+    const refusal = floorRefusal(floor, { target: 'v2.2.6', want: TAG.floors.claudeCode });
+    assert.equal(refusal,
+      `upgrade: Claude Code is installed at ${file}, but that folder is not on PATH, and v2.2.6 wants 2.1.214 or later; nothing was changed. Pass --force-floor to go on without the check, or ${fix}`, plat);
+    assert.ok(refusal.endsWith(fix), `${plat}: the line ends with the fix`);
+  }
+  // Nothing in the native folder: the words the absent case has always had, line and refusal alike.
+  const none = makeExec({ env: { HOME: '/Users/someone' }, plat: 'darwin', resolve: () => null, exists: () => false });
+  const absent = floorCheck(TAG, { exec: none });
+  assert.equal(absent.line, 'claude-floor 2.1.214 (installed: not found — install Claude Code, or pass --force-floor)');
+  assert.match(floorRefusal(absent, { target: 'v2.2.6', want: TAG.floors.claudeCode }), /^upgrade: Claude Code was not found, or its version not understood, and v2\.2\.6 wants 2\.1\.214 or later — install or upgrade it first/);
+});
+
 test('the classifier names a remedy only for a shape it recognises', () => {
   // Git's own words are printed by the CALLER, always. What this decides is whether a second,
   // actionable line is added — and a confident wrong remedy costs more than none.

@@ -11,6 +11,7 @@ import { CLAUDE_ABSENT, CREATED_BY_US, SHIM_UNRESOLVED, flagsChanged, get, isShi
   register, shimTarget, spawnClaude,
   unregister } from '../lib/registration-claude.mjs';
 import { EXIT_OK } from '../lib/exit.mjs';
+import { remedyFor } from '../lib/remedies.mjs';
 import { emptyState, loadState, saveState } from '../lib/state.mjs';
 import { tempDir } from './helpers/temp.mjs';
 import { makeCheckout, recorder } from './helpers/workspace.mjs';
@@ -224,6 +225,23 @@ test('no claude on PATH is a named prerequisite, not a stack trace', async () =>
   assert.equal(log.lines.join('\n').includes(CLAUDE_ABSENT), true);
 });
 
+test('ARC-09-C270 — --register with no claude on PATH says so when Claude Code is installed and only its folder is not on PATH', () => {
+  // The same fact B00 and the upgrade's floor line report: the native installer puts the program in ~/.local/bin and leaves PATH alone,
+  // and "install it, then re-run" sends a reader who has just installed it round again. The file system here is one path.
+  const home = '/Users/someone';
+  const file = `${home}/.local/bin/claude`;
+  const attempt = (exists) => register({ root: '/r', serverKey: 'servicenow', scope: 'local', entry: { type: 'stdio' },
+    claudePath: null, env: { HOME: home }, plat: 'darwin', exists });
+
+  const off = attempt((p) => p === file);
+  assert.equal(off.ok, false);
+  assert.equal(off.reason, `Claude Code is installed at ${file}, but that folder is not on PATH — ${remedyFor('claudeCode', { platform: 'darwin', variant: 'offPath' })}`);
+  assert.doesNotMatch(off.reason, /install it from|not on PATH — --register/);
+
+  // Nothing in the native folder: the words it has always had.
+  assert.equal(attempt(() => false).reason, CLAUDE_ABSENT);
+});
+
 test('a renamed flag is reported as a renamed flag, with the CLI version', () => {
   const exec = (file, args) => (args[0] === '--version'
     ? { status: 0, stdout: '9.9.9 (Claude Code)\n', stderr: '' }
@@ -399,9 +417,45 @@ test('nothing under lib/ opens ~/.claude.json, or anything else in the home dire
    * for the others: no write verb at all, anywhere in it.
    */
   const READ_ONLY_DETECTOR = 'doctor/checks/legacy.mjs';
+  /**
+   * ARC-09-C270 — the one other file that names a home variable, and what it may do with it.
+   *
+   * Claude Code's native installer puts the program at `%USERPROFILE%\.local\bin\claude.exe` or `~/.local/bin/claude`, and "installed, but PATH
+   * does not name its folder" can only be told from "not installed" by asking whether that one file is there. So this file builds that one path
+   * from the environment its caller hands in and asks `existsSync` about it, and the rule's other half holds for it as strictly as for the
+   * detector: it never calls `homedir()`, never reads, lists, opens or writes anything, never mentions `.claude.json`, and `existsSync` is
+   * the only file-system function in it.
+   *
+   * "The only file-system function" is checked from the IMPORTS, not only from the calls. A scan for `*Sync` names cannot see the async API
+   * (`import { stat } from 'node:fs/promises'`, or `readFile` from 'node:fs'), a namespace import reached as `fs.` or a dynamic `import()`
+   * or `require()`, and a later edit that added any of them would have passed it. So the module's imports from the file system are exactly
+   * `{ existsSync }`, it has no `fs/promises` import, no `fs.` member access, and no dynamic import or require; `fsImportsOf` is the reader
+   * of the first, and the control below proves it can see each shape the rule is about.
+   */
+  const NATIVE_INSTALL_FINDER = 'claude-install.mjs';
+  assert.ok(files.some((f) => f.split('\\').join('/').endsWith(NATIVE_INSTALL_FINDER)), 'the finder is not among the scanned modules');
+  /** What each static import from `fs` or `node:fs` (or their `/promises`) brings in, as written, whitespace folded. */
+  const fsImportsOf = (src) => [...src.matchAll(/\bimport\b([^;]*?)\bfrom\s*['"](?:node:)?fs(\/promises)?['"]/g)]
+    .map((m) => `${m[1].replace(/\s+/g, ' ').trim()}${m[2] ?? ''}`);
+  assert.deepEqual(fsImportsOf("import { existsSync } from 'node:fs';\nimport { posix } from 'node:path';"), ['{ existsSync }']);
+  assert.deepEqual(fsImportsOf("import { existsSync, readFile } from 'node:fs';"), ['{ existsSync, readFile }'], 'the exactness would catch a second name');
+  assert.deepEqual(fsImportsOf("import { stat } from 'node:fs/promises';"), ['{ stat }/promises'], 'and the async API');
+  assert.deepEqual(fsImportsOf("import fs from 'fs';"), ['fs'], 'and a default import');
+  assert.deepEqual(fsImportsOf("import * as fs from 'node:fs';"), ['* as fs'], 'and a namespace import');
 
   for (const file of files) {
     const text = stripComments(readFileSync(file, 'utf8'));
+    if (file.split('\\').join('/').endsWith(NATIVE_INSTALL_FINDER)) {
+      assert.equal(WRITE_VERB.test(text), false, `${file} is the native-install finder and it writes something`);
+      assert.equal(/\bhomedir\b|\.claude\.json|readFileSync|readdirSync|opendirSync|createReadStream/.test(text), false,
+        `${file} is the native-install finder and it reads more than the one file's existence`);
+      assert.deepEqual([...new Set(text.match(/\b\w+Sync\b/g) ?? [])], ['existsSync'], `${file} uses a file-system call other than existsSync`);
+      assert.deepEqual(fsImportsOf(text), ['{ existsSync }'], `${file} imports something from the file system besides existsSync`);
+      assert.equal(/['"](?:node:)?fs\/promises['"]/.test(text), false, `${file} imports the async file-system API`);
+      assert.equal(/\bfs\./.test(text), false, `${file} reaches the file system as a member of a namespace`);
+      assert.equal(/\bimport\s*\(|\brequire\s*\(/.test(text), false, `${file} loads a module dynamically, which no import scan can see`);
+      continue;
+    }
     if (file.split('\\').join('/').endsWith(READ_ONLY_DETECTOR)) {
       assert.equal(WRITE_VERB.test(text), false,
         `${file} is the read-only detector and it writes something`);

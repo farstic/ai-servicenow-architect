@@ -241,7 +241,22 @@ test('ARC-09-C271 — Node 26 has four cells: test on Linux and Windows, bootstr
 
 test('every bootstrap run skips the Claude Code check and fetches its own corpus', () => {
   const ci = wf('ci.yml');
-  const job = ci.slice(ci.indexOf('\n  bootstrap:'), ci.indexOf('\n  launcher:'));
+  const wholeJob = ci.slice(ci.indexOf('\n  bootstrap:'), ci.indexOf('\n  launcher:'));
+  // ARC-09-C270 — ONE step is about the Claude Code check itself, and runs the Windows launcher WITHOUT the flag, twice, expecting exit 3 from
+  // it: a runner has no Claude Code, and the profile it runs under is a fake one that holds the native installer's file, or nothing. It is
+  // taken out of the scan by name, and held to what makes that safe: two runs, no flag, a fake profile under the runner's temp folder, and
+  // an exit-code check after each. Every other invocation is still held to the flag below.
+  const CHECK_STEP = '- name: Claude Code installed but its folder not on PATH (Windows launcher)';
+  const stepAt = wholeJob.indexOf(CHECK_STEP);
+  assert.ok(stepAt > 0, 'the step that proves the Windows launcher tells an installed Claude Code from a missing one is gone');
+  const stepEnd = wholeJob.indexOf('\n      - name:', stepAt + 1);
+  const checkStep = wholeJob.slice(stepAt, stepEnd);
+  const job = wholeJob.slice(0, stepAt) + wholeJob.slice(stepEnd);
+  const own = checkStep.split('\n').map((l) => l.trim()).filter((l) => /^call \.\\bootstrap\.cmd/.test(l));
+  assert.equal(own.length, 2, 'once with the file there, once without it');
+  for (const r of own) assert.ok(!r.includes('--skip-claude-check'), `the step is about the check it would skip: ${r}`);
+  assert.equal((checkStep.match(/if not "%CODE%"=="3" exit \/b 1/g) ?? []).length, 2, 'each run is held to the launcher\'s exit code for a failed preflight');
+  assert.match(checkStep, /set "USERPROFILE=%RUNNER_TEMP%\\/, 'the profile is a fake one under the runner\'s temp folder, never the runner\'s own');
   // Invocation lines only — a comment that MENTIONS a launcher is prose, and matching it would
   // make this test fail for a sentence rather than for a command.
   const runs = job.split('\n')

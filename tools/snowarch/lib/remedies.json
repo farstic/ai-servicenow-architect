@@ -1,5 +1,5 @@
 {
-  "$comment": "ARC-06-S04. One sentence per check id per platform. The launchers (ARC-06-S10/S11) print these WITHOUT Node, so they are data rather than code, and their parity test reads this file. `default` is used when a platform has no row of its own.",
+  "$comment": "ARC-06-S04. One sentence per check id per platform. The launchers (ARC-06-S10/S11) print these WITHOUT Node, so they are data rather than code, and their parity test reads this file. `default` is used when a platform has no row of its own. ARC-09-C270: a second cause of the same check is a named object inside its row (claudeCode.offPath), asked for with remedyFor(id, { variant }); it is not a check id.",
   "root": {
     "darwin": "cd \"{root}\" && ./bootstrap.sh",
     "linux": "cd \"{root}\" && ./bootstrap.sh",
@@ -16,7 +16,13 @@
     "darwin": "install Claude Code from https://code.claude.com/docs/en/setup, then re-run",
     "linux": "install Claude Code from https://code.claude.com/docs/en/setup, then re-run",
     "win32": "install Claude Code from https://code.claude.com/docs/en/setup, then re-run",
-    "default": "install Claude Code from https://code.claude.com/docs/en/setup, then re-run"
+    "default": "install Claude Code from https://code.claude.com/docs/en/setup, then re-run",
+    "offPath": {
+      "darwin": "add ~/.local/bin to your PATH with this line, then re-run (bash on macOS: ~/.bash_profile instead; https://code.claude.com/docs/en/troubleshoot-install): echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc && source ~/.zshrc",
+      "linux": "add ~/.local/bin to your PATH with this line, then re-run (zsh: ~/.zshrc instead; https://code.claude.com/docs/en/troubleshoot-install): echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc && source ~/.bashrc",
+      "win32": "add that folder to your PATH with this PowerShell line, then open a new PowerShell window and re-run (https://code.claude.com/docs/en/troubleshoot-install): [Environment]::SetEnvironmentVariable(\"Path\", [Environment]::GetEnvironmentVariable(\"Path\", \"User\") + \";$env:USERPROFILE\\.local\\bin\", \"User\")",
+      "default": "add ~/.local/bin to your shell's PATH (https://code.claude.com/docs/en/troubleshoot-install), open a new terminal and re-run"
+    }
   },
   "disk": {
     "darwin": "free up {needed} on {mount}",

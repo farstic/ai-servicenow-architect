@@ -26,8 +26,16 @@ cannot change that state.
 was found and what it did (no answer in 10 s, tried twice; or the exit code and the first line it printed), and ask you to run
 `claude --version` once and run again. They no longer say it was not found and tell you to install it. The command is asked a second
 time before it is given up on, so one slow start, such as a first start after an update or a virus scan, no longer stops an upgrade.
-A Claude Code that is not on PATH gets the words it had.
 The upgrade from 2.2.5 to this release still runs 2.2.5's own check: if its plan says `installed: not found` while `claude --version` prints a version, run `claude --version` once and run the upgrade again.
+
+**A Claude Code that is installed but not on PATH is no longer told to be installed.** Claude Code's native installer puts the program in
+`~/.local/bin` (`%USERPROFILE%\.local\bin\claude.exe` on Windows) and does not always add that folder to PATH, so a Windows install
+ended with `'claude' is not recognized` and a bootstrap that said `Claude Code not found on PATH — install it`, which the reader had
+just done. When `claude` is not on PATH, the bootstrap's preflight (the Node path and both launchers), the doctor, the upgrade plan and
+its refusal, and `--register` now look in that folder. If the file is there they say where Claude Code is and that its folder is not
+on PATH, and give the line that adds it for your platform (one PowerShell line for the user PATH on Windows, no administrator window; the
+`echo` line for zsh or bash on macOS and Linux) and Claude Code's troubleshooting page. They no longer say to install it. If nothing is
+there, the words are the ones they had.
 
 ### Fixed
 
@@ -51,6 +59,15 @@ The upgrade from 2.2.5 to this release still runs 2.2.5's own check: if its plan
   the first line on stderr, with the remedy to run it once and run again, and found-but-silent still refuses without `--force-floor`.
   The words for a Claude Code that is not on PATH, a version that is not understood and a version below the floor are unchanged. An
   upgrade from 2.2.5 runs 2.2.5's own plan, so the new floor line appears from 2.2.6 on (ARC-09-C269).
+- On Windows, a Claude Code installed by its native installer into `%USERPROFILE%\.local\bin` was reported as `Claude Code not found on
+  PATH` with the remedy `install Claude Code from …, then re-run`, in the bootstrap's preflight, in `bootstrap.ps1`, in the upgrade plan
+  and its refusal, and in `--register`; the reader installed it again and met the same line (found in an end-to-end install of 2.2.5 on
+  Windows, where the installer's own notes had said the folder was not on PATH). `makeExec` now carries `nativeInstall`, which says
+  whether the native installer's file is there (`%USERPROFILE%\.local\bin\claude.exe`, or `~/.local/bin/claude` on macOS and Linux,
+  from the platform's own home variable), and `probeClaude` returns a new kind, `offPath`, when `claude` is not on PATH and that file
+  is. The sentence (`Claude Code is installed at <path>, but that folder is not on PATH`) and the fix for each platform are data
+  (`remedies.json`, under `claudeCode.offPath`) and are generated into both launchers, whose own B00 looks for the file the same way.
+  A `claude` that is on PATH is never looked for there, and nothing in that folder keeps the words it had (ARC-09-C270).
 
 ## 2.2.5 — 2026-11-02
 
