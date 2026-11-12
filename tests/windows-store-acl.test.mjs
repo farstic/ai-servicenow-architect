@@ -195,12 +195,23 @@ test('ARC-09-C272 — the loop, for real: SV-02 finds an open .local and names w
   assert.match(after.detail, /readable only by you/);
 });
 
+/**
+ * The environment for a Windows PowerShell 5.1 child. A job's default shell on a hosted Windows runner is pwsh (PowerShell 7), which puts its
+ * own module folders in PSModulePath; powershell.exe inherits that, finds PowerShell 7's Microsoft.PowerShell.Security before its own and
+ * cannot load it: "The 'ConvertTo-SecureString' command was found in the module 'Microsoft.PowerShell.Security', but the module could not be
+ * loaded" (measured on windows-latest, 2026-11-12). Without the variable, 5.1 works out its own.
+ */
+function windowsPowerShellEnv() {
+  // Any spelling: a copy of process.env is a plain object, and Windows variable names are not case-sensitive.
+  return Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toLowerCase() !== 'psmodulepath'));
+}
+
 test('ARC-09-C272 — the effect: another local account is denied the locked store and — the control — can read an open file', { skip: skip || (onCi ? false : 'runs on CI, where a throwaway account can be made') }, async (t) => {
   const { base, why } = sandbox();
   if (!base) { t.skip(why); return; }
   const out = `${base}-out`;
   mkdirSync(out);
-  t.after(() => { spawnSync('powershell.exe', ['-NoProfile', '-Command', 'Remove-LocalUser -Name aclprobe -ErrorAction SilentlyContinue']); rmSync(base, { recursive: true, force: true }); rmSync(out, { recursive: true, force: true }); });
+  t.after(() => { spawnSync('powershell.exe', ['-NoProfile', '-Command', 'Remove-LocalUser -Name aclprobe -ErrorAction SilentlyContinue'], { env: windowsPowerShellEnv() }); rmSync(base, { recursive: true, force: true }); rmSync(out, { recursive: true, force: true }); });
   const { saveStore } = await import(href('packages/snowarch/dist/store/index.js'));
   const locked = join(base, 'locked', '.local', 'instances.json');
   saveStore(locked, store());
@@ -224,7 +235,7 @@ test('ARC-09-C272 — the effect: another local account is denied the locked sto
     '}',
   ].join('\n');
   // The throwaway account's password is assembled and handed over in the environment: no secret-shaped literal in the file or the command.
-  const env = { ...process.env, ACL_TEST_PW: ['Acl', 'Probe', '1!aA'].join('-') };
+  const env = { ...windowsPowerShellEnv(), ACL_TEST_PW: ['Acl', 'Probe', '1!aA'].join('-') };
   const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 120_000, env });
   assert.equal(r.status, 0, `the second account could not be made or run: ${r.stdout}${r.stderr}`);
   const results = Object.fromEntries(r.stdout.split(/\r?\n/).filter((l) => l.startsWith('RESULT|'))
