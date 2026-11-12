@@ -51,6 +51,13 @@ The upgrade from 2.2.5 to this release still runs 2.2.5's own check: if its plan
   the first line on stderr, with the remedy to run it once and run again, and found-but-silent still refuses without `--force-floor`.
   The words for a Claude Code that is not on PATH, a version that is not understood and a version below the floor are unchanged. An
   upgrade from 2.2.5 runs 2.2.5's own plan, so the new floor line appears from 2.2.6 on (ARC-09-C269).
+- `scripts/render-drawio.sh` did not find draw.io Desktop on Windows. It looked for `drawio` on PATH and for three macOS and Linux paths,
+  so in Git Bash a `draw.io.exe` that was there was reported as not found, with `brew install --cask drawio` as the remedy, and a Windows
+  user had to make a `drawio` shim by hand to get a Word document with a diagram. It now finds `drawio`, `draw.io` and `draw.io.exe` on
+  PATH and, on Windows, `%LOCALAPPDATA%\Programs\drawio` (the zip), `%LOCALAPPDATA%\Programs\draw.io` (the per-user installer) and
+  `%PROGRAMFILES%\draw.io`. When it finds nothing it gives the install line of the platform it runs on: `brew` for macOS only, the zip that
+  needs no administrator rights for Windows, the packages for Linux. macOS keeps its sentence, and a shim made by hand keeps working.
+  `scripts/README.md` says the same (ARC-09-C273).
 
 ## 2.2.5 — 2026-11-02
 
