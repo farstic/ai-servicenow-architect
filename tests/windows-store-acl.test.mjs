@@ -220,11 +220,15 @@ test('ARC-09-C272 — the effect: another local account is denied the locked sto
   const openFile = join(openDir, 'instances.json');
   writeFileSync(openFile, 'OPEN-SECRET');
 
+  // TIMING lines say where the seconds go: the first logon of a new account builds its profile, and on a loaded hosted runner that has taken
+  // more than the 120 s this case first allowed (release-dryrun (windows-latest), 126.5 s, 2026-11-12, while the test cells made it in under).
   const script = [
     "$ErrorActionPreference = 'Stop'",
+    '$sw = [Diagnostics.Stopwatch]::StartNew()',
     `icacls '${out}' /grant '*S-1-1-0:(OI)(CI)F' | Out-Null`,
     '$pw = ConvertTo-SecureString $env:ACL_TEST_PW -AsPlainText -Force',
     "New-LocalUser -Name 'aclprobe' -Password $pw | Out-Null",
+    "'TIMING|account|' + [math]::Round($sw.Elapsed.TotalSeconds, 1)",
     "$cred = New-Object System.Management.Automation.PSCredential('.\\aclprobe', $pw)",
     `foreach ($f in '${locked}', '${openFile}') {`,
     '  $n = [IO.Path]::GetRandomFileName()',
@@ -232,12 +236,13 @@ test('ARC-09-C272 — the effect: another local account is denied the locked sto
     '  $a = \'/c type "\' + $f + \'" > "\' + $o + \'" 2>&1\'',
     `  $p = Start-Process -FilePath cmd.exe -ArgumentList $a -Credential $cred -WorkingDirectory '${out}' -Wait -PassThru -WindowStyle Hidden`,
     '  "RESULT|$f|$($p.ExitCode)|" + ((Get-Content -LiteralPath $o -Raw) -replace "\\s+", " ").Trim()',
+    "  'TIMING|read|' + [math]::Round($sw.Elapsed.TotalSeconds, 1)",
     '}',
   ].join('\n');
   // The throwaway account's password is assembled and handed over in the environment: no secret-shaped literal in the file or the command.
   const env = { ...windowsPowerShellEnv(), ACL_TEST_PW: ['Acl', 'Probe', '1!aA'].join('-') };
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 120_000, env });
-  assert.equal(r.status, 0, `the second account could not be made or run: ${r.stdout}${r.stderr}`);
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', timeout: 300_000, env });
+  assert.equal(r.status, 0, `the second account could not be made or run (status ${r.status}, signal ${r.signal ?? 'none'}${r.error ? `, ${r.error.message}` : ''}): ${r.stdout}${r.stderr}`);
   const results = Object.fromEntries(r.stdout.split(/\r?\n/).filter((l) => l.startsWith('RESULT|'))
     .map((l) => { const [, f, code, text] = l.split('|'); return [f, { code, text }]; }));
   assert.equal(results[openFile]?.text, 'OPEN-SECRET', `the control failed: the second account could not read an open file: ${JSON.stringify(results)}`);
