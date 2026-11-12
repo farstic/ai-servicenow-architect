@@ -48,3 +48,13 @@ export function install(registerHooks, fixtureKeysUrl) {
     },
   });
 }
+
+/**
+ * Which of the two APIs, chosen by what the module HAS and not by which Node it is: `registerHooks` when it is a function, `register()` only when
+ * it is absent. A version test would be wrong on the next backport, and Node's own deprecation notice names the replacement, not a version.
+ * `nodeModule` is `node:module`'s namespace, a parameter so a case can hand in one that has the function and one that has not.
+ */
+export function installHook(nodeModule, hooksUrl, fixtureKeysUrl) {
+  if (typeof nodeModule.registerHooks === 'function') install(nodeModule.registerHooks, fixtureKeysUrl);
+  else nodeModule.register(hooksUrl, { data: { keysUrl: fixtureKeysUrl } });
+}

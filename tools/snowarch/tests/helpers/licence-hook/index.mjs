@@ -89,11 +89,10 @@ export function fixtureKeysHook(dir, keys) {
   writeFileSync(keysFile, `export const PRODUCT_KEYS = Object.freeze(${JSON.stringify(trusted, null, 2)}.map((k) => Object.freeze(k)));\n`);
   const keysUrl = pathToFileURL(keysFile).href;
   const registerFile = join(dir, 'register-hook.mjs');
-  // registerHooks where Node has it, register() where it does not: see `install` in hooks.mjs for why (DEP0205).
+  // registerHooks where the module has it, register() where it does not: `installHook` in hooks.mjs chooses, and says why (DEP0205).
   writeFileSync(registerFile, "import * as nodeModule from 'node:module';\n"
-    + `import { install } from ${JSON.stringify(HOOKS_URL)};\n`
-    + `if (typeof nodeModule.registerHooks === 'function') install(nodeModule.registerHooks, ${JSON.stringify(keysUrl)});\n`
-    + `else nodeModule.register(${JSON.stringify(HOOKS_URL)}, { data: { keysUrl: ${JSON.stringify(keysUrl)} } });\n`);
+    + `import { installHook } from ${JSON.stringify(HOOKS_URL)};\n`
+    + `installHook(nodeModule, ${JSON.stringify(HOOKS_URL)}, ${JSON.stringify(keysUrl)});\n`);
   const registerUrl = pathToFileURL(registerFile).href;
   return { keysUrl, registerUrl, importArgs: [`--import=${registerUrl}`], nodeOptions: `--import=${registerUrl}` };
 }
