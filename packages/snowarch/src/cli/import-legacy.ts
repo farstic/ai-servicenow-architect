@@ -33,7 +33,7 @@ import {
   COLUMNS, ENTRY_DEFAULTS, labelOf, resolveFlags, wrapText, type ReviewIo,
 } from './preset-ui.js';
 import {
-  cloudSyncGate, maskUsername, probeOptionsFor, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY,
+  aclNote, cloudSyncGate, maskUsername, probeOptionsFor, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY,
   EXIT_USAGE, LABEL_RULE, type AddIo, type ManageDeps,
 } from './instance.js';
 import { probeAll, toLastProbe, type LastProbe } from '../servicenow/probes.js';
@@ -534,9 +534,12 @@ Promise<ImportResult> {
     if (plan.defaultInstance === entry.label && next.defaultInstance === undefined) {
       next = { ...next, defaultInstance: entry.label } as Store;
     }
-    saveStore(target.path, next);
+    // ARC-09-C272 — credentials are being stored: the file, and the product's own folder, are made private whatever they were, and said so if that changed them.
+    const written = saveStore(target.path, next, { lock: 'always' });
     imported += 1;
     io.write(`  ${entry.label}: imported (preset ${decision.preset}, user ${maskUsername(credentials.username)})\n`);
+    const note = aclNote(written.acl, deps.platform ?? process.platform);
+    if (note) io.write(`${note}\n`);
   }
 
   io.write(`${deletionAdvice(imported, entries.length, home, deps.platform ?? process.platform)}\n`);

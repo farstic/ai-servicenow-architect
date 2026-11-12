@@ -163,6 +163,9 @@ describe('ARC-07-C38 — the server doctor spells the launcher for the ctx it wa
     // `checks.ts` read `process.platform` at MODULE LOAD for this note, so it was fixed at import and
     // undrivable. It reads the ctx now, which this asserts in both directions.
     //
+    // ARC-09-C272 — the Windows note is no longer "ACL-inherited": SV-02 reads who can read the store and says it is readable only by the
+    // account (and SYSTEM and Administrators). The direction is the same: a win32 ctx gets the Windows verdict and a POSIX ctx never does.
+    //
     // THE BRANCH NEEDS A STORE TO EXIST, and measuring is how I know: without one the check returns
     // before reaching the mode question, so both directions came back with no note and the case passed
     // its negative half while proving nothing about its positive one.
@@ -173,9 +176,10 @@ describe('ARC-07-C38 — the server doctor spells the launcher for the ctx it wa
       writeFileSync(store, JSON.stringify({ version: 1, instances: {} }));
       process.env.SNOW_STORE = store;
       const win = (await runAll(WIN)).map((r) => r.detail).join('\n');
-      expect(win, 'the ACL note did not follow a win32 ctx').toContain('ACL-inherited');
+      expect(win, 'the ACL verdict did not follow a win32 ctx').toContain('readable only by you');
+      expect(win).not.toContain('ACL-inherited');
       const posix = (await runAll(POSIX)).map((r) => r.detail).join('\n');
-      expect(posix, 'the ACL note appeared on a POSIX ctx').not.toContain('ACL-inherited');
+      expect(posix, 'the Windows verdict appeared on a POSIX ctx').not.toContain('readable only by you');
     } finally {
       if (previous === undefined) delete process.env.SNOW_STORE;
       else process.env.SNOW_STORE = previous;

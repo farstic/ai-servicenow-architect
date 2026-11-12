@@ -205,15 +205,15 @@ describe('ARC-08-C14 - a healthy store is asserted, not assumed', () => {
     expect(check(r, 'SV-02').detail).not.toContain(FIXTURE_PASS);
   }, 120_000);
 
-  it.skipIf(!isWindows)('on Windows a healthy store keeps the ACL note, and is still not a failure', async () => {
-    // The platform exception is written out rather than left as a weaker assertion. Windows has no
-    // POSIX mode to read, so SV-02 reports the ACL note instead of `ok` — that is a DIFFERENT
-    // correct answer, not a laxer one, and saying so here stops the next reader treating the
-    // Windows branch as the one where the check does less.
+  it.skipIf(!isWindows)('on Windows a healthy store is exactly ok, from its permissions read for real', async () => {
+    // ARC-09-C272 — this was "not a failure, and the ACL note": Windows has no POSIX mode to read, so SV-02 skipped the question and
+    // reported the note, which is how a password file every account could read was a healthy store. It reads the DACL now (icacls, on this
+    // runner) and a store in the temp folder of the account — the account, SYSTEM and Administrators — is exactly ok, like the POSIX one.
     writeStore();
     const r = await doctor(['--no-network', '--json']);
-    expect(check(r, 'SV-02').status).not.toBe('fail');
-    expect(check(r, 'SV-02').detail).toContain('ACL-inherited');
+    expect(check(r, 'SV-02').status).toBe('ok');
+    expect(check(r, 'SV-02').detail).toContain('readable only by you');
+    expect(check(r, 'SV-02').detail).not.toContain(FIXTURE_PASS);
   }, 120_000);
 
   it('SV-02 is present in the report in every store state', async () => {

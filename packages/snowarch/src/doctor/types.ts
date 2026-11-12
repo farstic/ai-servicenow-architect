@@ -1,6 +1,7 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { cliSpelling } from '../cli/tty.js';
+import type { AclTools } from '../store/acl.js';
 /**
  * The registry contract, shared with ARC-08's unified doctor.
  *
@@ -83,6 +84,11 @@ export interface CheckContext {
    * flags an entry actually states — the loaded runtime has had every absent one filled in.
    */
   storeEntry?: (label: string) => { flags?: Record<string, string | undefined> } | undefined;
+  /**
+   * ARC-09-C272 — the Windows lock tools, injected for the reason `fluent` is: SV-02 reads who can read the store through them, and a test
+   * never runs icacls. Absent means the real ones for this process.
+   */
+  acl?: AclTools;
 }
 
 export interface Check {

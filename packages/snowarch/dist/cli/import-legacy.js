@@ -29,7 +29,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { normalizeInstanceUrl, proposeEnvironment } from './url.js';
 import { COLUMNS, ENTRY_DEFAULTS, labelOf, resolveFlags, wrapText, } from './preset-ui.js';
-import { cloudSyncGate, maskUsername, probeOptionsFor, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY, EXIT_USAGE, LABEL_RULE, } from './instance.js';
+import { aclNote, cloudSyncGate, maskUsername, probeOptionsFor, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY, EXIT_USAGE, LABEL_RULE, } from './instance.js';
 import { probeAll, toLastProbe } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
 import { loadStore, saveStore } from '../store/index.js';
@@ -444,9 +444,13 @@ export async function runImport(options, io, deps = {}) {
         if (plan.defaultInstance === entry.label && next.defaultInstance === undefined) {
             next = { ...next, defaultInstance: entry.label };
         }
-        saveStore(target.path, next);
+        // ARC-09-C272 — credentials are being stored: the file, and the product's own folder, are made private whatever they were, and said so if that changed them.
+        const written = saveStore(target.path, next, { lock: 'always' });
         imported += 1;
         io.write(`  ${entry.label}: imported (preset ${decision.preset}, user ${maskUsername(credentials.username)})\n`);
+        const note = aclNote(written.acl, deps.platform ?? process.platform);
+        if (note)
+            io.write(`${note}\n`);
     }
     io.write(`${deletionAdvice(imported, entries.length, home, deps.platform ?? process.platform)}\n`);
     return { exitCode: imported === 0 ? EXIT_FAILED : EXIT_OK, imported, total: entries.length, plan };
