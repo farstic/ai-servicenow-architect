@@ -90,6 +90,13 @@ itself. Nothing changes an existing store's permissions without saying so.
   doctor's cache) and the server's (the audit log, the licence state, the integrity files) are made by `makePrivateDir`, and a test fails
   on any `mkdirSync` with a mode outside the two helpers. SV-02 reads the DACL (from the SDDL `icacls /save` writes, so no language matters)
   and tolerates the account, SYSTEM and Administrators; F9 (`store-acl`) is the whitelisted repair (ARC-09-C272).
+- `scripts/render-drawio.sh` did not find draw.io Desktop on Windows. It looked for `drawio` on PATH and for three macOS and Linux paths,
+  so in Git Bash a `draw.io.exe` that was there was reported as not found, with `brew install --cask drawio` as the remedy, and a Windows
+  user had to make a `drawio` shim by hand to get a Word document with a diagram. It now finds `drawio`, `draw.io` and `draw.io.exe` on
+  PATH and, on Windows, `%LOCALAPPDATA%\Programs\drawio` (the zip), `%LOCALAPPDATA%\Programs\draw.io` (the per-user installer) and
+  `%PROGRAMFILES%\draw.io`. When it finds nothing it gives the install line of the platform it runs on: `brew` for macOS only, the zip that
+  needs no administrator rights for Windows, the packages for Linux. macOS keeps its sentence, and a shim made by hand keeps working.
+  `scripts/README.md` says the same (ARC-09-C273).
 
 ## 2.2.5 — 2026-11-02
 

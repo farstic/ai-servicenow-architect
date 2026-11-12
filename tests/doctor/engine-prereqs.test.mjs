@@ -13,7 +13,7 @@ import { resolve } from 'node:path';
 import { makeExec } from '../../tools/snowarch/lib/steps/B00.mjs';
 import { TIMED_OUT } from '../../tools/snowarch/lib/probe-net.mjs';
 import { StateError } from '../../tools/snowarch/lib/state.mjs';
-import { capabilityPacks, DRAWIO_CANDIDATES, enginePrereqChecks, recordedMode,
+import { capabilityPacks, DRAWIO_CANDIDATES, drawioCandidates, enginePrereqChecks, recordedMode,
   SOFFICE_CANDIDATES } from '../../tools/snowarch/lib/doctor/checks/engine-prereqs.mjs';
 import { contextFor, greenTree, runById } from './helpers/tree.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
@@ -183,6 +183,26 @@ test('E-04 finds draw.io at the paths the renderer itself looks in', () => {
   assert.equal(packs.drawio.how, DRAWIO_CANDIDATES.posix[1]);
   for (const candidate of DRAWIO_CANDIDATES.posix.slice(0, 2)) assert.ok(seen.includes(candidate));
   assert.ok(seen.includes(SOFFICE_CANDIDATES[0]));
+});
+
+test('ARC-09-C273 — E-04 finds draw.io on Windows where the renderer does: the zip, the per-user installer, Program Files', () => {
+  const env = { PATH: '', LOCALAPPDATA: 'C:\\Users\\Test User\\AppData\\Local', PROGRAMFILES: 'C:\\Program Files' };
+  const places = [
+    'C:\\Users\\Test User\\AppData\\Local\\Programs\\drawio\\draw.io.exe',
+    'C:\\Users\\Test User\\AppData\\Local\\Programs\\draw.io\\draw.io.exe',
+    'C:\\Program Files\\draw.io\\draw.io.exe',
+  ];
+  assert.deepEqual(drawioCandidates({ platform: 'win32', env }).slice(0, 3), places);
+  for (const place of places) {
+    assert.equal(capabilityPacks({ env, platform: 'win32', exists: (p) => p === place }).drawio.how, place);
+  }
+  assert.equal(capabilityPacks({ env, platform: 'win32', exists: () => false }).drawio.how, null);
+  // The fixed places are still tried after them, and a variable that is unset or empty adds none.
+  assert.deepEqual(drawioCandidates({ platform: 'win32', env: { PATH: '' } }), DRAWIO_CANDIDATES.win32);
+  assert.deepEqual(drawioCandidates({ platform: 'win32', env: { LOCALAPPDATA: '', PROGRAMFILES: '' } }), DRAWIO_CANDIDATES.win32);
+  // Another platform never reads them.
+  assert.deepEqual(drawioCandidates({ platform: 'linux', env }), DRAWIO_CANDIDATES.posix);
+  assert.deepEqual(drawioCandidates({ platform: 'darwin', env }), DRAWIO_CANDIDATES.posix);
 });
 
 test('E-04 looks for the Windows tooling when the platform is Windows', () => {
