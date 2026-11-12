@@ -44,6 +44,18 @@ one, and the commands for changing an answer later, renewing the licence, upgrad
 install on such a computer, its clone command carries the release tag that the release writes, and tests hold it to the product's own words,
 commands and states.
 
+**The instance store is private on Windows.** It holds the basic-auth password. On macOS and Linux it is 0600 in a 0700 folder; on Windows
+it was whatever its folder inherited, and a folder made directly under `C:\` hands `BUILTIN\Users` read and `Authenticated Users` modify to
+everything made in it, so every other account on the computer could read it. The wizard said the permissions were "inherited from the folder",
+and the doctor skipped the check and reported the store as healthy. Now a folder the product creates (`.local/`, its logs, the store's own
+folder) is locked to your account and SYSTEM, by SID, with `icacls`. Storing a credential (`instance add`, `set-credentials`,
+`import --from-legacy`) makes the store, and the product's own folder, private whatever they were — an existing `.local/` that holds a licence
+too, which follows its folder — and says what it changed: "It was open to BUILTIN\Users and NT AUTHORITY\Authenticated Users; its
+permissions were changed just now." A save that stores nothing new never makes an open file private and keeps a private one private. The
+doctor's SV-02 reads the permissions and names who else can read the store ("BUILTIN\Users can read it"). Its repair for the checkout's
+own store is `doctor --fix` (F9), which shows its plan first; for any other store it prints one PowerShell line that works out your account
+itself. Nothing changes an existing store's permissions without saying so.
+
 ### Fixed
 
 - The upgrade plan's `credentials:` line said that `.local/instances.json` is never read or written by the upgrade. The verify step of
@@ -89,6 +101,23 @@ commands and states.
   stderr in every process the hook is loaded into, and seven cases that read a child's stderr or its JSON failed on it. It installs through
   `registerHooks` where Node has it (22.15 and later) and keeps `register()` for Node 20; nothing shipped is affected, and the guard that keeps
   shipped code away from `register` holds it away from `registerHooks` too (ARC-09-C271).
+- On Windows the instance store, which holds the basic-auth password, was readable by every account on the computer when it sat in a folder
+  made directly under `C:\` (a folder such as `C:\work\…` or `C:\AI_Arch`): `BUILTIN\Users` read and
+  `Authenticated Users` modify are inherited from the drive root (measured on a windows-latest runner, with a second local account denied the
+  locked file and reading an open one). `saveStore` now locks a folder it creates, and a file it creates in a folder that was there, to the
+  account and SYSTEM, by SID (`icacls /inheritance:r /grant:r`); `instance add`, `set-credentials` and `import --from-legacy` pass
+  `lock: 'always'` and report what they changed; a routine save reads the file first and makes the replacement private again if it was, because a
+  save replaces the file with one made in its folder. The engine's private folders (`.local/`, logs, the licence and upgrade caches, the
+  doctor's cache) and the server's (the audit log, the licence state, the integrity files) are made by `makePrivateDir`, and a test fails
+  on any `mkdirSync` with a mode outside the two helpers. SV-02 reads the DACL (from the SDDL `icacls /save` writes, so no language matters)
+  and tolerates the account, SYSTEM and Administrators; F9 (`store-acl`) is the whitelisted repair (ARC-09-C272).
+- `scripts/render-drawio.sh` did not find draw.io Desktop on Windows. It looked for `drawio` on PATH and for three macOS and Linux paths,
+  so in Git Bash a `draw.io.exe` that was there was reported as not found, with `brew install --cask drawio` as the remedy, and a Windows
+  user had to make a `drawio` shim by hand to get a Word document with a diagram. It now finds `drawio`, `draw.io` and `draw.io.exe` on
+  PATH and, on Windows, `%LOCALAPPDATA%\Programs\drawio` (the zip), `%LOCALAPPDATA%\Programs\draw.io` (the per-user installer) and
+  `%PROGRAMFILES%\draw.io`. When it finds nothing it gives the install line of the platform it runs on: `brew` for macOS only, the zip that
+  needs no administrator rights for Windows, the packages for Linux. macOS keeps its sentence, and a shim made by hand keeps working.
+  `scripts/README.md` says the same (ARC-09-C273).
 
 ## 2.2.5 — 2026-11-02
 

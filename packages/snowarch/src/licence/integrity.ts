@@ -42,6 +42,7 @@ import { dirname, isAbsolute, join, posix, relative, sep } from 'node:path';
 
 import { appendAudit, type IntegrityRestoreEntry } from '../audit/writer.js';
 import { cliSpelling } from '../cli/tty.js';
+import { makePrivateDir } from '../store/acl.js';
 import { verifyBody, type KeyRole, type ProductKey } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
 
@@ -437,7 +438,7 @@ function writeVerdict(root: string, local: string | undefined, tag: string, mani
   for (const p of coveredOnDisk(root, coverage)) files[p] = stampOf(join(root, ...p.split('/'))) ?? '';
   const path = verdictPath(root, local);
   try {
-    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    makePrivateDir(dirname(path));
     const tmp = `${path}.tmp-${process.pid}`;
     writeFileSync(tmp, `${JSON.stringify({ format: VERDICT_FORMAT, tag, manifest: stampOf(manifestCachePath(root, local)) ?? '',
       coverage, files })}\n`, { mode: 0o600 });
@@ -479,7 +480,7 @@ const sleep = (ms: number): void => { Atomics.wait(new Int32Array(new SharedArra
 /** Take `.local/integrity.lock` (R1): one restore at a time; a lock older than 30 s is a dead holder's. */
 function takeLock(root: string, local: string | undefined, now: () => Date): (() => void) | null {
   const path = lockPath(root, local);
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  makePrivateDir(dirname(path));
   const deadline = Date.now() + LOCK_WAIT_MS;
   for (;;) {
     try {
@@ -638,7 +639,7 @@ function restoreTree(root: string, tag: string, manifest: ManifestBody, modified
   const put = modified.filter((d) => d.why !== 'extra').map((d) => d.path);
   const extras = modified.filter((d) => d.why === 'extra').map((d) => d.path);
   try {
-    mkdirSync(folder, { recursive: true, mode: 0o700 });
+    makePrivateDir(folder);
     for (const d of modified.filter((x) => x.why === 'changed')) {
       const to = join(folder, ...d.path.split('/'));
       mkdirSync(dirname(to), { recursive: true });

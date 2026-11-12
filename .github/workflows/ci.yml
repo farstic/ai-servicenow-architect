@@ -567,6 +567,64 @@ jobs:
           node scripts/ci/doctor-snapshot.mjs --in "$RUNNER_TEMP/doctor.json" \
             --out "$RUNNER_TEMP/doctor-normalised.json" --summary
 
+      # ARC-09-C273 — render-drawio.sh finds draw.io Desktop where Windows puts it. Run in Git Bash, as the Architect runs it, against a draw.io.exe
+      # built here: a console program that writes the file named after -o, so the script's own loop runs unchanged. Four placements (the zip, the
+      # per-user installer, Program Files, a folder on PATH), each in a folder with a space in its name and, for the two variables, handed over the
+      # way Windows does it (a C:\ path); the other variable names an empty folder, so only the placement under test can be found. Each is asked
+      # first: the script is sourced and find_drawio only looks, so a render starts only when the answer is the stub. Last, nothing anywhere: exit 3,
+      # the Windows words, no brew. The stub is the only program this step starts.
+      - name: 'ARC-09-C273 — render-drawio.sh finds draw.io.exe where Windows puts it (Git Bash)'
+        if: matrix.variant == 'node-cli' && matrix.os == 'windows-latest' && matrix.node == '22'
+        shell: bash
+        run: |
+          set -eu
+          w="$(cygpath -u "$RUNNER_TEMP")/c273"
+          rm -rf "$w"; mkdir -p "$w/stub" "$w/diagrams" "$w/empty"
+          for n in drawio draw.io draw.io.exe; do
+            if command -v "$n"; then echo "a draw.io is already on PATH ($n): this step would prove nothing"; exit 1; fi
+          done
+          uname -s
+          env | grep -i -E '^(localappdata|programfiles|programw6432)=' || true
+          printf '%s\n' \
+            'static class Stub { static int Main(string[] a) {' \
+            '  for (int i = 0; i + 1 < a.Length; i++) if (a[i] == "-o") System.IO.File.WriteAllText(a[i + 1], "stub");' \
+            '  return 0; } }' > "$w/stub/stub.cs"
+          MSYS2_ARG_CONV_EXCL='*' /c/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe -nologo \
+            -out:"$(cygpath -w "$w/stub/draw.io.exe")" "$(cygpath -w "$w/stub/stub.cs")"
+          printf '<mxfile/>\n' > "$w/diagrams/a.drawio"
+          place() {
+            # $1 label, $2 where the stub goes (under $w), $3 the variable that leads to it (LOCALAPPDATA, PROGRAMFILES or PATH), $4 its folder (under $w)
+            dest="$w/$2"; folder="$w/$4"
+            mkdir -p "$(dirname "$dest")"; cp "$w/stub/draw.io.exe" "$dest"
+            la="$(cygpath -w "$w/empty")"; pf="$la"; pa="$PATH"
+            case "$3" in
+              LOCALAPPDATA) la="$(cygpath -w "$folder")" ;;
+              PROGRAMFILES) pf="$(cygpath -w "$folder")" ;;
+              PATH) pa="$PATH:$folder" ;;
+            esac
+            # The single quotes are for the inner bash, which expands $1 and $2 itself.
+            # shellcheck disable=SC2016
+            asked="$(env "LOCALAPPDATA=$la" "PROGRAMFILES=$pf" "PATH=$pa" bash -c 'source "$1" "$2"; find_drawio; echo "$DRAWIO"' lookup scripts/render-drawio.sh "$w/empty")"
+            echo "$1: the lookup says $asked"
+            [ "${asked%.exe}" = "${dest%.exe}" ] || { echo "$1: expected $dest"; exit 1; }
+            env "LOCALAPPDATA=$la" "PROGRAMFILES=$pf" "PATH=$pa" bash scripts/render-drawio.sh "$w/diagrams" | tee "$w/out.txt"
+            grep -q 'done: 1 rendered, 0 failed' "$w/out.txt"
+            test -s "$w/diagrams/a.png"
+            rm -f "$w/diagrams/a.png" "$dest"
+          }
+          place 'the zip'                'Local App Data/Programs/drawio/draw.io.exe'  LOCALAPPDATA 'Local App Data'
+          place 'the per-user installer' 'Local App Data/Programs/draw.io/draw.io.exe' LOCALAPPDATA 'Local App Data'
+          place 'Program Files'          'Program Files/draw.io/draw.io.exe'           PROGRAMFILES 'Program Files'
+          place 'a folder on PATH'       'on path/draw.io.exe'                         PATH         'on path'
+          set +e
+          env "LOCALAPPDATA=$(cygpath -w "$w/empty")" "PROGRAMFILES=$(cygpath -w "$w/empty")" bash scripts/render-drawio.sh "$w/diagrams" > "$w/out.txt" 2> "$w/err.txt"
+          code=$?
+          set -e
+          cat "$w/err.txt"
+          test "$code" = 3
+          grep -q 'Without administrator rights: download the zip whose name ends in -windows.zip' "$w/err.txt"
+          if grep -q brew "$w/err.txt"; then echo 'the Windows words name brew'; exit 1; fi
+
       # ── ARC-09-C5: where the re-run path's time goes ────────────────────────────────────────
       # MEASURE BEFORE ANY FIX. The Windows cells spend 690–920 ms of the product's own time on the
       # banner's re-run path — a quick doctor plus rendering — and the cap does not move until

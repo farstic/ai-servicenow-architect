@@ -740,6 +740,18 @@ that reports "not found" asks through `probeClaude` and never tests `found` itse
 (`claudeCode.offPath`) and are generated into both launchers. A test hands in its own `exec` or its own `exists`, so no case depends on what the machine
 it runs on has in `~/.local/bin`.
 
+### A private folder is made by makePrivateDir
+
+A folder the product keeps private — `.local/`, its logs, the licence state, the doctor's cache, the store's own folder — is made with
+`makePrivateDir` (`tools/snowarch/lib/private-dir.mjs` for the engine, `packages/snowarch/src/store/acl.ts` for the server) and never
+with `mkdirSync(dir, { mode: 0o700 })` by hand. On POSIX the two are the same call. On Windows the mode is ignored, and a folder made
+directly under `C:\` hands `BUILTIN\Users` read and `Authenticated Users` modify to what is made in it (ARC-09-C272), so the helper locks a
+folder it CREATES to the account and SYSTEM, by SID: `icacls <path> /inheritance:r /grant:r *<SID>:(OI)(CI)F *S-1-5-18:(OI)(CI)F`. It locks
+what it created and nothing it found. A folder that was already there is the user's, and its lock is `instance add`'s (a credential is being
+stored, and it says what it changed) and `doctor --fix`'s (F9), never a side effect of writing a cache. `tests/private-dir-guard.test.mjs`
+searches the tree for a folder made by hand and allows the two helpers; `tests/private-dir-parity.test.mjs` holds them to one command. A case
+gives the helper its own lock tools and never runs icacls; the one that does is `tests/windows-store-acl.test.mjs`, which runs on Windows only.
+
 ### Never mutate a shared build artefact in a test
 
 A test that edits `dist/` — even one that restores it in a `finally` — cannot be isolated by cleaning
