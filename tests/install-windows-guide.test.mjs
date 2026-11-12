@@ -191,6 +191,8 @@ const SCREEN_PHRASES = [
   'Health check (quick):',
   'more run with',
   'Next: run',
+  // The wizard's line when the store could not be locked (ARC-09-C272); the troubleshooting table quotes its start.
+  'Its permissions could not be restricted',
 ];
 
 test('ARC-09-C271 — the words on the screens are the product\'s, in both directions', () => {
@@ -201,6 +203,38 @@ test('ARC-09-C271 — the words on the screens are the product\'s, in both direc
     assert.ok(onPage.includes(fold(shown)), `the page lacks: ${shown}`);
     assert.ok(product.includes(fold(written)), `the product no longer says (the page still does): ${written}`);
   }
+});
+
+test('ARC-09-C271 — the store line of question 7 is the one `storeLine` builds, and the doctor has the check and the repair the page names', async () => {
+  // ARC-09-C272: on Windows the wizard says who can read the store from what the save DID, and `storeLine` builds that sentence. The screen of
+  // question 7 quotes it, so the page is asked of the function and not of a copy of its words. The store is the checkout's own
+  // (`.local\instances.json` in the folder the install runs in), which is where this guide puts it. `{}` is the environment: the second line of
+  // a failed lock is spelled for the shell, and an empty one is Windows PowerShell whatever runs the test.
+  const { storeLine } = await import(href('packages/snowarch/dist/cli/instance.js'));
+  const store = 'C:\\Users\\you\\AI-Arch\\.local\\instances.json';
+  const lineOf = (acl) => storeLine(store, 'win32', store, acl, {});
+  const screen = fold(screens.flatMap((b) => b.lines).join('\n'));
+  const private_ = lineOf({ state: 'created' }).split('\n')[0];
+  assert.equal(private_, 'Saved to .local\\instances.json in this folder — readable only by you.');
+  assert.ok(screen.includes(fold(private_)), `the screen of question 7 on the page lacks the product's line: ${private_}`);
+  // The three ways a save ends with a store only the account can read begin with that sentence; the last adds a line saying what it changed,
+  // which Step 4 of the page explains in words.
+  for (const acl of [{ state: 'private' }, { state: 'locked', was: null }]) assert.equal(lineOf(acl).split('\n')[0], private_, acl.state);
+  assert.match(page, /the wizard adds a line saying who could, and that the permissions were changed just now/);
+  // A lock that failed does not say "readable only by you", and it names the repair that the troubleshooting table gives.
+  const failed = fold(lineOf({ state: 'failed', reason: 'Access is denied.' }));
+  assert.ok(!failed.includes('readable only by you'), 'a lock that failed was reported as private');
+  assert.ok(failed.includes('.\\snowarch.cmd doctor --fix tries again'), `the failed line no longer names the doctor's repair: ${failed}`);
+  assert.match(page, /Run \.\\snowarch\.cmd doctor --fix\. It shows what it will change and changes it when you press Enter\./);
+  assert.match(page, /`\.\\snowarch\.cmd doctor --fix` repairs it after showing what it will change/);
+  // ...and the doctor has what the page names: SV-02 reads the store's permissions, `--fix` is its flag, F9 is the repair that locks the folder.
+  assert.match(read('packages/snowarch/src/doctor/checks.ts'), /id: 'SV-02',\s*title: 'store'/);
+  const { COMMANDS } = await import(href('tools/snowarch/lib/cli.mjs'));
+  assert.match(String(COMMANDS.doctor.usage({})), /\[--fix\]/);
+  assert.match(read('tools/snowarch/lib/doctor/fix.mjs'), /id: 'F9', kind: 'store-acl'/);
+  // The lock is to the account and SYSTEM; the doctor also accepts the administrators, because they can take a file over, and the page says both.
+  assert.match(page, /so that only your account and the system can read them \(the computer's administrators can always take a file over\)/);
+  assert.match(read('packages/snowarch/src/doctor/checks.ts'), /readable only by you \(and SYSTEM and Administrators\)/);
 });
 
 test('ARC-09-C271 — the settings commands are the product\'s: each sub-command, with the arguments it takes', async () => {

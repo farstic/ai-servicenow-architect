@@ -256,7 +256,7 @@ PS C:\Users\you\AI-Arch>
 
 The `warning: ... is not a commit!` line is harmless. Your line should now end in `\AI-Arch>`.
 
-> **Why this folder.** The installer keeps your ServiceNow password in a file inside this folder (`.local\instances.json`) and locks that file, and the folder `.local` around it, so that only your account and the system can read them. It does this whatever the folder is, and the wizard says so when it saves. Your user folder is private to you anyway, so it is the one this guide uses. If you prefer another folder, use its name in these commands and in "Every day". A folder name with a space in it has not been tested.
+> **Why this folder.** The installer keeps your ServiceNow password in a file inside this folder (`.local\instances.json`) and locks that file, and the folder `.local` around it, so that only your account and the system can read them. It does this in whatever folder you choose, and the wizard says so when it saves; if that folder had let other accounts read the file, the wizard adds a line saying who could, and that the permissions were changed just now. Your user folder is private to you anyway, so it is the one this guide uses. If you prefer another folder, use its name in these commands and in "Every day". A folder name with a space in it has not been tested.
 
 If git says the folder *already exists*, you already have a copy. Either continue with Step 5 in that folder, or pick another name and use it in both of the last two commands.
 
@@ -824,6 +824,7 @@ It shows a plan first and changes nothing until you accept it. Your instances an
 | A line in the installer's check (Step 6a) is not ok | The line says what to do. Do it, then run .\bootstrap.cmd again; it continues where it stopped. |
 | github.com is unreachable, or you are behind a company proxy | Ask your IT team for the proxy address, set it in the window as shown below, and run the installer again. |
 | The login check (question 6) fails | Check the address, user name and password. Press Ctrl+C and run .\bootstrap.cmd again. |
+| After the password is saved, the wizard says Its permissions could not be restricted | Your password is saved, but Windows would not let the installer lock the file, so other accounts on this computer might be able to read it. Run .\snowarch.cmd doctor --fix. It shows what it will change and changes it when you press Enter. If it cannot lock the file either, send the output of .\snowarch.cmd doctor (see "Asking for help"). |
 | /mcp shows no servicenow line | Claude was started outside your folder. Type /exit, then follow "Every day". |
 | The licence says expired or missing | See "Licence renewal" or Step 5. |
 
@@ -872,7 +873,7 @@ Run:
 ## Your data and safety
 
 - Your ServiceNow password is stored only in `.local\instances.json` inside your AI Architect folder. It never goes into the chat. Nobody helping you needs it, so never send that file.
-- The installer locks that file, and the folder `.local` around it, so that only your account and the system can read them. `.\snowarch.cmd doctor` checks it (check SV-02) and says who else could read the file, with the command that fixes it.
+- The installer locks that file, and the folder `.local` around it, so that only your account and the system can read them (the computer's administrators can always take a file over). `.\snowarch.cmd doctor` checks it (check SV-02) and names anyone else who could read the file; `.\snowarch.cmd doctor --fix` repairs it after showing what it will change.
 - The AI Architect asks *write approved?* before every change on your instance, and a prod instance is saved read-only.
 - Your licence file is issued to you. Do not share it.
 
