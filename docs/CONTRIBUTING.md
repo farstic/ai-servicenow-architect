@@ -292,6 +292,15 @@ where the shell is absent — ARC-09-S08 built it, and there are now two: `boots
 windows-latest)` and the four `windows-native` cells, which strip Git Bash from `PATH` and drive
 the product entirely through `.cmd`.
 
+**A test that starts Windows PowerShell 5.1 from node gives it an environment without `PSModulePath`.**
+On a hosted Windows runner a job's default shell is `pwsh` (PowerShell 7), which puts its own module folders
+in `PSModulePath`; a node process started from it hands the variable to a `powershell.exe` child, which finds
+PowerShell 7's `Microsoft.PowerShell.Security` first and cannot load it: `The 'ConvertTo-SecureString' command
+was found in the module 'Microsoft.PowerShell.Security', but the module could not be loaded`. Measured on
+windows-latest during ARC-09-C272: `powershell.exe` run by pwsh itself works, run from a node child it fails,
+with `PSModulePath` removed it works, and moving `TEMP`, `TMP` and `TMPDIR` the way `npm test` moves them
+changes nothing. `windowsPowerShellEnv()` in `tests/windows-store-acl.test.mjs` is the helper that does it.
+
 **If a macOS cell ever needs to be cheap:** the repository is public, so hosted runners cost nothing
 today. Should it ever become private, scheduling macOS on `main` only is the lever — recorded as an
 option, not a default.
