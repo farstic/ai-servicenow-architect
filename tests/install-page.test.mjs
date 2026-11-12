@@ -171,7 +171,7 @@ test('ARC-07-W8 — every clone command on a user page quiets the detached-HEAD 
   // A release tag is a TAG, so a correct clone earns fourteen lines of git advice about being in a
   // state the reader did not choose and cannot act on. The option is on every clone line, and the
   // page says once what the note means for anyone who clones another way.
-  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md']) {
+  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md']) {
     const clones = [...read(rel).matchAll(/git\b[^\n]*?\bclone --branch v\d/g)].map((m) => m[0]);
     assert.ok(clones.length > 0, `${rel} names no pinned clone`);
     for (const line of clones) {

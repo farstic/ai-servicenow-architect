@@ -30,7 +30,7 @@ const fold = (s) => s.replace(/\s+/g, ' ').trim();
 
 /**
  * The page's fenced blocks, each with the line that introduces it and the heading it sits under.
- * `Run:` introduces a command; a line starting `On screen` introduces what the reader sees.
+ * A line ending `Run:` introduces a command; a line starting `On screen` introduces what the reader sees.
  */
 function blocksOf(text) {
   const out = [];
@@ -40,7 +40,7 @@ function blocksOf(text) {
   for (const line of text.split('\n')) {
     if (line.startsWith('```')) {
       if (open) { out.push(open); open = null; } else {
-        open = { kind: label === 'Run:' ? 'run' : label.startsWith('On screen') ? 'screen' : 'other', label, heading, lines: [] };
+        open = { kind: /(^|\s)Run:$/.test(label) ? 'run' : label.startsWith('On screen') ? 'screen' : 'other', label, heading, lines: [] };
       }
       continue;
     }
@@ -70,7 +70,9 @@ function productText() {
     ...walk('tools/snowarch/lib', /\.(mjs|json)$/),
   ];
   return fold(files.map(read).join('\n')
-    .replace(/\\u([0-9a-f]{4})/gi, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\'/g, "'").replace(/\\"/g, '"'));
+    .replace(/\\u([0-9a-f]{4})/gi, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\'/g, "'").replace(/\\"/g, '"')
+    // A sentence the source writes as two literals joined with `+` is one sentence on the screen.
+    .replace(/['"`]\s*\+\s*['"`]/g, ''));
 }
 
 test('ARC-09-C271 — the page has the steps it is read in, and the product points at two of them', () => {
@@ -133,6 +135,16 @@ test('ARC-09-C271 — the licence is in place before the installer, under the na
   assert.ok(commands.filter((c) => /\.local\\licence\.json$/.test(c.line)).length >= 2, 'the renewal command is gone');
 });
 
+test('ARC-09-C271 — step 2d is the line the installer prints when it finds Claude Code off PATH', () => {
+  // ARC-09-C270: when `claude` is not on PATH and the native installer's file is there, B00 prints the fix for the platform, and the
+  // fix ends the line. The page tells the reader the same command in the main steps, so the reader is not sent to a failure to meet it.
+  const fix = JSON.parse(read('tools/snowarch/lib/remedies.json')).claudeCode.offPath.win32;
+  const command = fix.slice(fix.indexOf('[Environment]::'));
+  assert.ok(command.startsWith('[Environment]::SetEnvironmentVariable('), `the product's fix no longer ends in the PowerShell line: ${fix}`);
+  assert.equal(commands.filter((c) => c.line === command).length, 1, 'the page does not give the command the installer prints, once');
+  assert.match(page, /The installer prints this same command if it ever finds Claude Code installed but its folder not on PATH\./);
+});
+
 test('ARC-09-C271 — the plan screen is the product\'s: its two lines, its header, its keys', async () => {
   const { ORIENTATION, HEADER, ackLine } = await import(href('tools/snowarch/lib/plan.mjs'));
   const text = fold(screens.flatMap((b) => b.lines).join('\n'));
@@ -166,7 +178,9 @@ const SCREEN_PHRASES = [
   'Username (a ServiceNow user on this instance — admin on a PDI)',
   'Password (nothing is shown while you type):',
   'Checking the login and what this account may do (read-only, a few seconds)',
-  'Permissions for instance "pdi" (environment pdi) — what Claude\'s tools may do there.',
+  // The product writes the label and the environment as values: the page shows an example, the product its template.
+  ['Permissions for instance "pdi" (environment pdi) — what Claude\'s tools may do there.',
+    'Permissions for instance "${label}" (environment ${environment}) — what Claude\'s tools may do there.'],
   'Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains',
   // The plan screen's menus.
   'works from the ServiceNow docs and the specialist skills; no instance',
@@ -182,13 +196,10 @@ const SCREEN_PHRASES = [
 test('ARC-09-C271 — the words on the screens are the product\'s, in both directions', () => {
   const product = productText();
   const onPage = fold(page);
-  for (const phrase of SCREEN_PHRASES) {
-    // The product writes `Permissions for instance "${label}" (environment ${environment})`: the label and the environment are values.
-    const fixed = phrase.replace(/ for instance "pdi" \(environment pdi\)/, ' for instance').trim();
-    const [head, tail] = fixed.includes(' for instance') ? fixed.split(' for instance') : [fixed, ''];
-    assert.ok(onPage.includes(fold(phrase)) || (tail && onPage.includes(fold(head)) && onPage.includes(fold(tail.replace(/^\s*—/, '—')))), `the page lacks: ${phrase}`);
-    const inProduct = tail ? product.includes(fold(head)) && product.includes(fold(tail.replace(/^\s*—\s*/, ''))) : product.includes(fold(phrase));
-    assert.ok(inProduct, `the product no longer says (the page still does): ${phrase}`);
+  for (const entry of SCREEN_PHRASES) {
+    const [shown, written] = Array.isArray(entry) ? entry : [entry, entry];
+    assert.ok(onPage.includes(fold(shown)), `the page lacks: ${shown}`);
+    assert.ok(product.includes(fold(written)), `the product no longer says (the page still does): ${written}`);
   }
 });
 
@@ -211,23 +222,27 @@ test('ARC-09-C271 — the settings commands are the product\'s: each sub-command
   for (const flag of ['WRITE', 'CMDB_WRITE', 'SCRIPTING', 'ATF', 'NOW_ASSIST', 'FLUENT']) assert.match(page, new RegExp(`\\| ${flag} \\|`));
 });
 
-test('ARC-09-C271 — the other commands exist: mode, doctor, licence check, upgrade, version', () => {
+test('ARC-09-C271 — the other commands exist: mode, doctor, licence check, upgrade, version', async () => {
   const lines = commands.map((c) => c.line);
   for (const expected of ['.\\snowarch.cmd mode design', '.\\snowarch.cmd mode live', '.\\snowarch.cmd doctor', '.\\snowarch.cmd licence check',
     '.\\snowarch.cmd upgrade --check', '.\\snowarch.cmd upgrade', '.\\snowarch.cmd version']) {
     assert.ok(lines.includes(expected), `the page lacks: ${expected}`);
   }
-  // `mode`, `doctor`, `licence`, `upgrade`, `version` and `instance` are the verbs the CLI lists; `--check` is upgrade's own flag.
-  const cli = read('tools/snowarch/lib/commands/upgrade.mjs');
-  assert.match(cli, /--check/);
-  const front = fold(read('tools/snowarch/bin/snowarch.mjs') + read('tools/snowarch/lib/text.json'));
-  for (const verb of ['version', 'mode', 'doctor', 'instance', 'upgrade', 'licence']) assert.ok(front.includes(verb), `the CLI has no ${verb}`);
-  // Each licence state the page explains is one the product reports.
-  const states = read('packages/snowarch/src/licence/state.ts');
-  for (const state of ['ok', 'expiring', 'expired', 'missing', 'invalid', 'revoked']) {
-    assert.match(page, new RegExp(`^\\| ${state} \\|`, 'm'), `the page does not explain "${state}"`);
-    assert.ok(states.includes(`'${state}'`), `the product has no licence state "${state}"`);
-  }
+  // Every `.\snowarch.cmd <verb>` on the page is a verb of the CLI's own table.
+  const { COMMANDS } = await import(href('tools/snowarch/lib/cli.mjs'));
+  const used = new Set(commands.filter((c) => c.line.startsWith('.\\snowarch.cmd ')).map((c) => c.line.split(/\s+/)[1]));
+  for (const verb of used) assert.ok(verb in COMMANDS, `the page uses "${verb}", which the CLI does not have`);
+  for (const verb of ['version', 'mode', 'doctor', 'instance', 'upgrade', 'licence']) assert.ok(used.has(verb), `the page no longer uses ${verb}`);
+  // The arguments: `upgrade --check` is upgrade's own flag; `mode live|design` are mode's; `licence check` is a licence sub-command.
+  assert.match(String(COMMANDS.upgrade.usage({})), /--check/);
+  assert.match(String(COMMANDS.mode.usage({})), /\[live\|design\]/);
+  assert.match(read('tools/snowarch/lib/commands/licence.mjs'), /check/);
+  // The licence states the page explains are the product's, no more and no fewer: the table under Step 7 has one row for each.
+  const union = /export type LicenceState = ([^;]+);/.exec(read('packages/snowarch/src/licence/core.ts'));
+  assert.ok(union, 'the product no longer declares LicenceState where it did');
+  const states = [...union[1].matchAll(/'(\w+)'/g)].map((m) => m[1]);
+  const rows = [...page.matchAll(/^\| (ok|expiring|expired|missing|invalid|revoked) \| /gm)].map((m) => m[1]);
+  assert.deepEqual([...rows].sort(), [...states].sort(), 'the licence table on the page and the product\'s states disagree');
 });
 
 test('ARC-09-C271 — what a reader is told about Node.js is what CI runs', () => {
@@ -251,4 +266,31 @@ test('ARC-09-C271 — the page is linked from where a Windows reader starts, and
   assert.equal(commands.filter((c) => /^git -c advice\.detachedHead=false clone --branch v\d+\.\d+\.\d+ https:\/\/github\.com\/farstic\/snowarch\.git AI-Arch$/.test(c.line)).length, 1);
   // No other release number is written on the page by hand outside the examples the page says are examples.
   assert.match(page, /The screens in this guide are examples\./);
+});
+
+test('ARC-09-C271 — the three no-administrator messages are on the page and on the troubleshooting page, in the same words', () => {
+  const troubleshooting = read('docs/TROUBLESHOOTING.md');
+  for (const message of ['0x8a15000f : Data required by the source is missing', 'The operation was canceled by the user', 'is not recognized']) {
+    assert.ok(page.includes(message), `the page lacks: ${message}`);
+    assert.ok(troubleshooting.includes(message), `the troubleshooting page lacks: ${message}`);
+  }
+  // ...and the one command that reloads PATH in the current window is the same on both.
+  const reload = '$env:Path = [Environment]::GetEnvironmentVariable("Path", "User") + ";" + [Environment]::GetEnvironmentVariable("Path", "Machine")';
+  assert.ok(commands.some((c) => c.line === reload), 'the page lacks the command that reloads PATH');
+  assert.ok(troubleshooting.includes(reload), 'the troubleshooting page lacks the command that reloads PATH');
+});
+
+test('ARC-09-C271 — now-sdk needs npm\'s global folder on PATH: the page puts it there and the modes page says why', () => {
+  assert.ok(commands.some((c) => /^\[Environment\]::SetEnvironmentVariable\("Path", .* \+ ";[^"]*;\$env:APPDATA\\npm", "User"\)$/.test(c.line)),
+    'step 2b no longer adds %APPDATA%\\npm to the user PATH');
+  assert.match(read('docs/MODES-AND-PRESETS.md'), /On Windows npm puts a global tool in `%APPDATA%\\npm`/);
+});
+
+test('ARC-09-C271 — the Word converter is run under the PowerShell every Windows has, in every example', () => {
+  for (const rel of ['scripts/README.md', 'scripts/md-to-docx.ps1']) {
+    const text = read(rel);
+    assert.equal(/^\s*pwsh\s+scripts/m.test(text), false, `${rel} still runs a script under pwsh`);
+    assert.match(text, /powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\md-to-docx\.ps1 /, `${rel} lacks the Windows PowerShell form`);
+  }
+  assert.match(read('scripts/README.md'), /`render-pdf-pages\.ps1` needs Word and has not been tested under 5\.1 yet/);
 });
