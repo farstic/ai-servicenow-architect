@@ -398,7 +398,7 @@ citations: checked: 588 | dead: 0
 
 This downloads all 51,665 pages of ServiceNow documentation that the Architect reads before it answers. The screen can sit still for a minute or two. Let it run. In our test it took two and a half minutes.
 
-## Step 6d · The instance wizard: seven questions
+### 6d · The instance wizard: seven questions
 
 On screen:
 
@@ -409,7 +409,7 @@ Have ready: the instance URL and a username + password for it. Nothing is saved 
 
 > **Made a mistake?** Nothing is saved until the very end. Press **Ctrl+C**, then run `.\bootstrap.cmd` again. It skips what is already done and brings you back to this wizard. After the wizard has finished, you change things with one command each; see "Change settings later".
 
-### Question 1 of 7 · Label
+#### Question 1 of 7 · Label
 
 On screen:
 
@@ -421,7 +421,7 @@ Label [pdi]
 - **What it is:** a nickname for this instance. You will use it later in commands, for example to change the password.
 - **What to type:** a short name without spaces, such as `pdi` or `acme-dev`. The name in brackets is a suggestion: press **Enter** to take it.
 
-### Question 2 of 7 · Instance URL
+#### Question 2 of 7 · Instance URL
 
 On screen:
 
@@ -434,7 +434,7 @@ Instance URL (https://<host>, no path)
 - **What to type:** only the beginning, up to and including `.service-now.com`. Leave out everything after it.
 - **Example:** if your browser shows `https://<your-instance>.service-now.com/now/nav/ui/home`, type `https://<your-instance>.service-now.com`. A slash at the very end does no harm: the wizard removes it and says `trailing slash removed`.
 
-### Question 3 of 7 · Environment
+#### Question 3 of 7 · Environment
 
 On screen:
 
@@ -463,7 +463,7 @@ Right after this question the screen shows a line like the one below. It only re
 network: HTTPS_PROXY=unset · NO_PROXY=unset · NODE_EXTRA_CA_CERTS=unset
 ```
 
-### Question 4 of 7 · Authentication
+#### Question 4 of 7 · Authentication
 
 On screen:
 
@@ -478,7 +478,7 @@ instances can disable it)
 - **What it is:** how the AI Architect signs in to ServiceNow.
 - **What to type:** `1` (basic), or just press **Enter**. Choose `2` only if your ServiceNow administrator gave you an OAuth client ID and secret and asked you to use them.
 
-### Question 5 of 7 · Credentials
+#### Question 5 of 7 · Credentials
 
 On screen:
 
@@ -492,7 +492,7 @@ Password (nothing is shown while you type):
 - **The password:** nothing appears while you type it, not even dots. That is on purpose. Type it, or paste it with a right-click, and press **Enter**.
 - **Where it goes:** it stays on this computer, in your AI Architect folder. It is never sent into the chat with Claude.
 
-### Question 6 of 7 · Login check
+#### Question 6 of 7 · Login check
 
 On screen:
 
@@ -508,7 +508,7 @@ On screen:
 - **What to type:** nothing. The `[INFO]` lines are normal.
 - **If it fails:** the message says why. Most often the address, user name or password has a typo. Nothing has been saved: press **Ctrl+C** and run `.\bootstrap.cmd` again.
 
-### Question 7 of 7 · Permissions
+#### Question 7 of 7 · Permissions
 
 On screen:
 
