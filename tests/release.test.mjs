@@ -70,7 +70,7 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
   // ARC-09-C60 — the two user pages carry the pinned clone command the release rewrites. A
   // fixture without them would make `applyWrites` fail on a missing file, which is the writer
   // doing its job; the tree it models has these pages.
-  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md']) {
+  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'docs/INSTALL-WINDOWS.md']) {
     write(root, page, `# Fixture page\n\n\`\`\`sh\ngit clone --branch v${version} `
       + `https://github.com/farstic/ai-servicenow-architect.git\n\`\`\`\n`);
   }
@@ -376,7 +376,7 @@ test('AC 1/2 — a green run commits once, tags once, and the tag carries the tw
   // `(?![-\d.])` and NOT `\b`, for the reason ARC-09-C12a spells it that way: the fixture seeds
   // these pages at `v2.0.0-dev`, and `\b` matches after the `0` in `v2.0.0-dev` too — so the first
   // cut of this assertion passed with the writer neutralised. Caught by running that control.
-  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md']) {
+  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'docs/INSTALL-WINDOWS.md']) {
     assert.match(read(root, page), /--branch v2\.0\.0(?![-\d.])/,
       `${page} does not name the version just cut`);
     assert.equal(/--branch v2\.0\.0-dev/.test(read(root, page)), false,
@@ -877,7 +877,7 @@ test('ARC-09-C61 — the install-page guard passes at the shape a release commit
   assert.deepEqual(allowed, ['v1.9.0', 'v2.0.0'],
     'the release commit\'s own version is not allowed on its pages — this is the refusal');
 
-  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md']) {
+  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'docs/INSTALL-WINDOWS.md']) {
     const named = cloneTagsIn(read(root, page));
     assert.ok(named.length > 0, `${page} names no clone tag after the release wrote it`);
     for (const tag of named) {

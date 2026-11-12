@@ -71,7 +71,7 @@ export const COVERAGE = Object.freeze({
         'scripts/render-pdf-pages.ps1', 'scripts/md-to-docx.py', 'scripts/md-to-docx.ps1', 'scripts/mermaid-theme.json',
         'scripts/README.md', 'scripts/docs.mjs', 'scripts/gen-docs-areas.mjs',
         // The user's documentation, and the live-coverage ledger.
-        'docs/INSTALL.md', 'docs/USER-GUIDE.md', 'docs/MODES-AND-PRESETS.md', 'docs/TROUBLESHOOTING.md', 'docs/MIGRATION.md',
+        'docs/INSTALL.md', 'docs/INSTALL-WINDOWS.md', 'docs/USER-GUIDE.md', 'docs/MODES-AND-PRESETS.md', 'docs/TROUBLESHOOTING.md', 'docs/MIGRATION.md',
         'docs/PLATFORM-NOTES.md', 'docs/CHANGELOG.md', 'docs/CLIENT-ONBOARDING.md', 'docs/KEY-COMPROMISE.md',
         'docs/RELICENSING.md', 'docs/ARCHITECTURE.md', 'docs/validation/LIVE-COVERAGE.md',
     ]),

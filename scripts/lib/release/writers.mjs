@@ -184,6 +184,8 @@ const WRITTEN_HERE = Object.freeze([
   // `docs/INSTALL.md`, so the install page is the source and the README follows it.
   'docs/INSTALL.md',
   'docs/MIGRATION.md',
+  // ARC-09-C271 — the Windows page's clone command, the same line on a page the README does not generate.
+  'docs/INSTALL-WINDOWS.md',
 ]);
 
 export const STAGED = Object.freeze([...new Set([
@@ -246,6 +248,7 @@ export function applyWrites({ root, version, date, run, from = null, tag = {}, g
     // ARC-09-C60 — the pinned clone command on both user-facing install paths.
     ['docs/INSTALL.md', (t) => writeInstallTag(t, version, 'docs/INSTALL.md')],
     ['docs/MIGRATION.md', (t) => writeInstallTag(t, version, 'docs/MIGRATION.md')],
+    ['docs/INSTALL-WINDOWS.md', (t) => writeInstallTag(t, version, 'docs/INSTALL-WINDOWS.md')],
   ]) {
     const result = fn(read(file));
     if (!result.ok) return { ok: false, message: result.message, touched };

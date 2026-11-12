@@ -56,6 +56,8 @@ cd snowarch
 .\bootstrap.cmd
 ```
 
+**On a Windows computer where you are not an administrator, or if you want every step explained** — the programs to install, the plan screen, the seven wizard questions and how to change an answer later — follow [Install on Windows](docs/INSTALL-WINDOWS.md). It installs Git, Node.js, Claude Code and draw.io for your user only, one command at a time.
+
 Git for Windows 2.54 and 2.55 may also print `warning: refs/tags/<tag> <sha> is not a commit!` while the tag is
 checked out. It is harmless: a release tag is a tag object that points at the commit, and the checkout is at the
 release all the same, as `git describe --tags` shows.
