@@ -211,6 +211,9 @@ test('ARC-09-C271 — the store line of question 7 is the one `storeLine` builds
   // (`.local\instances.json` in the folder the install runs in), which is where this guide puts it. `{}` is the environment: the second line of
   // a failed lock is spelled for the shell, and an empty one is Windows PowerShell whatever runs the test.
   const { storeLine } = await import(href('packages/snowarch/dist/cli/instance.js'));
+  // The launcher the page types in Windows PowerShell is the product's own spelling of it, not a copy kept here.
+  const { cliSpelling } = await import(href('packages/snowarch/dist/cli/tty.js'));
+  const cli = cliSpelling('win32', {});
   const store = 'C:\\Users\\you\\AI-Arch\\.local\\instances.json';
   const lineOf = (acl) => storeLine(store, 'win32', store, acl, {});
   const screen = fold(screens.flatMap((b) => b.lines).join('\n'));
@@ -224,9 +227,9 @@ test('ARC-09-C271 — the store line of question 7 is the one `storeLine` builds
   // A lock that failed does not say "readable only by you", and it names the repair that the troubleshooting table gives.
   const failed = fold(lineOf({ state: 'failed', reason: 'Access is denied.' }));
   assert.ok(!failed.includes('readable only by you'), 'a lock that failed was reported as private');
-  assert.ok(failed.includes('.\\snowarch.cmd doctor --fix tries again'), `the failed line no longer names the doctor's repair: ${failed}`);
-  assert.match(page, /Run \.\\snowarch\.cmd doctor --fix\. It shows what it will change and changes it when you press Enter\./);
-  assert.match(page, /`\.\\snowarch\.cmd doctor --fix` repairs it after showing what it will change/);
+  assert.ok(failed.includes(`${cli} doctor --fix tries again`), `the failed line no longer names the doctor's repair: ${failed}`);
+  assert.ok(page.includes(`Run ${cli} doctor --fix. It shows what it will change and changes it when you press Enter.`), 'the troubleshooting row lost the repair');
+  assert.ok(page.includes(`\`${cli} doctor --fix\` repairs it after showing what it will change`), 'the safety list lost the repair');
   // ...and the doctor has what the page names: SV-02 reads the store's permissions, `--fix` is its flag, F9 is the repair that locks the folder.
   assert.match(read('packages/snowarch/src/doctor/checks.ts'), /id: 'SV-02',\s*title: 'store'/);
   const { COMMANDS } = await import(href('tools/snowarch/lib/cli.mjs'));

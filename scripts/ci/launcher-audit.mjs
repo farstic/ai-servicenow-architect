@@ -253,6 +253,9 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ['tests/hook/session-start.test.mjs', [
     { at: '~~', kind: 'DERIVED', n: 1, why: 'the assertion is about the launcher alone' },
   ]],
+  ['tests/install-windows-guide.test.mjs', [
+    { at: '~ doctor --fix tries again', kind: 'PINNED', n: 1, why: 'the case drives a pinned shell in another statement' },
+  ]],
   ['tests/launcher-audit.test.mjs', [
     { at: '~', kind: 'PINNED', n: 1, why: 'the assertion is about the launcher alone' },
   ]],
