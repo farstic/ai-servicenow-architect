@@ -34,7 +34,7 @@ import { probeAll, toLastProbe } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
 import { loadStore, saveStore } from '../store/index.js';
 import { STORE_VERSION, completeFlags } from '../store/schema.js';
-import { maskPath } from '../store/paths.js';
+import { maskPath, projectStorePath } from '../store/paths.js';
 import { applyDependencyRule, matchPreset, FLAG_NAMES } from '../utils/permissions.js';
 import { remedyFor } from '../errors/codes.js';
 import { cliSpelling } from './tty.js';
@@ -448,7 +448,7 @@ export async function runImport(options, io, deps = {}) {
         const written = saveStore(target.path, next, { lock: 'always' });
         imported += 1;
         io.write(`  ${entry.label}: imported (preset ${decision.preset}, user ${maskUsername(credentials.username)})\n`);
-        const note = aclNote(written.acl, deps.platform ?? process.platform);
+        const note = aclNote(written.acl, deps.platform ?? process.platform, process.env, target.path === projectStorePath());
         if (note)
             io.write(`${note}\n`);
     }

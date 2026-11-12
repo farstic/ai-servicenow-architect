@@ -393,7 +393,7 @@ env = process.env) => {
     // is what `runAdd` uses under that flag. The relative spelling is DERIVED from the path's own last
     // two segments, never spelled here, so a store that moves cannot leave this line describing the
     // old place.
-    const note = aclNote(outcome, platform, env);
+    const note = aclNote(outcome, platform, env, path === project);
     const tail = (note ? `\n${note}` : '');
     if (path === project) {
         const where = path.split(/[\\/]/).slice(-2).join(sepChar);
@@ -413,7 +413,9 @@ env = process.env) => {
  * was changed, or that it could not be made private. Null when there is nothing to say (made private as it was created, or already so).
  * Folded to the screen's width; the line it follows is not.
  */
-export function aclNote(outcome, platform = process.platform, env = process.env) {
+export function aclNote(outcome, platform = process.platform, env = process.env, 
+// Whether this is the checkout's own store, whose repair is the doctor's fixer (`doctor --fix`); any other store gets the line the doctor prints.
+fixerApplies = true) {
     if (platform !== 'win32' || !outcome)
         return null;
     if (outcome.state === 'locked') {
@@ -423,7 +425,11 @@ export function aclNote(outcome, platform = process.platform, env = process.env)
         return wrapText(text, COLUMNS).join('\n');
     }
     if (outcome.state === 'failed') {
-        return wrapText(`Its permissions could not be restricted (${outcome.reason}), so other accounts on this computer may be able to read it. ${cliSpelling(platform, env)} doctor says how to fix that.`, COLUMNS).join('\n');
+        // NEVER A REASON TO STOP: the store is saved, and what could not be done is said in words with the one command that tries again. icacls can
+        // fail on a locked-down machine, for an account it cannot resolve, or on a network home folder; none of those is a reason to lose a credential.
+        const cli = cliSpelling(platform, env);
+        const next = fixerApplies ? `${cli} doctor --fix tries again, and ${cli} doctor says who can read it.` : `${cli} doctor gives a line to run by hand.`;
+        return wrapText(`Its permissions could not be restricted (${outcome.reason}), so other accounts on this computer may be able to read it. The store is saved. ${next}`, COLUMNS).join('\n');
     }
     return null;
 }
@@ -1549,7 +1555,7 @@ export async function runSetCredentials(options, io, deps = {}) {
                 action: 'set-credentials', result: 'ok' });
             io.write(`${credentialsUpdated(label)} ${probeSummary(last, completeFlags(entry.flags), false)}\n`);
             // Said only when the permissions were changed, or could not be: a store that was private and stays so has nothing to report.
-            const note = aclNote(written.acl, deps.platform ?? process.platform, env);
+            const note = aclNote(written.acl, deps.platform ?? process.platform, env, opened.opened.path === projectStorePath());
             if (note)
                 io.write(`${note}\n`);
             return EXIT_OK;

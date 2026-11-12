@@ -309,7 +309,7 @@ export declare const storeLine: (path: string, platform: NodeJS.Platform | undef
  * was changed, or that it could not be made private. Null when there is nothing to say (made private as it was created, or already so).
  * Folded to the screen's width; the line it follows is not.
  */
-export declare function aclNote(outcome: StoreAclOutcome | undefined, platform?: NodeJS.Platform, env?: NodeJS.ProcessEnv): string | null;
+export declare function aclNote(outcome: StoreAclOutcome | undefined, platform?: NodeJS.Platform, env?: NodeJS.ProcessEnv, fixerApplies?: boolean): string | null;
 /**
  * Why the authentication step did not ask. Named from what was actually observed, never a default sentence.
  *

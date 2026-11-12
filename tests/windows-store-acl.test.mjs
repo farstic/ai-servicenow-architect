@@ -155,6 +155,46 @@ test('ARC-09-C272 — the doctor\'s repair (F9) locks an open .local, children i
   for (const p of [dir, join(dir, 'logs'), join(dir, 'instances.json')]) assert.deepEqual(tools.read(p).exposure.who, [], p);
 });
 
+test('ARC-09-C272 — the loop, for real: SV-02 finds an open .local and names who, the doctor\'s repair locks it, and SV-02 is then ok', { skip }, async (t) => {
+  const { base, why } = sandbox();
+  if (!base) { t.skip(why); return; }
+  t.after(() => rmSync(base, { recursive: true, force: true }));
+  const { svStore } = await import(href('packages/snowarch/dist/doctor/checks.js'));
+  const { stubProbesFor } = await import(href('packages/snowarch/dist/doctor/types.js'));
+  const { saveStore } = await import(href('packages/snowarch/dist/store/index.js'));
+  const { applyPlan } = await import(href('tools/snowarch/lib/doctor/fix.mjs'));
+  const checkout = join(base, 'checkout');
+  const dir = join(checkout, '.local');
+  mkdirSync(dir, { recursive: true });     // the user's own folder, made before the bootstrap: open
+  const file = join(dir, 'instances.json');
+  saveStore(file, store());                // a routine create: the file is locked, the folder is not the save's to change
+  const before = { project: process.env.CLAUDE_PROJECT_DIR, store: process.env.SNOW_STORE };
+  process.env.CLAUDE_PROJECT_DIR = checkout;
+  delete process.env.SNOW_STORE;
+  t.after(() => {
+    for (const [key, value] of [['CLAUDE_PROJECT_DIR', before.project], ['SNOW_STORE', before.store]]) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  });
+  const ctx = { noNetwork: true, cwd: checkout, platform: 'win32', env: process.env, probes: stubProbesFor({ platform: 'win32', env: process.env }),
+    fluent: () => ({ installed: false }) };
+
+  const found = await svStore.run(ctx);
+  assert.equal(found.status, 'fail', found.detail);
+  assert.match(found.detail, /its folder: .*BUILTIN\\Users.*can read it/s);
+  assert.equal(found.fixable, true);
+  assert.deepEqual(found.data, { fix: { kind: 'store-acl', path: '.local' } });
+  assert.ok(found.remedy.endsWith(' doctor --fix'), found.remedy);
+
+  const action = { id: 'F9', check: 'SV-02', kind: 'store-acl', title: 't', target: '.local/', detail: 'd', fix: found.data.fix };
+  const done = await applyPlan({ actions: [action] }, { root: checkout, platform: 'win32' });
+  assert.equal(done[0].result, 'applied', done[0].detail);
+
+  const after = await svStore.run(ctx);
+  assert.equal(after.status, 'ok', after.detail);
+  assert.match(after.detail, /readable only by you/);
+});
+
 test('ARC-09-C272 — the effect: another local account is denied the locked store and — the control — can read an open file', { skip: skip || (onCi ? false : 'runs on CI, where a throwaway account can be made') }, async (t) => {
   const { base, why } = sandbox();
   if (!base) { t.skip(why); return; }

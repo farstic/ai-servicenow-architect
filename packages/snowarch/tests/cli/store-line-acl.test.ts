@@ -8,7 +8,7 @@
  * private, and — when the file or its folder existed already and was changed — what it was open to, so that nothing about a
  * credential's permissions changes without saying so.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -51,7 +51,7 @@ describe('ARC-09-C272 — storeLine on Windows', () => {
     expect(flat(out)).toContain('Its permissions were changed just now.');
   });
 
-  it('does not claim a privacy it could not make, and says how to fix it', () => {
+  it('does not claim a privacy it could not make, says the store is saved, and names the command that tries again', () => {
     // `env: {}` is load-bearing (ARC-07-C38): the spelling follows SHELL, and a Mac that sets it would render the POSIX launcher for win32.
     const out = storeLine(PROJECT, 'win32', PROJECT, { state: 'failed', reason: 'icacls exited 5: Access is denied.' }, {});
     expect(lines(out)[0]).toBe('Saved to .local\\instances.json in this folder.');
@@ -59,8 +59,18 @@ describe('ARC-09-C272 — storeLine on Windows', () => {
     expect(flat(out)).toContain('could not be restricted (icacls exited 5: Access is denied.)');
     expect(flat(out)).toContain('other accounts on this computer may be able to read it');
     expect(out.includes(cliSpelling('win32', {}))).toBe(true);
-    expect(flat(out)).toContain(' doctor says how to fix that.');
+    expect(flat(out)).toContain('The store is saved.');
+    expect(flat(out)).toContain(' doctor --fix tries again, and ');
+    expect(flat(out)).toContain(' doctor says who can read it.');
     for (const l of lines(out)) expect(l.length, l).toBeLessThanOrEqual(COLUMNS);
+  });
+
+  it('for a store the doctor\'s fixer may not touch, the failed note points to the line the doctor prints and not to --fix', () => {
+    const out = storeLine('C:\\Users\\someone\\AppData\\Roaming\\snowarch\\instances.json', 'win32', PROJECT,
+      { state: 'failed', reason: 'icacls exited 5: Access is denied.' }, {});
+    expect(flat(out)).toContain('The store is saved.');
+    expect(flat(out)).toContain(' doctor gives a line to run by hand.');
+    expect(flat(out)).not.toContain('--fix');
   });
 
   it('keeps the words it had when it is not told what the lock did (no outcome, or not Windows)', () => {
@@ -103,6 +113,23 @@ describe('ARC-09-C272 — instance add on Windows', () => {
       expect(calls).toEqual(['lock file']);
       expect(t.written()).toContain('readable only by you');
       expect(t.written()).not.toContain('inherited from the folder');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('a lock that FAILS never stops the save: the credential is stored, the exit is ok, and the person is told in words what to do', async () => {
+    const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'add-acl-')));
+    try {
+      const store = join(dir, 'instances.json');
+      const t = terminal();
+      const failing: AclTools = { ...fake(() => ({ state: 'private' }), []), lock: () => ({ ok: false, reason: 'icacls exited 5: Access is denied.' }) };
+      const result = await runAdd(base, t, { storePath: store, makeClient: rest, reachability: reachable, env: {}, platform: 'win32', acl: failing });
+      expect(result.saved).toBe(true);
+      expect(result.exitCode).toBe(0);
+      expect(existsSync(store)).toBe(true);
+      expect(flat(t.written())).toContain('Saved instance "pdi"');
+      expect(flat(t.written())).not.toContain('readable only by you');
+      expect(flat(t.written())).toContain('could not be restricted (icacls exited 5: Access is denied.)');
+      expect(flat(t.written())).toContain('The store is saved.');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
