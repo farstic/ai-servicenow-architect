@@ -99,9 +99,16 @@ export function remediesTable(remedies) {
     node: 'Node.js is missing or too old (live mode only)',
     platform: 'A 32-bit Node.js build',
   };
+  // ARC-09-C270 — a second cause of the same check is a row of its own, right after the check's (`claudeCode.offPath`: installed, and
+  // the folder the native installer used is not on PATH). The reader who has just run that installer looks for THEIR words here.
+  const OFF_PATH_LABEL = { claudeCode: 'Claude Code is installed, but its folder is not on PATH' };
+  const cells = (r) => `\`${r.darwin ?? r.default}\` | \`${r.win32 ?? r.default}\``;
   const rows = Object.entries(remedies)
     .filter(([id]) => !id.startsWith('$'))
-    .map(([id, r]) => `| ${LABEL[id] ?? id} | \`${r.darwin ?? r.default}\` | \`${r.win32 ?? r.default}\` |`);
+    .flatMap(([id, r]) => [
+      `| ${LABEL[id] ?? id} | ${cells(r)} |`,
+      ...(r.offPath ? [`| ${OFF_PATH_LABEL[id] ?? `${id}, second cause`} | ${cells(r.offPath)} |`] : []),
+    ]);
   return ['| If | macOS / Linux | Windows |', '|---|---|---|', ...rows].join('\n');
 }
 

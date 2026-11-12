@@ -313,7 +313,10 @@ test('the page stays a page, and the tail stays a tail', () => {
   // Back down to 317 and up to 319 again since ARC-09-C259, the row that gave the product one unit (moved into 2.2.5 by the owner's
   // directive of 2026-11-01): the clause came out, and the transcript took the two lines of the docs step it lacked, the size line
   // and the citations line, as a CI run's log prints them. The cap follows the page's real length both ways.
-  assert.ok(install <= 319, `${install} lines of install page (criterion: 319)`);
+  // 320 since ARC-09-C270: one row of the remedies table, the words for a Claude Code that is installed and whose folder is not on PATH.
+  // The table is the page's one place for what each preflight failure prints, and that failure now has two causes with two fixes; the row
+  // is generated from the remedy file like its neighbours, so nothing on the page was written by hand or deleted to pay for it.
+  assert.ok(install <= 320, `${install} lines of install page (criterion: 320)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.
