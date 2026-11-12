@@ -292,6 +292,15 @@ where the shell is absent — ARC-09-S08 built it, and there are now two: `boots
 windows-latest)` and the three `windows-native` cells, which strip Git Bash from `PATH` and drive
 the product entirely through `.cmd`.
 
+**A test that starts Windows PowerShell 5.1 from node gives it an environment without `PSModulePath`.**
+On a hosted Windows runner a job's default shell is `pwsh` (PowerShell 7), which puts its own module folders
+in `PSModulePath`; a node process started from it hands the variable to a `powershell.exe` child, which finds
+PowerShell 7's `Microsoft.PowerShell.Security` first and cannot load it: `The 'ConvertTo-SecureString' command
+was found in the module 'Microsoft.PowerShell.Security', but the module could not be loaded`. Measured on
+windows-latest during ARC-09-C272: `powershell.exe` run by pwsh itself works, run from a node child it fails,
+with `PSModulePath` removed it works, and moving `TEMP`, `TMP` and `TMPDIR` the way `npm test` moves them
+changes nothing. `windowsPowerShellEnv()` in `tests/windows-store-acl.test.mjs` is the helper that does it.
+
 **If a macOS cell ever needs to be cheap:** the repository is public, so hosted runners cost nothing
 today. Should it ever become private, scheduling macOS on `main` only is the lever — recorded as an
 option, not a default.
@@ -730,6 +739,18 @@ PATH, and never says to install it, since the reader has just done that. `probeC
 that reports "not found" asks through `probeClaude` and never tests `found` itself; the words and the fix for each platform are data in `remedies.json`
 (`claudeCode.offPath`) and are generated into both launchers. A test hands in its own `exec` or its own `exists`, so no case depends on what the machine
 it runs on has in `~/.local/bin`.
+
+### A private folder is made by makePrivateDir
+
+A folder the product keeps private — `.local/`, its logs, the licence state, the doctor's cache, the store's own folder — is made with
+`makePrivateDir` (`tools/snowarch/lib/private-dir.mjs` for the engine, `packages/snowarch/src/store/acl.ts` for the server) and never
+with `mkdirSync(dir, { mode: 0o700 })` by hand. On POSIX the two are the same call. On Windows the mode is ignored, and a folder made
+directly under `C:\` hands `BUILTIN\Users` read and `Authenticated Users` modify to what is made in it (ARC-09-C272), so the helper locks a
+folder it CREATES to the account and SYSTEM, by SID: `icacls <path> /inheritance:r /grant:r *<SID>:(OI)(CI)F *S-1-5-18:(OI)(CI)F`. It locks
+what it created and nothing it found. A folder that was already there is the user's, and its lock is `instance add`'s (a credential is being
+stored, and it says what it changed) and `doctor --fix`'s (F9), never a side effect of writing a cache. `tests/private-dir-guard.test.mjs`
+searches the tree for a folder made by hand and allows the two helpers; `tests/private-dir-parity.test.mjs` holds them to one command. A case
+gives the helper its own lock tools and never runs icacls; the one that does is `tests/windows-store-acl.test.mjs`, which runs on Windows only.
 
 ### Never mutate a shared build artefact in a test
 

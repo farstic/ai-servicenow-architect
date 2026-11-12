@@ -33,14 +33,14 @@ import {
   COLUMNS, ENTRY_DEFAULTS, labelOf, resolveFlags, wrapText, type ReviewIo,
 } from './preset-ui.js';
 import {
-  cloudSyncGate, maskUsername, probeOptionsFor, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY,
+  aclNote, cloudSyncGate, maskUsername, probeOptionsFor, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY,
   EXIT_USAGE, LABEL_RULE, type AddIo, type ManageDeps,
 } from './instance.js';
 import { probeAll, toLastProbe, type LastProbe } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
 import { loadStore, saveStore } from '../store/index.js';
 import { STORE_VERSION, completeFlags, type Store, type StoreInstance } from '../store/schema.js';
-import { maskPath } from '../store/paths.js';
+import { maskPath, projectStorePath } from '../store/paths.js';
 import { applyDependencyRule, matchPreset, FLAG_NAMES, type Flags } from '../utils/permissions.js';
 import { remedyFor } from '../errors/codes.js';
 import { cliSpelling } from './tty.js';
@@ -534,9 +534,12 @@ Promise<ImportResult> {
     if (plan.defaultInstance === entry.label && next.defaultInstance === undefined) {
       next = { ...next, defaultInstance: entry.label } as Store;
     }
-    saveStore(target.path, next);
+    // ARC-09-C272 — credentials are being stored: the file, and the product's own folder, are made private whatever they were, and said so if that changed them.
+    const written = saveStore(target.path, next, { lock: 'always' });
     imported += 1;
     io.write(`  ${entry.label}: imported (preset ${decision.preset}, user ${maskUsername(credentials.username)})\n`);
+    const note = aclNote(written.acl, deps.platform ?? process.platform, process.env, target.path === projectStorePath());
+    if (note) io.write(`${note}\n`);
   }
 
   io.write(`${deletionAdvice(imported, entries.length, home, deps.platform ?? process.platform)}\n`);

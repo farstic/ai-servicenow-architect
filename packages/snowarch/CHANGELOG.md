@@ -5,6 +5,17 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**The store is private on Windows (ARC-09-C272).** `saveStore` returns `{ acl }` and takes `{ acl?, lock? }`. On Windows it locks a folder it creates, and a file it creates in a
+folder that was there, to the account and SYSTEM (`icacls <path> /inheritance:r /grant:r *<SID>:… *S-1-5-18:…`, the account by SID from `whoami`); with
+`lock: 'always'` (`instance add`, `set-credentials`, `import --from-legacy`) it makes the file, and the folder when it is `.local` or `snowarch`, private
+whatever they were and reports `locked` with who they were open to; a routine save reads the file first and makes the replacement private again if it
+was, because the rename gives the file its folder's permissions. A failed lock is reported as `failed` and never loses the store. The new
+`store/acl.ts` holds the command, the SDDL reader (`icacls /save`, UTF-16LE, so no language matters), the exposure sentence ("BUILTIN\Users can read it") and
+`makePrivateDir`, which replaces every hand-made `mkdirSync(…, { mode: 0o700 })` in `src`. SV-02 reads the DACL on Windows instead of skipping the check:
+a store that anyone besides the account, SYSTEM and Administrators can read is a failure that names them, with `doctor --fix` for the checkout's store
+and a paste-ready PowerShell line otherwise; permissions that could not be read are a warning, never ok. The wizard's store line follows what the lock did.
+`CheckContext` gains `acl`, the seam a test uses so that no case runs icacls.
+
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.

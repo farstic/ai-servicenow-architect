@@ -351,7 +351,7 @@ Four files and an empty folder, all of them gitignored, and **nothing outside th
 
 | File | Written by | What goes in it |
 |---|---|---|
-| `.local/` (+ `logs/`) | B01 | 0700 on POSIX — an existing directory is chmodded, so a checkout bootstrapped before this rule stays private too. Windows records `fileModes: acl-inherited`. |
+| `.local/` (+ `logs/`) | B01 | 0700 on POSIX — an existing directory is chmodded, so a checkout bootstrapped before this rule stays private too. Windows records `fileModes: acl-inherited`, and a `.local/` that B01 creates is locked to the account and SYSTEM (`makePrivateDir`, ARC-09-C272). |
 | `clients/` | the bootstrap command, not a step | empty, made only when nothing is there and never touched when something is (a link or a file of that name is left alone; ARC-09-C265). It is the user's: an upgrade neither moves nor names it. |
 | `.local/bootstrap-state.json` | the runner | S03's schema v1 |
 | `.claude/settings.local.json` | B07 | **two array members and one hook entry, merged** |
@@ -1129,7 +1129,7 @@ diverge (P-16).
 |---|---|
 | `SV-00` | Node meets the declared floor of 20 |
 | `SV-01` | `dist/server.js` and `dist/contract.json` exist and parse; contract sha printed |
-| `SV-02` | Store resolution (source, masked path), schema, 0600/0700 modes (skipped on Windows, where permissions are ACL-inherited), cloud-sync warning |
+| `SV-02` | Store resolution (source, masked path), schema, 0600/0700 modes (on Windows the DACL instead: anyone besides the account, SYSTEM and Administrators who can read the file, or the product's own folder, is named; ARC-09-C272), cloud-sync warning |
 | `SV-03` | Per instance: bare-https URL, flags explicit, dependency-consistent, `toolPackage`, prod posture |
 | `SV-04` | Network probes — a declared interface with a stub that returns `skip`; ARC-07-S03 supplies the implementation. `--no-network` skips it explicitly |
 | `SV-05` | A real stdio handshake against `dist/server.js`: `initialize` + `tools/list`, names compared to `dist/contract.json`. Unconfigured mode expects the five core tools |
@@ -1321,6 +1321,7 @@ REFUSED with the check's own command, and a grep test proves the module cannot r
 | `F3` | `head-off-pin` | check the corpus out onto the pin | `vendor/ServiceNowDocs` |
 | `F4` | `flags-incomplete` | state every flag explicitly | `.local/instances.json` |
 | `F5` | `store-mode` | restore the store directory mode | `.local/` |
+| `F9` | `store-acl` | lock the store folder to you and SYSTEM | `.local/` |
 | `F6` | `toggles-mismatch` | rewrite the mode toggles | `.claude/settings.local.json` |
 | `F6` | `hooks-disabled-by-bootstrap` | remove the bootstrap's hook toggle | `.claude/settings.local.json` |
 | `F6` | `hook-absent` | register the hooks | `.claude/settings.local.json` |

@@ -347,6 +347,35 @@ test('ARC-09-C270 — the floor line and the refusal name an install whose folde
   assert.match(floorRefusal(absent, { target: 'v2.2.6', want: TAG.floors.claudeCode }), /^upgrade: Claude Code was not found, or its version not understood, and v2\.2\.6 wants 2\.1\.214 or later — install or upgrade it first/);
 });
 
+// ── ARC-09-C272 — an upgrading user learns that the store is open the same day ──────────────────────────────────────
+//
+// The upgrade leaves the store alone by design: it moves the tree and runs the target's bootstrap, whose verify step only writes a probe
+// result into a store (a routine save, which never makes an open file private). U7, the closing step, runs the target's FULL doctor — not
+// the quick subset, which leaves the server's checks out — and prints every failing and warning check with its remedy. So SV-02, which
+// now fails on Windows for a store others can read, reaches the screen as a line that names them and the repair.
+test('ARC-09-C272 — the upgrade\'s closing doctor prints an open store with who can read it and the command that fixes it', async () => {
+  const { spellings } = await import('../../tools/snowarch/lib/text.mjs');
+  const win = spellings({ platform: 'win32', env: {} });
+  const report = {
+    summary: { ok: 40, warn: 0, fail: 1, skip: 0 },
+    checks: [
+      { id: 'SV-01', title: 'dist artefacts', status: 'ok', detail: 'present' },
+      { id: 'SV-02', title: 'store', status: 'fail', detail: 'the file: BUILTIN\\Users can read it', remedy: `${win.cli} doctor --fix`, fixable: true,
+        data: { fix: { kind: 'store-acl', path: '.local' } } },
+    ],
+  };
+  const lines = doctorLines(report);
+  assert.equal(lines[0], 'DOCTOR: 40 ok, 0 warn, 1 fail (0 skip)');
+  const sv02 = lines.find((l) => l.startsWith('SV-02 FAIL store: '));
+  assert.ok(sv02, lines.join('\n'));
+  assert.ok(sv02.includes('BUILTIN\\Users can read it'), sv02);
+  assert.ok(sv02.endsWith(' doctor --fix'), sv02);
+  // Permissions that could not be read are a warning, and a warning is printed too: never a silent ok.
+  const unreadable = doctorLines({ summary: { ok: 40, warn: 1, fail: 0, skip: 0 },
+    checks: [{ id: 'SV-02', title: 'store', status: 'warn', detail: 'could not read the permissions (icacls exited 5: Access is denied.)' }] });
+  assert.ok(unreadable.some((l) => l.startsWith('SV-02 WARN store: could not read the permissions')), unreadable.join('\n'));
+});
+
 test('the classifier names a remedy only for a shape it recognises', () => {
   // Git's own words are printed by the CALLER, always. What this decides is whether a second,
   // actionable line is added — and a confident wrong remedy costs more than none.

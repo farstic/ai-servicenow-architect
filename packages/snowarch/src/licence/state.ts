@@ -9,7 +9,8 @@
  * and `revocations.json`, the last list a fetch brought back and when it was checked. Enforcement is on
  * every build (ARC-11-C6, from 2.0.13), and no variable turns it off.
  */
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { makePrivateDir } from '../store/acl.js';
 import { join } from 'node:path';
 import { checkLicence, readList, type LicenceStatus, type ProductKey, type VerifiedList } from './core.js';
 import { PRODUCT_KEYS } from './keys.js';
@@ -56,7 +57,7 @@ export function readListCache(root: string): ListCache | null {
 /** Written whole, atomically, 0600 — the discipline of every `.local/` file. */
 export function writeListCache(root: string, { list, checkedAt, source }: { list: unknown; checkedAt: string; source: string }): void {
   const path = revocationsPath(root);
-  mkdirSync(join(root, '.local'), { recursive: true, mode: 0o700 });
+  makePrivateDir(join(root, '.local'));
   const tmp = `${path}.tmp-${process.pid}`;
   writeFileSync(tmp, `${JSON.stringify({ checkedAt, source, list }, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, path);
