@@ -301,6 +301,32 @@ windows-latest during ARC-09-C272: `powershell.exe` run by pwsh itself works, ru
 with `PSModulePath` removed it works, and moving `TEMP`, `TMP` and `TMPDIR` the way `npm test` moves them
 changes nothing. `windowsPowerShellEnv()` in `tests/windows-store-acl.test.mjs` is the helper that does it.
 
+**A test that starts a process as another local account uses `System.Diagnostics.Process`, never `Start-Process -Credential`.**
+On windows-latest the second-account case of `tests/windows-store-acl.test.mjs` failed three times in about two
+hours (2026-11-12: develop's push run on node 20 and node 22, and #578 on node 24), each time on its first launch,
+right after the account was made: `Start-Process : Cannot process request because the process (N) has exited`.
+The cmdlet creates the child with `CreateProcessWithLogonW` and then looks it up by its id: PowerShell 7's
+`Process.cs` calls `Process.GetProcessById` and then reads `process.Handle`, and .NET Framework's
+`Process.GetProcessHandle` throws that message for a process it opens by id and finds already exited. A
+`cmd.exe /c type` of a small file is gone in milliseconds. Windows PowerShell 5.1's own code is closed and was
+not read; its message and exception type are that path's. `Process.Start` with a `ProcessStartInfo` (`UserName`,
+`Domain`, `Password` as a `SecureString`, `UseShellExecute = $false`, `RedirectStandardOutput`, a working
+directory the account can enter) keeps the handle `CreateProcessWithLogonW` returned, so `WaitForExit()` and
+`ExitCode` do not depend on the child still being there; read the output to the end before waiting.
+
+Measured on windows-latest during ARC-09-C274 (scratch branch `scratch/c274-probe`): the old call threw once
+in 228 runs of the case, on the first run of one replica while the engine suite was starting, with CI's exact
+message, and not in the other 227 (idle, under synthetic CPU load, under the suite, at suite start-ups); the new
+call threw in none of 430 runs; 800 bare launches per method of a child that exits at once threw in neither. With the lock
+planted out of the harness the case fails 80 of 80, so the control still bites. The probes did not reproduce
+CI's frequency (three of the six Windows cells of the two runs that hit it), so the fix rests on the mechanism and
+on the absence of the call that threw, not on a measured rate. The cmdlet also builds the account's profile, which the new call does not:
+each old run left a 1,317 MB profile on `C:` and took about 17 s (20 runs took `C:` from 28.7 GB free to 2.5 GB,
+and the 24th run of a loop failed with "There is not enough space on the disk"), where 20 new runs left no
+account, no profile and `C:` as free as before (31,660 MB), at about 1.3 s a run. A hosted runner is thrown away;
+a machine that is not (a self-hosted runner, or a contributor who sets `GITHUB_ACTIONS=true` to run the case,
+which is skipped otherwise) would have lost the disk.
+
 **If a macOS cell ever needs to be cheap:** the repository is public, so hosted runners cost nothing
 today. Should it ever become private, scheduling macOS on `main` only is the lever — recorded as an
 option, not a default.
