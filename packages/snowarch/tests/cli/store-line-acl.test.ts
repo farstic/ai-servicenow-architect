@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { COLUMNS } from '../../src/cli/preset-ui.js';
+import { cliSpelling } from '../../src/cli/tty.js';
 import { runAdd, storeLine } from '../../src/cli/instance.js';
 import type { AddIo } from '../../src/cli/instance.js';
 import type { AclTools, Exposure } from '../../src/store/acl.js';
@@ -57,7 +58,8 @@ describe('ARC-09-C272 — storeLine on Windows', () => {
     expect(out).not.toContain('readable only by you');
     expect(flat(out)).toContain('could not be restricted (icacls exited 5: Access is denied.)');
     expect(flat(out)).toContain('other accounts on this computer may be able to read it');
-    expect(flat(out)).toContain('.\\snowarch.cmd doctor');
+    expect(out.includes(cliSpelling('win32', {}))).toBe(true);
+    expect(flat(out)).toContain(' doctor says how to fix that.');
     for (const l of lines(out)) expect(l.length, l).toBeLessThanOrEqual(COLUMNS);
   });
 

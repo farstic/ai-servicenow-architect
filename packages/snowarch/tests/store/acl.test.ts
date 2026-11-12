@@ -27,8 +27,13 @@ const USER_SID = 'S-1-5-21-3289802278-1561746829-1498425070-500';
 const WHOAMI = `"runnervmm7ud1\\runneradmin","${USER_SID}"\r\n`;
 /** A folder under C:\ — what `icacls /save` wrote for it. The first line is the path, the second the DACL. */
 const OPEN_DACL = 'D:AI(A;ID;0x1301bf;;;AU)(A;OICIIOID;SDGXGWGR;;;AU)(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;0x1200a9;;;BU)';
-/** The same folder after the lock: protected, and only the two accounts. */
-const LOCKED_DACL = `D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;${USER_SID})`;
+/**
+ * The same folder after the lock, as the runner wrote it (round 2 of the probe): protected, and only the two accounts. The account is `LA`
+ * because it is the built-in Administrator (RID 500), which SDDL writes as an alias; any other account is written as its SID.
+ */
+const LOCKED_DACL = 'D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;LA)';
+const OTHER_USER_SID = 'S-1-5-21-3289802278-1561746829-1498425070-1001';
+const LOCKED_DACL_OTHER_USER = `D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;${OTHER_USER_SID})`;
 
 const ok = (stdout = '', stderr = ''): RunResult => ({ status: 0, stdout, stderr });
 const exe = (file: string): string => (file.split(/[\\/]/).pop() ?? file).toLowerCase().replace(/\.exe$/, '');
@@ -96,7 +101,8 @@ describe('ARC-09-C272 — the DACL, read from the SDDL (locale-independent)', ()
       { type: 'A', flags: 'OICIID', rights: 'FA', trustee: 'BA' },
       { type: 'A', flags: 'OICIID', rights: '0x1200a9', trustee: 'BU' },
     ]);
-    expect(parseSddl(LOCKED_DACL).map((a) => a.trustee)).toEqual(['SY', USER_SID]);
+    expect(parseSddl(LOCKED_DACL).map((a) => a.trustee)).toEqual(['SY', 'LA']);
+    expect(parseSddl(LOCKED_DACL_OTHER_USER).map((a) => a.trustee)).toEqual(['SY', OTHER_USER_SID]);
   });
 
   it('keeps the DACL only: a full descriptor with an owner, a group and a SACL gives the DACL\'s entries', () => {
@@ -135,7 +141,17 @@ describe('ARC-09-C272 — who can read it, in words', () => {
 
   it('is empty for the locked folder, and for the user\'s own profile (the account, SYSTEM, Administrators)', () => {
     expect(exposureOf(parseSddl(LOCKED_DACL), USER_SID).who).toEqual([]);
-    expect(exposureOf(parseSddl(`D:PAI(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;${USER_SID})`), USER_SID).who).toEqual([]);
+    expect(exposureOf(parseSddl(LOCKED_DACL_OTHER_USER), OTHER_USER_SID).who).toEqual([]);
+    expect(exposureOf(parseSddl(`D:PAI(A;OICIID;FA;;;SY)(A;OICIID;FA;;;BA)(A;OICIID;FA;;;${OTHER_USER_SID})`), OTHER_USER_SID).who).toEqual([]);
+    // The runner\'s profile folder as it printed it: SYSTEM, Administrators, the account as `LA`.
+    expect(exposureOf(parseSddl('D:(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;LA)'), USER_SID).who).toEqual([]);
+  });
+
+  it('reads the alias LA as the account only when the account is the built-in Administrator (RID 500), and as another account otherwise', () => {
+    // On a machine whose user is a normal account, an `LA` entry is somebody else: the machine\'s Administrator.
+    const e = exposureOf(parseSddl(LOCKED_DACL), OTHER_USER_SID);
+    expect(e.who).toEqual(['the local Administrator account']);
+    expect(exposureSentence(e)).toBe('the local Administrator account can read it');
   });
 
   it('tolerates the account written as a SID or as an alias, and the three it always tolerates', () => {

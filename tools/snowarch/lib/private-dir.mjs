@@ -42,7 +42,7 @@ const firstLine = (text) => String(text ?? '').split(/\r?\n/).map((l) => l.trim(
  * system. The system's own `whoami.exe` and `icacls.exe` are named by full path, and the account is asked once.
  */
 export function createLocker({ platform = process.platform, run = defaultRun, env = process.env } = {}) {
-  const system32 = win32.join(env.SystemRoot ?? env.windir ?? 'C:\\Windows', 'System32');
+  const system32 = win32.join(env.SystemRoot ?? 'C:\\Windows', 'System32');
   let sid;
   const userSid = () => {
     if (platform !== 'win32') return null;

@@ -80,6 +80,7 @@ const ALIASES = {
     MU: 'BUILTIN\\Performance Monitor Users', LU: 'BUILTIN\\Performance Log Users', IS: 'IIS_IUSRS', CY: 'BUILTIN\\Cryptographic Operators',
     ER: 'BUILTIN\\Event Log Readers', RM: 'BUILTIN\\Remote Management Users', DU: 'Domain Users', DA: 'Domain Admins',
     DG: 'Domain Guests', DC: 'Domain Computers', CO: 'CREATOR OWNER', CG: 'CREATOR GROUP', OW: 'OWNER RIGHTS',
+    LA: 'the local Administrator account', LG: 'the local Guest account',
 };
 /** What is never an exposure: the account itself (by SID, added at the call), SYSTEM, Administrators (who can take ownership anyway), the owner. */
 const TOLERATED = new Set(['SY', 'BA', 'CO', 'OW', SYSTEM_SID, ADMINISTRATORS_SID, CREATOR_OWNER_SID, OWNER_RIGHTS_SID]);
@@ -99,6 +100,10 @@ export function exposureOf(aces, userSid, nameOf = (t) => t) {
         if (!['A', 'XA', 'OA'].includes(ace.type))
             continue;
         if (ace.trustee === userSid || TOLERATED.has(ace.trustee))
+            continue;
+        // SDDL writes the built-in Administrator (RID 500) as the alias `LA`, not as a SID — and a hosted runner's account, and any machine whose
+        // user is that account, is exactly that one (measured, 2026-11-12). It is the account itself, not another.
+        if (ace.trustee === 'LA' && userSid.endsWith('-500'))
             continue;
         const name = ALIASES[ace.trustee] ?? WELL_KNOWN_SIDS[ace.trustee] ?? nameOf(ace.trustee);
         if (!who.includes(name))
@@ -129,7 +134,7 @@ export function createAclTools(options = {}) {
     const platform = options.platform ?? process.platform;
     const run = options.run ?? defaultRun;
     const env = options.env ?? process.env;
-    const system32 = win32.join(env.SystemRoot ?? env.windir ?? 'C:\\Windows', 'System32');
+    const system32 = win32.join(env.SystemRoot ?? 'C:\\Windows', 'System32');
     const exe = (name) => win32.join(system32, name);
     let sid;
     const userSid = () => {

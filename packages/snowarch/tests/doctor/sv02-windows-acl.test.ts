@@ -99,7 +99,9 @@ describe('ARC-09-C272 — SV-02 on Windows', () => {
     expect(r.status).toBe('fail');
     expect(r.detail).toContain('BUILTIN\\Users can read it');
     expect(r.detail).toContain('the file');
-    expect(r.remedy).toBe(`${WIN_CLI} doctor --fix`);
+    // The launcher is derived (the product spells it for the ctx), so it is checked by position: it starts the line, and the repair ends it.
+    expect(r.remedy?.startsWith(WIN_CLI)).toBe(true);
+    expect(r.remedy?.endsWith(' doctor --fix')).toBe(true);
     expect(r.fixable).toBe(true);
     expect(r.data).toEqual({ fix: { kind: 'store-acl', path: '.local' } });
   });

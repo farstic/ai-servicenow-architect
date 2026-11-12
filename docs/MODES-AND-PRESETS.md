@@ -197,11 +197,8 @@ it — rewriting a path you named would point the command somewhere you did not 
 risk: a 0600 file is unreadable wherever it sits, so what a directory bit buys an attacker is group or world **write**
 — replacing the file, or planting a symlink where it was. So group/world writable **without** the sticky bit is
 refused; with it (1777, as `/tmp` is) or with any other group/world bit the store loads with a warning; 0700 is
-silent. On Windows the POSIX bits Node reports are synthetic, so the check reads the ACL instead (ARC-09-C272): the account, SYSTEM and
-Administrators may hold the store, and anyone else with an allow entry is named — a folder made directly under `C:\` hands
-`BUILTIN\Users` read and `Authenticated Users` modify to everything made in it. The product locks a folder it creates to the account
-and SYSTEM, by SID; `instance add` and `set-credentials` make the store (and the product's own folder) private whatever they were and
-say what they changed; `doctor --fix` (F9) does the same for the checkout's store.
+silent. On Windows the POSIX bits Node reports are synthetic, so SV-02 reads the ACL (ARC-09-C272) and names anyone but the account,
+SYSTEM and Administrators who can read the store; the product locks what it creates, a stored credential and `doctor --fix` (F9) the rest.
 
 Writes are atomic — temp file, `fsync`, `rename` — so a reader never sees a half-written store, and paths in logs are
 masked (home to `~`, the checkout to `<checkout>`) because a log line reaches screen shares and support tickets.

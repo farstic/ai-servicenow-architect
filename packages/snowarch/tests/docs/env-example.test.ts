@@ -50,6 +50,10 @@ const NOT_OURS = new Set([
   // these, not the user, and a project `.env` inviting anyone to set `SHELL` would be this package
   // reaching outside its contract in the most confusing way available.
   'SHELL', 'MSYSTEM',
+  // `SystemRoot` is where Windows keeps its own programs (`C:\Windows`). ARC-09-C272 names `icacls.exe` and `whoami.exe` by their full path in
+  // System32 and not by what PATH offers, because a lock command that resolved through PATH would be one somebody else could provide. The
+  // operating system sets it, and a project `.env` inviting a reader to set it would be this package reaching outside its contract.
+  'SystemRoot',
   // Set by Claude Code for a project-scoped server.
   'CLAUDE_PROJECT_DIR',
   // Standard proxy variables. Documented in .env.example's prose (they are not `KEY=` lines

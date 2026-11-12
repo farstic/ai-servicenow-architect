@@ -57,7 +57,7 @@ test('ARC-09-C272 — a folder under C:\\ is open (the control), and what the pr
   const { base, why } = sandbox();
   if (!base) { t.skip(why); return; }
   t.after(() => rmSync(base, { recursive: true, force: true }));
-  const { createAclTools, parseSddl, SYSTEM_SID } = await import(href('packages/snowarch/dist/store/acl.js'));
+  const { createAclTools, parseSddl } = await import(href('packages/snowarch/dist/store/acl.js'));
   const { saveStore } = await import(href('packages/snowarch/dist/store/index.js'));
   const { makePrivateDir } = await import(href('tools/snowarch/lib/private-dir.mjs'));
   const tools = createAclTools();
@@ -88,18 +88,21 @@ test('ARC-09-C272 — a folder under C:\\ is open (the control), and what the pr
   const written = saveStore(storeFile, store());
   assert.deepEqual(written.acl, { state: 'created' });
   for (const p of [storeDir, storeFile]) assert.deepEqual(readers(p).who, [], p);
-  // Read back from the DACL itself, not only through the tolerance: exactly the two principals, as SIDs.
+  // Read back from the DACL itself, not only through the tolerance: exactly the two principals. SDDL writes SYSTEM as `SY`, and the account as
+  // its SID — except the built-in Administrator (RID 500, which a hosted runner uses), which it writes as the alias `LA` (measured).
+  const account = sid.endsWith('-500') ? 'LA' : sid;
   const save = join(base, 'dacl.txt');
   assert.equal(spawnSync('icacls', [storeFile, '/save', save], { encoding: 'utf8' }).status, 0);
   const trustees = parseSddl(readFileSync(save, 'utf16le').split(/\r?\n/).find((l) => l.startsWith('D:'))).map((a) => a.trustee);
-  assert.deepEqual([...trustees].sort(), ['SY', sid].sort(), `the store's DACL is not just the account and SYSTEM: ${trustees}`);
-  assert.ok(trustees.includes('SY') && !trustees.includes('BU') && !trustees.includes('AU') && !trustees.includes(SYSTEM_SID.toLowerCase()));
+  assert.deepEqual([...trustees].sort(), ['SY', account].sort(), `the store's DACL is not just the account and SYSTEM: ${trustees}`);
+  assert.ok(!trustees.includes('BU') && !trustees.includes('AU'), 'Users or Authenticated Users are still on the store');
 
   // The account can still read it, change it, and the server can write it again.
   assert.equal(JSON.parse(readFileSync(storeFile, 'utf8')).version, 1);
   appendFileSync(storeFile, '\n');
+  // A routine save replaces the file with one made in its folder; the file was private, so the replacement is made private again.
   const again = saveStore(storeFile, store());
-  assert.deepEqual(again.acl, { state: 'untouched' });
+  assert.deepEqual(again.acl, { state: 'private' });
   assert.equal(JSON.parse(readFileSync(storeFile, 'utf8')).defaultInstance, 'pdi');
 });
 
@@ -118,8 +121,9 @@ test('ARC-09-C272 — the guide\'s order: an existing .local with a licence in i
   // A routine write into it — a probe result, a default — changes nothing about who can read it.
   const file = join(dir, 'instances.json');
   saveStore(file, store());   // creates the file: locked as a file (the folder existed)
-  const routine = saveStore(file, store());
-  assert.deepEqual(routine.acl, { state: 'untouched' });
+  const routine = saveStore(file, store());   // the file was private: the replacement is private again, and the folder is not the write's to change
+  assert.deepEqual(routine.acl, { state: 'private' });
+  assert.deepEqual(tools.read(file).exposure.who, [], 'a routine write reopened the file it replaced');
   assert.ok(tools.read(dir).exposure.who.length > 0, 'a routine write changed the folder\'s permissions');
 
   // Storing a credential into it does, and says so.
