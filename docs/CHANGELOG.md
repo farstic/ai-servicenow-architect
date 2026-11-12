@@ -29,6 +29,18 @@ time before it is given up on, so one slow start, such as a first start after an
 A Claude Code that is not on PATH gets the words it had.
 The upgrade from 2.2.5 to this release still runs 2.2.5's own check: if its plan says `installed: not found` while `claude --version` prints a version, run `claude --version` once and run the upgrade again.
 
+**The instance store is private on Windows.** It holds the basic-auth password. On macOS and Linux it is 0600 in a 0700 folder; on Windows
+it was whatever its folder inherited, and a folder made directly under `C:\` hands `BUILTIN\Users` read and `Authenticated Users` modify to
+everything made in it, so every other account on the computer could read it. The wizard said the permissions were "inherited from the folder",
+and the doctor skipped the check and reported the store as healthy. Now a folder the product creates (`.local/`, its logs, the store's own
+folder) is locked to your account and SYSTEM, by SID, with `icacls`. Storing a credential (`instance add`, `set-credentials`,
+`import --from-legacy`) makes the store, and the product's own folder, private whatever they were — an existing `.local/` that holds a licence
+too, which follows its folder — and says what it changed: "It was open to BUILTIN\Users and NT AUTHORITY\Authenticated Users; its
+permissions were changed just now." A save that stores nothing new never makes an open file private and keeps a private one private. The
+doctor's SV-02 reads the permissions and names who else can read the store ("BUILTIN\Users can read it"). Its repair for the checkout's
+own store is `doctor --fix` (F9), which shows its plan first; for any other store it prints one PowerShell line that works out your account
+itself. Nothing changes an existing store's permissions without saying so.
+
 ### Fixed
 
 - The upgrade plan's `credentials:` line said that `.local/instances.json` is never read or written by the upgrade. The verify step of
@@ -51,6 +63,16 @@ The upgrade from 2.2.5 to this release still runs 2.2.5's own check: if its plan
   the first line on stderr, with the remedy to run it once and run again, and found-but-silent still refuses without `--force-floor`.
   The words for a Claude Code that is not on PATH, a version that is not understood and a version below the floor are unchanged. An
   upgrade from 2.2.5 runs 2.2.5's own plan, so the new floor line appears from 2.2.6 on (ARC-09-C269).
+- On Windows the instance store, which holds the basic-auth password, was readable by every account on the computer when it sat in a folder
+  made directly under `C:\` (a folder such as `C:\work\…` or `C:\AI_Arch`): `BUILTIN\Users` read and
+  `Authenticated Users` modify are inherited from the drive root (measured on a windows-latest runner, with a second local account denied the
+  locked file and reading an open one). `saveStore` now locks a folder it creates, and a file it creates in a folder that was there, to the
+  account and SYSTEM, by SID (`icacls /inheritance:r /grant:r`); `instance add`, `set-credentials` and `import --from-legacy` pass
+  `lock: 'always'` and report what they changed; a routine save reads the file first and makes the replacement private again if it was, because a
+  save replaces the file with one made in its folder. The engine's private folders (`.local/`, logs, the licence and upgrade caches, the
+  doctor's cache) and the server's (the audit log, the licence state, the integrity files) are made by `makePrivateDir`, and a test fails
+  on any `mkdirSync` with a mode outside the two helpers. SV-02 reads the DACL (from the SDDL `icacls /save` writes, so no language matters)
+  and tolerates the account, SYSTEM and Administrators; F9 (`store-acl`) is the whitelisted repair (ARC-09-C272).
 
 ## 2.2.5 — 2026-11-02
 
