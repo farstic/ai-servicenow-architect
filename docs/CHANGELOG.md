@@ -156,7 +156,9 @@ itself. Nothing changes an existing store's permissions without saying so.
   in its preflight (B00: `git 2.30.0 found, >= 2.34.1 required`), so a reader with git 2.30 who followed a page was told they were ready and
   then refused. The three pages now say 2.34.1, with the floor's own reason in the install table (the oldest git the install was run on,
   which is the one Ubuntu 22.04 LTS ships), and so does one sentence of the platform notes. The floor is still read from
-  `engine.config.json`; a test now reads each page's floors from that file as well and fails when a page says another one (ARC-09-C275).
+  `engine.config.json`; a test now reads each page's floors from that file as well and fails when a page says another one. The install
+  page's paragraph on what the corpus costs, and the README's copy of it, now also say that the bootstrap builds the names index: about
+  9 MB under `.local/corpus-names/`, about 15 seconds once for each docs pin (ARC-09-C275).
 
 ## 2.2.5 — 2026-11-02
 

@@ -280,7 +280,9 @@ made before 2.2.5, which fetched only the areas the specialists cite, moves to t
 its upgrade to 2.2.5: about 150 MB more on disk, measured from a default 2.2.4 install (20 areas).
 `--docs sparse` keeps only the cited areas (about 365 MB on disk) and exists for CI; the Architect cannot
 read the other areas then. Every release re-measures all three platforms and attaches the same table as
-`install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases).
+`install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases). The bootstrap also builds a
+names index of the whole corpus, which records which pages print a name: about 9 MB under
+`.local/corpus-names/`, about 15 seconds once for each docs pin, rebuilt by `docs sync` and `doctor --fix`.
 
 ### Upgrading
 
