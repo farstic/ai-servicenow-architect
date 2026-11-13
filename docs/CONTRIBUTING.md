@@ -2219,6 +2219,30 @@ Monthly, or when a citation goes dead upstream. Five steps, and the tool does th
 Exit 1 means the pin moved *and* citations broke. Both are true and both matter: the pin is staged
 because you need the new corpus in order to repair the citations against it.
 
+## The names index of the corpus
+
+`.local/corpus-names/<pin, 12 characters>/` (`meta.json`, `pages.txt`, `names.tsv`) says which corpus pages print a name (ARC-09-C263).
+Answering that by reading the pages takes about 26 s on a Mac; the index is built once, when the corpus changes, and read in
+milliseconds. For the whole corpus at the pin it holds 51,657 pages and 75,895 names in 8,620 KiB, and builds in about 15 s with about
+280 MB resident. Four rules keep it cheap and safe:
+
+- **One caller builds it, in a child process, never in a session.** `lib/docs/sync-index.mjs` is the only module that names
+  `names-index-build.mjs`, and it runs the builder in a child node, so nothing a hook can load can build an index. Bootstrap B02,
+  `docs sync` and `doctor --fix` (F10, sent by E-33) are its callers. `tests/docs-names-index.test.mjs` follows the static imports of
+  every hook and fails when one reaches the builder, and fails when a new module names it: decide in review whether it may run in a
+  session (it may not).
+- **A reader that gets `null` runs without the index.** `loadNamesIndex` (`lib/docs/names-index.mjs`) answers `null` for a missing,
+  short, corrupt, unknown-version or other-pin index; E-33 says which of "not built" and "built for another docs pin" it is.
+- **Absence is claimed only from `coverage: full`.** `full` means the pages on disk were every page of the corpus tree at the pin, so a
+  name the index lacks is not in the corpus; `disk` is a sparse checkout, whose index covers the areas it lists, so presence is proof
+  and absence is not.
+- **One tokeniser.** `pageNames` in `lib/docs/name-rules.mjs` is the only reader of a page's names; `docs verify` (`corpusIndex`) and
+  the index both call it, and a test fails on a second copy. B02 declares the index as its output (`outputMissing`), as it does for
+  B01's manifest, so an install made before the index existed builds it at the next bootstrap or upgrade.
+
+A fixer id is taken once: `doctor --fix`'s F9 is the store lock (ARC-09-C272) and the index's is F10. When two branches add a fixer,
+the second to merge takes the next free id and says so in its pull request.
+
 ## When to run the validation tests
 
 **Run `tests/VALIDATION-TESTS.md` after any change to `CLAUDE.md`, to `governance/`, to a `SKILL.md`
