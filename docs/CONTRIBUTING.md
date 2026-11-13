@@ -2137,11 +2137,11 @@ the only failure mode and it changes nothing. A second writer would be a second 
 
 ## Editing the registration files
 
-**Never hand-edit `permissions` in `.claude/settings.json`.** It is generated from the server
-contract — 236 allow entries and 161 ask entries, regenerated whenever a tool's gate changes — and a
-hand-edit is overwritten by the next `npm run gen`. **`env` and `hooks` are yours**: the generator
-rewrites only the key it owns and carries the rest through, which is asserted by test rather than
-trusted.
+**Never hand-edit `permissions` in `.claude/settings.json`.** It is generated: 236 allow entries and
+163 ask entries from the server contract, regenerated whenever a tool's gate changes, and two more allow
+entries, for `docs lookup`, from the launcher spelling (ARC-09-C268). A hand-edit is overwritten by the
+next `npm run gen`. **`env` and `hooks` are yours**: the generator rewrites only the key it owns and
+carries the rest through, which is asserted by test rather than trusted.
 
 `.mcp.json` is hand-written and small. Every `${…}` must carry a `:-` default, no key may look like
 a credential, and the server key must equal `engine.config.json`'s `mcp.serverKey` — all three are
