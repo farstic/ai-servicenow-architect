@@ -152,6 +152,11 @@ itself. Nothing changes an existing store's permissions without saying so.
   `%PROGRAMFILES%\draw.io`. When it finds nothing it gives the install line of the platform it runs on: `brew` for macOS only, the zip that
   needs no administrator rights for Windows, the packages for Linux. macOS keeps its sentence, and a shim made by hand keeps working.
   `scripts/README.md` says the same (ARC-09-C273).
+- The README, the install page and the Windows guide told a reader that git 2.25 is enough, and the bootstrap refuses anything below 2.34.1
+  in its preflight (B00: `git 2.30.0 found, >= 2.34.1 required`), so a reader with git 2.30 who followed a page was told they were ready and
+  then refused. The three pages now say 2.34.1, with the floor's own reason in the install table (the oldest git the install was run on,
+  which is the one Ubuntu 22.04 LTS ships), and so does one sentence of the platform notes. The floor is still read from
+  `engine.config.json`; a test now reads each page's floors from that file as well and fails when a page says another one (ARC-09-C275).
 
 ## 2.2.5 — 2026-11-02
 
