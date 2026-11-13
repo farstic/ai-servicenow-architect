@@ -225,7 +225,7 @@ test('ARC-09-C272 — the effect: another local account is denied the locked sto
   // The limit is 300 s still, as a margin.
   //
   // THE SECOND ACCOUNT'S PROCESSES ARE STARTED WITH System.Diagnostics.Process, NOT Start-Process -Credential (ARC-09-C274). On hosted runners that cmdlet
-  // failed this case three times in about two hours (2026-11-12: develop's push run on node 20 and 22, #578 on node 24) with "Start-Process : Cannot
+  // failed this case four times in about three hours (2026-11-12: develop's push run on node 20 and 22, #578 on node 24, develop's next push run in release-dryrun) with "Start-Process : Cannot
   // process request because the process (N) has exited", on its first launch, right after the account was made. The cmdlet creates the child with
   // CreateProcessWithLogonW and then looks it up by its id (PowerShell 7's Process.cs: Process.GetProcessById, then process.Handle; Windows PowerShell
   // 5.1's own code is closed and was not read), and .NET throws that message for a process that has already exited; `cmd.exe /c type` of a small file is

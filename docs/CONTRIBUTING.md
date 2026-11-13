@@ -302,9 +302,9 @@ with `PSModulePath` removed it works, and moving `TEMP`, `TMP` and `TMPDIR` the 
 changes nothing. `windowsPowerShellEnv()` in `tests/windows-store-acl.test.mjs` is the helper that does it.
 
 **A test that starts a process as another local account uses `System.Diagnostics.Process`, never `Start-Process -Credential`.**
-On windows-latest the second-account case of `tests/windows-store-acl.test.mjs` failed three times in about two
-hours (2026-11-12: develop's push run on node 20 and node 22, and #578 on node 24), each time on its first launch,
-right after the account was made: `Start-Process : Cannot process request because the process (N) has exited`.
+On windows-latest the second-account case of `tests/windows-store-acl.test.mjs` failed four times in about three
+hours (2026-11-12: develop's push run on node 20 and node 22, #578 on node 24, and develop's next push run in
+`release-dryrun (windows-latest)`), each time on its first launch, right after the account was made: `Start-Process : Cannot process request because the process (N) has exited`.
 The cmdlet creates the child with `CreateProcessWithLogonW` and then looks it up by its id: PowerShell 7's
 `Process.cs` calls `Process.GetProcessById` and then reads `process.Handle`, and .NET Framework's
 `Process.GetProcessHandle` throws that message for a process it opens by id and finds already exited. A
@@ -1349,6 +1349,7 @@ is behaviour rather than description. ARC-02-S08 took it from 425 lines to 125 a
 and 20,000 bytes, enforced by `tests/claude-md.test.mjs`. ARC-09-C250 raised the byte cap to 20,400 on the
 owner's decision (2026-10-24), for two additions that remove nothing. ARC-09-C256 raised it to 20,600 on the
 owner's decision (2026-10-29), for the grounding rule's twelve-page budget, which rewrites three lines and adds none.
+ARC-09-C263 took that budget out again (the rule has no page limit) and stayed inside the same cap, at 20,543 bytes: it asked for no raise.
 
 | # | Section | Budget |
 |---|---|---|

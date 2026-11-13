@@ -45,7 +45,10 @@ test('ARC-09-C118 — the co-fire rule is one sentence, in the same words in CLA
   // `(citation: …)` at all. The rule says each Envelope cites as a single-gateway turn does.
   assert.ok(rules[0].words.includes('Each Envelope cites as a single-gateway turn does, `(citation: markdown/<area>/<page>.md)` '
     + 'on every baseline claim, never a bare file name.'), 'the per-Envelope citation sentence is missing');
-  assert.match(rules[0].words, /Each Envelope has its own grounding budget, twelve pages by default, not shared with another Envelope, declared per Envelope in the answer\./);
+  // ARC-09-C263 — the page budget is gone from the rule (tests/grounding-rule.test.mjs): a co-fired Envelope is grounded as fully as a
+  // single-gateway one, and this sentence keeps no budget and no page number.
+  assert.ok(rules[0].words.includes('Each Envelope is grounded as fully as a single-gateway one.'), 'the per-Envelope grounding sentence is missing');
+  assert.doesNotMatch(rules[0].words, /grounding budget|twelve pages|by default/, 'a page budget is back in the co-fire rule');
   for (const f of SITES) assert.doesNotMatch(real(f), DISPATCH_BOUND, `${f}: a co-fire is tied to the dispatch again`);
 });
 
