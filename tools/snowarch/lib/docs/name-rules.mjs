@@ -82,3 +82,39 @@ export const qualifiesWhole = (whole, namespaces) => {
   return left === 'com' || left === 'glide' || (namespaces.get(left) ?? 0) >= NAMESPACE_MIN;
 };
 
+/**
+ * The phrases by which a text calls a name absent from the corpus. Strict list: NOT a bare "verify on the instance", which defers to
+ * the instance and claims nothing of the corpus.
+ */
+const ABSENCE = 'not documented|not in the (?:bundled )?corpus|undocumented|citation unavailable in australia branch';
+export const ABSENCE_ANYWHERE = new RegExp(ABSENCE, 'i');
+const AFTER_NAME = new RegExp(`^[\\s*_\\-–—:;,()]*(?:(?:is|are)\\s+)?(?:${ABSENCE})`, 'i');
+
+/** A span that is only a name: letters, digits, underscores, dots, hyphens and the corpus's `\_` escape. */
+const PURE_NAME = /^[A-Za-z0-9_.\\-]+$/;
+
+/** The backticked spans and `[table]` brackets of a line that are only a name, as `{ raw, start, end }` (start and end include the marks). */
+export function nameSpans(line) {
+  const spans = [];
+  for (const m of line.matchAll(/`([^`\n]+)`/g)) spans.push({ raw: m[1], start: m.index, end: m.index + m[0].length });
+  for (const m of line.matchAll(/\[([A-Za-z0-9_.\\]+)\](?!\()/g)) spans.push({ raw: m[1], start: m.index, end: m.index + m[0].length });
+  return spans.filter((sp) => PURE_NAME.test(sp.raw));
+}
+
+/**
+ * Is the name at `span` called absent? STRICT ATTRIBUTION: the phrase follows the name's closing mark with only separators between
+ * (whitespace, dashes, a colon, semicolon, comma, parentheses, an optional is/are), or the line is a table row the name heads and a later
+ * cell carries the phrase. A phrase later in the sentence, or about another name, marks nothing: measured on the roster, line-level
+ * attribution is wrong nine times in ten (66 names on absence lines, 60 of them printed by the corpus), strict attribution names 5 and
+ * the corpus prints none of them.
+ */
+export function markedAbsent(line, span) {
+  if (AFTER_NAME.test(line.slice(span.end))) return true;
+  const t = line.trim();
+  if (!t.startsWith('|')) return false;
+  const cells = t.split('|').map((c) => c.trim()).filter((c, k, all) => !(c === '' && (k === 0 || k === all.length - 1)));
+  if (cells.length < 2) return false;
+  const head = /^`([^`]+)`$/.exec(cells[0]);
+  return Boolean(head) && head[1].replace(/\\_/g, '_').toLowerCase() === line.slice(span.start + 1, span.end - 1).replace(/\\_/g, '_').toLowerCase()
+    && cells.slice(1).some((c) => ABSENCE_ANYWHERE.test(c));
+}

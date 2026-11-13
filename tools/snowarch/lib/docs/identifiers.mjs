@@ -46,7 +46,7 @@ import { loadContract, toolNames } from '../../../../packages/contract/lib/contr
 import { SPARSE, sparseOf } from './status.mjs';
 import {
   MARKER, PROPOSED, DECLARED, PLATFORM_PREFIXES, NAMESPACE_MIN, TOKEN, DOTTED, CUSTOM, PLACEHOLDER, bare, dotted, candidate,
-  pageNames, qualifiesWhole,
+  pageNames, qualifiesWhole, markedAbsent, nameSpans,
 } from './name-rules.mjs';
 
 // ARC-09-C263 — the definitions moved to name-rules.mjs, a leaf; what this file exported it still does.
@@ -358,7 +358,7 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
   const corpus = resolve(root, corpusDir);
   const none = () => ({ checked: 0, unexcused: [], scriptCode: 0, excused: 0 });
   if (!index && !existsSync(join(corpus, 'markdown'))) {
-    return { status: 'missing', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [], deadPrefixes: [], allowErrors, reasons, dotted: none(), camel: none(), spaced: none() };
+    return { status: 'missing', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [], deadPrefixes: [], allowErrors, reasons, dotted: none(), camel: none(), spaced: none(), strict: { checked: 0, printed: [] } };
   }
   // ARC-09-C244 — the guard is defined against the whole corpus, which is what an install has by default. A sparse
   // checkout holds only the cited areas: a name another area prints would read as unexcused there, and an excuse that
@@ -366,7 +366,7 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
   // list's own errors count. `shape` is the checkout's (`sparseOf`), given by a test.
   if (!index && [SPARSE.cone, SPARSE.pattern].includes(shape ?? sparseOf(corpus))) {
     return { status: 'sparse', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [],
-      deadPrefixes: [], allowErrors, reasons, dotted: none(), camel: none(), spaced: none() };
+      deadPrefixes: [], allowErrors, reasons, dotted: none(), camel: none(), spaced: none(), strict: { checked: 0, printed: [] } };
   }
   const wants = rosterWants(roster);
   const idx = index ?? corpusIndex(corpus, wants);
@@ -511,15 +511,48 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
         : (CAMEL_NAME.test(e.identifier) ? idx.foundCamel.has(e.identifier) : idx.has(e.identifier));
     if (found) stale.push({ file: e.file, identifier: e.identifier, why: 'the corpus has this name: remove the entry' });
   }
+  // ARC-09-C263 (M6) — the roster must not CALL "not documented" a name the corpus prints: the text a model reads must not teach a
+  // false absence. STRICT attribution (name-rules.mjs `markedAbsent`): the phrase follows the name's closing mark, or the name heads
+  // a table row that carries it. Only a subject the index can answer is looked up — a token, or a dotted name looked up whole; a
+  // table written with a field is looked up by its parts, which this index does not hold per page, so it is not checked here.
+  // Measured at the pin: 3 subjects are looked up (employment_status, sub_state, sn_aia_version), none printed by the corpus; the two
+  // `sn_hr_core_case.sub_state` sites are the by-parts case.
+  const strictArm = { checked: 0, printed: [] };
+  for (const abs of rosterFiles(root)) {
+    const file = relative(root, abs).split(sep).join('/');
+    let fenced = false;
+    readFileSync(abs, 'utf8').split(/\r?\n/).forEach((text, i) => {
+      if (FENCE.test(text)) { fenced = !fenced; return; }
+      if (fenced) return;
+      for (const sp of nameSpans(text)) {
+        if (!markedAbsent(text, sp)) continue;
+        const raw = sp.raw.replace(/\\_/g, '_');
+        let name;
+        let printed;
+        if (raw.includes('.')) {
+          const whole = dotted(raw);
+          if (!whole.includes('.') || CUSTOM.test(whole) || !qualifies(whole)) continue;
+          name = whole;
+          printed = idx.dotted.has(whole);
+        } else if (raw.includes('_')) {
+          name = bare(raw);
+          if (CUSTOM.test(name)) continue;
+          printed = idx.tokens.has(name);
+        } else continue;
+        strictArm.checked += 1;
+        if (printed) strictArm.printed.push({ file, line: i + 1, identifier: name, why: 'the roster calls it not documented, and the corpus prints it: use the corpus\'s page, or drop the marker' });
+      }
+    });
+  }
   const firsts = new Set([...idx.tokens].map((t) => t.split('_')[0]));
   const deadPrefixes = prefixes.filter((p) => !firsts.has(p));
   const bad = unexcused.length + dottedArm.unexcused.length + camelArm.unexcused.length + spacedArm.unexcused.length
-    + stale.length + deadPrefixes.length + allowErrors.length;
+    + stale.length + deadPrefixes.length + allowErrors.length + strictArm.printed.length;
   return {
     status: bad ? 'fail' : 'ok',
     checked: classes.found + classes.custom + classes.constant + classes.mixed + classes.absent + classes.qualified,
     classes, capitals: { constant: [...new Set(capitals.constant)].sort(), mixed: [...new Set(capitals.mixed)].sort() },
-    unexcused, excused, stale, deadPrefixes, allowErrors, reasons, dotted: dottedArm, camel: camelArm, spaced: spacedArm,
+    unexcused, excused, stale, deadPrefixes, allowErrors, reasons, dotted: dottedArm, camel: camelArm, spaced: spacedArm, strict: strictArm,
   };
 }
 
@@ -537,10 +570,13 @@ export function formatIdentifiers(r) {
   for (const u of [...r.unexcused, ...r.dotted.unexcused, ...r.camel.unexcused, ...r.spaced.unexcused]) {
     lines.push(`UNEXCUSED ${u.file}:${u.line} ${u.identifier} — ${u.why}`);
   }
+  const strict = r.strict ?? { checked: 0, printed: [] };
+  for (const p of strict.printed) lines.push(`STRICT ${p.file}:${p.line} ${p.identifier} — ${p.why}`);
   for (const s of r.stale) lines.push(`STALE ${s.file} ${s.identifier} — ${s.why}`);
   lines.push(`identifiers: checked ${r.checked} | unexcused ${r.unexcused.length}`);
   lines.push(`dotted names: checked ${r.dotted.checked} | unexcused ${r.dotted.unexcused.length} | script-code ${r.dotted.scriptCode}`);
   lines.push(`camelcase names: checked ${r.camel.checked} | unexcused ${r.camel.unexcused.length} | excused ${r.camel.excused}`);
   lines.push(`spaced names: checked ${r.spaced.checked} | unexcused ${r.spaced.unexcused.length} | excused ${r.spaced.excused}`);
+  lines.push(`strict marker subjects: checked ${strict.checked} | printed by the corpus ${strict.printed.length}`);
   return { text: lines.join('\n'), code: r.status === 'ok' ? 0 : 1 };
 }
