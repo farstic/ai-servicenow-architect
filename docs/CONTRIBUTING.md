@@ -1349,6 +1349,7 @@ is behaviour rather than description. ARC-02-S08 took it from 425 lines to 125 a
 and 20,000 bytes, enforced by `tests/claude-md.test.mjs`. ARC-09-C250 raised the byte cap to 20,400 on the
 owner's decision (2026-10-24), for two additions that remove nothing. ARC-09-C256 raised it to 20,600 on the
 owner's decision (2026-10-29), for the grounding rule's twelve-page budget, which rewrites three lines and adds none.
+ARC-09-C263 took that budget out again (the rule has no page limit) and stayed inside the same cap, at 20,543 bytes: it asked for no raise.
 
 | # | Section | Budget |
 |---|---|---|
