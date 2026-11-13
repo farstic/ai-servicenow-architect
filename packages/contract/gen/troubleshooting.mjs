@@ -32,10 +32,11 @@ which reports the same codes for the same conditions before you meet them in a c
 
 ## What \`--fix\` will and will not do
 
-\`./snowarch doctor --fix\` repairs a CLOSED list of seven drifts and prints a plan before it
+\`./snowarch doctor --fix\` repairs a CLOSED list of drifts and prints a plan before it
 touches anything: install the server dependencies, sync or re-sparse the documentation corpus,
 check the corpus out onto its pin, write the flags a store entry never stated, restore the store
-directory's mode, rewrite the mode toggles, and clear a stale doctor cache. Each one reports
+directory's mode, rewrite the mode toggles, build the grounding names index (the doctor's E-33), and clear
+a stale doctor cache. Each one reports
 \`applied\`, \`noop\` or \`failed\`, and running it twice changes nothing the second time.
 
 It never edits credentials, \`.mcp.json\`, \`.claude/settings.json\`, \`engine.config.json\` or

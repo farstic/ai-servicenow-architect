@@ -135,9 +135,10 @@ function writeStore(root, store) {
 test('every kind the whitelist knows has a fixer and a target, and nothing else does', () => {
   assert.deepEqual([...new Set(FIXERS.map((f) => f.kind))].sort(), [...KINDS].sort());
   for (const kind of KINDS) assert.ok(TARGETS[kind], `${kind} has no target`);
-  // The ids are the story's seven, ARC-11-C141's F8, which runs before the cache is cleared, and ARC-09-C272's F9, which locks the store's
-  // folder on Windows and sits beside F5, the POSIX repair of the same thing; F2/F6 legitimately cover two kinds each.
-  assert.deepEqual([...new Set(FIXERS.map((f) => f.id))], ['F1', 'F2', 'F3', 'F4', 'F5', 'F9', 'F6', 'F8', 'F7']);
+  // The ids are the story's seven, ARC-11-C141's F8, which runs before the cache is cleared, ARC-09-C272's F9, which locks the store's
+  // folder on Windows and sits beside F5, the POSIX repair of the same thing, and ARC-09-C263's F10, the names index, which runs
+  // after the corpus and F8 and before the cache; F2/F6 legitimately cover two kinds each.
+  assert.deepEqual([...new Set(FIXERS.map((f) => f.id))], ['F1', 'F2', 'F3', 'F4', 'F5', 'F9', 'F6', 'F8', 'F10', 'F7']);
 });
 
 test('every fixable result carries a kind the whitelist knows', async (t) => {
@@ -377,6 +378,32 @@ test('F2 syncs with the recorded docs mode, and rewrites "skip" to the whole cor
     { root: '/nowhere', docsMode: 'skip', config: {} }, { run });
   assert.deepEqual(asked, ['sparse', 'full', 'full'], 'a "skip" mode was passed through');
   assert.match(skipped[0].detail, /recorded mode was "skip" — synced as "full"/);
+});
+
+// ARC-09-C263 (M8) — F10, the grounding names index, through the same policy module docs sync and B02 use.
+test('ARC-09-C263 — F10 builds the names index for the recorded pin, forced, and reports the builder\'s own reason when it cannot', async () => {
+  const PIN40 = 'c'.repeat(40);
+  const asked = [];
+  const built = (o) => { asked.push(o); return { built: true, error: null, line: '[docs] names index … 1.0 s · 5 names · 2 pages · coverage full' }; };
+  const action = { id: 'F10', check: 'E-33', kind: 'names-index', title: 't', target: '.local/corpus-names/', detail: 'd', fix: {} };
+  const ctx = { root: '/nowhere', config: { docs: { pin: PIN40 } } };
+  const done = await applyPlan({ actions: [action] }, ctx, { run: built });
+  assert.equal(done[0].result, 'applied');
+  assert.equal(done[0].detail, 'names index … 1.0 s · 5 names · 2 pages · coverage full');
+  assert.equal(asked[0].force, true, 'the doctor asked: rebuild even if one is held');
+  assert.equal(asked[0].pin, PIN40);
+  assert.match(asked[0].corpus.replace(/\\/g, '/'), /\/nowhere\/vendor\/ServiceNowDocs$/);
+  const failed = await applyPlan({ actions: [action] }, ctx, { run: () => ({ built: false, error: 'disk full' }) });
+  assert.equal(failed[0].result, 'failed');
+  assert.equal(failed[0].detail, 'disk full');
+});
+
+test('ARC-09-C263 — an E-33 warning plans F10, with the index folder as its target', () => {
+  const report = { checks: [{ id: 'E-33', status: 'warn', fixable: true, detail: 'not built', data: { fix: { kind: 'names-index' } } }] };
+  const plan = buildPlan(report);
+  assert.equal(plan.actions.length, 1);
+  assert.equal(plan.actions[0].id, 'F10');
+  assert.equal(plan.actions[0].target, '.local/corpus-names/');
 });
 
 test('F1 is design-only\'s noop and live\'s repair', async () => {

@@ -357,7 +357,7 @@ test('ARC-09-C253 — any other change in E-28 still fails, and so does the same
   // a release that is available: a warn that names its tag, so it is a finding about the install and not about the network
   const available = await e28Entry(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
   assert.equal(available.status, 'warn', available.detail);
-  assert.deepEqual(diff(base, normalise(rawFrom(base, available))), ['E-28: status ok → warn', 'summary.ok: 29 → 28', 'summary.warn: 0 → 1']);
+  assert.deepEqual(diff(base, normalise(rawFrom(base, available))), ['E-28: status ok → warn', `summary.ok: ${base.summary.ok} → ${base.summary.ok - 1}`, 'summary.warn: 0 → 1']);
   assert.deepEqual(compare.notices(base, normalise(rawFrom(base, available))), [], 'a run that compared E-28 said it did not');
   for (const [name, entry] of [
     ['crashed', { id: 'E-28', status: 'fail', fixable: false, detail: 'check crashed' }],
