@@ -94,6 +94,12 @@ itself. Nothing changes an existing store's permissions without saying so.
   searches with names the request, the skill or a page it read gives it, never a name it made up; two pages that disagree are both cited and
   the difference is an OPEN QUESTION; and a field a page creates in an example belongs to that example, not to baseline. A co-fired Envelope
   is grounded as fully as a single one (ARC-09-C263).
+- The Architect looks a construct up before it calls it absent. Part 2 of each of the six gateways now ends with two sentences: before
+  calling a construct not documented, unverified or left to the instance, run `./snowarch docs lookup <name or words>…` (many names, one
+  call), where only ABSENT grounds "not documented in the bundled corpus" and a page the lookup shows is opened before more is said; and
+  cite only a page you read that prints the construct's name. The checkout's `.claude/settings.json` lets a session run that one command
+  without asking, as `Bash(./snowarch docs lookup *)` and, for the PowerShell tool on Windows, `PowerShell(.\snowarch.cmd docs lookup *)`;
+  no other command of the launcher is allowed (ARC-09-C268).
 
 ### Fixed
 

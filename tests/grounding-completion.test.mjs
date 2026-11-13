@@ -6,16 +6,28 @@
 // (tests/grounding-rule.test.mjs) and the answer carries no count of pages read: the owner's measurement found that line the
 // only source of regressions, and it is not in the text (the last test below holds that). The paragraph is the same in the six
 // gateways, so seven places do not drift from each other.
+//
+// ARC-09-C268 (phase B) — two sentences end the line: run `docs lookup` for a construct before calling it not documented, unverified or
+// left to the instance (only ABSENT grounds "not documented in the bundled corpus"; a page the lookup shows is opened before more is
+// said), and cite only a page that was Read and prints the construct's name. The sentence names a command, so the command, the word
+// ABSENT and the generated allow entry that lets a session run it without a prompt are held to it below.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ruleAllows } from './helpers/permission-rule.mjs';
+import { STATUS } from '../tools/snowarch/lib/docs/lookup.mjs';
+import { spellings } from '../tools/snowarch/lib/launcher-spelling.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const GATEWAYS = ['itsm-specialist', 'csm-specialist', 'hrsd-specialist', 'itom-discovery-specialist',
   'fso-insurance-specialist', 'cmdb-csdm-specialist'];
 const LEAD = '[Completing Part 2:';
+// ARC-09-C268 — the two sentences the owner approved, byte for byte (+253 and +60 bytes with their leading space).
+const LOOKUP = 'Before calling a construct not documented, unverified or left to the instance, run `./snowarch docs lookup <name or words>…` '
+  + '(many names, one call): only ABSENT grounds "not documented in the bundled corpus"; open a page it shows before you say more.';
+const CITE = 'Cite only a page you Read that prints the construct\'s name.';
 
 /** The completion line as each gateway states it, with where it sits relative to the Live line and Part 3. */
 export function completionLines(read) {
@@ -53,10 +65,51 @@ test('ARC-09-C263 — Part 2 carries the completion paragraph: one line per gate
 });
 
 // The words C263 keeps out: a resting label, a budget, "in words" (R4's resting label), and a page path — a Grep scope names the
-// folder without a page path under it.
+// folder without a page path under it. ARC-09-C268 lets "unverified" stand in ONE place: the lookup sentence's list of reasons to look a
+// construct up ("not documented, unverified or left to the instance"). There it is a trigger, not a label the answer is asked to
+// carry; anywhere else in the line it is still the resting label C263 removed.
 test('ARC-09-C263 — the completion line has no resting label, no budget and no page path', () => {
   const { words } = completionLines(real)[0];
-  assert.doesNotMatch(words, /unverified|budget|in words|markdown\/[a-z]/, 'the completion line has a slot the rule removed');
+  assert.ok(words.includes(LOOKUP), 'the lookup sentence is not in the line, so there is nothing to take out before the check');
+  const slot = (line) => /unverified|budget|in words|markdown\/[a-z]/.test(line.replace(LOOKUP, ''));
+  assert.equal(slot(words), false, 'the completion line has a slot the rule removed');
+  assert.doesNotMatch(words, /budget|in words|markdown\/[a-z]/, 'the lookup sentence has a slot the rule removed');
+  assert.equal((words.match(/unverified/g) ?? []).length, 1, '"unverified" stands in more than the one trigger list');
+  // The control: the check can fail. A label asked for, a budget, R4's "in words" and a page path are each found.
+  for (const planted of [' Mark it unverified.', ' Keep a budget.', ' Say it in words.', ' See markdown/it-service-management.']) {
+    assert.equal(slot(words.replace(/\]$/, `${planted}]`)), true, `the check does not see:${planted}`);
+  }
+});
+
+test('ARC-09-C268 — the line sends a session to the lookup before it calls a construct absent, and to cite only what it Read', () => {
+  for (const c of completionLines(real)) {
+    const at = (sentence) => c.words.split(sentence).length - 1;
+    assert.equal(at(LOOKUP), 1, `${c.file}: the lookup sentence is not in the line exactly once`);
+    assert.equal(at(CITE), 1, `${c.file}: the citation sentence is not in the line exactly once`);
+    assert.ok(c.words.endsWith(` ${LOOKUP} ${CITE}]`), `${c.file}: the two sentences are not the end of the line, lookup then citation`);
+    // They come after the three C263 sentences, which are unchanged and in their order.
+    const before = c.words.slice(0, c.words.indexOf(LOOKUP));
+    assert.ok(before.indexOf('Search with Grep') < before.indexOf('Two pages that disagree') && before.indexOf('Two pages that disagree') < before.indexOf('A field, column or table'), `${c.file}: the C263 sentences moved`);
+  }
+});
+
+test('ARC-09-C268 — the command the line names is a command that exists, ABSENT is the word it prints, and the generated settings allow it', () => {
+  const cli = spellings({ platform: 'linux', env: {} }).cli;
+  // The command, as the sentence spells it: the launcher, the two words, and the placeholder for what follows.
+  const named = /run `(\S+) (docs lookup) <name or words>…`/.exec(LOOKUP);
+  assert.ok(named, 'the sentence no longer names the command the way this test reads it');
+  assert.equal(named[1], cli, 'the sentence spells the launcher otherwise than the product\'s POSIX launcher');
+  // It is a verb of `docs`, which the product's own usage lists, and ABSENT is the state the command prints for a name no page has.
+  const usage = readFileSync(resolve(ROOT, 'tools/snowarch/lib/cli.mjs'), 'utf8');
+  assert.match(usage, /docs \(sync \| verify \| status \| lookup \| family\)/, 'the product no longer lists `docs lookup`');
+  assert.equal(STATUS.absent, 'ABSENT', 'the sentence says ABSENT; the command prints another word');
+  // And the generated settings let a session run exactly what the sentence tells it to: a typed command is the launcher, the words, and
+  // a name or words after them.
+  const { allow } = JSON.parse(real('.claude/settings.json')).permissions;
+  const typed = `${named[1]} ${named[2]} requested item`;
+  assert.ok(allow.some((rule) => ruleAllows(rule, 'Bash', typed)), `no entry of permissions.allow lets a session run: ${typed}`);
+  // The control: a sentence that named another verb would not be covered.
+  assert.ok(!allow.some((rule) => ruleAllows(rule, 'Bash', `${named[1]} docs find requested item`)), 'the settings allow more than the lookup');
 });
 
 test('ARC-09-C263 — a completion line that drifts is found', () => {

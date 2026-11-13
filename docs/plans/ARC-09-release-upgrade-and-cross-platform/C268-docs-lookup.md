@@ -1,6 +1,6 @@
-# ARC-09-C268 — a lookup before an absence claim (phase A)
+# ARC-09-C268 — a lookup before an absence claim (phases A and B)
 
-**Status:** phase A built; the instruction that makes the Architect call it (phase B) is the architect's to write and measure, and is not in this change.
+**Status:** phase A built (the lookup and its offline check). Phase B built on top of it: the two sentences the owner approved in the six gateways' Part 2 that make the Architect call it, the generated permission entry that lets it run without a prompt, and the validation case T-48. The measurement of phase B (R7, fresh hidden tasks) is the architect's and is not claimed here.
 
 ## Why
 
@@ -20,16 +20,26 @@ The Architect searches the corpus with the words of the request, and the corpus 
 
 The index loads in about 15 ms; titles and labels are read when asked for (about 10 ms); a page is read only to show its line, at most `--limit` pages for each name and 300 to rank one. Measured on this Mac, whole processes: one term 0.10 to 0.14 s, five names 0.19 to 0.47 s (cold). The index grows from 8.6 to 11.5 MB and its build from 14 to 15 s, 330 MB resident, in the child process the harvest already runs.
 
-## Where the Architect would call it (phase B, not built)
+## Where the Architect calls it (phase B, built)
 
-Only before an absence claim or an unverified claim: before it writes "not documented in the bundled corpus — verify on the instance", "unverified" or "not opened" about a construct, it runs the lookup for that name. `PRINTED` or `NOT PRINTED as typed` with names: open the page and cite it. `ABSENT`: the marker is grounded. `UNKNOWN` or `NO MATCH`: say the search did not find it and keep the OPEN QUESTION. It is not run for every name; it is the check on the claim that costs the answer most when it is false.
+Only before an absence claim or an unverified claim. The instruction is two sentences at the end of the `[Completing Part 2: …]` line of each of the six gateways. That line is one identical line (326 bytes before, 639 after: +253 and +60 bytes, +1,878 over the six files); `CLAUDE.md` is not changed.
 
-## How it would be measured (phase B)
+> Before calling a construct not documented, unverified or left to the instance, run `./snowarch docs lookup <name or words>…` (many names, one call): only ABSENT grounds "not documented in the bundled corpus"; open a page it shows before you say more. Cite only a page you Read that prints the construct's name.
+
+`PRINTED` or `NOT PRINTED as typed` with names: the page is opened and cited. `ABSENT`: the marker is grounded. `UNKNOWN` or `NO MATCH` is not ABSENT, so it grounds nothing: the search did not find it and the OPEN QUESTION stays. It is not run for every name; it is the check on the claim that costs the answer most when it is false.
+
+**The permission.** In `design-only` mode the corpus is read through the shell, and a prompt on every lookup would sit in the middle of grounding. So `.claude/settings.json` allows this command and nothing else of the launcher: `Bash(./snowarch docs lookup *)` and, for the PowerShell tool on Windows (a `Bash` rule does not cover that tool), `PowerShell(.\snowarch.cmd docs lookup *)`. `packages/contract/gen/permissions.mjs` writes both from the launcher spelling, after a user's own entries and once, and `gen:check` finds a hand edit. The trailing ` *` is the form Claude Code's permissions page documents: it also matches the bare command and does not match `docs lookupx`.
+
+What the tests hold is the agreement of three things that live apart: the command the gateways name, the generated entries, and the launcher each shell types (`tests/contract/gen-governance.test.mjs`, `tests/grounding-completion.test.mjs`, with a reader of that one rule shape in `tests/helpers/permission-rule.mjs`). **What they do not hold:** Claude Code's own matcher was not run, and neither was the Windows PowerShell spelling in particular: the permissions page does not say how the PowerShell tool matches a command named by a path (`.\snowarch.cmd`). S-16 (2026-09-07, Claude Code 2.1.258) found that a command wrapped in a second statement (`… 2>&1; echo "EXIT: $?"`) is judged part by part and the wrapper part prompts; that was not measured again, so a session may still be asked about a wrapper and not about the lookup.
+
+**T-48** (`tests/VALIDATION-TESTS.md`) is the case: a prompt that names two tables by their labels ("requested item", "catalog task"), and a pass that needs a lookup call, a page it showed that the session read, and the construct cited from that page. No run of it is part of this change.
+
+## How phase B is measured (the architect's)
 
 - **A prompt class where the user's words differ from the corpus's:** a label for a table (`requested item`, `catalog task`), a synonym (`RITM`, `CI`), a part of a title, a guessed field. Built from the corpus the way the offline cases below are, with the key page named beforehand from the index.
 - **Primary:** the key page is read and cited.
 - **Guards:** no new dead paths (`turn-report.mjs`: cited pages missing, 0); no invented names (names printed that no page read and no request gives); no more false absences (a "not documented" about a name the index says the corpus prints: `markedAbsent` over the answer, with the index); the §1.1 verdict letters unchanged, prompt by prompt.
-- **Arms:** the current text, and the current text with the instruction. No sitting is part of phase A.
+- **Arms:** the current text, and the current text with the instruction. No sitting is part of phase A, and none was run for the build of phase B.
 
 ## The offline retrieval check (phase A)
 
@@ -49,4 +59,4 @@ For N, 28,548 names (45.0%) are printed only with escaped underscores. For T, a 
 
 ## Not in phase A
 
-No change to `CLAUDE.md`, a skill or an agent. No sitting. No model-visible text: the lookup's output is read only when someone runs it.
+No change to `CLAUDE.md`, a skill or an agent. No sitting. No model-visible text: the lookup's output is read only when someone runs it. All of that is phase B's, above.

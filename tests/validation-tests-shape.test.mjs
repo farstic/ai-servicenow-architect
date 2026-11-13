@@ -120,6 +120,13 @@ const C254_DEAD_IN_FINDING = 'markdown/australia/application-development/collabo
  */
 const C263_CASES = 'ARC-09-C263 — T-47: no page limit, an Envelope that needs more than twelve pages reads past twelve';
 
+/**
+ * ARC-09-C268 — T-48: a construct the corpus prints under another label is looked up and opened, not called not documented. The six
+ * gateways' Part 2 carry the two sentences it tests (tests/grounding-completion.test.mjs). Its prompt names tables by their labels and
+ * never by the names the corpus prints them under, so the session has to find the name, which is what the lookup is for.
+ */
+const C268_CASES = 'ARC-09-C268 — T-48: a construct the corpus prints under another label is looked up and opened, not called not documented';
+
 const CHECKS = {
   'criterion 1a — the file is under tests/, and not at the root': () => {
     assert.ok(existsSync(join(root, REL)), `${REL} is missing`);
@@ -414,6 +421,26 @@ const CHECKS = {
     assert.ok(s.fail.includes('A page cited that the session did not read.'), 'T-47 does not fail a page cited and not read');
     assert.doesNotMatch(s.whole, /Pages read|Stop hook/, 'T-47 asks for a count of pages read, or for a hook: the rule carries neither');
   },
+
+  // ARC-09-C268 — T-48: the labels are in the prompt and the names are not, and the case asks for the lookup and for its page to be opened.
+  [C268_CASES]: (t) => {
+    const row1 = t.split('\n').find((l) => l.startsWith('| 1 | macOS'));
+    assert.ok(row1.includes('`T-48`'), "the cutover list's first row lacks T-48");
+    const s = sectionsOf(t, 'T-48');
+    assert.ok(s.whole.includes('ARC-09-C268'), 'T-48 does not name the row it covers');
+    assert.ok(s.prompt.includes('```'), 'T-48 has no prompt');
+    assert.ok(s.prompt.includes('requested item') && s.prompt.includes('catalog task'), 'T-48 does not name the tables by their labels');
+    assert.doesNotMatch(s.prompt, /sc_req_item|sc_task|requested_item|request_item|catalog_task/, 'T-48 names a table the way the corpus prints it, so the session would not have to find the name');
+    assert.ok(s.expected.includes(`\`${CLI} docs lookup\``), 'T-48 does not expect the lookup');
+    assert.ok(s.expected.includes('opens a page the lookup shows'), 'T-48 does not expect the page to be opened');
+    assert.ok(s.pass.includes(`- The session's stream holds at least one Bash call of \`${CLI} docs lookup\` before the Envelope is written.`), 'T-48 does not ask for a lookup call');
+    assert.ok(s.pass.includes('cites that table only from pages in that list'), 'T-48 does not ask for a citation from a page read');
+    assert.ok(s.pass.includes('are not called "not documented in the bundled corpus"'), 'T-48 does not forbid calling a printed construct not documented');
+    assert.ok(s.fail.includes('A name guessed from the label'), 'T-48 does not fail a guessed name');
+    assert.ok(s.fail.includes('A lookup run and its pages not opened'), 'T-48 does not fail a lookup whose pages were not opened');
+    assert.ok(s.fail.includes("whose text does not print the construct's name"), 'T-48 does not fail a page that does not print the name');
+    assert.doesNotMatch(s.whole, /Pages read|Stop hook/, 'T-48 asks for a count of pages read, or for a hook: the rule carries neither');
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -553,11 +580,23 @@ const NEGATIVES = [
   ['T-46 stops failing a correction after the copy', C254_CASES,
     (t) => t.replace('- A "Correction:" line after the copy, or a Stop hook feedback event, for a path that stands only inside the copy.\n', '')],
   ['the cutover list forgets the new cases', C254_CASES, (t) => t.replace(' `T-45` `T-46` ', ' ')],
-  ['the cutover list forgets T-47', C263_CASES, (t) => t.replace(' `T-47` |', ' |')],
+  ['the cutover list forgets T-47', C263_CASES, (t) => t.replace(' `T-47` `T-48` |', ' `T-48` |')],
   ['T-47 stops asking for more than twelve pages', C263_CASES, (t) => t.replace('- The report lists 13 or more corpus pages read, and the Envelope cites pages it read.\n', '')],
   ['T-47 stops failing the old ceiling', C263_CASES, (t) => t.replace('- Exactly twelve pages read, then a statement of what is still unverified (the old ceiling).\n', '')],
   ['T-47 stops failing a page cited and not read', C263_CASES, (t) => t.replace('- A page cited that the session did not read.\n', '')],
   ['T-47 asks for a count of the pages read again', C263_CASES, (t) => t.replace('The Envelope has no line that counts the pages read.', 'It ends with `Pages read: <n>`.')],
+  ['the cutover list forgets T-48', C268_CASES, (t) => t.replace(' `T-48` |', ' |')],
+  ['T-48\'s prompt names the table the way the corpus prints it', C268_CASES,
+    (t) => t.replace('rejects one requested item of a request', 'rejects one requested item (sc_req_item) of a request')],
+  ['T-48 stops asking for the lookup', C268_CASES,
+    (t) => t.replace(`- The session's stream holds at least one Bash call of \`${CLI} docs lookup\` before the Envelope is written.\n`, '')],
+  ['T-48 stops asking for the page to be opened', C268_CASES,
+    (t) => t.replace('and opens a page the lookup shows for it before it says more about the construct', 'and says what it found')],
+  ['T-48 stops failing a guessed name', C268_CASES, (t) => t.replace(/- A name guessed from the label[^\n]*\n/, '')],
+  ['T-48 stops failing a lookup whose pages were not opened', C268_CASES, (t) => t.replace(/- A lookup run and its pages not opened[^\n]*\n/, '')],
+  ['T-48 stops failing a page that does not print the name', C268_CASES, (t) => t.replace(/- A page cited for a construct that the session did not Read, or whose[^\n]*\n/, '')],
+  ['T-48 asks for a count of the pages read', C268_CASES,
+    (t) => t.replace('### Fail signals\n\n- A name guessed from the label', '### Fail signals\n\n- No `Pages read: <n>` line.\n- A name guessed from the label')],
   ['a test is added without updating the header count', 'the stated test count is the number of tests',
     (t) => `${t}\n## T-26 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];
