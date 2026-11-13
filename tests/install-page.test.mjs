@@ -318,7 +318,11 @@ test('the page stays a page, and the tail stays a tail', () => {
   // is generated from the remedy file like its neighbours, so nothing on the page was written by hand or deleted to pay for it.
   // 322 since ARC-09-C271: the Windows page (INSTALL-WINDOWS.md) is linked from the Windows lines, by one paragraph and the line before
   // it. The page that explains every step is a page of its own, so the one paragraph that sends a reader there is all this one takes.
-  assert.ok(install <= 322, `${install} lines of install page (criterion: 322)`);
+  // 324 since ARC-09-C275: 2.2.6 builds the names index of the corpus (ARC-09-C263), and the install page follows what a release adds
+  // (CONTRIBUTING, Releasing, item 7). One sentence in the paragraph on what the corpus costs, where the figures are: what the index is,
+  // its size, its build time and what rebuilds it. The paragraph's last line was nearly full, so the sentence takes two new lines.
+  // Nothing was deleted to pay for it.
+  assert.ok(install <= 324, `${install} lines of install page (criterion: 324)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.
