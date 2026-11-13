@@ -22,7 +22,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { bare, dotted } from './name-rules.mjs';
 import { GENERIC, contentWords, normalisePhrase, parseSynonyms, wordsOf } from './label-rules.mjs';
-import { loadNamesIndex } from './names-index.mjs';
+import { COVERAGE, loadNamesIndex } from './names-index.mjs';
 import { corpusNamesDir } from '../local-paths.mjs';
 import { spellings } from '../launcher-spelling.mjs';
 
@@ -48,22 +48,35 @@ export function classify(raw) {
   return { raw, kind: 'phrase', key: normalisePhrase(text) };
 }
 
-/** `{ line, text }` of the first line of `page` that prints `name`, or null. The text is one line, markdown escapes off, windowed. */
+/**
+ * `{ line, text }` of the first line of `page` that prints `name`, or null: the line with the name in brackets (`Label \[name\]`, the
+ * corpus's own pairing) when the page has one, else the first line of the body, else of the front matter. The text is one line,
+ * markdown escapes off, windowed.
+ */
 function lineOf(page, name) {
-  const re = namePattern(name);
   const rows = page.split(/\r?\n/);
-  for (let i = 0; i < rows.length; i += 1) {
-    const m = re.exec(rows[i]);
-    if (!m) continue;
-    let text = rows[i].replace(/\\([_[\]()*#`])/g, '$1').replace(/\s+/g, ' ').trim();
-    if (text.length > 2 * LINE_WINDOW) {
-      const at = Math.max(0, text.search(namePattern(name.replace(/\\/g, ''))));
-      const from = Math.max(0, at - LINE_WINDOW);
-      text = `${from > 0 ? '…' : ''}${text.slice(from, at + LINE_WINDOW)}…`;
+  const fmEnd = rows[0] === '---' ? rows.indexOf('---', 1) : -1;          // the front matter is rows 0..fmEnd
+  const order = [...rows.keys()].filter((i) => i > fmEnd).concat([...rows.keys()].filter((i) => i <= fmEnd));
+  const bracketed = new RegExp(`\\\\?\\[${name.split('_').map(ESC).join('\\\\?_')}\\\\?\\]`, 'i');
+  const re = namePattern(name);
+  for (const pass of [bracketed, re]) {
+    for (const i of order) {
+      if (!pass.test(rows[i])) continue;
+      return excerpt(rows[i], i + 1, name);
     }
-    return { line: i + 1, text };
   }
   return null;
+}
+
+/** One matching row as `{ line, text }`: markdown escapes off, white space folded, a long row cut to a window around the name. */
+function excerpt(row, line, name) {
+  let text = row.replace(/\\([_[\]()*#`])/g, '$1').replace(/\s+/g, ' ').trim();
+  if (text.length > 2 * LINE_WINDOW) {
+    const at = Math.max(0, text.search(namePattern(name.replace(/\\/g, ''))));
+    const from = Math.max(0, at - LINE_WINDOW);
+    text = `${from > 0 ? '…' : ''}${text.slice(from, at + LINE_WINDOW)}…`;
+  }
+  return { line, text };
 }
 
 /** The pages (ids) to show for a name, best first: titled for it, then printing it beside its label, then most mentions. */
@@ -93,13 +106,15 @@ function rankPages({ ctx, name, ids, pairIds, labelKey }) {
 }
 
 /** A resolved name with its pages: `{ name, via, count, pages: [{ path, line, text, why }] }`. */
-function nameEntry({ ctx, name, via, labelKey = null, pairs = [] }) {
+function nameEntry({ ctx, name, via, labelKey: given = null, pairs = [], limit = ctx.limit }) {
   const { idx } = ctx;
+  // A page titled for the name's own label ("Requested Item …" for sc_req_item) is the one to read first.
+  const labelKey = given ?? idx.labelsOfName(name)[0]?.key ?? null;
   const indexed = idx.count(name) > 0;
   const ids = indexed ? idx.pagesOf(name) : [...new Set(pairs.flatMap((p) => p.ids))].sort((a, b) => a - b);
   const count = indexed ? idx.count(name) : pairs.reduce((n, p) => n + p.count, 0);
   const pairIds = pairs.flatMap((p) => p.ids);
-  const shown = rankPages({ ctx, name, ids, pairIds, labelKey });
+  const shown = rankPages({ ctx: { ...ctx, limit }, name, ids, pairIds, labelKey });
   const pages = shown.map(({ id, why }) => {
     const path = idx.pagePath(id);
     const found = lineOf(ctx.page(path) ?? '', name);
@@ -126,6 +141,8 @@ function labelKeysFor(key, synonyms) {
   const out = new Set([key]);
   const trim = (k) => {
     const w = k.split(' ');
+    while (w.length > 1 && ['the', 'a', 'an'].includes(w[0])) w.shift();        // "the incident table": the label is "incident"
+    k = w.join(' ');
     const forms = [k];
     if (w.length > 1 && GENERIC.has(w[w.length - 1])) forms.push(w.slice(0, -1).join(' '));
     if (w.length > 1 && GENERIC.has(w[0])) forms.push(w.slice(1).join(' '));
@@ -154,63 +171,111 @@ function nearNames(key, idx, max) {
 
 function resolveName(c, ctx) {
   const { idx } = ctx;
-  if (idx.count(c.key) > 0) return { status: STATUS.printed, names: [nameEntry({ ctx, name: c.key, via: 'name' })] };
-  // Not printed as typed. The words it is made of may be a label the corpus prints beside a real name.
-  const names = [];
-  const seen = new Set();
-  const add = (entry) => { if (!seen.has(entry.name) && names.length < ctx.maxNames) { seen.add(entry.name); names.push(entry); } };
-  const words = c.key.split('_').map((w) => normalisePhrase(w)).join(' ');
-  for (const key of labelKeysFor(words, ctx.synonyms)) {
-    for (const e of namesForLabel(idx, key)) add(nameEntry({ ctx, name: e.name, via: `label "${key}"`, labelKey: key, pairs: e.pairs }));
+  if (idx.count(c.key) > 0) {
+    // Printed as typed, but `requested_item` is printed twice and "Requested Item" is printed beside sc_req_item on 129 pages: say so.
+    const own = idx.count(c.key);
+    const words = c.key.split('_').map((w) => normalisePhrase(w)).join(' ');
+    const related = [];
+    for (const e of namesForLabel(idx, words)) {
+      if (e.name === c.key || e.count < 10 || e.count < 3 * own || related.length >= 2) continue;
+      related.push(nameEntry({ ctx, name: e.name, via: `label "${words}"`, labelKey: words, pairs: e.pairs, limit: 3 }));
+    }
+    return { status: STATUS.printed, names: [nameEntry({ ctx, name: c.key, via: 'name' })], related };
   }
+  // Not printed as typed. The words it is made of may be a label the corpus prints beside a real name.
+  const words = c.key.split('_').map((w) => normalisePhrase(w)).join(' ');
+  const names = labelCandidates(idx, labelKeysFor(words, ctx.synonyms), words).slice(0, ctx.maxNames)
+    .map(({ e, key, via }) => nameEntry({ ctx, name: e.name, via, labelKey: key, pairs: e.pairs }));
   if (names.length < ctx.maxNames) {
-    for (const n of nearNames(c.key, idx, ctx.maxNames)) add(nameEntry({ ctx, name: n.name, via: 'similar name' }));
+    const seen = new Set(names.map((n) => n.name));
+    for (const n of nearNames(c.key, idx, ctx.maxNames)) {
+      if (names.length >= ctx.maxNames) break;
+      if (!seen.has(n.name)) names.push(nameEntry({ ctx, name: n.name, via: 'similar name' }));
+    }
   }
   if (names.length) return { status: STATUS.near, names };
-  return { status: idx.coverage === 'full' ? STATUS.absent : STATUS.unknown, names: [] };
+  return { status: idx.coverage === COVERAGE.full ? STATUS.absent : STATUS.unknown, names: [] };
 }
 
+/** The first line that prints both `a` and `b`, as `{ line, text }`, or null. */
+function togetherLine(page, a, b) {
+  const ra = namePattern(a);
+  const rb = namePattern(b);
+  const rows = page.split(/\r?\n/);
+  for (let i = 0; i < rows.length; i += 1) if (ra.test(rows[i]) && rb.test(rows[i])) return excerpt(rows[i], i + 1, b);
+  return null;
+}
+
+/**
+ * A dotted name. Printed whole (a `com.` or `glide.` name, or a namespace the corpus qualifies) it is a name like any other. Otherwise it
+ * is a table written with a field (`incident.assigned_to`) and is looked up by its parts: the pages that print both, a line with both
+ * first. A part that is one plain word (`incident`) is not in the index, so the pages of the other part are read for it; when neither
+ * part is indexed, the pages that print the first as a label pair are.
+ */
 function resolveDotted(c, ctx) {
   const { idx } = ctx;
   if (idx.count(c.key) > 0) return { status: STATUS.printed, names: [nameEntry({ ctx, name: c.key, via: 'name' })] };
   const parts = c.key.split('.');
-  const indexed = parts.filter((p) => idx.count(p) > 0);
-  if (parts.length === 2 && indexed.length === 2) {
-    const both = idx.both(parts[0], parts[1]);
-    if (both.length) {
-      const entry = nameEntry({ ctx, name: parts[1], via: `${parts[0]} and ${parts[1]} on one page` });
-      const pages = both.slice(0, ctx.limit).map((id) => {
+  const known = (p) => idx.count(p) > 0;
+  const missing = parts.filter((p) => p.includes('_') && !known(p));        // an underscore name that no page prints
+  if (parts.length === 2 && !missing.length) {
+    const [a, b] = parts;
+    let candidates;
+    if (known(a) && known(b)) candidates = idx.both(a, b);
+    else if (known(a) || known(b)) candidates = idx.pagesOf(known(a) ? a : b).slice(0, DENSITY_MAX);
+    else candidates = [...new Set(idx.labelsOfName(a).flatMap((e) => e.ids))];
+    const plain = known(a) ? b : a;
+    const seen = candidates.map((id) => {
+      const text = ctx.page(idx.pagePath(id)) ?? '';
+      const needs = known(a) && known(b) ? [] : [plain];
+      if (needs.some((w) => !namePattern(w).test(text))) return null;
+      return { id, together: togetherLine(text, a, b) };
+    }).filter(Boolean);
+    if (seen.length) {
+      seen.sort((x, y) => (x.together ? 0 : 1) - (y.together ? 0 : 1) || x.id - y.id);
+      const pages = seen.slice(0, ctx.limit).map(({ id, together }) => {
         const path = idx.pagePath(id);
-        const found = lineOf(ctx.page(path) ?? '', parts[1]);
-        return { path, line: found?.line ?? null, text: found?.text ?? null, why: 'both' };
+        const found = together ?? lineOf(ctx.page(path) ?? '', b);
+        return { path, line: found?.line ?? null, text: found?.text ?? null, why: together ? 'one line' : 'both' };
       });
-      return { status: STATUS.printed, names: [{ ...entry, name: c.key, count: both.length, atLeast: false, pages }] };
+      return { status: STATUS.printed, names: [{ name: c.key, via: `${a} and ${b} on one page`, count: seen.length, atLeast: candidates.length >= DENSITY_MAX, pages }] };
     }
-    return { status: STATUS.near, names: indexed.map((p) => nameEntry({ ctx, name: p, via: `printed, but never on a page with ${parts.find((x) => x !== p)}` })).slice(0, ctx.maxNames) };
   }
-  if (indexed.length) return { status: STATUS.near, names: indexed.map((p) => nameEntry({ ctx, name: p, via: 'one part of the name' })).slice(0, ctx.maxNames) };
-  return { status: idx.coverage === 'full' && parts.some((p) => p.includes('_')) ? STATUS.absent : STATUS.unknown, names: [] };
+  const printed = parts.filter(known);
+  if (printed.length) {
+    return { status: STATUS.near, names: printed.slice(0, ctx.maxNames).map((p) => nameEntry({ ctx, name: p, via: parts.length === 2 ? `printed, but never on a page with ${parts.find((x) => x !== p)}` : 'one part of the name' })) };
+  }
+  return { status: idx.coverage === COVERAGE.full && missing.length ? STATUS.absent : STATUS.unknown, names: [] };
+}
+
+/** The names the corpus prints beside any of `keys`, one candidate per name (the label with the most pages), most pages first. */
+function labelCandidates(idx, keys, from) {
+  const best = new Map();
+  for (const key of keys) {
+    for (const e of namesForLabel(idx, key)) {
+      const had = best.get(e.name);
+      if (!had || e.count > had.e.count) best.set(e.name, { e, key, via: key === from ? `label "${key}"` : `label "${key}" (from "${from}")` });
+    }
+  }
+  return [...best.values()].sort((a, b) => b.e.count - a.e.count || (a.e.name < b.e.name ? -1 : 1));
 }
 
 function resolvePhrase(c, ctx) {
   const { idx } = ctx;
-  const names = [];
-  const seen = new Set();
-  for (const key of labelKeysFor(c.key, ctx.synonyms)) {
-    for (const e of namesForLabel(idx, key)) {
-      if (seen.has(e.name) || names.length >= ctx.maxNames) continue;
-      seen.add(e.name);
-      names.push(nameEntry({ ctx, name: e.name, via: key === c.key ? `label "${key}"` : `label "${key}" (from "${c.key}")`, labelKey: key, pairs: e.pairs }));
-    }
-  }
+  const names = labelCandidates(idx, labelKeysFor(c.key, ctx.synonyms), c.key).slice(0, ctx.maxNames)
+    .map(({ e, key, via }) => nameEntry({ ctx, name: e.name, via, labelKey: key, pairs: e.pairs }));
   // Titles: every content word of the phrase (or of a synonym of it) among the content words of a page's title.
   const queries = [contentWords(c.raw)];
   for (const s of ctx.synonyms?.get(c.key) ?? []) queries.push(contentWords(s));
   const titles = idx.titles();
   const hits = [];
   if (queries.some((q) => q.length)) {
+    // 51,657 titles per phrase: a title is tokenised only when each word of some query (cut to its stem) occurs in it.
+    const lower = ctx.cache.lowerTitles ?? (ctx.cache.lowerTitles = titles.map((x) => x.toLowerCase()));
+    const stem = (w) => (w.length > 4 ? w.slice(0, w.length - 2) : w);
     for (let id = 0; id < titles.length; id += 1) {
-      if (!titles[id]) continue;
+      const low = lower[id];
+      if (!low || !queries.some((q) => q.length && q.every((w) => low.includes(stem(w))))) continue;
       const tw = new Set(contentWords(titles[id]));
       for (const q of queries) {
         if (q.length && q.every((w) => tw.has(w))) { hits.push({ id, score: q.length / tw.size }); break; }
@@ -228,7 +293,7 @@ function resolvePhrase(c, ctx) {
  * `page(path)` the text of a corpus page or null, `synonyms` the corpus's synonym Map or null. Returns one result per term.
  */
 export function lookupTerms(terms, ctx) {
-  const full = { limit: DEFAULT_LIMIT, maxNames: DEFAULT_NAMES, synonyms: null, ...ctx };
+  const full = { limit: DEFAULT_LIMIT, maxNames: DEFAULT_NAMES, synonyms: null, cache: {}, ...ctx };
   return terms.map((raw) => {
     const c = classify(raw);
     let r;
@@ -236,11 +301,12 @@ export function lookupTerms(terms, ctx) {
     else if (c.kind === 'name') r = resolveName(c, full);
     else if (c.kind === 'dotted') r = resolveDotted(c, full);
     else r = resolvePhrase(c, full);
-    return { term: raw, kind: c.kind, key: c.key, ...r };
+    const note = /^(x|u)_/.test(c.key) ? 'a custom name (u_ or x_): a page that prints it is an example, not baseline' : null;
+    return { term: raw, kind: c.kind, key: c.key, ...r, ...(note ? { note } : {}) };
   });
 }
 
-const sayCoverage = (idx) => (idx.coverage === 'full'
+const sayCoverage = (idx) => (idx.coverage === COVERAGE.full
   ? 'the whole corpus at the pin'
   : 'a sparse checkout: only the areas it holds');
 
@@ -250,14 +316,19 @@ export function formatLookup(results, { pin, idx }) {
   for (const r of results) {
     const named = r.names.map((n) => n.name);
     let head;
-    if (r.status === STATUS.printed) head = 'PRINTED';
+    if (r.status === STATUS.printed) head = r.related?.length ? `PRINTED; see also ${r.related.map((n) => n.name).join(', ')}` : 'PRINTED';
     else if (r.status === STATUS.near) head = `NOT PRINTED as typed; the corpus prints: ${named.join(', ')}`;
     else if (r.status === STATUS.absent) head = `ABSENT: no page of the corpus prints this name (${sayCoverage(idx)}), so "not documented in the bundled corpus" is grounded`;
     else if (r.status === STATUS.unknown) head = `UNKNOWN: no page prints it, but this index covers ${sayCoverage(idx)}; no claim either way`;
     else head = 'NO MATCH: it is no label the corpus prints beside a name, no synonym, and no title word set; that does not show the corpus lacks the construct';
     out.push(`${r.term}: ${head}`);
+    if (r.note) out.push(`  note: ${r.note}`);
     for (const n of r.names) {
       out.push(`  ${n.name}: ${n.atLeast ? 'at least ' : ''}${n.count} page${n.count === 1 ? '' : 's'} (${n.via})`);
+      for (const p of n.pages) out.push(`  ${p.path}${p.line ? `:${p.line}` : ''}: ${p.text ?? '(the page is not on disk)'}`);
+    }
+    for (const n of r.related ?? []) {
+      out.push(`  also ${n.name}: ${n.atLeast ? 'at least ' : ''}${n.count} page${n.count === 1 ? '' : 's'} (${n.via})`);
       for (const p of n.pages) out.push(`  ${p.path}${p.line ? `:${p.line}` : ''}: ${p.text ?? '(the page is not on disk)'}`);
     }
     if (r.titles?.length) {
