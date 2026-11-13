@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.2.6-rc.1 — 2026-11-13
+
+### Notes
+
 **A patch release: the Architect reads the ServiceNow documentation with no page limit, a change measured before it shipped;
 every install gets a names index of the documentation; and a Windows install has its own page, keeps the instance store private
 and finds a Claude Code that is not on PATH.** The no-limit text was measured against 2.2.5 on 30 held-out ServiceNow tasks, five
@@ -152,6 +156,87 @@ itself. Nothing changes an existing store's permissions without saying so.
   `%PROGRAMFILES%\draw.io`. When it finds nothing it gives the install line of the platform it runs on: `brew` for macOS only, the zip that
   needs no administrator rights for Windows, the packages for Linux. macOS keeps its sentence, and a shim made by hand keeps working.
   `scripts/README.md` says the same (ARC-09-C273).
+
+### Added
+
+- engine: ARC-09-C263b, the grounding rule has no page limit, as #567 has it (f751420)
+- tests: ARC-09-C263, the turn report keeps the Envelope before a Stop block (c927dd5)
+- engine: ARC-09-C263, docs verify fails a roster line calling a printed name absent (fb790bb)
+- engine: ARC-09-C263, a corpus names index, built at docs sync, bootstrap and --fix (c77450b)
+
+### Fixed
+
+- engine: ARC-09-C263, the upgrade plan says what the index build does, and its time (5aa254f)
+- ci: ARC-09-C273, the step passes shellcheck; the cases read only the script's lines (f2719ed)
+- bootstrap: ARC-09-C271, the Windows git and Node remedies add a way without admin (c8df4fb)
+- bootstrap: ARC-09-C271, the plan screen says a few minutes; the quick line names E-31 (34c5939)
+- doctor: ARC-09-C273, E-04 looks for draw.io where the renderer looks on Windows (66e5144)
+- wizard: ARC-09-C272, the Saved line for another file no longer ends in "you:" (73e9e9f)
+- engine: ARC-09-C273, render-drawio finds draw.io Desktop where Windows puts it (a5afdf5)
+- server: ARC-09-C272, a failed lock never blocks a save; the note says what retries (dff347b)
+- server: ARC-09-C272, RID 500 is the account itself; the guards name this change (32ac9c3)
+- server: ARC-09-C272, the store and the product's folders are private on Windows (3c7037e)
+- ci: ARC-09-C270, the Windows step finds its text with find, not findstr (b21da0e)
+- engine: ARC-09-C270, an installed Claude Code off PATH is named, not reinstalled (81dc808)
+- engine: ARC-09-C269, a silent Claude Code is not a missing one; ask twice, say why (9e2b3f8)
+- engine: ARC-09-C265, the bootstrap command makes clients/, so no step goes stale (f45af26)
+- doctor: ARC-09-C266, E-27 tells a fresh install to start claude, not to rerun a mode (44ff433)
+- engine: ARC-09-C265, the bootstrap makes an empty clients/, so Status finds no error (60d88c2)
+- engine: ARC-09-C264, the upgrade plan names the one field it writes, lastProbe (6587d29)
+
+### Internal
+
+- changelog: 2.2.6, the Notes' first paragraph, written by the architect (f2b4f87)
+- changelog: 2.2.6, the Notes begin with a paragraph left empty for the architect (bd1358b)
+- ARC-09-C274, the hit count is four in about three hours, in three places (85061c0)
+- ARC-09-C263b, the changelog, the cap history and the plan row (668b556)
+- tests: ARC-09-C263b, T-47 reads past twelve pages and asks for no count (b94a11a)
+- ARC-09-C263, the harvest's changelog, the names index rules and the plan row (53f233b)
+- ARC-09-C274, the rule for a process as another account, its numbers, the plan row (7ea7657)
+- tests: ARC-09-C274, the second-account case starts its children with Process.Start (08a2464)
+- ARC-09-C271, the record says PowerShell 7 was on the test machine, not in the guide (9cc122b)
+- ARC-09-C271, the plan row names the 17 cases, the version pin and the guard (b482ad0)
+- ARC-09-C271, the shipped pages use one placeholder licence id, and a test holds it (b8d72f4)
+- ARC-09-C271, Step 2b installs the Node.js that was run; 5b shows the placeholder id (f4d3a5e)
+- tests: ARC-09-C271, the store-line case takes the launcher from cliSpelling (8c78834)
+- ARC-09-C271, the plan row for the Windows page, built in #578 (d615ea5)
+- ARC-09-C271, the page follows what C272 does to the store, and a test holds it (11ee3cc)
+- engine: ARC-09-C271, a product start prints nothing on stderr on any Node (f204639)
+- engine: ARC-09-C271, the hook chooses its API by feature, and both branches are held (1a585e4)
+- engine: ARC-09-C271, the licence test hook uses registerHooks where Node has it (5362360)
+- ARC-09-C272, CONTRIBUTING records the PSModulePath rule that the Windows run found (e6db212)
+- tests: ARC-09-C272, the second-account case allows 300 s and shows where time went (596e62e)
+- ARC-09-C271, the wizard is a sub-step of Step 6 on the Windows page (bed91dc)
+- ARC-09-C271, CONTRIBUTING records the PSModulePath rule C272's Windows run found (1b1367e)
+- ARC-09-C271, the server changelog names the shipped list's new page (b105a2b)
+- ARC-09-C271, the sample window banner has no copyright line (606d820)
+- tests: ARC-09-C271, 15 cases hold the Windows page to the product; fixtures know it (6184e7a)
+- ARC-09-C271, the Windows page lists what it was not tested on; the changelog (4cf4c42)
+- ARC-09-C271, the Word converter's examples run under the PowerShell all Windows has (0a625c2)
+- ARC-09-C271, troubleshooting names the no-admin messages; now-sdk needs npm's folder (e9b0d64)
+- ARC-09-C271, a page for a Windows user without admin rights, linked and registered (b636ae0)
+- ci: ARC-09-C271, the launcher audit baseline holds the quick line's new literals (48e7745)
+- ci: ARC-09-C271, Node 26 on Linux and Windows: four more cells, 59 to 63 (f1ba437)
+- ARC-09-C273, the scripts README, changelog and plan row for draw.io on Windows (1e9e265)
+- ci: ARC-09-C273, a Windows step runs render-drawio.sh in Git Bash against a stub exe (a4a6d42)
+- doctor: ARC-09-C272, the Windows case expects the ACL verdict, not the old skip (301c7ee)
+- tests: ARC-09-C272, the second-account case gives powershell.exe its own module path (c42d740)
+- ARC-09-C272, the row lists what is verified only at the rc (3c9ce68)
+- ARC-09-C272, the row, the changelogs and the rule for private folders (9261951)
+- server: ARC-09-C272, red: a store and its folder are private on Windows (dfc7992)
+- engine: ARC-09-C270, the finder's guard reads its imports, not just its calls (bd49113)
+- engine: ARC-09-C270, the install page's cap moves one line for the remedies row (bf0407f)
+- ARC-09-C270, the row, the changelog and the rule: an installed Claude Code is named (c6faac6)
+- engine: ARC-09-C270, red: a Claude Code installed off PATH is not a missing one (1314916)
+- ARC-09-C269, the changelog says the upgrade from 2.2.5 still runs 2.2.5's own check (4f01373)
+- engine: ARC-09-C269, tracked temp helper; launcher audit pin moves two lines (abf2d47)
+- ARC-09-C269, the row, the changelog and the rule say why Claude Code was not found (f1a6b04)
+- engine: ARC-09-C269, red: the upgrade names a Claude Code that is on PATH and fails (1efda44)
+- engine: ARC-09-C269, red: a Claude Code that is on PATH and silent is not absent (cb1471d)
+- tests: ARC-09-C265, the fixture-repository guard counts the clients-dir fixture (7c1e162)
+- ci: ARC-09-C263, gitleaks excuses the beta list recorded in the transcript fixtures (862c0b1)
+
+Tag v2.2.6-rc.1 · contract b03dd15040e8 · docs-pin c10276e
 
 ## 2.2.5 — 2026-11-02
 
