@@ -69,6 +69,18 @@ itself. Nothing changes an existing store's permissions without saying so.
 - `docs verify` fails a skill or agent line that calls a name "not documented" when the corpus prints it, and prints one more line,
   `strict marker subjects` (ARC-09-C263).
 
+### Changed
+
+- The Architect reads the documentation with no page limit. The grounding rule (`CLAUDE.md` and the six gateways' Part 2) said "twelve by
+  default; while pages remain, open a construct's page before you call it unverified; past that, say which construct is still unverified
+  and what you will open, then continue", and 38 of 41 measured Envelopes stopped under twelve pages and 3 at exactly twelve, then called
+  constructs "not documented", one of them "in the pages I opened". Now it reads the pages for the constructs in play until each is cited
+  from a page it read, or a search of the corpus that copes with its escaped underscores did not find it. A construct a search finds is
+  opened, never labelled; "not documented in the bundled corpus — verify on the instance" is for a construct such a search did not find; it
+  searches with names the request, the skill or a page it read gives it, never a name it made up; two pages that disagree are both cited and
+  the difference is an OPEN QUESTION; and a field a page creates in an example belongs to that example, not to baseline. A co-fired Envelope
+  is grounded as fully as a single one (ARC-09-C263).
+
 ### Fixed
 
 - The upgrade plan's `credentials:` line said that `.local/instances.json` is never read or written by the upgrade. The verify step of

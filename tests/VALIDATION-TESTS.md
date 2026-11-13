@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 46 tests, T-01 through T-46, no number reserved. The count is asserted by
+> **How many.** 47 tests, T-01 through T-47, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -2461,6 +2461,38 @@ Is the copy safe to send?
 
 ---
 
+## T-47 — grounding has no page limit: an Envelope that needs more than twelve pages reads past twelve
+
+**Covers:** ARC-09-C263 (`CLAUDE.md` §1's grounding rule and the six gateways' Part 2, `scripts/validation/turn-report.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin. The prompt names ten constructs across ITSM, more than the twelve pages the earlier rule allowed. Run it four times on each tree (the release before and the one under test).
+
+### Prompt
+
+```
+Design the major-incident communication for ITSM: who is notified and how, how the major incident relates to the problem and change records it leads to, how the on-call schedule is used, and how the SLA timers behave while it is open. Design-only, grounded in the docs. No engagement is loaded.
+```
+
+### Expected behaviour
+
+1. The ITSM gateway fires and the Envelope is written with its five parts.
+2. The session reads the corpus pages for the constructs in play and does not stop at a number: `scripts/validation/turn-report.mjs` lists more than twelve corpus pages read.
+3. No construct the corpus documents is called "not documented in the bundled corpus", "unverified" or "not opened", and no page budget is mentioned or declared spent. The Envelope has no line that counts the pages read.
+
+### Pass criteria
+
+- The report lists 13 or more corpus pages read, and the Envelope cites pages it read.
+- No "unverified", "not opened" or "budget" wording about a corpus construct. Every "not documented in the bundled corpus" is for a name an escape-safe corpus search did not find.
+- No cited page is missing from the pages the report lists as read.
+
+### Fail signals
+
+- Exactly twelve pages read, then a statement of what is still unverified (the old ceiling).
+- A documented construct called not documented.
+- A page cited that the session did not read.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -2539,7 +2571,7 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` `T-38` `T-39` `T-40` `T-41` `T-42` `T-43` `T-44` `T-45` `T-46` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` `T-38` `T-39` `T-40` `T-41` `T-42` `T-43` `T-44` `T-45` `T-46` `T-47` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
 | 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` `T-35` | the launchers, without Git Bash — the path that has cost the most cells |
 | 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |

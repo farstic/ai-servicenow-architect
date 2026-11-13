@@ -114,6 +114,12 @@ const C254_ANSWER = {
 const C254_DEAD_IN_FINDING = 'markdown/australia/application-development/collaboration-permissions.md';
 
 /** Named so the negatives can run exactly the code the positives run. */
+/**
+ * ARC-09-C263 — T-47 reads past twelve pages: the grounding rule has no page limit. It asks nothing of a count of pages read; the
+ * rule and the six gateways' Part 2 carry none (tests/grounding-completion.test.mjs).
+ */
+const C263_CASES = 'ARC-09-C263 — T-47: no page limit, an Envelope that needs more than twelve pages reads past twelve';
+
 const CHECKS = {
   'criterion 1a — the file is under tests/, and not at the root': () => {
     assert.ok(existsSync(join(root, REL)), `${REL} is missing`);
@@ -394,6 +400,20 @@ const CHECKS = {
     const row1 = t.split('\n').find((l) => l.startsWith('| 1 | macOS'));
     for (const id of [...Object.keys(C254_READ), ...Object.keys(C254_ANSWER), 'T-46']) assert.ok(row1.includes(`\`${id}\``), `the cutover list's first row lacks ${id}`);
   },
+
+  // ARC-09-C263 — T-47: past twelve pages, and no count asked for.
+  [C263_CASES]: (t) => {
+    const row1 = t.split('\n').find((l) => l.startsWith('| 1 | macOS'));
+    assert.ok(row1.includes('`T-47`'), "the cutover list's first row lacks T-47");
+    const s = sectionsOf(t, 'T-47');
+    assert.ok(s.whole.includes('ARC-09-C263'), 'T-47 does not name the row it covers');
+    assert.ok(s.prompt.includes('```'), 'T-47 has no prompt');
+    assert.ok(s.expected.includes('lists more than twelve corpus pages read'), 'T-47 does not expect more than twelve pages');
+    assert.ok(s.pass.includes('The report lists 13 or more corpus pages read'), 'T-47 does not ask for more than twelve pages');
+    assert.ok(s.fail.includes('Exactly twelve pages read'), 'T-47 does not fail the old ceiling');
+    assert.ok(s.fail.includes('A page cited that the session did not read.'), 'T-47 does not fail a page cited and not read');
+    assert.doesNotMatch(s.whole, /Pages read|Stop hook/, 'T-47 asks for a count of pages read, or for a hook: the rule carries neither');
+  },
 };
 
 for (const [title, check] of Object.entries(CHECKS)) {
@@ -532,7 +552,12 @@ const NEGATIVES = [
     (t) => t.replace('- No Stop hook feedback in any of the four turns, unless the session wrote the dead path outside the copy.\n', '')],
   ['T-46 stops failing a correction after the copy', C254_CASES,
     (t) => t.replace('- A "Correction:" line after the copy, or a Stop hook feedback event, for a path that stands only inside the copy.\n', '')],
-  ['the cutover list forgets the new cases', C254_CASES, (t) => t.replace(' `T-45` `T-46` |', ' |')],
+  ['the cutover list forgets the new cases', C254_CASES, (t) => t.replace(' `T-45` `T-46` ', ' ')],
+  ['the cutover list forgets T-47', C263_CASES, (t) => t.replace(' `T-47` |', ' |')],
+  ['T-47 stops asking for more than twelve pages', C263_CASES, (t) => t.replace('- The report lists 13 or more corpus pages read, and the Envelope cites pages it read.\n', '')],
+  ['T-47 stops failing the old ceiling', C263_CASES, (t) => t.replace('- Exactly twelve pages read, then a statement of what is still unverified (the old ceiling).\n', '')],
+  ['T-47 stops failing a page cited and not read', C263_CASES, (t) => t.replace('- A page cited that the session did not read.\n', '')],
+  ['T-47 asks for a count of the pages read again', C263_CASES, (t) => t.replace('The Envelope has no line that counts the pages read.', 'It ends with `Pages read: <n>`.')],
   ['a test is added without updating the header count', 'the stated test count is the number of tests',
     (t) => `${t}\n## T-26 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];
