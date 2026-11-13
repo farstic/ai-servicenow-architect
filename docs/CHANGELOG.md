@@ -58,7 +58,7 @@ itself. Nothing changes an existing store's permissions without saying so.
 
 ### Added
 
-- `./snowarch doctor` gains E-33, the names index of the docs pin: a file under `.local/corpus-names/` (about 9 MB for the whole corpus)
+- `./snowarch doctor` gains E-33, the names index of the docs pin: a file under `.local/corpus-names/` (about 11.5 MB for the whole corpus)
   that says which pages of the documentation corpus print a name. The bootstrap and `docs sync` build it once the corpus is complete, and
   `./snowarch doctor --fix` builds it too (F10), which E-33 points to when the index is missing or was built for another docs pin. An
   upgrade runs the docs step of the bootstrap once more for an install made before the index existed, and its plan says what that does:
@@ -66,6 +66,11 @@ itself. Nothing changes an existing store's permissions without saying so.
   never stops the sync (ARC-09-C263).
 - `docs verify` fails a skill or agent line that calls a name "not documented" when the corpus prints it, and prints one more line,
   `strict marker subjects` (ARC-09-C263).
+- `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
+  word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints whether
+  the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a second and
+  exits 1 when a term is not printed. The names index it reads (`.local/corpus-names/`, about 11.5 MB) now also holds the labels and the
+  titles (ARC-09-C268).
 
 ### Fixed
 
