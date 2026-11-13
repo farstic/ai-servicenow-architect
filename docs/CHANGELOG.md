@@ -9,6 +9,17 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A patch release: the Architect reads the ServiceNow documentation with no page limit, a change measured before it shipped;
+every install gets a names index of the documentation; and a Windows install has its own page, keeps the instance store private
+and finds a Claude Code that is not on PATH.** The no-limit text was measured against 2.2.5 on 30 held-out ServiceNow tasks, five
+runs each, read by two blind readers and an adjudicator. The Architect called a construct the documentation covers absent,
+unverified or "left to the instance" less often (better in 66 of the 108 task runs where the two versions differed, worse in 42),
+read and cited more of each task's key pages (3.07 against 2.75 per answer), cited fewer pages that do not exist (2 against 8) and
+wrote fewer invented names (6 against 10). The measured text also ended Part 2 with a `Pages read` count; that line was the one place
+the new version did worse (one wrong path, five counts above the pages actually read), so this release leaves it out, and that is its
+only difference from the measured text. The names index is built at `docs sync`, at bootstrap and by `./snowarch doctor --fix`, in
+about 15 seconds, and the doctor's E-33 checks it.
+
 **The upgrade plan says what the upgrade writes.** Its `credentials:` line no longer promises that `.local/instances.json` is never
 read or written, which was not true for an install with an instance: it says that no instance, credential or flag is changed, and
 names the one field written, each instance's last probe.
