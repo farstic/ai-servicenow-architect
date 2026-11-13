@@ -11,6 +11,9 @@
 //   meta.json   { v, pin, coverage, areas, pages, names, built }
 //   pages.txt   one `markdown/<area>/…/<page>.md` per line; a page's id is its line number, from 0
 //   names.tsv   `<name>\t<page count>\t<id>,<id>,…` per line, sorted by name; ids ascending
+//   labels.tsv  `<label key>\t<name>\t<page count>\t<id>,<id>,…` per line: the pairs the corpus prints as `Label \[name\]` (ARC-09-C268);
+//               the key is the label's words, lower case, plurals folded (label-rules.mjs); at most 40 ids
+//   titles.txt  one page title per line, in page-id order (an empty line for a page with none)
 // A name is an underscore token (lower case, edge underscores off) or a dotted `com.`/`glide.`/`sn_*.` name — the same
 // tokeniser as `corpusIndex` (name-rules.mjs `pageNames`).
 //
@@ -24,8 +27,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODE } from './sync.mjs';
 
-export const NAMES_INDEX_VERSION = 1;
-export const FILES = Object.freeze({ meta: 'meta.json', pages: 'pages.txt', names: 'names.tsv' });
+export const NAMES_INDEX_VERSION = 2;
+export const FILES = Object.freeze({ meta: 'meta.json', pages: 'pages.txt', names: 'names.tsv', labels: 'labels.tsv', titles: 'titles.txt' });
 // `full` is the docs mode's own word for "the whole corpus is on disk" (sync.mjs MODE.full, ARC-09-C244): one spelling, not two.
 export const COVERAGE = Object.freeze({ full: MODE.full, disk: 'disk' });
 
@@ -54,10 +57,12 @@ export function loadNamesIndex(dir, { pin = null, read = readFileSync } = {}) {
     if (!existsSync(metaPath)) return null;
     const meta = JSON.parse(read(metaPath, 'utf8'));
     if (!meta || meta.v !== NAMES_INDEX_VERSION || typeof meta.pin !== 'string'
-      || !Object.values(COVERAGE).includes(meta.coverage) || !Number.isInteger(meta.pages) || !Number.isInteger(meta.names)) return null;
+      || !Object.values(COVERAGE).includes(meta.coverage) || !Number.isInteger(meta.pages) || !Number.isInteger(meta.names)
+      || !Number.isInteger(meta.labels)) return null;
     if (pin !== null && meta.pin !== pin) return null;
     const pages = lines(read(join(dir, FILES.pages), 'utf8'));
     if (pages.length !== meta.pages) return null;
+    if (!existsSync(join(dir, FILES.labels)) || !existsSync(join(dir, FILES.titles))) return null;
     const text = read(join(dir, FILES.names), 'utf8');
     // name -> [page count, start, end] of its posting list inside `text`, parsed only when a name is asked about.
     const entries = new Map();
@@ -75,6 +80,38 @@ export function loadNamesIndex(dir, { pin = null, read = readFileSync } = {}) {
     }
     if (entries.size !== meta.names) return null;
     let namespaces = null;
+    // The words side, read when asked for (the doctor and bootstrap only need to know the index loads): titles by page id, and the
+    // label pairs both ways. A file that does not match the metadata reads as empty, and `wordsOk` says so.
+    let titles = null;
+    let labelsByKey = null;
+    let labelsByName = null;
+    let wordsOk = true;
+    const readTitles = () => {
+      if (titles) return titles;
+      try {
+        titles = lines(read(join(dir, FILES.titles), 'utf8'));
+        if (titles.length !== meta.pages) { wordsOk = false; titles = pages.map(() => ''); }
+      } catch { wordsOk = false; titles = pages.map(() => ''); }
+      return titles;
+    };
+    const readLabels = () => {
+      if (labelsByKey) return;
+      labelsByKey = new Map();
+      labelsByName = new Map();
+      try {
+        const rows = lines(read(join(dir, FILES.labels), 'utf8'));
+        if (rows.length !== meta.labels) wordsOk = false;
+        for (const row of rows) {
+          const [key, name, count, idList] = row.split('\t');
+          if (!key || !name || !Number.isInteger(Number(count))) { wordsOk = false; continue; }
+          const e = { key, name, count: Number(count), ids: idList ? idList.split(',').map(Number) : [] };
+          if (!labelsByKey.has(key)) labelsByKey.set(key, []);
+          labelsByKey.get(key).push(e);
+          if (!labelsByName.has(name)) labelsByName.set(name, []);
+          labelsByName.get(name).push(e);
+        }
+      } catch { wordsOk = false; }
+    };
     const ids = (name) => {
       const e = entries.get(name);
       if (!e) return [];
@@ -90,6 +127,18 @@ export function loadNamesIndex(dir, { pin = null, read = readFileSync } = {}) {
       count: (name) => entries.get(name)?.[0] ?? 0,
       pagesOf: ids,
       pagePath: (id) => pages[id] ?? null,
+      /** Every name in the index (the lookup's near-name search walks them). */
+      nameKeys: () => entries.keys(),
+      /** ARC-09-C268 — the page titles by id. */
+      titles: readTitles,
+      /** The pairs the corpus prints for a label key (`requested item`): `[{ key, name, count, ids }]`, most pages first. */
+      labelNames: (key) => { readLabels(); return [...(labelsByKey.get(key) ?? [])].sort((a, b) => b.count - a.count || (a.name < b.name ? -1 : 1)); },
+      /** The labels the corpus prints beside a name: `[{ key, name, count, ids }]`, most pages first. */
+      labelsOfName: (name) => { readLabels(); return [...(labelsByName.get(name) ?? [])].sort((a, b) => b.count - a.count || (a.key < b.key ? -1 : 1)); },
+      /** Every label key (a lookup that backs off walks them). */
+      labelKeys: () => { readLabels(); return labelsByKey.keys(); },
+      /** False once a read found the words files short or garbled: the lookup says so, and `doctor --fix` rebuilds them. */
+      get wordsOk() { readTitles(); readLabels(); return wordsOk; },
       pathsOf: (name) => ids(name).map((id) => pages[id]),
       /** The ids of the pages that print both names (a dotted name looked up by its parts). */
       both: (a, b) => intersect(ids(a), ids(b)),

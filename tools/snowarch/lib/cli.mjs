@@ -165,7 +165,7 @@ export const COMMANDS = {
     run: versionCommand, readOnly: true,
     usage: (where) => `usage: ${spellings(where).cli} version [--json]` },
   docs: { summary: 'sync, verify, describe or re-family the documentation corpus', run: docsCommand,
-    usage: (where) => `usage: ${spellings(where).cli} docs (sync | verify | status | family) …\n\n`
+    usage: (where) => `usage: ${spellings(where).cli} docs (sync | verify | status | lookup | family) …\n\n`
       + `  Run \`${spellings(where).cli} docs\` with no sub-command for the full flag list.` },
   bootstrap: { summary: 'install this checkout: plan, then the numbered steps, resumable',
     run: bootstrapCommand, usage: BOOTSTRAP_USAGE, booleans: ['yes', 'reset', 'skip-claude-check'],
