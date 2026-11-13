@@ -494,11 +494,12 @@ export function stepsThatWillRun(root, tag, { ctx, opts = {} }) {
 /**
  * Why a step runs although its inputs did not move: its OUTPUT is not held (`outputMissing` in the step). ARC-09-C263 added B02's
  * — the names index of the pin. Only the runner's own comparison (`rerunAtTag`) knows it; the file-diff estimate does not read
- * `.local/`, so a plan that cannot make the worktree still says "up to date" at the tag itself (ARC-09-C196).
+ * `.local/`, so a plan that cannot make the worktree still says "up to date" at the tag itself (ARC-09-C196). B02's reason is said in
+ * the reader's words, what the step will do and how long it takes (14.8 s for the whole corpus on a Mac), not in the runner's.
  */
 const OUTPUT_MISSING = Object.freeze({
   B01: 'the release manifest is not held',
-  B02: 'the names index is not held',
+  B02: 'builds the documentation names index once, about 15 s',
 });
 
 /**

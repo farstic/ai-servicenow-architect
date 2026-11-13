@@ -217,14 +217,14 @@ test('ARC-09-C263 — B02 is in the plan when the names index of the pin is not 
   // An install made before the index existed: the corpus at an unchanged pin, B02's inputs unmoved, no index.
   rmSync(corpusNamesDir(root, ctx.config.docs.pin), { recursive: true, force: true });
   const missing = planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync });
-  assert.deepEqual(missing.steps.map((s) => [s.step, s.why]), [['B02', 'the names index is not held']]);
+  assert.deepEqual(missing.steps.map((s) => [s.step, s.why]), [['B02', 'builds the documentation names index once, about 15 s']]);
   assert.equal(missing.estimate, false);
 
   // The file-diff estimate does not read `.local/`: a plan that cannot make the worktree says nothing of the index (ARC-09-C196).
 
   // A corpus the install skipped has no index to want.
   const skipped = planSteps(root, 'v9.9.9-target', { ctx: { ...ctx, docs: 'skip' }, state: { ...state, docs: { mode: 'skip' } }, run: spawnSync });
-  assert.ok(!skipped.steps.some((x) => x.step === 'B02' && x.why === 'the names index is not held'), 'a skipped corpus planned B02 for its index');
+  assert.ok(!skipped.steps.some((x) => x.step === 'B02' && /names index/.test(x.why)), 'a skipped corpus planned B02 for its index');
 });
 
 test('the plan says so when it could not make the runner\'s comparison', { timeout: 120_000 }, (t) => {
