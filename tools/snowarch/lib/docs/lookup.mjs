@@ -24,7 +24,6 @@ import { bare, dotted } from './name-rules.mjs';
 import { GENERIC, contentWords, normalisePhrase, parseSynonyms, wordsOf } from './label-rules.mjs';
 import { COVERAGE, loadNamesIndex } from './names-index.mjs';
 import { corpusNamesDir } from '../local-paths.mjs';
-import { spellings } from '../launcher-spelling.mjs';
 
 export const LOOKUP_EXIT = Object.freeze({ ok: 0, notPrinted: 1, usage: 2, missing: 3 });
 export const STATUS = Object.freeze({ printed: 'PRINTED', near: 'NEAR', absent: 'ABSENT', unknown: 'UNKNOWN', none: 'NO MATCH' });
@@ -137,7 +136,7 @@ function namesForLabel(idx, key) {
 }
 
 /** Label keys to try for a phrase: itself, its synonyms, and each without a generic word at either end ("incident table"). */
-function labelKeysFor(key, synonyms) {
+function labelFormsOf(key, synonyms) {
   const out = new Set([key]);
   const trim = (k) => {
     const w = k.split(' ');
@@ -184,7 +183,7 @@ function resolveName(c, ctx) {
   }
   // Not printed as typed. The words it is made of may be a label the corpus prints beside a real name.
   const words = c.key.split('_').map((w) => normalisePhrase(w)).join(' ');
-  const names = labelCandidates(idx, labelKeysFor(words, ctx.synonyms), words).slice(0, ctx.maxNames)
+  const names = labelCandidates(idx, labelFormsOf(words, ctx.synonyms), words).slice(0, ctx.maxNames)
     .map(({ e, key, via }) => nameEntry({ ctx, name: e.name, via, labelKey: key, pairs: e.pairs }));
   if (names.length < ctx.maxNames) {
     const seen = new Set(names.map((n) => n.name));
@@ -248,10 +247,10 @@ function resolveDotted(c, ctx) {
   return { status: idx.coverage === COVERAGE.full && missing.length ? STATUS.absent : STATUS.unknown, names: [] };
 }
 
-/** The names the corpus prints beside any of `keys`, one candidate per name (the label with the most pages), most pages first. */
-function labelCandidates(idx, keys, from) {
+/** The names the corpus prints beside any of the label forms in `forms`, one candidate per name (the label with the most pages), most pages first. */
+function labelCandidates(idx, forms, from) {
   const best = new Map();
-  for (const key of keys) {
+  for (const key of forms) {
     for (const e of namesForLabel(idx, key)) {
       const had = best.get(e.name);
       if (!had || e.count > had.e.count) best.set(e.name, { e, key, via: key === from ? `label "${key}"` : `label "${key}" (from "${from}")` });
@@ -262,7 +261,7 @@ function labelCandidates(idx, keys, from) {
 
 function resolvePhrase(c, ctx) {
   const { idx } = ctx;
-  const names = labelCandidates(idx, labelKeysFor(c.key, ctx.synonyms), c.key).slice(0, ctx.maxNames)
+  const names = labelCandidates(idx, labelFormsOf(c.key, ctx.synonyms), c.key).slice(0, ctx.maxNames)
     .map(({ e, key, via }) => nameEntry({ ctx, name: e.name, via, labelKey: key, pairs: e.pairs }));
   // Titles: every content word of the phrase (or of a synonym of it) among the content words of a page's title.
   const queries = [contentWords(c.raw)];
@@ -343,10 +342,11 @@ const usage = (cli) => `usage: ${cli} docs lookup <name or phrase>… [--limit <
   + 'exit: 0 every term printed · 1 some term is not · 2 usage · 3 no corpus or no names index for the docs pin';
 
 /**
- * The command. `argv` is what follows `docs lookup`. `root` and `corpus` are the checkout and its corpus folder, `pin` the docs pin.
+ * The command. `argv` is what follows `docs lookup`. `root` and `corpus` are the checkout and its corpus folder, `pin` the docs pin,
+ * `spell` the launcher's spelling for this person's shell (REQUIRED: the one boundary that reads the process is `runDocs`, ARC-07-C31).
  * Returns the exit code; prints through `out` and `err`.
  */
-export function runLookup(argv, { root, corpus, pin, spell = spellings(), out = console.log, err = console.error } = {}) {
+export function runLookup(argv, { root, corpus, pin, spell, out = console.log, err = console.error } = {}) {
   const terms = [];
   let json = false;
   let limit = DEFAULT_LIMIT;
@@ -363,12 +363,12 @@ export function runLookup(argv, { root, corpus, pin, spell = spellings(), out = 
   }
   if (!terms.length || terms.length > MAX_TERMS) { err(usage(spell.cli)); return LOOKUP_EXIT.usage; }
   if (!existsSync(join(corpus, 'markdown'))) {
-    err(`docs lookup: the documentation corpus is not on disk. Run ${spell.cli} docs sync, then ${spell.cli} doctor --fix`);
+    err(`docs lookup: the documentation corpus is not on disk (${spell.cli} docs sync fetches it, and ${spell.cli} doctor --fix builds its names index)`);
     return LOOKUP_EXIT.missing;
   }
   const idx = loadNamesIndex(corpusNamesDir(root, pin), { pin });
   if (!idx) {
-    err(`docs lookup: the names index for the docs pin ${String(pin).slice(0, 12)} is not built, or does not load. Run ${spell.cli} doctor --fix`);
+    err(`docs lookup: the names index for the docs pin ${String(pin).slice(0, 12)} is not built, or does not load (${spell.cli} doctor --fix builds it)`);
     return LOOKUP_EXIT.missing;
   }
   const cache = new Map();
@@ -390,7 +390,7 @@ export function runLookup(argv, { root, corpus, pin, spell = spellings(), out = 
     out(JSON.stringify({ pin, coverage: idx.coverage, pages: idx.pageCount, names: idx.nameCount, terms: results }, null, 2));
   } else {
     for (const line of formatLookup(results, { pin, idx })) out(line);
-    if (!idx.wordsOk) err(`docs lookup: the labels or titles of the names index are short or garbled; run ${spell.cli} doctor --fix`);
+    if (!idx.wordsOk) err(`docs lookup: the labels or titles of the names index are short or garbled (${spell.cli} doctor --fix rebuilds them)`);
   }
   return results.every((r) => r.status === STATUS.printed) ? LOOKUP_EXIT.ok : LOOKUP_EXIT.notPrinted;
 }

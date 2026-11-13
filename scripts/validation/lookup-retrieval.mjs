@@ -243,7 +243,7 @@ async function main() {
   const pin = execFileSync('git', ['-C', corpus, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const indexRoot = resolve(val('--index-root', root));      // the checkout whose .local/ holds the index, when it is not this one
   const idx = loadNamesIndex(corpusNamesDir(indexRoot, pin), { pin });
-  if (!idx || idx.coverage !== COVERAGE.full) { console.error('needs the names index (format 2) of the whole corpus: run ./snowarch doctor --fix'); process.exit(3); }
+  if (!idx || idx.coverage !== COVERAGE.full) { console.error('needs the names index (format 2) of the whole corpus: the doctor\'s --fix builds it'); process.exit(3); }
   const texts = loadTexts(corpus, idx);
   const cache = new Map();
   const page = (p) => { if (!cache.has(p)) cache.set(p, readFileSync(join(corpus, ...p.split('/')), 'utf8')); return cache.get(p); };

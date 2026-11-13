@@ -206,16 +206,19 @@ test('ARC-09-C268 — a usage error is 2 and says how; no corpus or no index is 
   for (const bad of [[], ['--bogus', 'x'], ['x', '--limit'], ['x', '--limit', '0'], ['x', '--names', 'many']]) {
     const r = run(w, bad);
     assert.equal(r.code, LOOKUP_EXIT.usage, JSON.stringify(bad));
-    assert.match(r.err[0], new RegExp(`^usage: ${SPELL.cli.replace(/[.\\]/g, '\\$&')} docs lookup <name or phrase>… `));
+    // The launcher is the one the product derives (`spellings().cli`, handed in), so it is checked by position, never typed here.
+    assert.ok(r.err[0].startsWith('usage: ') && r.err[0].includes(' docs lookup <name or phrase>… ') && r.err[0].includes(SPELL.cli), r.err[0]);
   }
   const bare = tempDir('lookup-bare-', t);
   mkdirSync(join(bare, 'vendor', 'ServiceNowDocs', 'markdown'), { recursive: true });
   const noIndex = run({ root: bare, corpus: join(bare, 'vendor', 'ServiceNowDocs') }, ['sc_task']);
   assert.equal(noIndex.code, LOOKUP_EXIT.missing);
-  assert.match(noIndex.err[0], new RegExp(`names index for the docs pin c10276e95345 is not built.* Run ${SPELL.cli.replace(/[.\\]/g, '\\$&')} doctor --fix$`));
+  assert.ok(noIndex.err[0].startsWith('docs lookup: the names index for the docs pin c10276e95345 is not built, or does not load ('), noIndex.err[0]);
+  assert.ok(noIndex.err[0].endsWith(' doctor --fix builds it)') && noIndex.err[0].includes(SPELL.cli), noIndex.err[0]);
   const noCorpus = run({ root: bare, corpus: join(bare, 'nowhere') }, ['sc_task']);
   assert.equal(noCorpus.code, LOOKUP_EXIT.missing);
-  assert.match(noCorpus.err[0], /the documentation corpus is not on disk/);
+  assert.ok(noCorpus.err[0].startsWith('docs lookup: the documentation corpus is not on disk (') && noCorpus.err[0].includes(SPELL.cli), noCorpus.err[0]);
+  assert.ok(noCorpus.err[0].endsWith(' doctor --fix builds its names index)'), noCorpus.err[0]);
 });
 
 test('ARC-09-C268 — a page with CRLF line ends gives the same line number and the same text, and no path has a backslash', (t) => {
