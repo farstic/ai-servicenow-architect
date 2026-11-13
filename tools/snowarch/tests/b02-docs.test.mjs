@@ -7,7 +7,11 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { run as runB02, gitlink, mapSyncFailure } from '../lib/steps/B02.mjs';
+import { run as runB02, gitlink, mapSyncFailure, outputMissing } from '../lib/steps/B02.mjs';
+import { outputMissingOf } from '../lib/steps/index.mjs';
+import * as B02 from '../lib/steps/B02.mjs';
+import { corpusNamesDir } from '../lib/local-paths.mjs';
+import { loadNamesIndex } from '../lib/docs/names-index.mjs';
 import { CORPUS_TEXT, stepLine } from '../lib/steps/format.mjs';
 import { ATTRIBUTION, CORPUS_DIR, EXIT as DOCS_EXIT, SyncError } from '../lib/docs/sync.mjs';
 import { docsStatus } from '../lib/docs/status.mjs';
@@ -223,6 +227,40 @@ test('a dead citation is a WARN — the corpus is here, and the fix is a maintai
     new RegExp(`^\\d+ dead citation\\(s\\) — see ${esc(FRAME_SPELL.cli)} docs verify$`));
   assert.ok(r.data.dead > 0);
   assert.match(ctx.lines.join('\n'), /^citations: checked: \d+ \| dead: [1-9]/m);
+});
+
+// ARC-09-C263 — the names index of the pin: built by B02 once the corpus is complete, held as B02's OUTPUT, and a build that fails
+// warns the step and nothing else.
+test('ARC-09-C263 — B02 builds the names index of the pin after the sync, says so, and holds it as its output', async () => {
+  const w = workspace();
+  const ctx = withLines(ctxFor(w));
+  assert.equal(outputMissing(ctx), true, 'precondition: no index for the pin');
+  assert.equal(outputMissingOf(B02, ctx), true, 'the runner asks B02 whether its output is held');
+
+  const r = await runB02(ctx);
+
+  assert.equal(r.status, 'ok', JSON.stringify(r));
+  assert.match(ctx.lines.join('\n'), /^\[docs\] names index … [\d.]+ s · \d+ names · \d+ pages · coverage (full|disk)$/m, ctx.lines.join('\n'));
+  const idx = loadNamesIndex(corpusNamesDir(w.root, upstream.pin), { pin: upstream.pin });
+  assert.ok(idx, 'the index the hook will look for is there');
+  assert.ok(idx.pageCount > 0);
+  assert.equal(outputMissing(ctx), false, 'held: the runner does not re-run B02 for it');
+  assert.equal(outputMissing({ ...ctx, docs: 'skip' }), false, 'a skipped corpus has no index to want');
+  assert.equal(outputMissing({ ...ctx, config: { docs: {} } }), false, 'no pin recorded: nothing to ask for');
+});
+
+test('ARC-09-C263 — a names index that cannot be built warns B02 with the doctor\'s remedy, and the corpus is still synced', async () => {
+  const w = workspace();
+  // The child cannot write `.local/corpus-names` when `.local` is a file: the sync has succeeded, the index has not.
+  writeFileSync(join(w.root, '.local'), 'not a directory');
+  const ctx = withLines(ctxFor(w));
+
+  const r = await runB02(ctx);
+
+  assert.equal(r.status, 'warn', JSON.stringify(r));
+  assert.match(r.detail, new RegExp(`the names index was not built — run ${esc(FRAME_SPELL.cli)} doctor --fix`));
+  assert.match(ctx.lines.join('\n'), /^\[docs\] note: the names index was not built \(/m);
+  assert.ok(existsSync(join(w.root, CORPUS_DIR, 'markdown')), 'the corpus itself was synced');
 });
 
 test('each docs exit code maps to the remedy that situation actually needs', () => {

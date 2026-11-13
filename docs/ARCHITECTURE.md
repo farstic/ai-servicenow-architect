@@ -1277,6 +1277,7 @@ about one registry rather than several:
 | `E-14` | docs | docs family | — | — |
 | `E-15` | docs | corpus completeness | — | yes |
 | `E-16` | docs | citations | — | — |
+| `E-33` | docs | grounding names index for the docs pin | — | yes |
 | `E-17` | roster | roster from directory listing | yes | — |
 | `E-18` | roster | skill descriptions | yes | — |
 | `E-19` | contract | no retired tool names | — | — |
@@ -1302,7 +1303,7 @@ about one registry rather than several:
 | `SV-09` | server | store schema | — | — |
 <!-- /generated:doctor-checks -->
 
-**`--fix` repairs a closed list of seven drifts** (ARC-08-S06), and the list being closed is the
+**`--fix` repairs a closed list of drifts** (ARC-08-S06), and the list being closed is the
 feature: every entry is a class of drift with exactly one correct resolution and no information in
 it a human would supply differently. It prints the plan before it touches anything (principle 10),
 applies in the order below so a later repair sees an earlier one, reports each as `applied`,
@@ -1327,6 +1328,7 @@ REFUSED with the check's own command, and a grep test proves the module cannot r
 | `F6` | `hook-absent` | register the hooks | `.claude/settings.local.json` |
 | `F6` | `hook-wrong` | rewrite the hooks | `.claude/settings.local.json` |
 | `F8` | `integrity-restore` | put the signed files back | `the covered files E-32 names; what it replaces is kept in .local/integrity-removed/` |
+| `F10` | `names-index` | build the grounding names index | `.local/corpus-names/` |
 | `F7` | `cache-stale` | clear the stale doctor cache | `.local/doctor-last.json` |
 <!-- /generated:doctor-fixes -->
 
@@ -1684,5 +1686,5 @@ of `engine.config.json` |
 | D36 | `CLAUDE.md` gates on `mcp__<key>__` | E-20 | re-targeted to the generated rule file, the protocol page and both registrations |
 | D37 | tool-name currency against the rename map | E-19 | `retired-names.json` |
 
-**New checks with no old counterpart** (17): `E-06`, `E-11`, `E-29`, `E-31`, `E-32`, `E-15`, `E-18`, `E-21`, `E-22`, `E-30`, `E-25`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
+**New checks with no old counterpart** (18): `E-06`, `E-11`, `E-29`, `E-31`, `E-32`, `E-15`, `E-33`, `E-18`, `E-21`, `E-22`, `E-30`, `E-25`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
 <!-- /generated:doctor-mapping -->

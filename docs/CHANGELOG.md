@@ -56,6 +56,17 @@ doctor's SV-02 reads the permissions and names who else can read the store ("BUI
 own store is `doctor --fix` (F9), which shows its plan first; for any other store it prints one PowerShell line that works out your account
 itself. Nothing changes an existing store's permissions without saying so.
 
+### Added
+
+- `./snowarch doctor` gains E-33, the names index of the docs pin: a file under `.local/corpus-names/` (about 9 MB for the whole corpus)
+  that says which pages of the documentation corpus print a name. The bootstrap and `docs sync` build it once the corpus is complete, and
+  `./snowarch doctor --fix` builds it too (F10), which E-33 points to when the index is missing or was built for another docs pin. An
+  upgrade runs the docs step of the bootstrap once more for an install made before the index existed, and its plan says what that does:
+  "builds the documentation names index once, about 15 s" (14.8 s for the whole corpus on a Mac). A build that fails is a sentence and
+  never stops the sync (ARC-09-C263).
+- `docs verify` fails a skill or agent line that calls a name "not documented" when the corpus prints it, and prints one more line,
+  `strict marker subjects` (ARC-09-C263).
+
 ### Changed
 
 - The Architect reads the documentation with no page limit. The grounding rule (`CLAUDE.md` and the six gateways' Part 2) said "twelve by
