@@ -19,7 +19,7 @@ Checked by the bootstrap, never installed by it.
 |---|---|---|
 | Everything | Claude **Sonnet** or a more capable model | the roster is validated on Sonnet; smaller models are not supported |
 | Everything | Claude Code ≥ **2.1.214**, logged in | 2.1.196 settled the `.mcp.json` approval semantics, 2.1.198 the hook placeholders, and 2.1.214 keeps the previous tool list when a refresh fails |
-| Everything | git ≥ **2.25** | cone-mode `sparse-checkout`, which is how the documentation corpus arrives |
+| Everything | git ≥ **2.34.1** | the oldest git the install was run on, which is the one Ubuntu 22.04 LTS ships; nothing older was tried |
 | Live mode only | Node.js ≥ **20** (22 LTS recommended; 20, 22 and 24 tested on Linux, macOS and Windows, 26 on Linux and Windows) with npm on PATH | the MCP server's own floor |
 | Windows | PowerShell 5.1 (built in) and **Git for Windows** | the launchers need no Git Bash — but Claude Code's Bash tool does, and the in-session skills (`/snowarch status`, `/snowarch setup-instance`) run through it |
 
