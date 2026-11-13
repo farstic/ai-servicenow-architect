@@ -9,6 +9,8 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+<!-- 2.2.6 release notes: the first paragraph is the architect's, written into this pull request in his own commit. -->
+
 **The upgrade plan says what the upgrade writes.** Its `credentials:` line no longer promises that `.local/instances.json` is never
 read or written, which was not true for an install with an instance: it says that no instance, credential or flag is changed, and
 names the one field written, each instance's last probe.
