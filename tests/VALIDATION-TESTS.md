@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 47 tests, T-01 through T-47, no number reserved. The count is asserted by
+> **How many.** 48 tests, T-01 through T-48, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -2493,6 +2493,40 @@ Design the major-incident communication for ITSM: who is notified and how, how t
 
 ---
 
+## T-48 — a construct the corpus prints under another label is looked up and opened, not called not documented
+
+**Covers:** ARC-09-C268 (the six gateways' Part 2 sentences on `./snowarch docs lookup` and on citing, `tools/snowarch/lib/docs/lookup.mjs`) · **Modes:** design-only ✅ · live ✅ (the case reads the corpus and touches no instance)
+
+One fresh session at the checkout root, the documentation corpus checked out at the pin and its names index built (the doctor's row E-33 is green). The prompt names two tables by the labels people use for them, not by the names the corpus prints them under: the corpus prints the Requested Item table as `sc_req_item`, and a search for the guess `requested_item` finds nothing. Run it four times on each tree (the release before and the one under test).
+
+### Prompt
+
+```
+Design the approval step for a catalog order in ITSM: when the approver rejects one requested item of a request, what happens to the other requested items, the request itself and the catalog task. Design-only, grounded in the docs. No engagement is loaded.
+```
+
+### Expected behaviour
+
+1. The ITSM gateway fires and the Envelope is written with its five parts.
+2. Before the Envelope calls a construct not documented, unverified or left to the instance, the session runs `./snowarch docs lookup` for it, by its label or its name, and opens a page the lookup shows for it before it says more about the construct.
+3. The Requested Item table is found under its name, `sc_req_item`, and is cited from a page the session Read that prints that name. No construct the lookup shows is called "not documented in the bundled corpus".
+
+### Pass criteria
+
+- The session's stream holds at least one Bash call of `./snowarch docs lookup` before the Envelope is written.
+- The report lists a page the lookup showed for `sc_req_item` among the corpus pages read, and the Envelope cites that table only from pages in that list.
+- "Requested item" and "catalog task" are not called "not documented in the bundled corpus", "unverified" or left to the instance.
+- No cited page is missing from the pages the report lists as read.
+
+### Fail signals
+
+- A name guessed from the label (`requested_item`, `request_item`, `catalog_task`) searched, not found, and the construct called not documented, unverified or left to the instance.
+- "Not documented in the bundled corpus" for a construct the lookup shows as PRINTED or as printed under another name.
+- A lookup run and its pages not opened: the Envelope says more about a construct than the pages the session Read print.
+- A page cited for a construct that the session did not Read, or whose text does not print the construct's name.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -2571,7 +2605,7 @@ the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
 
 | # | Machine · mode | Tests | What this row is for |
 |---|---|---|---|
-| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` `T-38` `T-39` `T-40` `T-41` `T-42` `T-43` `T-44` `T-45` `T-46` `T-47` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` `T-24` `T-25` `T-26` `T-27` `T-28` `T-30` `T-31` `T-32` `T-33` `T-35` `T-36` `T-37` `T-38` `T-39` `T-40` `T-41` `T-42` `T-43` `T-44` `T-45` `T-46` `T-47` `T-48` | the first fifteen minutes on a machine that has never seen this product, then the cases added since (T-28 by its CLI and doctor rows) |
 | 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
 | 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` `T-35` | the launchers, without Git Bash — the path that has cost the most cells |
 | 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` `T-25` `T-28` `T-29` | the gate, the write approval and the capture protocol, against a real PDI; then T-25's live variant, the licence end to end, and the live reads |
