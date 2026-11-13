@@ -386,6 +386,20 @@
       "durationMs": 0
     },
     {
+      "id": "E-33",
+      "section": "docs",
+      "title": "grounding names index for the docs pin",
+      "status": "skip",
+      "severity": "warn",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
       "id": "E-17",
       "section": "roster",
       "title": "roster from directory listing",
@@ -751,9 +765,9 @@
     "ok": 15,
     "warn": 0,
     "fail": 1,
-    "skip": 27,
+    "skip": 28,
     "fixable": 0,
     "notInSection": 0,
-    "notInQuick": 26
+    "notInQuick": 27
   }
 }

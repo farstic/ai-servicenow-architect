@@ -28,7 +28,7 @@ import { makePrivateDir } from '../private-dir.mjs';
 /** The `data.fix.kind` vocabulary. A kind outside this table is never applied — it is reported. */
 export const KINDS = Object.freeze(['deps-missing', 'corpus-missing', 'sparse-mismatch',
   'head-off-pin', 'flags-incomplete', 'store-mode', 'store-acl', 'toggles-mismatch',
-  'hooks-disabled-by-bootstrap', 'hook-absent', 'hook-wrong', 'integrity-restore', 'cache-stale']);
+  'hooks-disabled-by-bootstrap', 'hook-absent', 'hook-wrong', 'integrity-restore', 'names-index', 'cache-stale']);
 
 /** The one place that says which file a repair is allowed to touch, for the report and the test. */
 export const TARGETS = Object.freeze({
@@ -44,6 +44,7 @@ export const TARGETS = Object.freeze({
   'hook-absent': '.claude/settings.local.json',
   'hook-wrong': '.claude/settings.local.json',
   'integrity-restore': 'the covered files E-32 names; what it replaces is kept in .local/integrity-removed/',
+  'names-index': '.local/corpus-names/',
   'cache-stale': '.local/doctor-last.json',
 });
 
@@ -268,6 +269,20 @@ async function fixIntegrity({ root, ctx }) {
   return result('noop', 'the files are as signed');
 }
 
+/**
+ * F10 — ARC-09-C263: the grounding names index of this pin (E-33), built from the corpus that is on disk, through the one policy
+ * module `docs sync` and bootstrap B02 use (docs/sync-index.mjs: a child node, so nothing here can build it in a session). It
+ * rebuilds even when one is held, because the doctor asked: E-33 only sends it here when the index does not load for this pin.
+ */
+async function fixNamesIndex({ root, ctx, run }) {
+  const { CORPUS_DIR } = await import('../docs/sync.mjs');
+  const { indexAfterSync } = await import('../docs/sync-index.mjs');
+  const r = (run ?? indexAfterSync)({ root, corpus: join(root, CORPUS_DIR), pin: ctx.config.docs.pin, force: true,
+    cli: cliOf(ctx), say: () => {} });
+  if (r?.error) return result('failed', r.error);
+  return result('applied', r?.line ? r.line.replace(/^\[docs\] /, '') : null);
+}
+
 /** F7 — a stale cache is deleted; the re-run writes a fresh one. */
 function fixCache({ root }) {
   let removed = 0;
@@ -302,6 +317,7 @@ export const FIXERS = Object.freeze([
   { id: 'F6', kind: 'hook-absent', title: 'register the hooks', apply: fixToggles },
   { id: 'F6', kind: 'hook-wrong', title: 'rewrite the hooks', apply: fixToggles },
   { id: 'F8', kind: 'integrity-restore', title: 'put the signed files back', apply: fixIntegrity },
+  { id: 'F10', kind: 'names-index', title: 'build the grounding names index', apply: fixNamesIndex },
   { id: 'F7', kind: 'cache-stale', title: 'clear the stale doctor cache', apply: fixCache },
 ]);
 
