@@ -179,11 +179,13 @@ export function runOutline({ argv, root, spell, out = console.log, err = console
     return 3;
   }
 
-  // The target is an area (`order-management`, `markdown/order-management`) or a page (`markdown/<area>/….md`).
+  // The target is an area (`order-management`, `markdown/order-management`, or the area's own index.md that every call prints first) or a
+  // page (`markdown/<area>/….md`, with or without its `markdown/` folder): what follows the area is never dropped.
   const arg = normalise(target);
   const parts = arg.replace(/^markdown\//, '').split('/');
   const area = parts[0];
-  const isPage = arg.startsWith('markdown/') && parts.length > 1;
+  const pagePath = parts.length > 1 ? `markdown/${parts.join('/')}` : null;
+  const isPage = pagePath !== null && pagePath !== `markdown/${area}/index.md`;
   const read = (rel) => { try { return readFileSync(join(corpus, 'markdown', ...rel.split('/')), 'utf8'); } catch { return null; } };
   const tree = loadArea({ read, area });
   if (tree === null) {
@@ -216,7 +218,7 @@ export function runOutline({ argv, root, spell, out = console.log, err = console
 
   let others = [];
   if (isPage) {
-    const hit = pick(tree.root, arg, area);
+    const hit = pick(tree.root, pagePath, area);
     if (hit === null) return 2;
     ({ node: start, others } = hit);
   }
