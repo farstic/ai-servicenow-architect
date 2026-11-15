@@ -14,6 +14,11 @@
 //   node scripts/validation/outline-walk.mjs [--corpus <dir>] [--pin <rev>] [--pages <file>] [-v] [<page path>...]
 //   node scripts/validation/outline-walk.mjs [--corpus <dir>] [--pin <rev>] --areas
 //
+// Two readers are counted for each page. The ORACLE follows the page's own branch, so its calls are a floor. The LISTING-ORDER reader
+// takes nothing from the titles: after a call that does not print the page it goes down the printed nodes that still have more below,
+// in listing order and each to its end (depth first), and pays for every call and every line. It is one deterministic blind reader, not
+// the worst case (where the page sits in the listing decides what it costs); a reader that uses the titles lies between the two.
+//
 // With no page it reads scripts/validation/outline-walk-pages.txt. `--areas` prints, for every area, the lines of its first level (what
 // `docs outline <area> --depth 1` prints), of its first call (what `docs outline <area>` prints) and of the largest single call over
 // every node of its index, and the median and the maximum of each over the areas. The target the architect set: at most 4 calls and
@@ -70,8 +75,29 @@ export function walkTo(tree, target) {
   return { calls, reached: false };
 }
 
-/** The listing-order reader: a stub that walks nothing, so that the cases written against it can be seen to fail first. */
-export function walkBlind() { return { calls: [], reached: false }; }
+/**
+ * The listing-order reader: it does not know the page's branch, so after a call that does not print the page it goes down the printed
+ * nodes that still have more below (a node with children, none of which the call printed), in listing order and each to its end, before
+ * the next. A node that a cut hid is never printed, so a page under it is not reached. The calls and lines are what it pays.
+ */
+export function walkBlind(tree, target) {
+  const calls = [];
+  let reached = false;
+  const go = (start) => {
+    const { lines, shown } = renderOutline(start);
+    calls.push({ under: start === tree.root ? null : start.path, lines: lines.length });
+    if (shown.some((n) => n.path === target.path)) { reached = true; return; }
+    const inView = new Set(shown);
+    for (const n of shown) {
+      if (n !== start && n.children.length > 0 && !n.children.some((c) => inView.has(c))) {
+        go(n);
+        if (reached) return;
+      }
+    }
+  };
+  go(tree.root);
+  return { calls, reached };
+}
 
 /** Finds a page's node at a pin: by its path, else by its file name in its area, else in any other area. */
 export function locate({ area, path, load, areas }) {
@@ -89,6 +115,7 @@ export function locate({ area, path, load, areas }) {
   return { tree, node: null, moved: null };
 }
 
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const median = (xs) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
 /** The figures over the pages that were reached: median and maximum of the calls and of the lines, and how many are within the target. */
@@ -146,25 +173,32 @@ export function main(argv, { out = (l) => writeSync(1, `${l}\n`), err = (l) => w
   const file = value('--pages') ?? join(ROOT, 'scripts', 'validation', 'outline-walk-pages.txt');
   const pages = positional.length > 0 ? positional : readFileSync(file, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
   const results = [];
+  const blindResults = [];
   let absent = 0;
   for (const page of pages) {
     const area = page.replace(/^markdown\//, '').split('/')[0];
     const found = locate({ area, path: page, load, areas });
     if (!found.node) { absent += 1; out(`${page} · absent at this pin`); continue; }
     const walk = walkTo(found.tree, found.node);
+    const blind = walkBlind(found.tree, found.node);
     results.push(walk);
+    blindResults.push(blind);
     const per = walk.calls.map((c) => c.lines);
     const where = found.moved ? ` · moved to ${found.moved}${found.candidates > 1 ? ` (${found.candidates} files of that name; the first)` : ''}` : '';
-    out(`${page} · ${walk.reached ? 'reached' : 'NOT reached'} in ${walk.calls.length} call${walk.calls.length === 1 ? '' : 's'}, lines per call ${per.join(' + ')} = ${per.reduce((a, b) => a + b, 0)}${where}`);
+    const paid = `${plural(blind.calls.length, 'call')}, ${plural(blind.calls.reduce((n, c) => n + c.lines, 0), 'line')}`;
+    out(`${page} · ${walk.reached ? 'reached' : 'NOT reached'} in ${plural(walk.calls.length, 'call')}, lines per call ${per.join(' + ')} = ${per.reduce((a, b) => a + b, 0)}`
+      + ` · listing-order reader: ${blind.reached ? '' : 'NOT reached after '}${paid}${where}`);
     if (verbose) walk.calls.forEach((c, i) => out(`    call ${i + 1}: ${c.under ? `--under ${c.under}` : 'the area'} · ${c.lines} lines`));
   }
   const s = summarise(results);
   const unreached = s.pages - s.reached;
   out(`pages ${s.pages + absent}, reached ${s.reached}`
     + (absent + unreached > 0 ? ` (${[absent && `${absent} absent at this pin`, unreached && `${unreached} not reachable`].filter(Boolean).join(', ')})` : ''));
-  if (s.calls) {
-    out(`calls: median ${s.calls.median}, max ${s.calls.max} · lines: median ${s.lines.median}, max ${s.lines.max} · within ${TARGET.calls} calls and ${TARGET.lines} lines: ${s.withinTarget} of ${s.reached}`);
-  }
+  const figures = (label, f) => `${label} — calls: median ${f.calls.median}, max ${f.calls.max} · lines: median ${f.lines.median}, max ${f.lines.max}`
+    + ` · within ${TARGET.calls} calls and ${TARGET.lines} lines: ${f.withinTarget} of ${f.reached}`;
+  if (s.calls) out(figures('oracle (the right branch every time)', s));
+  const b = summarise(blindResults);
+  if (b.calls) out(figures('listing-order reader (no title signal, depth first)', b));
   return 0;
 }
 
