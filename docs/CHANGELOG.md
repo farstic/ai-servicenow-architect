@@ -15,6 +15,11 @@ documentation were the Brazil family's. `vendor/docs-map.md` now leaves a family
 notes" is "Release notes", and no area, page count or product in it changes. Nine sentences in the gateway skills no longer name a
 plan row, an id that the reader of an answer has no use for.
 
+**CLAUDE.md says which family the corpus is.** The corpus family is the one `vendor/ServiceNowDocs/README.md` and each page's
+`release:` field name. The release-notes area and some area index titles can name a newer family, and then they describe that
+family, not the corpus: a patch they list is not the corpus family's patch, and when the corpus holds no release notes for its own
+family, the Architect says so. The sentence takes `CLAUDE.md` from 20,543 to 20,895 bytes, so its byte cap is now 21,000.
+
 ### Changed
 
 - The corpus map, `vendor/docs-map.md`, no longer shows a release family at the start of an area's title. The corpus is the
@@ -27,6 +32,11 @@ plan row, an id that the reader of an answer has no use for.
   `(ARC-09-C161)` in the CSM and ITSM always-evaluate leads, and "until ARC-02-S13 measured it" in the CSM anti-patterns. A row id
   means nothing to the reader of an answer, so the sentences no longer carry one, and the two tests that pin the leads follow.
   A new test fails on a plan row id in the prose of a skill or an agent, HTML comments aside (ARC-09-C282).
+- `CLAUDE.md` says which release family the corpus is: the one `vendor/ServiceNowDocs/README.md` and each page's `release:` field
+  name. It says that the release-notes area and some area index titles can name a newer family, and then describe that family, not
+  the corpus, so a patch they list is not the corpus family's patch, and that when the corpus holds no release notes for its own
+  family the Architect says so. One sentence of 352 bytes: the file is 20,895 bytes, and its cap, 20,600 since ARC-09-C256, is
+  21,000 on the owner's decision of 2026-11-15 (ARC-09-C277).
 
 ## 2.2.6 — 2026-11-15
 
