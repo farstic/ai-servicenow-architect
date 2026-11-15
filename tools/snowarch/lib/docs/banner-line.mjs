@@ -21,7 +21,7 @@ const ROW = /^\|\s*`markdown\/([a-z0-9][a-z0-9-]*)\/`\s*\|[^|]*\|\s*(\d+)\s*\|/;
 const FAMILY = /^[a-z0-9][a-z0-9-]*$/;
 
 /** The map's areas, each with its pages. */
-function mapAreas(root) {
+export function mapAreas(root) {
   const areas = [];
   for (const line of readFileSync(join(root, 'vendor', 'docs-map.md'), 'utf8').split('\n')) {
     const m = line.match(ROW);

@@ -14,6 +14,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { CORPUS_DIR } from './sync.mjs';
 import { needSpell } from '../launcher-spelling.mjs';
+import { mapAreas } from './banner-line.mjs';
 
 /** The most lines one call prints at its depth before it falls back to the first level. */
 export const OUTLINE_LINES = 120;
@@ -186,9 +187,21 @@ export function runOutline({ argv, root, spell, out = console.log, err = console
   const area = parts[0];
   const pagePath = parts.length > 1 ? `markdown/${parts.join('/')}` : null;
   const isPage = pagePath !== null && pagePath !== `markdown/${area}/index.md`;
-  const read = (rel) => { try { return readFileSync(join(corpus, 'markdown', ...rel.split('/')), 'utf8'); } catch { return null; } };
+  const read = (rel) => {
+    // Nothing above markdown/ is a corpus page: a `..` in a path is refused here, where every read goes through.
+    if (rel.split('/').includes('..')) return null;
+    try { return readFileSync(join(corpus, 'markdown', ...rel.split('/')), 'utf8'); } catch { return null; }
+  };
   const tree = loadArea({ read, area });
   if (tree === null) {
+    // An area of the corpus map that this checkout does not hold is a sparse corpus, not an area the corpus lacks: it is said that way,
+    // as the banner's `Docs on disk:` line says it, so that it is never reported as not documented.
+    let mapped = false;
+    try { mapped = mapAreas(root).some((a) => a.area === area); } catch { /* no map: the area is simply not one */ }
+    if (mapped && !existsSync(join(corpus, 'markdown', area))) {
+      return refuse(`docs outline: "${area}" is an area of the corpus map that this checkout does not hold (a sparse corpus holds some areas only): `
+        + `${spell.cli} docs sync --mode full brings the whole corpus`);
+    }
     const near = areasOn(corpus).filter((a) => a.includes(area) || area.includes(a) || a.slice(0, 3) === area.slice(0, 3)).slice(0, 8);
     return refuse(`docs outline: no area named "${area}" with an index.md under vendor/ServiceNowDocs/markdown`
       + (near.length ? ` (nearest: ${near.join(', ')})` : ''));
