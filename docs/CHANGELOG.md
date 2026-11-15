@@ -48,6 +48,10 @@ on this tree it reads 22 such names, and all of them resolve.
   out of the corpus stayed unseen. A glob, a placeholder or braces in a folder name give no folder, and a repository file name
   ends the list. The check goes from 593 to 609 citations on this tree, all resolving; the Stop hook, which reads an answer, still
   takes full paths only (ARC-09-C281).
+- The install page's corpus costs describe the corpus at the 96d3212 pin: 54 areas and 51,186 files (it said 56 and 51,665), a 286
+  MB working tree on Linux and macOS and 293 MB on Windows (293 and 299), and 476 MB Ubuntu, 484 MB macOS and 482 MB Windows with
+  `.git` (484, 491 and 489), fetched in about 30 to 45 seconds, the median of five `docs-real.yml` runs of 2026-11-15. The README
+  is the page's copy (ARC-09-C279).
 
 ## 2.2.6 — 2026-11-15
 
