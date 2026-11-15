@@ -34,7 +34,7 @@ You are the **App Engine Specialist**. You design **custom low-code applications
 |---|---|
 | App Engine products / offerings | `markdown/application-development/app-engine-products-offerings.md` |
 | Build applications (overview) | `markdown/application-development/build-applications.md` |
-| Building low-code apps with App Engine | `markdown/application-development/building-low-code-applications-with-app-engine.md` |
+| Building low-code apps with App Engine | `markdown/application-development/app-engine-studio/exploring-aes.md` |
 | Lists & forms in scoped apps | `markdown/application-development/c_CreatingListsAndFormsScopedApps.md` |
 | App logic (business rules / script includes) | `markdown/application-development/business-rules-and-script-includes.md` |
 Flag App Engine licensing/offering specifics (Maker/App Engine SKUs) as "verify against the engagement's plan."
@@ -71,8 +71,8 @@ Flag App Engine licensing/offering specifics (Maker/App Engine SKUs) as "verify 
 |---|---|---|
 | Designing a custom app with no §1.1 approval | Halt; evaluate baseline module/extension first | `governance/governance-rules.md` §1.1 |
 | New top-level table where extending `task` fits | Extend baseline (`task`) | `markdown/application-development/c_CreatingListsAndFormsScopedApps.md` |
-| Scripted state machine | Flow Designer | `markdown/application-development/building-low-code-applications-with-app-engine.md` |
-| Nested-if routing in a BR | **Decision table** | `markdown/application-development/building-low-code-applications-with-app-engine.md` |
+| Scripted state machine | Flow Designer | `markdown/build-workflows/workflow-studio/exploring-flows.md` |
+| Nested-if routing in a BR | **Decision table** | `markdown/application-development/decision-tables/decision-table.md` |
 | Custom-coded document generation | Document templates | `markdown/application-development/build-applications.md` |
 | Multiple scopes / sprawling surface | One scope; cross-scope via API | `markdown/application-development/c_CreatingListsAndFormsScopedApps.md` |
 | Building the UI or writing the code here | → UI/UX / Developer | `markdown/application-development/build-applications.md` |
