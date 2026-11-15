@@ -110,9 +110,10 @@ export const occurrences = (tree, path) => [...nodesOf(tree.root)].filter((n) =>
 const lineOf = (node, level) => `${'  '.repeat(level)}${node.title} — ${node.path}${node.below > 0 ? ` (+${node.below} below)` : ''}`;
 
 /**
- * What one call prints for a start node: its own line, then its descendants to `depth` levels, as `{ lines, shown }` (`shown` are
- * the nodes that have a line). A call that would print more than the bound prints the first level only, and says so; a first level
- * that is itself too long is cut, and says so.
+ * What one call prints for a start node: its own line, then its descendants to `depth` levels, as `{ lines, shown, cut }` (`shown` are
+ * the nodes that have a line, `cut` how many entries of the level were not printed). A call that would print more than the bound
+ * prints the first level only, and says so; a first level that is itself too long is cut at OUTLINE_FIRST_LEVEL_MAX lines, and the
+ * last line says how many entries were not shown and how to narrow: a level is never cut silently.
  */
 export function renderOutline(start, depth = OUTLINE_DEPTH) {
   const levels = (limit) => {
@@ -126,18 +127,19 @@ export function renderOutline(start, depth = OUTLINE_DEPTH) {
     return { lines, shown };
   };
   const full = levels(depth);
-  if (full.lines.length <= OUTLINE_LINES) return full;
+  if (full.lines.length <= OUTLINE_LINES) return { ...full, cut: 0 };
   let first = depth > 1 ? levels(1) : full;
   const notes = [];
   if (depth > 1) {
     notes.push(`(depth ${depth} would print ${full.lines.length} lines, over the bound of ${OUTLINE_LINES}: this is the first level only; go down with --under <path or title>)`);
   }
+  let cut = 0;
   if (first.lines.length > OUTLINE_FIRST_LEVEL_MAX) {
-    const hidden = first.lines.length - OUTLINE_FIRST_LEVEL_MAX;
+    cut = first.lines.length - OUTLINE_FIRST_LEVEL_MAX;
     first = { lines: first.lines.slice(0, OUTLINE_FIRST_LEVEL_MAX), shown: first.shown.slice(0, OUTLINE_FIRST_LEVEL_MAX) };
-    notes.push(`(${hidden} more nodes at this level are not printed; name one of the listed nodes with --under to go down)`);
+    notes.push(`(+${cut} more; use --under <child> or docs lookup <words>)`);
   }
-  return { lines: [...first.lines, ...notes], shown: first.shown };
+  return { lines: [...first.lines, ...notes], shown: first.shown, cut };
 }
 
 const normalise = (arg) => String(arg).replaceAll('\\', '/').replace(/^(?:vendor\/)?(?:ServiceNowDocs\/)?/, '').replace(/\/+$/, '');
@@ -241,10 +243,13 @@ export function runOutline({ argv, root, spell, out = console.log, err = console
     ({ node: start, others } = hit);
   }
 
-  const { lines } = renderOutline(start, depth);
+  const { lines, cut } = renderOutline(start, depth);
+  // A cut level says so on the LAST line, so the line about a page that is listed twice goes before it.
+  const tail = cut > 0 ? lines.splice(-1, 1) : [];
   for (const line of lines) out(line);
   if (others.length > 0) {
     out(`(the page also appears at ${others.length} other place${others.length === 1 ? '' : 's'}: ${others.join(', ')})`);
   }
+  for (const line of tail) out(line);
   return 0;
 }
