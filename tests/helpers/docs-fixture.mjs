@@ -201,7 +201,21 @@ function writeFollowers(root, pin, { except = [] } = {}) {
   }
 }
 
+/**
+ * ARC-09-C283 — an install page with the paragraph the bump reads its figures from, as `docs/INSTALL.md` words it
+ * (the sentence wraps across lines there, and the reader has to follow it).
+ */
+function installPage({ areas, files, mb }) {
+  return [
+    '# Install', '', '### What the corpus costs', '',
+    '**The documentation costs about 490 MB on disk and about 30–45 seconds to fetch** — the whole corpus, all',
+    `${areas} areas and ${files.toLocaleString('en-US')} files, in a blobless checkout. Two measurements, because they count different things:`,
+    `the **working tree** is ${mb} MB on Linux and macOS and ${mb + 7} MB on Windows, and **tree plus \`.git\`** is 476`,
+    'MB Ubuntu / 484 MB macOS / 482 MB Windows. The first is what you read, the second is what the disk loses.', '',
+  ].join('\n');
+}
+
 export {
   AREAS, CITED_PAGE, LONG_NAME, PIN_FOLLOWERS, SAMPLE_DOCS, STATUS_FIXTURES, UNCITED, git, buildUpstream, makeWorkspace,
-  writeCitingSkill, writeFollowers,
+  installPage, writeCitingSkill, writeFollowers,
 };
