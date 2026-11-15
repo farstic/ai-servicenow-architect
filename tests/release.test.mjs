@@ -543,21 +543,15 @@ test('a pin that disagrees with the artefact refuses before anything runs', asyn
 
 // ── the integration case: the real script, on the real tree ─────────────────────────────────────
 
-test('a real --dry-run on this checkout prints this checkout\'s tag message and writes nothing', async (t) => {
-  // PRECONDITION, stated rather than assumed: gate 6 is `docs verify`, which needs the corpus, and
-  // a checkout without the submodule cannot run the real gates at all.
-  //
-  // This used to pass on a runner with no submodule, and for a bad reason (ARC-09-C2): the doctor's
-  // `--fix` fixtures were syncing a corpus into the live checkout through a symlink, so whichever
-  // test ran first left one behind for this one to find. With that writer gone, a cell without the
-  // corpus says so and skips — the `release-dryrun` job syncs one and is where this claim is
-  // actually proved on three OSes.
-  if (!existsSync(join(REAL_ROOT, 'vendor', 'ServiceNowDocs', 'markdown'))) {
-    return t.skip('no docs corpus in this checkout — release-dryrun covers this on three OSes');
-  }
-  const before = execFileSync('git', ['status', '--porcelain'], { cwd: REAL_ROOT, encoding: 'utf8' });
+/**
+ * ARC-09-C276 — the real script's dry run, driven against ONE tree and asserted. `root` is this repository for the
+ * integration case below, and a temporary repository for the cases that put a tree in a state this repository passes
+ * through only now and then (see `windowTree`).
+ */
+async function dryRunOnTree(root) {
+  const before = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' });
   const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
-    { cwd: REAL_ROOT, encoding: 'utf8' }).trim();
+    { cwd: root, encoding: 'utf8' }).trim();
   const out = capture();
   const err = capture();
   // `--no-install` and `--offline`: no network and no `npm ci` inside a test, ever. The gates are
@@ -568,7 +562,7 @@ test('a real --dry-run on this checkout prints this checkout\'s tag message and 
     // spawned here (`run: () => 0`) and nothing this asserts — the tag message, the contract sha, the
     // pin, the clean tree — is platform-shaped. One rule for all four call sites beats one exception
     // that a later edit has to remember.
-    root: REAL_ROOT, out: out.stream, err: err.stream, platform: 'linux',
+    root, out: out.stream, err: err.stream, platform: 'linux',
     // The gates are stubbed to pass: running lint and the whole suite from inside the suite would
     // be a recursion, not a test. What is real here is everything else — the preflight against
     // this repository, the contract sha of the committed artefact, the pin, the gitlink.
@@ -585,9 +579,52 @@ test('a real --dry-run on this checkout prints this checkout\'s tag message and 
   const parsed = parseTagMessage(out.text());
   assert.ok(tagIsComplete(parsed), out.text());
   assert.equal(parsed.contract, createHash('sha256')
-    .update(readFileSync(join(REAL_ROOT, 'packages/snowarch/dist/contract.json'))).digest('hex'));
+    .update(readFileSync(join(root, 'packages/snowarch/dist/contract.json'))).digest('hex'));
   assert.equal(parsed.docsPin, PIN);
-  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: REAL_ROOT, encoding: 'utf8' }), before);
+  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }), before);
+}
+
+test('a real --dry-run on this checkout prints this checkout\'s tag message and writes nothing', async (t) => {
+  // PRECONDITION, stated rather than assumed: gate 6 is `docs verify`, which needs the corpus, and
+  // a checkout without the submodule cannot run the real gates at all.
+  //
+  // This used to pass on a runner with no submodule, and for a bad reason (ARC-09-C2): the doctor's
+  // `--fix` fixtures were syncing a corpus into the live checkout through a symlink, so whichever
+  // test ran first left one behind for this one to find. With that writer gone, a cell without the
+  // corpus says so and skips — the `release-dryrun` job syncs one and is where this claim is
+  // actually proved on three OSes.
+  if (!existsSync(join(REAL_ROOT, 'vendor', 'ServiceNowDocs', 'markdown'))) {
+    return t.skip('no docs corpus in this checkout — release-dryrun covers this on three OSes');
+  }
+  await dryRunOnTree(REAL_ROOT);
+});
+
+// ── ARC-09-C276 — between a final's release commit and its tag ─────────────────────────────────────
+
+/**
+ * The tree a final's release commit leaves behind BEFORE its tag exists: a final version in every manifest, the
+ * previous final's tag (v2.0.0) on an earlier commit, a change under packages/snowarch/src since that tag, and a
+ * server changelog whose Unreleased block the cut has already renamed into `## 2.0.1`, so that Unreleased is empty.
+ * Every clone of the real repository passes through this state once per final, between the release commit and its tag.
+ */
+function windowTree(t, { tagged = false } = {}) {
+  const root = fixture(t, { version: '2.0.1' });
+  git(root, ['tag', '-a', 'v2.0.0', '-m', 'snowarch v2.0.0']);
+  write(root, 'packages/snowarch/src/server.ts', 'export const changed = true;\n');
+  write(root, 'packages/snowarch/CHANGELOG.md',
+    '# Changelog\n\n## Unreleased\n\n## 2.0.1 — 2026-09-11\n\n**The server did a thing it did not do before.** It does it.\n');
+  git(root, ['add', 'packages']);
+  git(root, ['commit', '-qm', 'chore(release): v2.0.1']);
+  if (tagged) git(root, ['tag', '-a', 'v2.0.1', '-m', 'snowarch v2.0.1']);
+  return root;
+}
+
+test('ARC-09-C276 — the dry-run check holds on a final\'s release commit before its tag (W1)', async (t) => {
+  await dryRunOnTree(windowTree(t));
+});
+
+test('ARC-09-C276 — and on the same tree once the tag exists (W2, the control)', async (t) => {
+  await dryRunOnTree(windowTree(t, { tagged: true }));
 });
 
 /** The default git runner, for the cases that stub only one command. */
