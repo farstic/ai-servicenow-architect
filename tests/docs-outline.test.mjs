@@ -269,3 +269,42 @@ test('ARC-09-C284 — a path with .. in it names nothing outside markdown/: it i
   }
   assert.equal(outline(root, 'alpha', '--under', '../x.md').code, 2);
 });
+
+test('ARC-09-C284 — a level cut at 200 lines says, on its last line, how many entries it did not show and how to narrow: it is never cut silently', (t) => {
+  const kids = (prefix) => Array.from({ length: 250 }, (_, i) => [`${prefix} ${i + 1}`, `markdown/wide/${prefix.toLowerCase()}${i + 1}.md`]);
+  const root = corpus(t, { wide: [
+    ['Wide overview', 'markdown/wide/overview.md', kids('Child')],
+    ['Twice', 'markdown/wide/twice.md', kids('Twin')],
+    ['Twice again', 'markdown/wide/twice.md'],
+  ] });
+  // 250 children and the node's own line are 251 lines: the header and 199 children are printed, 51 are not.
+  const NOTE = '(+51 more; use --under <child> or docs lookup <words>)';
+
+  // Depth 2 would print 251 lines (over 120), so the first level is printed, and the first level is itself cut: two notes, the cut one last.
+  const r = outline(root, 'wide', '--under', 'Wide overview');
+  assert.equal(r.code, 0, r.text);
+  assert.equal(r.lines.length, 200 + 2, 'the 200 lines, the note that depth 2 fell back, and the note that the level was cut');
+  assert.equal(r.lines.at(-1), NOTE, 'the last line says how many were not shown');
+  assert.match(r.lines.at(-2), /^\(depth 2 would print 251 lines, over the bound of 120: this is the first level only/);
+  assert.equal(r.lines[199], '  Child 199 — markdown/wide/child199.md');
+  assert.ok(!r.text.includes('Child 200 '), 'the 200th entry is the first that is not shown');
+
+  // --depth 1 asked for outright: the same cut and the same last line, with no fall-back note before it.
+  const one = outline(root, 'wide', '--under', 'Wide overview', '--depth', '1');
+  assert.equal(one.lines.length, 201);
+  assert.equal(one.lines.at(-1), NOTE);
+  assert.ok(!one.text.includes('would print'), one.text);
+
+  // A page listed twice: the line that says so comes before the cut note, which stays the last line.
+  const twice = outline(root, 'wide', '--under', 'markdown/wide/twice.md');
+  assert.equal(twice.lines.at(-1), NOTE);
+  assert.equal(twice.lines.at(-2), '(the page also appears at 1 other place: markdown/wide/twice.md#2)');
+
+  // A level that is not cut says nothing of the kind, and nor does one that only fell back to its first level.
+  assert.ok(!outline(root, 'wide', '--under', 'markdown/wide/child7.md').text.includes('more; use --under'));
+  const small = corpus(t, { big: Array.from({ length: 1 }, () => ['Big overview', 'markdown/big/overview.md',
+    Array.from({ length: 70 }, (_, i) => [`Topic ${i + 1}`, `markdown/big/t${i + 1}.md`, [[`Task ${i + 1}`, `markdown/big/k${i + 1}.md`]]])]) });
+  const fell = outline(small, 'big', '--under', 'Big overview');
+  assert.match(fell.lines.at(-1), /^\(depth 2 would print 141 lines/);
+  assert.ok(!fell.text.includes('more; use --under'), fell.text);
+});
