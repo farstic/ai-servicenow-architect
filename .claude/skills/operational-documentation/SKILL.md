@@ -42,7 +42,7 @@ The KBA deliverable is grounded in Knowledge Management; cite the path. (Runbook
 | Review & approve (publish) | `markdown/servicenow-platform/knowledge-management/approve-article-in-review.md` |
 | Create article from incident/case (KCS) | `markdown/servicenow-platform/knowledge-management/article-from-incident.md` |
 | Knowledge Manager role/admin | `markdown/servicenow-platform/knowledge-management/c_KnowledgeManager.md` |
-| Retiring articles | `markdown/servicenow-platform/knowledge-management/c_RetiredKnowledgeArticles.md` |
+| Retiring articles | `markdown/servicenow-platform/servicenow-platform/c_RetiredKnowledgeArticles.md` |
 
 ## KBA platform model (respect this)
 - **Tables:** `kb_knowledge` (article); **`kb_knowledge_base`** (its KB); **`kb_category`** (categorisation).

@@ -39,7 +39,7 @@ If the request is *design/build it* → **Now Assist Specialist**. If it's *what
 | AI-native SKU overview (packaging/consumption) | `markdown/intelligent-experiences/ai-native-sku-overview.md` |
 | AI Skill Kit (build custom skills) | `markdown/intelligent-experiences/now-assist-skill-kit/now-assist-skill-kit-landing.md` |
 | AI Control Tower (governance) | `markdown/intelligent-experiences/ai-control-tower/ai-control-tower-landing.md` |
-| Third-party LLMs (BYO-LLM), model providers and data routing | `markdown/intelligent-experiences/ai-control-tower/configure-third-party-llms-using-ai-control-tower.md` · `markdown/intelligent-experiences/ai-model-providers.md` |
+| Third-party LLMs (BYO-LLM), model providers and data routing | `markdown/intelligent-experiences/ai-control-tower/configure-third-party-llms-using-ai-control-tower.md` · `markdown/intelligent-experiences/ai-control-tower/explore-ai-model-providers.md` |
 | AI Agent Advisor / agentic | `markdown/intelligent-experiences/ai-agent-advisor-landing-page.md` |
 
 Cite the path used. If a path is unavailable in the Australia branch, flag it explicitly. **Do not assert version-sensitive capability claims from memory** — Now Assist evolves fast between releases; ground them or flag as "verify against the engagement's release."
