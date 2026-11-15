@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CORPUS_DIR, EXIT, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
@@ -11,7 +11,7 @@ import { syncUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { prBody } from '../scripts/docs-bump.mjs';
 import { RECIPE_TARGET, renderRecipeBlock } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 import {
-  AREAS, CITED_PAGE, PIN_FOLLOWERS, buildUpstream, git, makeWorkspace, writeCitingSkill, writeFollowers,
+  AREAS, CITED_PAGE, PIN_FOLLOWERS, buildUpstream, git, installPage, makeWorkspace, writeCitingSkill, writeFollowers,
 } from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
@@ -395,6 +395,78 @@ test('ARC-09-C280 — a follower that no longer quotes the pin is reported befor
   const fenced = out.prBody.split('```')[1].trim().split('\n');
   assert.match(fenced.at(-2), new RegExp(`^pin: ${PIN_FOLLOWERS[0].replaceAll('.', '\\.')} carries neither`));
   assert.match(fenced.at(-1), /^staged: /);
+});
+
+/**
+ * ARC-09-C283 — a bump says whether the install page's corpus figures still hold.
+ *
+ * Nothing on the page follows the corpus, and the bump has both in front of it: the fresh corpus on disk and `docs/INSTALL.md` in the
+ * tree. The body's checklist gets one line with the corpus's files, areas and working tree next to the page's, so a stale page is
+ * visible at the bump and not a month later (ARC-09-C279 found it at 56 areas and 51,665 files against 54 and 51,186).
+ */
+/** The corpus as the bump left it, counted here by walking the disk, not by the code under test. */
+function corpusNow(w) {
+  const dir = join(w.root, CORPUS_DIR);
+  let files = 0, bytes = 0;
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      if (e.name === '.git') continue;
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.isFile()) { files += 1; bytes += statSync(p).size; }
+    }
+  };
+  walk(dir);
+  const areas = readdirSync(join(dir, 'markdown'), { withFileTypes: true }).filter((e) => e.isDirectory()).length;
+  return { files, areas, workingTreeMb: Math.round(bytes / 1e6) };
+}
+const commitAll = (w, message) => {
+  git(['add', '-A'], w.root);
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', message], w.root);
+};
+
+test('ARC-09-C283 — a bump prints the corpus figures next to a stale page\'s, and a page that holds gets a checked line', () => {
+  const w = ready();
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: 99, files: 99999, mb: 5 }));
+  commitAll(w, 'a stale page');
+
+  const first = bump(w, '--json');
+  assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  const corpus = corpusNow(w);
+  assert.deepEqual(out.figures?.corpus, corpus, 'the report does not carry the corpus figures, or they are not what is on disk');
+  assert.deepEqual(out.figures?.page, { areas: 99, files: 99999, workingTreeMb: 5 });
+  const lead = out.prBody.split('```')[0].split('\n');
+  const line = lead.find((l) => l.includes('install page figures'));
+  assert.ok(line, `the checklist has no install page figures line:\n${lead.join('\n')}`);
+  assert.ok(line.startsWith('- [ ] install page figures differ from the corpus'), line);
+  for (const part of [`files ${corpus.files.toLocaleString('en-US')} (page: 99,999)`, `areas ${corpus.areas} (page: 99)`,
+    `working tree ${corpus.workingTreeMb} MB (page: 5 MB)`]) assert.ok(line.includes(part), `${part} is not in: ${line}`);
+
+  // The page is brought up to the corpus, and the same bump, with nothing left to move, says so. The report file is the run's own
+  // output and not a change, so it goes before the commit: a bump refuses a tree that is not clean.
+  rmSync(join(w.root, 'bump.json'));
+  commitAll(w, 'bumped');
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: corpus.areas, files: corpus.files, mb: corpus.workingTreeMb }));
+  commitAll(w, 'the page follows');
+  const second = bump(w, '--json');
+  assert.equal(second.status, 0, `${second.stdout}${second.stderr}`);
+  const again = JSON.parse(read(w.root, 'bump.json'));
+  assert.equal(again.from, again.to, 'the second bump moved after all — this proves nothing');
+  assert.ok(again.prBody.split('```')[0].includes(
+    `- [x] install page figures match the corpus: ${corpus.files.toLocaleString('en-US')} files · ${corpus.areas} areas · ${corpus.workingTreeMb} MB working tree`),
+  again.prBody.split('```')[0]);
+});
+
+test('ARC-09-C283 — a tree with no install page says it did not check, and the report still carries the corpus', () => {
+  const w = ready();
+  const r = bump(w, '--json');
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  assert.equal(out.figures?.page, null, 'the report says nothing about the page');
+  assert.deepEqual(out.figures?.corpus, corpusNow(w));
+  assert.ok(out.prBody.includes('- [ ] install page figures not checked: there is no docs/INSTALL.md in this tree'));
 });
 
 /**

@@ -18,6 +18,9 @@ import { CORPUS_DIR, EXIT, SyncError } from '../tools/snowarch/lib/docs/sync.mjs
 import { syncUpstream, formatUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { follow } from './lib/pin-followers.mjs';
+import { figuresChecklist, pageFigures } from './lib/page-figures.mjs';
+import { docsStatus } from '../tools/snowarch/lib/docs/status.mjs';
+import { megabytes } from '../tools/snowarch/lib/size.mjs';
 
 /**
  * The repository to act on: the working directory when it is one, else this script's own.
@@ -35,6 +38,20 @@ const flag = (n) => argv.includes(n);
 const value = (n) => { const i = argv.indexOf(n); return i === -1 ? undefined : argv[i + 1]; };
 
 const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();
+
+/**
+ * The corpus as this bump left it, and the install page as the tree has it: what `figuresChecklist` compares. The measure is
+ * `docs status`'s own (files and bytes under the corpus, `.git` excluded; the area directories under `markdown/`), and the
+ * megabytes are the page's, decimal.
+ */
+function figuresOf(root) {
+  const status = docsStatus({ root, verify: false, measure: true });
+  const corpus = status.present && status.fileCount !== null
+    ? { files: status.fileCount, areas: status.areaCount, workingTreeMb: megabytes(status.sizeBytes) }
+    : null;
+  const file = join(root, 'docs', 'INSTALL.md');
+  return { corpus, page: existsSync(file) ? pageFigures(readFileSync(file, 'utf8')) : null };
+}
 
 /**
  * The lines for what did not follow the pin: a file that quotes neither pin (reworded since, so there is nothing to
@@ -69,6 +86,8 @@ export function prBody(report) {
     '- [ ] newly dead citations remapped (or none)',
     '- [ ] `node scripts/docs.mjs verify` → `dead: 0`',
     '- [ ] release notes skimmed: `vendor/ServiceNowDocs/markdown/release-notes/`',
+    // ARC-09-C283 — whether the install page's corpus figures still hold, from the corpus this bump just checked out.
+    ...figuresChecklist(report.figures ?? { corpus: null, page: null }),
     '',
     '```',
     shown.join('\n'),
@@ -147,6 +166,8 @@ function main() {
     git(['add', '--', ...followed.staged]);
     report.staged.push(...followed.staged);
   }
+
+  report.figures = figuresOf(root);
 
   const body = prBody(report);
   const out = { ...report, prBody: body, dryRun };
