@@ -27,12 +27,12 @@ function part2(dir) {
 
 const LISTS = {
   'csm-specialist': {
-    lead: '**Always evaluate, for a request about money against an account or an audit trail (ARC-09-C161).**',
+    lead: '**Always evaluate, for a request about money against an account or an audit trail.**',
     names: ['task_sla', 'contract_sla', 'sn_otc_invoice', 'sn_otc_invoice_line', 'ast_contract', 'service_entitlement',
       'sys_journal_field', 'sys_audit', 'sys_history_set'],
   },
   'itsm-specialist': {
-    lead: '**Always evaluate, for a request about an audit trail or an escalation record (ARC-09-C161).**',
+    lead: '**Always evaluate, for a request about an audit trail or an escalation record.**',
     names: ['sys_journal_field', 'sys_audit', 'sys_history_set', 'sys_history_line', 'task_sla', 'contract_sla', 'cmn_rota',
       'cmn_rota_member'],
   },

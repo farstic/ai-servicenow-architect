@@ -71,16 +71,42 @@ function llmsTitles(corpus) {
 }
 
 /**
+ * ServiceNow's release families, written as a title writes them. A title that opens with one opens with a release
+ * label, not a name — and a corpus can carry the label of a newer family than its own: the `australia` branch has 45 area
+ * titles that open with "Brazil". A docs bump that meets a family not listed here adds it (tests/gen-docs-map.test.mjs
+ * fails when one label opens ten titles); the corpus's own family goes from a title as well, listed or not.
+ */
+const FAMILIES = [
+  'Aspen', 'Berlin', 'Calgary', 'Dublin', 'Eureka', 'Fuji', 'Geneva', 'Helsinki', 'Istanbul', 'Jakarta', 'Kingston',
+  'London', 'Madrid', 'New York', 'Orlando', 'Paris', 'Quebec', 'Rome', 'San Diego', 'Tokyo', 'Utah', 'Vancouver',
+  'Washington DC', 'Xanadu', 'Yokohama', 'Zurich', 'Australia', 'Brazil',
+];
+
+/**
+ * A title without the release family it opens with — "Brazil release notes" is "Release notes", and a capital letter
+ * opens what is left. A family named anywhere else in a title, a name that only begins with one (Fujitsu) and a title
+ * that is nothing but a family stay as they are.
+ */
+function withoutFamily(title, own) {
+  const names = [...FAMILIES, ...(own ? [own] : [])]
+    .map((name) => name.trim().split(/\s+/).map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+'));
+  const lead = title.match(new RegExp(`^(?:${names.join('|')})\\s+(?=\\S)`, 'i'));
+  return lead ? title.slice(lead[0].length).replace(/^\p{Ll}/u, (c) => c.toUpperCase()) : title;
+}
+
+/**
  * The title cell. llms.txt's title, with the area index.md's beside it when the two differ — "<llms> / <index>" — so an
  * area renamed since llms.txt was written is found by either name: acct-lifecycle-events is "Account Lifecycle Events"
- * there and "Customer Success Management" in its index, and its pages carry no `product:` to find it by. An index
- * title opens with the release family ("Australia Customer Success Management"), a release label rather than a name,
- * so it is compared and shown without it. With no llms.txt title, the index title alone, as it is.
+ * there and "Customer Success Management" in its index, and its pages carry no `product:` to find it by. A title opens
+ * with a release family now and then ("Brazil Customer Success Management", "australia Combined Product Files"), a
+ * label rather than a name, so each part is compared and shown without it. With no llms.txt title, the index title
+ * alone, without its family as well.
  */
 function titleOf(llms, index, family) {
-  const own = index && family ? index.replace(new RegExp(`^${family}\\s+`, 'i'), '') : index;
-  if (llms && own && llms.toLowerCase() !== own.toLowerCase()) return `${llms} / ${own}`;
-  return llms ?? index;
+  const named = llms && withoutFamily(llms, family);
+  const indexed = index && withoutFamily(index, family);
+  if (named && indexed && named.toLowerCase() !== indexed.toLowerCase()) return `${named} / ${indexed}`;
+  return named ?? indexed;
 }
 
 /** The release family the corpus's own links name (`…/ServiceNowDocs/<family>/markdown/…`), or null. */

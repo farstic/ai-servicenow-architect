@@ -155,7 +155,7 @@ For each table:
 
 **Citation:** `markdown/customer-service-management/csm-data-management.md`
 
-**Always evaluate, for a request about money against an account or an audit trail (ARC-09-C161).** Part 2 names each of these, says what it records, and says whether it serves the need and why, before Part 3 decides:
+**Always evaluate, for a request about money against an account or an audit trail.** Part 2 names each of these, says what it records, and says whether it serves the need and why, before Part 3 decides:
 - SLA records — Task SLA [`task_sla`] and SLA Definition [`contract_sla`] *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*;
 - invoices — AR invoice [`sn_otc_invoice`] and AR invoice line [`sn_otc_invoice_line`], the invoice data held for an account *(citation: `markdown/customer-service-management/ar-invoice.md`, `markdown/customer-service-management/ar-invoice-line.md`)*;
 - contracts and entitlements — Contract [`ast_contract`] and Entitlement [`service_entitlement`], and the entitlement a case carries *(citation: `markdown/customer-service-management/r_BRIWCustomerService.md`, `markdown/customer-service-management/create-csm-service-contracts.md`)*;
@@ -301,7 +301,7 @@ After Technical Designer returns a spec for a CSM-tagged design, you are re-disp
 
 4. **Anti-pattern check.** Does the spec contain any anti-pattern from Part 5? Each hit is a §1.1 violation.
 
-**What the review returns — exactly one of two (ARC-09-C160).** It answers one question: does the artefact keep this Envelope — its tables, fields and state values, and its Part 3 verdict? It is not a code review. Style, performance, security and quality are the Code Reviewer's, which the Architect proposes separately at Phase 2 Step 5.
+**What the review returns — exactly one of two.** It answers one question: does the artefact keep this Envelope — its tables, fields and state values, and its Part 3 verdict? It is not a code review. Style, performance, security and quality are the Code Reviewer's, which the Architect proposes separately at Phase 2 Step 5.
 
 - **Cleared** — every check above holds. Name the Envelope the artefact was checked against.
 - **§1.1 violation (what, where)** — one line for each deviation: the construct, where in the artefact it is, and the part of the Envelope it breaks (a table, field, scope or state value the Envelope does not carry, a baseline construct replaced, or a Part 5 anti-pattern). The artefact goes back to its builder with these lines as the brief, and the review runs again on what returns (CLAUDE.md Phase 2 Steps 3 and 4).
@@ -366,7 +366,7 @@ Return rejection when:
 - **Designing ACL matrices** in Part 2 — name baseline ACL patterns only.
 - **Drafting flow internals** in Part 1.
 - **Ratifying a custom object without halting per §1.1.**
-- **Claiming `sn_customerservice_escalation` is unavailable in Australia.** It is baseline here, and this skill asserted the opposite in five places until ARC-02-S13 measured it against the corpus.
+- **Claiming `sn_customerservice_escalation` is unavailable in Australia.** It is baseline here, and this skill asserted the opposite in five places until it was measured against the corpus.
 - **Reading from training-data memory instead of `ServiceNowDocs/`** for non-trivial baseline claims.
 - **Producing an envelope without Part 5 anti-patterns.** Always include at least three relevant anti-patterns.
 
