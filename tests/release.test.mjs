@@ -544,11 +544,30 @@ test('a pin that disagrees with the artefact refuses before anything runs', asyn
 // ── the integration case: the real script, on the real tree ─────────────────────────────────────
 
 /**
+ * ARC-09-C276 — the window between a final's release commit and its tag, from two facts that git holds: the tree's own
+ * version is a final (no hyphen), and no tag v<version> exists. Neither is a copy of the rule that matters here. In that
+ * window the highest final TAG is still the previous release, `packages/snowarch/src` has changed since it, and the cut
+ * has just moved the server changelog's Unreleased block into the new version, so a dry run for another version is
+ * refused by preflight check 5b (ARC-09-C206), and is right to be.
+ */
+const inReleaseWindow = (root) => {
+  const { version } = JSON.parse(read(root, 'package.json'));
+  return !version.includes('-') && git(root, ['tag', '-l', `v${version}`]).trim() === '';
+};
+
+/** C206's own refusal, for the version the dry run asks for (99.0.0 has no section of its own, in any tree). */
+const C206_REFUSAL = /^release: packages\/snowarch\/src changed since v\d+\.\d+\.\d+, and packages\/snowarch\/CHANGELOG\.md has no 99\.0\.0 section/m;
+
+/**
  * ARC-09-C276 — the real script's dry run, driven against ONE tree and asserted. `root` is this repository for the
  * integration case below, and a temporary repository for the cases that put a tree in a state this repository passes
- * through only now and then (see `windowTree`).
+ * through only now and then (see `windowTree`). Outside the window the answer is exit 0 and the tag message, as ever,
+ * which is also what keeps this a developer-side guard for C206: a change under packages/snowarch/src with nothing
+ * written for it fails here. Inside the window exactly two answers are right: exit 0, or exit 2 with C206's text and
+ * nothing written. Any other refusal fails. It returns what happened, so a case can assert which one it was.
  */
 async function dryRunOnTree(root) {
+  const window = inReleaseWindow(root);
   const before = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' });
   const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
     { cwd: root, encoding: 'utf8' }).trim();
@@ -573,7 +592,14 @@ async function dryRunOnTree(root) {
   if (before.trim() !== '') {
     assert.equal(code, 2, 'a dirty checkout must refuse');
     assert.match(err.text(), /release: working tree not clean:/);
-    return;
+    return { code, window };
+  }
+  if (window && code === 2) {
+    // The window's one right refusal: C206's own text, and nothing written.
+    assert.match(err.text(), C206_REFUSAL, `${out.text()}${err.text()}`);
+    assert.match(err.text(), /nothing was written/);
+    assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }), before);
+    return { code, window };
   }
   assert.equal(code, 0, `${out.text()}${err.text()}`);
   const parsed = parseTagMessage(out.text());
@@ -582,6 +608,7 @@ async function dryRunOnTree(root) {
     .update(readFileSync(join(root, 'packages/snowarch/dist/contract.json'))).digest('hex'));
   assert.equal(parsed.docsPin, PIN);
   assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }), before);
+  return { code, window };
 }
 
 test('a real --dry-run on this checkout prints this checkout\'s tag message and writes nothing', async (t) => {
@@ -620,11 +647,26 @@ function windowTree(t, { tagged = false } = {}) {
 }
 
 test('ARC-09-C276 — the dry-run check holds on a final\'s release commit before its tag (W1)', async (t) => {
-  await dryRunOnTree(windowTree(t));
+  const { code, window } = await dryRunOnTree(windowTree(t));
+  assert.equal(window, true, 'a final version and no tag of its own: this tree is in the window');
+  assert.equal(code, 2, 'and the answer there is C206\'s refusal, so the case really took the refusal path');
 });
 
 test('ARC-09-C276 — and on the same tree once the tag exists (W2, the control)', async (t) => {
-  await dryRunOnTree(windowTree(t, { tagged: true }));
+  const { code, window } = await dryRunOnTree(windowTree(t, { tagged: true }));
+  assert.equal(window, false, 'the tag exists: the window is closed');
+  assert.equal(code, 0, 'and the dry run passes, as it does on this repository whenever the window is closed');
+});
+
+test('ARC-09-C276 — outside the window the same refusal still fails the check, so C206 stays guarded (W3)', async (t) => {
+  // The tag exists, and a later change under packages/snowarch/src has nothing written for it: the case ARC-09-C206
+  // exists for, and what this test has always caught on develop when a server change came with no server paragraph.
+  const root = windowTree(t, { tagged: true });
+  write(root, 'packages/snowarch/src/server.ts', 'export const changed = 2;\n');
+  git(root, ['add', 'packages']);
+  git(root, ['commit', '-qm', 'a server change with nothing written for it']);
+  await assert.rejects(() => dryRunOnTree(root),
+    (e) => e.code === 'ERR_ASSERTION' && /packages\/snowarch\/src changed since v2\.0\.1/.test(e.message));
 });
 
 /** The default git runner, for the cases that stub only one command. */
