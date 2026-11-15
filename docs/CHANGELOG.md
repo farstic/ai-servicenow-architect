@@ -9,6 +9,25 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**The corpus map no longer shows a release family at the start of a title.** The corpus is the Australia family's, and 45 of its
+area index titles open with "Brazil" (four delta areas with "australia", one with "Australia"), which made the map read as if the
+documentation were the Brazil family's. `vendor/docs-map.md` now leaves a family out of each part of a title, so "Brazil release
+notes" is "Release notes", and no area, page count or product in it changes. Nine sentences in the gateway skills no longer name a
+plan row, an id that the reader of an answer has no use for.
+
+### Changed
+
+- The corpus map, `vendor/docs-map.md`, no longer shows a release family at the start of an area's title. The corpus is the
+  Australia family's, and 45 of its area index titles open with "Brazil", four delta areas with "australia" and one with
+  "Australia"; the map copied them and read as a map of the Brazil family's documentation. `scripts/gen-docs-map.mjs` now leaves a
+  family out of each part of a title, from one list of ServiceNow's families and the corpus's own family, only where it opens the
+  title ("Brazil release notes" is "Release notes"). 50 of the map's 54 title cells change, and no area, page-count or product
+  cell does (ARC-09-C277).
+- Nine sentences in the gateway skills ended in, or held, a plan row id: `(ARC-09-C160)` in the six review-mode answers,
+  `(ARC-09-C161)` in the CSM and ITSM always-evaluate leads, and "until ARC-02-S13 measured it" in the CSM anti-patterns. A row id
+  means nothing to the reader of an answer, so the sentences no longer carry one, and the two tests that pin the leads follow
+  (ARC-09-C282).
+
 ## 2.2.6 — 2026-11-15
 
 ### Notes
