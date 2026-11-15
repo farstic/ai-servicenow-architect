@@ -9,6 +9,17 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**The corpus map no longer shows a release family at the start of a title.** The corpus is the Australia family's, and 45 of its
+area index titles open with "Brazil" (four delta areas with "australia", one with "Australia"), which made the map read as if the
+documentation were the Brazil family's. `vendor/docs-map.md` now leaves a family out of each part of a title, so "Brazil release
+notes" is "Release notes", and no area, page count or product in it changes. Nine sentences in the gateway skills no longer name a
+plan row, an id that the reader of an answer has no use for.
+
+**CLAUDE.md says which family the corpus is, when a question turns on the release.** The corpus family is the one
+`vendor/ServiceNowDocs/README.md` and each page's `release:` field name. The release-notes area and some area index titles can
+name a newer family, which they then describe instead of the corpus, so a patch they list is not the corpus family's patch. The
+sentence takes `CLAUDE.md` from 20,543 to 20,861 bytes, so its byte cap is now 21,000.
+
 **The citation check reads a page named by its bare file name in a list.** The skills write several pages of one folder as a full
 path followed by file names, as in `markdown/a/b/x.md`, `y.md`, and the check read only the first. A name that follows a full
 citation over a comma is now the page of that name in that path's folder, and `docs verify` checks it. On the files as they were
@@ -17,6 +28,21 @@ on this tree it reads 22 such names, and all of them resolve.
 
 ### Changed
 
+- The corpus map, `vendor/docs-map.md`, no longer shows a release family at the start of an area's title. The corpus is the
+  Australia family's, and 45 of its area index titles open with "Brazil", four delta areas with "australia" and one with
+  "Australia"; the map copied them and read as a map of the Brazil family's documentation. `scripts/gen-docs-map.mjs` now leaves a
+  family out of each part of a title, from one list of ServiceNow's families and the corpus's own family, only where it opens the
+  title ("Brazil release notes" is "Release notes"). 50 of the map's 54 title cells change, and no area, page-count or product
+  cell does (ARC-09-C277).
+- Nine sentences in the gateway skills ended in, or held, a plan row id: `(ARC-09-C160)` in the six review-mode answers,
+  `(ARC-09-C161)` in the CSM and ITSM always-evaluate leads, and "until ARC-02-S13 measured it" in the CSM anti-patterns. A row id
+  means nothing to the reader of an answer, so the sentences no longer carry one, and the two tests that pin the leads follow.
+  A new test fails on a plan row id in the prose of a skill or an agent, HTML comments aside (ARC-09-C282).
+- `CLAUDE.md` says, when a question turns on the release, which release family the corpus is: the one
+  `vendor/ServiceNowDocs/README.md` and each page's `release:` field name. It says that the release-notes area and some area index
+  titles can name a newer family, which they then describe instead of the corpus, so a patch they list is not the corpus family's
+  patch. One sentence of 318 bytes: the file is 20,861 bytes, and its cap, 20,600 since ARC-09-C256, is 21,000 on the owner's
+  decision of 2026-11-15 (ARC-09-C277).
 - `docs verify` checks a page named by its bare file name in a comma list after a full citation, in the folder of the full path
   before it (`markdown/a/b/x.md`, `y.md`). Until now only the full path was read, and four such names that the 96d3212 bump took
   out of the corpus stayed unseen. A glob, a placeholder or braces in a folder name give no folder, and a repository file name

@@ -11,57 +11,57 @@ How to find a page:
 
 | Area | Title | Pages | Top products |
 |---|---|---|---|
-| `markdown/acct-lifecycle-events/` | Account Lifecycle Events / Brazil Customer Success Management | 191 |  |
-| `markdown/api-reference/` | API implementation and reference / Brazil API Reference | 1257 | Server API Reference (449) · Web Services (248) · REST APIs (140) |
-| `markdown/application-development/` | Building applications / Brazil Build or modify applications | 2061 | Process Mining (205) · Automated Test Framework \(ATF\) (182) · UI Builder (151) |
-| `markdown/application-portfolio-management/` | Enterprise Architecture / Brazil Enterprise Architecture | 674 |  |
-| `markdown/better-together/` | Solutions / Brazil Better Together | 14 |  |
-| `markdown/build-workflows/` | Build workflows / Brazil Build workflows | 774 | Workflow Studio (547) · Legacy Workflow (85) · Workflow Activities (53) |
-| `markdown/cloud-governance-suite/` | Australia Cloud Governance Suite | 1 |  |
-| `markdown/cloud-observability/` | Cloud Observability / Brazil Cloud Observability | 1 |  |
-| `markdown/conversational-interfaces/` | Conversational Interfaces / Brazil Conversational Interfaces | 924 | Virtual Agent (400) · Advanced Work Assignment (105) · Agent Chat (31) |
-| `markdown/core-business-suite/` | Core Business Suite / Brazil Core Business Suite | 94 |  |
-| `markdown/customer-relationship-management/` | Customer Relationship Management / Brazil Customer Relationship Management | 24 |  |
-| `markdown/customer-service-management/` | Customer Service Management / Brazil Customer Service Management | 2104 | Customer Self-service and Omnichannel Engagement (198) · Communities (141) · Now Assist for CSM (95) |
-| `markdown/delta-washingtondc-australia/` | australia Combined Product Files | 414 |  |
-| `markdown/delta-xanadu-australia/` | australia Combined Product Files | 431 |  |
-| `markdown/delta-yokohama-australia/` | australia Combined Product Files | 400 |  |
-| `markdown/delta-zurich-australia/` | australia Combined Product Files | 357 |  |
-| `markdown/employee-service-management/` | Employee Service Management / Brazil Employee Service Management | 5066 | Employee Experience Foundation (896) · HR Service Delivery (697) · Contract Management Pro (271) |
-| `markdown/environmental-social-governance/` | Environmental, Social, and Governance Management (formerly Environmental, Social, and Governance) / Brazil Operational Sustainability Management (formerly Environmental, Social, and Governance) | 238 |  |
-| `markdown/field-service-management/` | Field Service Management / Brazil Field Service Management | 1005 | Work Order Management (346) · Field Service Scheduling (224) · Workforce Optimization for Field Service (96) |
-| `markdown/financial-services-operations/` | Financial Services Operations (FSO) / Brazil Financial Services Operations | 732 | Dispute Management (172) · Insurance Claims (109) · Financial Services Payment Operations (31) |
+| `markdown/acct-lifecycle-events/` | Account Lifecycle Events / Customer Success Management | 191 |  |
+| `markdown/api-reference/` | API implementation and reference / API Reference | 1257 | Server API Reference (449) · Web Services (248) · REST APIs (140) |
+| `markdown/application-development/` | Building applications / Build or modify applications | 2061 | Process Mining (205) · Automated Test Framework \(ATF\) (182) · UI Builder (151) |
+| `markdown/application-portfolio-management/` | Enterprise Architecture | 674 |  |
+| `markdown/better-together/` | Solutions / Better Together | 14 |  |
+| `markdown/build-workflows/` | Build workflows | 774 | Workflow Studio (547) · Legacy Workflow (85) · Workflow Activities (53) |
+| `markdown/cloud-governance-suite/` | Cloud Governance Suite | 1 |  |
+| `markdown/cloud-observability/` | Cloud Observability | 1 |  |
+| `markdown/conversational-interfaces/` | Conversational Interfaces | 924 | Virtual Agent (400) · Advanced Work Assignment (105) · Agent Chat (31) |
+| `markdown/core-business-suite/` | Core Business Suite | 94 |  |
+| `markdown/customer-relationship-management/` | Customer Relationship Management | 24 |  |
+| `markdown/customer-service-management/` | Customer Service Management | 2104 | Customer Self-service and Omnichannel Engagement (198) · Communities (141) · Now Assist for CSM (95) |
+| `markdown/delta-washingtondc-australia/` | Combined Product Files | 414 |  |
+| `markdown/delta-xanadu-australia/` | Combined Product Files | 431 |  |
+| `markdown/delta-yokohama-australia/` | Combined Product Files | 400 |  |
+| `markdown/delta-zurich-australia/` | Combined Product Files | 357 |  |
+| `markdown/employee-service-management/` | Employee Service Management | 5066 | Employee Experience Foundation (896) · HR Service Delivery (697) · Contract Management Pro (271) |
+| `markdown/environmental-social-governance/` | Environmental, Social, and Governance Management (formerly Environmental, Social, and Governance) / Operational Sustainability Management (formerly Environmental, Social, and Governance) | 238 |  |
+| `markdown/field-service-management/` | Field Service Management | 1005 | Work Order Management (346) · Field Service Scheduling (224) · Workforce Optimization for Field Service (96) |
+| `markdown/financial-services-operations/` | Financial Services Operations (FSO) / Financial Services Operations | 732 | Dispute Management (172) · Insurance Claims (109) · Financial Services Payment Operations (31) |
 | `markdown/glossary/` | ServiceNow AI Platform glossary / NOW Platform Glossary | 1 |  |
-| `markdown/governance-risk-compliance/` | Governance, Risk, and Compliance / Brazil Governance, Risk, and Compliance | 2516 | GRC: Risk Management Workspace (318) · GRC Common Functions (283) · Third-party Risk Management (237) |
-| `markdown/government-industry/` | Public Sector Digital Services (PSDS) / Brazil Public Sector | 413 |  |
-| `markdown/healthcare-life-sciences/` | Healthcare and Life Sciences / Brazil Healthcare and Life Sciences | 548 | Healthcare and Life Sciences Service Management Core (119) · Vaccine Administration Management (49) · Healthcare Operations Core (42) |
-| `markdown/hyperautomation-low-code/` | App development, agentic development, and low-code / Brazil App development and low-code | 1 |  |
-| `markdown/impact/` | Impact / Brazil Impact | 456 | Accelerator and Initiative List (156) · Value Library (12) · Impact Product Adoption Roadmap (7) |
-| `markdown/industry-products/` | Industry Products / Brazil CRM and Industry Products | 1 |  |
-| `markdown/integrate-applications/` | Workflow Data Fabric (proposed) / Brazil Workflow Data Fabric | 2278 | Integration Hub (698) · Orchestration (184) · ERP Integration Framework (148) |
-| `markdown/intelligent-experiences/` | Enable AI Experiences / Brazil Enable AI | 1994 | AI Control Tower (160) · NLU Service (69) · Predictive Intelligence (63) |
+| `markdown/governance-risk-compliance/` | Governance, Risk, and Compliance | 2516 | GRC: Risk Management Workspace (318) · GRC Common Functions (283) · Third-party Risk Management (237) |
+| `markdown/government-industry/` | Public Sector Digital Services (PSDS) / Public Sector | 413 |  |
+| `markdown/healthcare-life-sciences/` | Healthcare and Life Sciences | 548 | Healthcare and Life Sciences Service Management Core (119) · Vaccine Administration Management (49) · Healthcare Operations Core (42) |
+| `markdown/hyperautomation-low-code/` | App development, agentic development, and low-code / App development and low-code | 1 |  |
+| `markdown/impact/` | Impact | 456 | Accelerator and Initiative List (156) · Value Library (12) · Impact Product Adoption Roadmap (7) |
+| `markdown/industry-products/` | Industry Products / CRM and Industry Products | 1 |  |
+| `markdown/integrate-applications/` | Workflow Data Fabric (proposed) / Workflow Data Fabric | 2278 | Integration Hub (698) · Orchestration (184) · ERP Integration Framework (148) |
+| `markdown/intelligent-experiences/` | Enable AI Experiences / Enable AI | 1994 | AI Control Tower (160) · NLU Service (69) · Predictive Intelligence (63) |
 | `markdown/it-asset-management/` | Asset Management | 1750 | Software Asset Management (498) · Enterprise Asset Management (410) · Hardware Asset Management (358) |
-| `markdown/it-business-management/` | Strategic Portfolio Management / Brazil Strategic Portfolio Management | 2325 | Portfolio Planning (340) · Scenario Planning in SPW (284) · Strategic Planning (233) |
-| `markdown/it-operations-management/` | IT Operations Management / Brazil IT Operations Management | 3422 | Event Management (468) · Discovery (438) · Discovery and Service Mapping Patterns (373) |
-| `markdown/it-service-management/` | IT Service Management / Brazil IT Service Management | 2501 | Service Operations Workspace (372) · Change Management (222) · DevOps Change Velocity (215) |
-| `markdown/manufacturing/` | Manufacturing Commercial Operations / Brazil Manufacturing | 211 |  |
-| `markdown/mobile/` | Mobile Platform / Brazil Mobile Configuration and Navigation | 641 |  |
-| `markdown/now-intelligence/` | Platform Analytics / Brazil Platform Analytics | 1236 | Performance Analytics (318) · Process Mining (205) · Reporting (116) |
-| `markdown/now-platform/` | ServiceNow AI Platform / Brazil ServiceNow AI Platform | 1 |  |
-| `markdown/operational-technology/` | Operational Technology / Brazil Operational Technology Management | 566 | Operational Technology Manager (101) · Industrial Process Manager (71) · Industrial Workspace (64) |
-| `markdown/order-management/` | Sales Customer Relationship Management / Brazil Sales Customer Relationship Management | 1064 |  |
-| `markdown/platform-administration/` | Administer the ServiceNow AI Platform / Brazil ServiceNow AI Platform Administration | 2195 | Search Administration (332) · AI Search (254) · Table Administration and Data Management (130) |
-| `markdown/platform-security/` | Secure your instance / Brazil Platform security | 1753 | Authentication (391) · Instance Security Hardening Settings (368) · Edge Encryption (91) |
-| `markdown/platform-user-interface/` | Configure user experiences / Brazil ServiceNow AI Platform user interface | 883 | Service Portal (236) · Content Management System (82) · Adoption Services (67) |
-| `markdown/proactive-service-exp-workflows/` | Product Support for Technology / Brazil Proactive Service Experience Workflows | 80 | Product Support for Technology (80) |
-| `markdown/release-notes/` | Brazil release notes | 298 |  |
-| `markdown/retail-industry/` | Retail / Brazil Retail Industry | 172 | \[Legacy\] Retail Task Management (17) |
+| `markdown/it-business-management/` | Strategic Portfolio Management | 2325 | Portfolio Planning (340) · Scenario Planning in SPW (284) · Strategic Planning (233) |
+| `markdown/it-operations-management/` | IT Operations Management | 3422 | Event Management (468) · Discovery (438) · Discovery and Service Mapping Patterns (373) |
+| `markdown/it-service-management/` | IT Service Management | 2501 | Service Operations Workspace (372) · Change Management (222) · DevOps Change Velocity (215) |
+| `markdown/manufacturing/` | Manufacturing Commercial Operations / Manufacturing | 211 |  |
+| `markdown/mobile/` | Mobile Platform / Mobile Configuration and Navigation | 641 |  |
+| `markdown/now-intelligence/` | Platform Analytics | 1236 | Performance Analytics (318) · Process Mining (205) · Reporting (116) |
+| `markdown/now-platform/` | ServiceNow AI Platform | 1 |  |
+| `markdown/operational-technology/` | Operational Technology / Operational Technology Management | 566 | Operational Technology Manager (101) · Industrial Process Manager (71) · Industrial Workspace (64) |
+| `markdown/order-management/` | Sales Customer Relationship Management | 1064 |  |
+| `markdown/platform-administration/` | Administer the ServiceNow AI Platform / ServiceNow AI Platform Administration | 2195 | Search Administration (332) · AI Search (254) · Table Administration and Data Management (130) |
+| `markdown/platform-security/` | Secure your instance / Platform security | 1753 | Authentication (391) · Instance Security Hardening Settings (368) · Edge Encryption (91) |
+| `markdown/platform-user-interface/` | Configure user experiences / ServiceNow AI Platform user interface | 883 | Service Portal (236) · Content Management System (82) · Adoption Services (67) |
+| `markdown/proactive-service-exp-workflows/` | Product Support for Technology / Proactive Service Experience Workflows | 80 | Product Support for Technology (80) |
+| `markdown/release-notes/` | Release notes | 298 |  |
+| `markdown/retail-industry/` | Retail / Retail Industry | 172 | \[Legacy\] Retail Task Management (17) |
 | `markdown/roles-by-product/` | Roles By Product | 16 |  |
-| `markdown/security-management/` | Security Operations / Brazil Security Management | 2858 | Security Incident Response (909) · Vulnerability Response (432) · Threat Intelligence Security Center (343) |
-| `markdown/service-exchange/` | Service Exchange / Brazil Service Exchange | 126 | Service Exchange (125) |
-| `markdown/service-management-for-the-enterprise/` | Service Management / Brazil Service Management | 69 | Planned Maintenance \(Family\) (15) |
-| `markdown/servicenow-platform/` | Extend ServiceNow AI Platform capabilities / Brazil ServiceNow AI Platform Capabilities | 3238 | Configuration Management Database \(CMDB\) (390) · Knowledge Management (278) · Service Catalog (276) |
-| `markdown/telecom-media-technology/` | Telecommunications, Media, and Technology (TMT) / Brazil Telecommunications, Media, and Technology | 267 | Field Service Management for Telecommunications (3) · Strategic Portfolio Management for Telecom (2) · Now Assist for Telecom, Media and Technology (1) |
-| `markdown/telecom-network-inventory/` | Telecommunications Network Inventory / Brazil Telecommunications Network Inventory | 356 | Telecommunications Network Inventory (356) |
-| `markdown/telecom-service-ops/` | Telecommunications Service Operations Management / Brazil Telecommunications Service Operations Management | 126 | Telecommunications Service Operations Management (126) |
+| `markdown/security-management/` | Security Operations / Security Management | 2858 | Security Incident Response (909) · Vulnerability Response (432) · Threat Intelligence Security Center (343) |
+| `markdown/service-exchange/` | Service Exchange | 126 | Service Exchange (125) |
+| `markdown/service-management-for-the-enterprise/` | Service Management | 69 | Planned Maintenance \(Family\) (15) |
+| `markdown/servicenow-platform/` | Extend ServiceNow AI Platform capabilities / ServiceNow AI Platform Capabilities | 3238 | Configuration Management Database \(CMDB\) (390) · Knowledge Management (278) · Service Catalog (276) |
+| `markdown/telecom-media-technology/` | Telecommunications, Media, and Technology (TMT) / Telecommunications, Media, and Technology | 267 | Field Service Management for Telecommunications (3) · Strategic Portfolio Management for Telecom (2) · Now Assist for Telecom, Media and Technology (1) |
+| `markdown/telecom-network-inventory/` | Telecommunications Network Inventory | 356 | Telecommunications Network Inventory (356) |
+| `markdown/telecom-service-ops/` | Telecommunications Service Operations Management | 126 | Telecommunications Service Operations Management (126) |
 | `markdown/vocabulary/` | vocabulary | 1 |  |
