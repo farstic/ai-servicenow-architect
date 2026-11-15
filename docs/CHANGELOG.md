@@ -39,9 +39,10 @@ corpus on disk and writes nothing. No rule or skill tells the Architect to use i
   `index.md` below a start node: two levels by default, one line per node (indent, title, page path, and `(+K below)` with every
   node below it), at most 120 lines a call before it falls back to the first level, and at most 200 lines at the first level, with
   the number of nodes not printed. A page that a sub-folder's `index.md` lists is below that folder's node, a page listed twice is
-  told apart by `path#2`, and a title that names two nodes is refused with their paths. Exit 2 for a bad argument or a node that
-  is not there, 3 for no corpus. On the 96d3212 corpus the first call of an area prints 2 to 98 lines and no call more than 202
-  (ARC-09-C284).
+  told apart by `path#2`, and a title that names two nodes is refused with their paths. An area of the corpus map that a sparse
+  checkout does not hold is refused as not installed, not as absent, and a path with `..` in it reads nothing. Exit 2 for a bad
+  argument or a node that is not there, 3 for no corpus. On the 96d3212 corpus the first call of an area prints 2 to 98 lines and
+  no call more than 202 (ARC-09-C284).
 
 ### Changed
 
