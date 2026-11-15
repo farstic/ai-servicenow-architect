@@ -145,11 +145,15 @@ test('criterion 7 — every repository path it names resolves', () => {
       // `clients/_unfiled/` (ARC-09-C90) and every other path under a gitignored `clients/`: none of
       // it is in a clean clone, which is the checkout this test runs in.
       if (p.includes('<') || p.startsWith('clients/')) { skipped.push(p); continue; }
+      // A path inside the corpus resolves only where the corpus is checked out: a CI test cell holds the submodule's
+      // directory and nothing in it. ARC-09-C277 — §1 names `vendor/ServiceNowDocs/README.md`, which the first push
+      // of that row had red in every cell that has no corpus.
+      if (p.startsWith('vendor/ServiceNowDocs/') && !existsSync(join(root, 'vendor/ServiceNowDocs/markdown'))) { skipped.push(p); continue; }
       if (!existsSync(join(root, p))) dead.push(`CLAUDE.md:${i + 1} ${p}`);
     }
   }
   assert.deepEqual(dead, []);
-  console.log(`    paths: ${skipped.length} placeholder(s) skipped, the rest resolve`);
+  console.log(`    paths: ${skipped.length} skipped (a placeholder, or inside a corpus that is not checked out), the rest resolve`);
 });
 
 test('the fixture this cannot produce, produced', () => {
