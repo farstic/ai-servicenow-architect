@@ -30,7 +30,7 @@ const MAX_DEPTH = 8;
  * missed five bullets of the real corpus that way.
  */
 const ITEM = /^( *)- \[(.*?)\]\((https?:\/\/\S+?)\)(?: -- (.*))?$/s;
-const ZERO_WIDTH = /[​-‍⁠﻿]/g;
+const ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF]/g;
 const tidy = (s) => s.replace(ZERO_WIDTH, '').replace(/\s+/g, ' ').trim();
 const pathOf = (url) => { const i = url.indexOf('/markdown/'); return i >= 0 ? url.slice(i + 1) : url; };
 

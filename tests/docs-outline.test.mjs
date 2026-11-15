@@ -188,7 +188,7 @@ test('ARC-09-C284 — paths are read the way a citation writes them, on every pl
 test('ARC-09-C284 — it reads the shapes the real indexes have: brackets and zero-width spaces in a title, a line separator in a description', () => {
   const text = [
     '---', 'title: x', '---', '', '# x', '',
-    `- [Case Admin  [sn_x.admin​]](${URL_OF('markdown/csm/roles.md')}) -- Uses roles to provide access and more.`,
+    `- [Case Admin  [sn_x.admin\u200b]](${URL_OF('markdown/csm/roles.md')}) -- Uses roles to provide access\u2028and more.`,
     `  - [Child](${URL_OF('markdown/csm/child.md')})`,
     'not a list line',
   ].join('\n');
