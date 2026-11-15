@@ -2191,16 +2191,21 @@ upstream has moved. It never merges anything.
   you would get running it locally. `newly dead (n)` is the whole reason the PR exists.
 - **Remap the citations on the PR's branch**, then push. The `needs-remap` label and the red
   `docs-check` job both clear when `docs verify` reports `dead: 0`.
-- **Four artefacts follow the pin, and `sync --upstream` stages none of them.** The chain is
-  **pin → fixtures → snippet → two quoting copies**, and every link has a test, so a bump that
-  stops at the five staged files is caught by CI rather than by its author:
+- **Four artefacts follow the pin, and `scripts/docs-bump.mjs` stages them (ARC-09-C280).** The chain is
+  **pin → fixtures → snippet → two quoting copies**, and every link has a test. The script moves the pin
+  in the five files listed in `scripts/lib/pin-followers.mjs` and regenerates `vendor/docs-map.md`, stages
+  them, and names them on the report's `staged:` line. A file that no longer quotes the pin, or a map the
+  generator refused (it is made from the whole corpus, so a sparse one is refused), is said on a line of its
+  own before that one. `sync --upstream` by itself stages none of them, so whoever refreshes with it by hand
+  runs the script instead, or does the four by hand:
     1. `node scripts/make-status-fixtures.mjs` — the doctor's `status-{design,live}.json` embed the
        pin. *"the committed fixtures are what the capture produces, today"*.
     2. `docs/snippets/status-template.md` — regenerate it from `renderPanel()` over the recaptured
        live fixture. *"the template block IS what the renderer prints — not a transcription of it"*.
     3. `.claude/skills/snowarch/SKILL.md` — it quotes that snippet byte for byte.
     4. `tests/VALIDATION-TESTS.md` T-07 — it quotes the same template.
-  Only the pin changes in all four, which is why the diff looks trivial and the omission does not.
+  Only the pin changes in all four, which is why moving it as text is enough, and why a link left out is
+  caught by CI rather than by its author.
 - **Two repository settings this depends on.** Settings → Actions → General → **"Allow GitHub
   Actions to create and approve pull requests"** must be on; without it the run moves the pin, pushes
   the branch and then fails at `gh pr create`. And the first CI run on each bot-authored pull request
@@ -2216,7 +2221,8 @@ Monthly, or when a citation goes dead upstream. Five steps, and the tool does th
 
 1. `node scripts/docs.mjs sync --upstream` — fetches the family tip, moves the pin and the gitlink,
    re-runs the citation gate and prints the before/after diff. It **stages** both paths and commits
-   nothing.
+   nothing. `node scripts/docs-bump.mjs` does the same and also moves what quotes the pin and the
+   corpus map (see "Reviewing a docs-bump PR"); use it when you want the pull request the bot would open.
 2. **Read the report.** `newly dead (0)` and exit 0 means the refresh is clean.
 3. **Remap what broke.** Every `newly dead` line names a file and a line to repair. Fix the
    citation, never the pin — and never delete a citation to make the gate pass.
