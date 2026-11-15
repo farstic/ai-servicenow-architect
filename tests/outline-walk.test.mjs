@@ -7,7 +7,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { loadArea, nodesOf } from '../tools/snowarch/lib/docs/outline.mjs';
-import { TARGET, locate, main, summarise, walkTo } from '../scripts/validation/outline-walk.mjs';
+import { TARGET, locate, main, summarise, walkBlind, walkTo } from '../scripts/validation/outline-walk.mjs';
 import { initFixtureRepo } from '../tools/snowarch/tests/helpers/fixture-git.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
@@ -63,6 +63,40 @@ test('ARC-09-C284 — a branch a call cuts off is not followed past what the cal
   assert.equal(shown.reached, true);
 });
 
+const BLIND = [['Overview', 'markdown/alpha/overview.md', [
+  ['Part A', 'markdown/alpha/a.md', [['A1', 'markdown/alpha/a1.md', [['A1 deep', 'markdown/alpha/a1d.md', [['A1 deeper', 'markdown/alpha/a1dd.md']]]]]]],
+  ['Part B', 'markdown/alpha/b.md', [['B1', 'markdown/alpha/b1.md']]],
+  ['Part C', 'markdown/alpha/c.md', [['C1', 'markdown/alpha/c1.md', [['Target page', 'markdown/alpha/target.md']]]]],
+]]];
+
+test('ARC-09-C284 — the listing-order reader goes down the printed nodes that have more below, in listing order and each to its end, and pays for every call', () => {
+  const tree = treeOf(BLIND);
+  const target = find(tree, 'markdown/alpha/target.md');
+  // The oracle knows the branch: the area, then Part C.
+  assert.deepEqual(walkTo(tree, target), { calls: [{ under: null, lines: 5 }, { under: 'markdown/alpha/c.md', lines: 3 }], reached: true });
+  // The listing-order reader takes nothing from the titles. After the area (the header, Overview and the three parts: 5 lines) it opens
+  // Part A (A, A1, A1 deep: 3), goes on down A's branch to its end (A1 deep, A1 deeper: 2) before it tries Part B (B, B1: 2), and then
+  // Part C (C, C1, Target page: 3), where the page is.
+  assert.deepEqual(walkBlind(tree, target), { reached: true, calls: [
+    { under: null, lines: 5 },
+    { under: 'markdown/alpha/a.md', lines: 3 },
+    { under: 'markdown/alpha/a1d.md', lines: 2 },
+    { under: 'markdown/alpha/b.md', lines: 2 },
+    { under: 'markdown/alpha/c.md', lines: 3 },
+  ] });
+  // A page the first call prints costs it the one call, as it costs the oracle.
+  assert.deepEqual(walkBlind(tree, find(tree, 'markdown/alpha/b.md')), { reached: true, calls: [{ under: null, lines: 5 }] });
+});
+
+test('ARC-09-C284 — a page that a cut hides is not reached by the listing-order reader either, and the calls it made are still counted', () => {
+  const wide = Array.from({ length: 250 }, (_, i) => [`Child ${i + 1}`, `markdown/wide/c${i + 1}.md`]);
+  const tree = treeOf([['Wide overview', 'markdown/wide/overview.md', wide]], 'wide');
+  const hidden = walkBlind(tree, find(tree, 'markdown/wide/c230.md'));
+  assert.equal(hidden.reached, false);
+  assert.deepEqual(hidden.calls, [{ under: null, lines: 3 }, { under: 'markdown/wide/overview.md', lines: 202 }]);
+  assert.equal(walkBlind(tree, find(tree, 'markdown/wide/c12.md')).reached, true);
+});
+
 test('ARC-09-C284 — the figures are the median and the maximum over the pages reached, and how many are within the target', () => {
   const calls = (...lines) => ({ reached: true, calls: lines.map((n) => ({ under: null, lines: n })) });
   const s = summarise([calls(10), calls(10, 20), calls(10, 20, 30), { reached: false, calls: [{ under: null, lines: 5 }] }]);
@@ -102,11 +136,12 @@ test('ARC-09-C284 — the command prints a line a page and the summary, and says
   const r = run('--corpus', root, 'markdown/alpha/linux.md', 'markdown/alpha/install.md', 'markdown/alpha/vanished.md');
   assert.equal(r.code, 0, r.err.join('\n'));
   // Linux is three levels down: the area's call prints two, so a second call under Install prints it.
-  assert.ok(r.out.includes('markdown/alpha/linux.md · reached in 2 calls, lines per call 3 + 2 = 5'), r.text);
-  assert.ok(r.out.includes('markdown/alpha/install.md · reached in 1 call, lines per call 3 = 3'), r.text);
+  assert.ok(r.out.includes('markdown/alpha/linux.md · reached in 2 calls, lines per call 3 + 2 = 5 · listing-order reader: 2 calls, 5 lines'), r.text);
+  assert.ok(r.out.includes('markdown/alpha/install.md · reached in 1 call, lines per call 3 = 3 · listing-order reader: 1 call, 3 lines'), r.text);
   assert.ok(r.out.includes('markdown/alpha/vanished.md · absent at this pin'), r.text);
   assert.ok(r.out.includes('pages 3, reached 2 (1 absent at this pin)'), r.text);
-  assert.ok(r.out.includes('calls: median 1.5, max 2 · lines: median 4, max 5 · within 4 calls and 300 lines: 2 of 2'), r.text);
+  assert.ok(r.out.includes('oracle (the right branch every time) — calls: median 1.5, max 2 · lines: median 4, max 5 · within 4 calls and 300 lines: 2 of 2'), r.text);
+  assert.ok(r.out.includes('listing-order reader (no title signal, depth first) — calls: median 1.5, max 2 · lines: median 4, max 5 · within 4 calls and 300 lines: 2 of 2'), r.text);
   const none = run('--corpus', join(root, 'nowhere'), 'markdown/alpha/linux.md');
   assert.equal(none.code, 3);
   assert.match(none.err.join('\n'), /no corpus at/);

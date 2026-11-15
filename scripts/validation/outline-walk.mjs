@@ -70,6 +70,9 @@ export function walkTo(tree, target) {
   return { calls, reached: false };
 }
 
+/** The listing-order reader: a stub that walks nothing, so that the cases written against it can be seen to fail first. */
+export function walkBlind() { return { calls: [], reached: false }; }
+
 /** Finds a page's node at a pin: by its path, else by its file name in its area, else in any other area. */
 export function locate({ area, path, load, areas }) {
   const tree = load(area);
