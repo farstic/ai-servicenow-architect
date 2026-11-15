@@ -238,3 +238,34 @@ test('ARC-09-C284 — a page path written without the corpus folder is a page an
   assert.deepEqual(ghost.lines, []);
   assert.match(ghost.text, /markdown\/alpha\/ghost\.md is not in alpha's index/);
 });
+
+test('ARC-09-C284 — an area of the corpus map that a sparse checkout does not hold is said to be not installed, and not to be absent', (t) => {
+  const root = corpus(t, { alpha: ALPHA });
+  writeFileSync(join(root, 'vendor', 'docs-map.md'), [
+    '# The documentation corpus map', '',
+    '| Area | Title | Pages | Top products |', '|---|---|---|---|',
+    '| `markdown/alpha/` | Alpha | 9 | Alpha (9) |',
+    '| `markdown/beta/` | Beta | 40 | Beta (40) |', ''].join('\n'));
+  const away = outline(root, 'beta');
+  assert.equal(away.code, 2);
+  assert.deepEqual(away.lines, [], 'a refusal prints nothing on stdout');
+  assert.match(away.text, /"beta" is an area of the corpus map that this checkout does not hold/);
+  assert.ok(away.text.includes(`${SPELL.cli} docs sync --mode full`), away.text);
+  // A page of that area is told the same, and is not said to be missing from an index that is not on disk.
+  assert.match(outline(root, 'markdown/beta/x.md').text, /"beta" is an area of the corpus map that this checkout does not hold/);
+  // An area that is in no map is not an area, and one that is on disk is read as before.
+  assert.match(outline(root, 'gamma').text, /no area named "gamma"/);
+  assert.equal(outline(root, 'alpha').code, 0);
+});
+
+test('ARC-09-C284 — a path with .. in it names nothing outside markdown/: it is refused, and no file outside it is read', (t) => {
+  const root = corpus(t, { alpha: ALPHA });
+  // What a ".." area would read: <corpus>/index.md, a level above markdown/.
+  writeFileSync(join(root, 'vendor', 'ServiceNowDocs', 'index.md'), `- [Outside](${URL_OF('markdown/outside/x.md')})\n`);
+  for (const target of ['..', '../', '../..', 'alpha/../..', 'alpha/../../x.md']) {
+    const r = outline(root, target);
+    assert.equal(r.code, 2, `${target}: ${r.text}`);
+    assert.deepEqual(r.lines, [], target);
+  }
+  assert.equal(outline(root, 'alpha', '--under', '../x.md').code, 2);
+});
