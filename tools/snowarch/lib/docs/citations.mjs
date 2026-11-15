@@ -95,6 +95,42 @@ export function extract(text, file = '<inline>') {
   return { citations: out, warnings };
 }
 
+// ARC-09-C281 — a page named by its bare file name in a comma list, after a full citation:
+//   `markdown/a/b/x.md`, `y.md`, `z.md`
+// The skills write several pages of one folder this way, and `extract` read the first and none of the others, so the gate
+// said `dead: 10` over a bump that had also taken four of these names out of the corpus. A name is a member of the list when
+// nothing but a comma (or "and", "or") lies between it and the member before, and it is the page of that name in the
+// FOLDER of the nearest full path before it on the line. The folder has to be one: a glob, a placeholder or braces in
+// a folder name give no folder, and a repository file name (`CLAUDE.md`) ends the list. A bare name that is not a member
+// stays what it was, unchecked. `extract` itself does not read them: the Stop hook reads an answer with it, and what may
+// block an answer is a separate decision.
+const LISTED = new RegExp(`${CITATION.source}|\`([A-Za-z0-9][A-Za-z0-9._-]*\\.md)\``, 'g');
+const FOLDER = /^markdown\/[a-z0-9][a-z0-9-]*(?:\/[A-Za-z0-9_.-]+)*$/;
+const CONTINUES = /^`?(?:\s*,\s*(?:(?:and|or)\s+)?|\s+(?:and|or)\s+)$/;
+
+export function extractListed(text, file = '<inline>') {
+  const out = [];
+  text.split('\n').forEach((lineText, i) => {
+    let folder = null;   // the folder of the nearest full path before, while the list runs; null when there is none to resolve against
+    let end = -1;        // where the list's last member ended
+    for (const m of lineText.matchAll(LISTED)) {
+      if (m[1] === undefined) {
+        const trail = m[0].match(/[).,;:]+$/)?.[0].length ?? 0;
+        const raw = m[0].slice(0, m[0].length - trail).replace(/^(?:vendor\/)?(?:ServiceNowDocs\/)?/, '');
+        const at = raw.lastIndexOf('/');
+        folder = raw.endsWith('.md') && FOLDER.test(raw.slice(0, at)) ? raw.slice(0, at) : null;
+        end = m.index + m[0].length - trail;
+        continue;
+      }
+      if (folder === null || !CONTINUES.test(lineText.slice(end, m.index)) || REPO_FILES.has(m[1])) { folder = null; continue; }
+      const path = `${folder}/${m[1]}`;
+      out.push({ path, area: folder.split('/')[1], isDir: false, file, line: i + 1, raw: path, listed: m[1] });
+      end = m.index + m[0].length;
+    }
+  });
+  return out;
+}
+
 // Roots are scanned in this order. A root that does not exist is SKIPPED and reported, never an
 // error: ARC-02 is still moving the engine's canonical location, and a generator that dies on a
 // missing directory would block the very import that creates it.
@@ -146,7 +182,7 @@ export function scanRepo({ root = process.cwd(), roots = DEFAULT_ROOTS } = {}) {
       scanned.push(rel);
       const text = readFileSync(f, 'utf8');
       const { citations: c, warnings: w } = extract(text, rel);
-      citations.push(...c); warnings.push(...w, ...findBareCitations(text, rel));
+      citations.push(...c, ...extractListed(text, rel)); warnings.push(...w, ...findBareCitations(text, rel));
     }
   }
   return { citations, warnings, skipped, scanned };
