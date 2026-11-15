@@ -134,12 +134,15 @@ test('ARC-09-C284 — --pin reads the index files of a commit, so one checkout a
   assert.ok(old.out[0].includes(`pin ${before}`), old.text);
 });
 
-test('ARC-09-C284 — --areas prints, for every area, the lines of its first call and the largest single call over its nodes', (t) => {
+test('ARC-09-C284 — --areas prints, for every area, the lines of its first level, of its first call and of its largest single call, and the figures over all areas', (t) => {
   const kids = Array.from({ length: 30 }, (_, i) => [`Topic ${i + 1}`, `markdown/big/t${i + 1}.md`, [[`Task ${i + 1}`, `markdown/big/k${i + 1}.md`]]]);
   const root = corpus(t, { small: [['Only', 'markdown/small/only.md']], big: [['Big overview', 'markdown/big/overview.md', kids]] });
   const r = run('--corpus', root, '--areas');
   assert.equal(r.code, 0, r.err.join('\n'));
-  assert.ok(r.out.includes('small · 1 · 2 · 2 ((the top))'), r.text);
-  // big: the area's first call is the header, the overview and its 30 topics (32 lines); the overview's own call at depth 2 is 1 + 30 + 30 = 61.
-  assert.ok(r.out.includes('big · 61 · 32 · 61 (markdown/big/overview.md)'), r.text);
+  assert.ok(r.out.includes('area · nodes · first level (lines) · first call (lines) · largest single call (lines, at which node)'), r.text);
+  assert.ok(r.out.includes('small · 1 · 2 · 2 · 2 ((the top))'), r.text);
+  // big: the first level is the header and the overview (2 lines), the first call adds the overview's 30 topics (32 lines), and the overview's
+  // own call at depth 2 is 1 + 30 + 30 = 61 lines.
+  assert.ok(r.out.includes('big · 61 · 2 · 32 · 61 (markdown/big/overview.md)'), r.text);
+  assert.ok(r.out.includes('areas 2 · first level: median 2, max 2 · first call: median 17, max 32 · largest call: median 31.5, max 61'), r.text);
 });
