@@ -5,6 +5,12 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
+then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
+with credentials the instance has just refused.
+
+## 2.2.6 — 2026-11-15
+
 **The shipped list names the Windows install page (ARC-09-C271).** `docs/INSTALL-WINDOWS.md` joins the user's documentation in the
 release coverage (`licence/integrity.ts`), so a distribution carries it and its signed manifest covers it. Nothing else in the package changed.
 
@@ -18,10 +24,6 @@ was, because the rename gives the file its folder's permissions. A failed lock i
 a store that anyone besides the account, SYSTEM and Administrators can read is a failure that names them, with `doctor --fix` for the checkout's store
 and a paste-ready PowerShell line otherwise; permissions that could not be read are a warning, never ok. The wizard's store line follows what the lock did.
 `CheckContext` gains `acl`, the seam a test uses so that no case runs icacls.
-
-**Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
-then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
-with credentials the instance has just refused.
 
 ## 2.2.5 — 2026-11-02
 

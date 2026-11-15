@@ -171,7 +171,7 @@ v26.13.0
 | Program | You need at least |
 |---|---|
 | Claude Code | 2.1.214 |
-| Git | 2.25 |
+| Git | 2.34.1 |
 | Node.js | v20. Step 2b installs v26.13.0, the version this guide was tested with. The AI Architect is tested with Node.js 20, 22 and 24 on Windows, macOS and Linux, and with 26 on Windows and Linux. |
 | npm | Any version. It comes with Node.js. |
 
@@ -233,7 +233,7 @@ cd $HOME
 Run:
 
 ```
-git -c advice.detachedHead=false clone --branch v2.2.5 https://github.com/farstic/snowarch.git AI-Arch
+git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git AI-Arch
 ```
 
 Run:
