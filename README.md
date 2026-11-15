@@ -1,8 +1,8 @@
 # AI ServiceNow Architect
 
-**v2.2.6-dev** · BUSL-1.1 · Claude Code ≥ 2.1.214
+**v2.2.7-dev** · BUSL-1.1 · Claude Code ≥ 2.1.214
 
-![version](https://img.shields.io/badge/version-2.2.6--dev-blue)
+![version](https://img.shields.io/badge/version-2.2.7--dev-blue)
 
 A virtual ServiceNow consulting team that runs inside Claude Code. You describe what you need; a Chief
 Architect routes the request to the right specialist, reviews what comes back, and hands you the
@@ -27,7 +27,7 @@ Checked by the bootstrap, never installed by it.
 |---|---|---|
 | Everything | Claude **Sonnet** or a more capable model | the roster is validated on Sonnet; smaller models are not supported |
 | Everything | Claude Code ≥ **2.1.214**, logged in | 2.1.196 settled the `.mcp.json` approval semantics, 2.1.198 the hook placeholders, and 2.1.214 keeps the previous tool list when a refresh fails |
-| Everything | git ≥ **2.25** | cone-mode `sparse-checkout`, which is how the documentation corpus arrives |
+| Everything | git ≥ **2.34.1** | the oldest git the install was run on, which is the one Ubuntu 22.04 LTS ships; nothing older was tried |
 | Live mode only | Node.js ≥ **20** (22 LTS recommended; 20, 22 and 24 tested on Linux, macOS and Windows, 26 on Linux and Windows) with npm on PATH | the MCP server's own floor |
 | Windows | PowerShell 5.1 (built in) and **Git for Windows** | the launchers need no Git Bash — but Claude Code's Bash tool does, and the in-session skills (`/snowarch status`, `/snowarch setup-instance`) run through it |
 
@@ -37,7 +37,7 @@ the doctor, the live wizard and the MCP server are what wait for Node.
 ### Path A — terminal first
 
 ```sh
-git -c advice.detachedHead=false clone --branch v2.2.5 https://github.com/farstic/snowarch.git && cd snowarch && ./bootstrap.sh
+git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git && cd snowarch && ./bootstrap.sh
 ```
 
 **The `--branch` is not optional, and it names a release.** A plain `git clone` checks out this repository's default branch, which is not a release line and is a long way behind — cloning it installs a development tree with none of the released fixes. The tag above is the current release, and it is written by the release itself, so this page never names a version that has not shipped. The `-c advice.detachedHead=false` is there because a release tag is a *tag*: without it
@@ -51,7 +51,7 @@ you have one.
 On Windows, three lines instead — or double-click `bootstrap.cmd` in the folder:
 
 ```bat
-git -c advice.detachedHead=false clone --branch v2.2.5 https://github.com/farstic/snowarch.git
+git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git
 cd snowarch
 .\bootstrap.cmd
 ```
@@ -139,9 +139,9 @@ mkdir my-engagement && cd my-engagement && claude
 Accept the workspace-trust dialog, then paste exactly this:
 
 > Install the AI ServiceNow Architect from https://github.com/farstic/snowarch into
-> this folder, from release tag v2.2.5.
+> this folder, from release tag v2.2.6.
 
-Claude runs two commands — `git -c advice.detachedHead=false clone --branch v2.2.5 https://github.com/farstic/snowarch.git .` and
+Claude runs two commands — `git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git .` and
 `./bootstrap.sh --mode design --yes --skip-claude-check` — asking your permission for each unless the
 session already allows them. They are written out here for a reason: if Claude proposes anything else
 — cloning into a *subfolder* is the common variation — paste them yourself and you are back on the
@@ -288,7 +288,9 @@ made before 2.2.5, which fetched only the areas the specialists cite, moves to t
 its upgrade to 2.2.5: about 150 MB more on disk, measured from a default 2.2.4 install (20 areas).
 `--docs sparse` keeps only the cited areas (about 365 MB on disk) and exists for CI; the Architect cannot
 read the other areas then. Every release re-measures all three platforms and attaches the same table as
-`install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases).
+`install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases). The bootstrap also builds a
+names index of the whole corpus, which records which pages print a name: about 9 MB under
+`.local/corpus-names/`, about 15 seconds once for each docs pin, rebuilt by `docs sync` and `doctor --fix`.
 
 ### Upgrading
 
