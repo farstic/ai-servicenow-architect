@@ -220,3 +220,21 @@ test('ARC-09-C284 — `docs outline` is a docs sub-command: with no argument it 
   assert.match(printed.join('\n'), /docs outline/);
   assert.ok(existsSync(join(REPO, 'tools', 'snowarch', 'lib', 'docs', 'outline.mjs')));
 });
+
+test('ARC-09-C284 — a page path written without the corpus folder is a page and not the area with its tail dropped, and the header\'s own path is the area', (t) => {
+  const root = corpus(t, { alpha: ALPHA });
+  const want = outline(root, 'markdown/alpha/install.md').lines;
+  assert.ok(want.length > 1);
+  // `alpha/install.md` is the page markdown/alpha/install.md, as it is when the folder is spelled out; the first reading of it was the area
+  // `alpha` with the `/install.md` thrown away, which printed a whole area for a page and said nothing.
+  assert.deepEqual(outline(root, 'alpha/install.md').lines, want);
+  assert.deepEqual(outline(root, 'alpha\\install.md').lines, want);
+  // The first line of every call names the node it starts at, and the area's own line is the area: pasting it back is the area.
+  assert.deepEqual(outline(root, 'markdown/alpha/index.md').lines, outline(root, 'alpha').lines);
+  assert.deepEqual(outline(root, 'alpha/index.md').lines, outline(root, 'alpha').lines);
+  // A tail that is not a page of the area is refused, never dropped.
+  const ghost = outline(root, 'alpha/ghost.md');
+  assert.equal(ghost.code, 2);
+  assert.deepEqual(ghost.lines, []);
+  assert.match(ghost.text, /markdown\/alpha\/ghost\.md is not in alpha's index/);
+});
