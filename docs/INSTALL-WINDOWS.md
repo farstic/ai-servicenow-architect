@@ -233,7 +233,7 @@ cd $HOME
 Run:
 
 ```
-git -c advice.detachedHead=false clone --branch v2.2.5 https://github.com/farstic/snowarch.git AI-Arch
+git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git AI-Arch
 ```
 
 Run:
