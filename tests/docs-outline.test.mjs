@@ -14,8 +14,9 @@ import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 /**
  * ARC-09-C284 — `docs outline`: the corpus's own hierarchy, a level at a time.
  *
- * Every area's index.md lists the whole area as a nested list, and those files are 0.6 to 2.3 MB: too big to read, and the pages a
- * question needs sit three to five levels down. The command prints the hierarchy below a start node, a few levels at a time, one
+ * Every area's index.md lists the whole area as a nested list, and the larger of those files are 0.4 to 2.3 MB (17 of the 53 at the
+ * 96d3212 pin are over 0.4 MB, the median is 199 KB): too big to read, and the pages a question needs sit three to five levels down.
+ * The command prints the hierarchy below a start node, a few levels at a time, one
  * line per node, bounded, so that the reader goes down level by level instead of reading the index.
  */
 const SPELL = spellings();

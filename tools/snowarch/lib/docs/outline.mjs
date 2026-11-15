@@ -3,7 +3,8 @@
 // ARC-09-C284 — `docs outline`: the corpus's own hierarchy, browsed a level at a time.
 //
 // Every area's index.md lists the whole area as a nested list — `- [Title](url) -- description`, two spaces a level — and the
-// files are 0.6 to 2.3 MB: too big to read, and the pages a question needs sit three to five levels down. This prints the
+// larger files are 0.4 to 2.3 MB (at the 96d3212 pin 17 of the 53 are over 0.4 MB, the median is 199 KB): too big to read, and the
+// pages a question needs sit three to five levels down. This prints the
 // hierarchy below a start node, a few levels at a time, one line per node, bounded, so the reader goes down level by level.
 //
 // Read-only and deterministic: it reads index.md files and prints; nothing is written, and the same corpus gives the same lines.
