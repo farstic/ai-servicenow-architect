@@ -20,6 +20,12 @@ plan row, an id that the reader of an answer has no use for.
 name a newer family, which they then describe instead of the corpus, so a patch they list is not the corpus family's patch. The
 sentence takes `CLAUDE.md` from 20,543 to 20,861 bytes, so its byte cap is now 21,000.
 
+**The citation check reads a page named by its bare file name in a list.** The skills write several pages of one folder as a full
+path followed by file names, as in `markdown/a/b/x.md`, `y.md`, and the check read only the first. A name that follows a full
+citation over a comma is now the page of that name in that path's folder, and `docs verify` checks it. On the files as they were
+before the corpus bump of 2026-11-15 it reports the four names that the bump took out of the corpus, which the check passed over;
+on this tree it reads 22 such names, and all of them resolve.
+
 ### Changed
 
 - The corpus map, `vendor/docs-map.md`, no longer shows a release family at the start of an area's title. The corpus is the
@@ -37,6 +43,11 @@ sentence takes `CLAUDE.md` from 20,543 to 20,861 bytes, so its byte cap is now 2
   titles can name a newer family, which they then describe instead of the corpus, so a patch they list is not the corpus family's
   patch. One sentence of 318 bytes: the file is 20,861 bytes, and its cap, 20,600 since ARC-09-C256, is 21,000 on the owner's
   decision of 2026-11-15 (ARC-09-C277).
+- `docs verify` checks a page named by its bare file name in a comma list after a full citation, in the folder of the full path
+  before it (`markdown/a/b/x.md`, `y.md`). Until now only the full path was read, and four such names that the 96d3212 bump took
+  out of the corpus stayed unseen. A glob, a placeholder or braces in a folder name give no folder, and a repository file name
+  ends the list. The check goes from 593 to 609 citations on this tree, all resolving; the Stop hook, which reads an answer, still
+  takes full paths only (ARC-09-C281).
 
 ## 2.2.6 — 2026-11-15
 
