@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { CORPUS_DIR, EXIT, SyncError } from '../tools/snowarch/lib/docs/sync.mjs';
 import { syncUpstream, formatUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
+import { follow } from './lib/pin-followers.mjs';
 
 /**
  * The repository to act on: the working directory when it is one, else this script's own.
@@ -36,6 +37,21 @@ const value = (n) => { const i = argv.indexOf(n); return i === -1 ? undefined : 
 const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: 'pipe' }).trim();
 
 /**
+ * The lines for what did not follow the pin: a file that quotes neither pin (reworded since, so there is nothing to
+ * move), and a map the generator refused to write. Nothing for what did, or was absent.
+ */
+function followLines(report) {
+  const lines = [];
+  for (const [path, status] of Object.entries(report.followers ?? {})) {
+    if (status === 'lost') lines.push(`pin: ${path} carries neither the old pin nor the new one — it was NOT updated`);
+  }
+  if (report.map === 'refused') {
+    lines.push(`map: vendor/docs-map.md was NOT regenerated (${report.mapNote}) and still names the old pin`);
+  }
+  return lines;
+}
+
+/**
  * The body a reviewer reads: what to check, then exactly what the tool saw.
  *
  * The checklist comes first because it is the ask. The fenced report is evidence, and it is
@@ -44,13 +60,18 @@ const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', s
  */
 export function prBody(report) {
   const { text } = formatUpstream(report);
+  // ARC-09-C280 — what did NOT follow the pin is said before the `staged:` line, which stays the last one: S09 pastes
+  // this report and keys on its shape. What did follow needs no line of its own, since the staged line names it.
+  const shown = text.split('\n');
+  const staged = shown.pop();
+  shown.push(...followLines(report), staged);
   return [
     '- [ ] newly dead citations remapped (or none)',
     '- [ ] `node scripts/docs.mjs verify` → `dead: 0`',
     '- [ ] release notes skimmed: `vendor/ServiceNowDocs/markdown/release-notes/`',
     '',
     '```',
-    text,
+    shown.join('\n'),
     '```',
     '',
     '_Opened by `.github/workflows/docs-bump.yml`. Never auto-merged._',
@@ -114,6 +135,17 @@ function main() {
     // job keys on. Both, because one without the other is a failure nobody reads.
     writeSync(1, `::error::docs-bump: ${e.message}\n`);
     process.exit(e.code);
+  }
+
+  // ARC-09-C280 — the files that quote the pin, and the corpus map, are this bump's output too. Staged and listed in
+  // `report.staged` like the rest, so the pull request carries them and a dry run's restore puts them back.
+  const followed = follow({ root, from: report.from, to: report.to });
+  report.followers = followed.followers;
+  report.map = followed.map.status;
+  if (followed.map.note) report.mapNote = followed.map.note;
+  if (followed.staged.length > 0) {
+    git(['add', '--', ...followed.staged]);
+    report.staged.push(...followed.staged);
   }
 
   const body = prBody(report);
