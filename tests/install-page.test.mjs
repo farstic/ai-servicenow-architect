@@ -328,7 +328,7 @@ test('the page stays a page, and the tail stays a tail', () => {
   // fact, and every figure on it carries where it was measured.
   assert.match(read(INSTALL), /### What the corpus costs/);
   // ARC-09-C244 — the corpus costs are the whole corpus, measured by docs-real on all three platforms.
-  assert.match(read(INSTALL), /measured\s+2026-10-30\s+by\s+`docs-real\.yml`/);
+  assert.match(read(INSTALL), /measured\s+2026-11-15\s+by\s+`docs-real\.yml`/);
 });
 
 test('ARC-09-C259 — the page counts one megabyte: no units clause, and the transcript\'s [docs] line is the page\'s own working-tree figure', () => {
@@ -343,6 +343,11 @@ test('ARC-09-C259 — the page counts one megabyte: no units clause, and the tra
   const figure = /\*\*working tree\*\* is (\d+) MB on Linux/.exec(page.replace(/\s+/g, ' '));
   assert.ok(figure, 'the corpus costs no longer give the working tree for Linux');
   assert.equal(line[1], figure[1], 'the transcript and the corpus costs count the working tree in different megabytes');
+  // ARC-09-C279 — and the same files: a page half moved to a new pin said 51,665 in one place and 51,186 in the other.
+  const files = /^\[docs\] ([\d,]+) files · \d+ MB working tree$/m.exec(page)?.[1];
+  const said = /all\s+\d+ areas and ([\d,]+) files/.exec(page.replace(/\s+/g, ' '))?.[1];
+  assert.ok(files && said, 'the file count is no longer stated in the transcript and in the corpus costs');
+  assert.equal(files, said, 'the transcript and the corpus costs count different files');
 });
 
 test('the server package\'s generated tables are current too', () => {
