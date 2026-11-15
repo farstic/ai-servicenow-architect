@@ -14,8 +14,10 @@
 //   node scripts/validation/outline-walk.mjs [--corpus <dir>] [--pin <rev>] [--pages <file>] [-v] [<page path>...]
 //   node scripts/validation/outline-walk.mjs [--corpus <dir>] [--pin <rev>] --areas
 //
-// With no page it reads scripts/validation/outline-walk-pages.txt. `--areas` prints, for every area, the lines of its first call and
-// the largest single call over every node of its index. The target the architect set: at most 4 calls and 300 printed lines a page.
+// With no page it reads scripts/validation/outline-walk-pages.txt. `--areas` prints, for every area, the lines of its first level (what
+// `docs outline <area> --depth 1` prints), of its first call (what `docs outline <area>` prints) and of the largest single call over
+// every node of its index, and the median and the maximum of each over the areas. The target the architect set: at most 4 calls and
+// 300 printed lines a page.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -114,17 +116,26 @@ export function main(argv, { out = (l) => writeSync(1, `${l}\n`), err = (l) => w
   out(`outline-walk: ${pin ? `pin ${pin}` : 'the working tree'} of ${corpus}, ${areas.length} areas`);
 
   if (argv.includes('--areas')) {
-    out('area · nodes · lines of the first call · largest single call (at which node)');
+    out('area · nodes · first level (lines) · first call (lines) · largest single call (lines, at which node)');
+    const figures = { level: [], first: [], largest: [] };
     for (const area of areas) {
       const tree = load(area);
       if (!tree) { out(`${area} · no index.md`); continue; }
-      let worst = { lines: renderOutline(tree.root).lines.length, at: '(the top)' };
-      const first = worst.lines;
+      const level = renderOutline(tree.root, 1).lines.length;
+      const first = renderOutline(tree.root).lines.length;
+      let worst = { lines: first, at: '(the top)' };
       for (const n of nodesOf(tree.root)) {
         const lines = renderOutline(n).lines.length;
         if (lines > worst.lines) worst = { lines, at: n.path };
       }
-      out(`${area} · ${tree.root.below} · ${first} · ${worst.lines} (${worst.at})`);
+      figures.level.push(level);
+      figures.first.push(first);
+      figures.largest.push(worst.lines);
+      out(`${area} · ${tree.root.below} · ${level} · ${first} · ${worst.lines} (${worst.at})`);
+    }
+    const spread = (xs) => `median ${median(xs)}, max ${Math.max(...xs)}`;
+    if (figures.first.length > 0) {
+      out(`areas ${figures.first.length} · first level: ${spread(figures.level)} · first call: ${spread(figures.first)} · largest call: ${spread(figures.largest)}`);
     }
     return 0;
   }
