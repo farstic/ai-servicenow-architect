@@ -1124,6 +1124,11 @@ ARC-02-S03:
 The second shape is caught by **SK-12** using `findRootlessCitations`. Its allow-list has a ceiling of
 one, and that one entry is the deliberate counter-example below.
 
+One more bare `foo.md` is read, since ARC-09-C281: a name in backticks in a comma list after a full citation, as in
+``markdown/a/b/x.md``, ``y.md``. It is the page `y.md` in the folder of the full path before it, and `docs verify` checks it like
+any citation. The list runs over a comma, "and" and "or" and nothing else; a glob, a placeholder or braces in a folder name give
+no folder, and a repository file name ends the list. The Stop hook, which reads an answer, still takes full paths only.
+
 `node scripts/docs.mjs verify` reports `checked` / `dead` and warns on each unrepaired citation. It
 warns rather than fails, because the fix is prose. One token is deliberately left unrepaired: the
 security skill names `servicenow-platform/security/` as the path ACLs are *not* under. A citation
