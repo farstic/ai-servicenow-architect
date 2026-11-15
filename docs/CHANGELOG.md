@@ -25,8 +25,8 @@ plan row, an id that the reader of an answer has no use for.
   cell does (ARC-09-C277).
 - Nine sentences in the gateway skills ended in, or held, a plan row id: `(ARC-09-C160)` in the six review-mode answers,
   `(ARC-09-C161)` in the CSM and ITSM always-evaluate leads, and "until ARC-02-S13 measured it" in the CSM anti-patterns. A row id
-  means nothing to the reader of an answer, so the sentences no longer carry one, and the two tests that pin the leads follow
-  (ARC-09-C282).
+  means nothing to the reader of an answer, so the sentences no longer carry one, and the two tests that pin the leads follow.
+  A new test fails on a plan row id in the prose of a skill or an agent, HTML comments aside (ARC-09-C282).
 
 ## 2.2.6 — 2026-11-15
 
