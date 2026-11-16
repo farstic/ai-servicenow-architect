@@ -62,7 +62,8 @@ const mdLines = new Set(blocks.flatMap((b) => b.lines.map((l) => l.trim())));
 function pureFunctions() {
   const a = code.indexOf('/* @pure-begin'); const b = code.indexOf('/* @pure-end */');
   assert.ok(a > 0 && b > a, 'the markers around the page\'s pure functions are gone');
-  return new Function('D', 'FL', `${code.slice(a, b)}\nreturn { checkUrl, checkVersions, checkPre, checkLic, norm, presetOf, presetFlags };`)(data, data.flags);
+  const names = ['checkUrl', 'checkVersions', 'checkPre', 'checkLic', 'norm', 'presetOf', 'presetFlags', 'navModel', 'nextModel', 'resetState', 'resetKeys', 'resetLabel', 'resetWords', 'resetFlow'];
+  return new Function('D', 'FL', `${code.slice(a, b)}\nreturn { ${names.map((n) => `${n}: typeof ${n} === 'function' ? ${n} : undefined`).join(', ')} };`)(data, data.flags);
 }
 const P = pureFunctions();
 
@@ -218,6 +219,75 @@ test('ARC-09-C285 — the installer\'s check: the keys are B00\'s, and it reads 
   // "login: not verified" is an ok line of the installer's (claude auth status unavailable), not a login to fix; a login the page does not know is one.
   assert.equal(kind({ id: 'claudeCode', status: 'ok', detail: '2.1.322 · login: not verified (claude auth status unavailable)' })[0].cls, 'oci ok');
   assert.equal(kind({ id: 'claudeCode', status: 'ok', detail: '2.1.322 · login: none' })[0].cls, 'oci bad');
+});
+
+test('ARC-09-C285 — Reset checkmarks, pressed from Step 3: no tick in Contents, % passed of the first section, no mark, Next at 0 of 25, a label that says so, and what the reader typed kept', () => {
+  // The owner pressed it and "nothing seemed to happen": the furthest section reached was set to the one the reader was in, so every tick above the
+  // reader stayed, and so did the percentage. The state a reset leaves is a function, so this runs the page's own.
+  for (const live of [true, false]) {
+    const fresh = { active: 'need', reached: 'need', done: {}, chk: {}, need: {} };
+    const ids = P.navModel(fresh, live).ids;
+    const first = P.navModel(fresh, live);
+    assert.equal(first.pct, `${Math.round(100 / ids.length)}%`, 'the first section is its share of the contents');
+    const from = { active: 'step-3', reached: 'step-3', done: Object.fromEntries(['s1-whoami', 's2a-dl', 's2a-inst', 's2c'].map((c) => [c, true])),
+      chk: { 'step-1': 'yes', 'step-2': 'no' }, need: { 'n-win': true, 'n-disk': true }, timers: { s2c: 1 } };
+    const before = P.navModel(from, live);
+    assert.ok(before.items.some((i) => i.mark === '✓') && before.pct !== first.pct, 'the state it starts from shows progress');
+    assert.equal(P.nextModel(from, live).done, 4);
+    const r = P.resetState(ids[0]);
+    assert.deepEqual([r.done, r.need, r.chk, r.timers], [{}, {}, {}, {}], 'no mark, no answer, no timer, nothing ticked in the checklist');
+    assert.deepEqual([r.reached, r.active, r.focus], [ids[0], ids[0], ids[0]], 'the furthest section reached is the first, and so is the one the reader is in');
+    const after = P.navModel(r, live);
+    assert.deepEqual(after.items.filter((i) => i.passed || i.mark === '✓'), [], 'no tick in Contents');
+    assert.equal(after.pct, first.pct, "% passed is the first section's");
+    const next = P.nextModel(r, live);
+    assert.deepEqual([next.done, next.total, next.next.cid], [0, 25, 's1-whoami']);
+    assert.match(next.text, /^Next command · 0\/25 done · ~\d+ min left$/);
+  }
+  // What it drops, and what it keeps: the commands' marks, the checklist and the answers; never what the reader typed or chose.
+  const stored = ['aiarch.lic', 'aiarch.label', 'aiarch.url', 'aiarch.mode', 'aiarch.view', 'aiarch.theme', 'aiarch.need', 'aiarch.reached', 'aiarch.chk', 'aiarch.cmd.s1-whoami', 'aiarch.cmd.s2c', 'other.key'];
+  assert.deepEqual(P.resetKeys(stored), ['aiarch.need', 'aiarch.chk', 'aiarch.cmd.s1-whoami', 'aiarch.cmd.s2c']);
+  // The furthest section is written back as the first, not removed (the reader who reloads finds the top), and the scroll spy may not raise it while the page scrolls up.
+  assert.match(code, /save\('aiarch\.reached', first\)/);
+  assert.match(code, /S\.reached = r\.reached; S\.active = r\.active; S\.focus = r\.focus;/, 'the reset applies the state it computes, and not the scroll position');
+  assert.match(code, /if \(!S\.noReach && ids\.indexOf\(active\) > ids\.indexOf\(S\.reached\)\)/, 'the spy raises the section reached while the page scrolls up after a reset');
+  assert.match(code, /window\.scrollTo\(\{ top: 0, behavior: rm\(\) \? 'auto' : 'smooth' \}\)/, 'a reset goes to the top, at once under reduced motion');
+  assert.match(code, /if \(S\.view === 'step'\) setFocus\(first\)/, 'in the step view the first section is the one shown');
+  // The click says something: the button's words, for about two seconds, and the same words for a screen reader.
+  assert.deepEqual(['cleared', 'armed', ''].map((x) => P.resetLabel(x)), ['Cleared ✓', '⚠ Click again to clear', 'Reset checkmarks']);
+  assert.deepEqual(['cleared', 'armed', ''].map((x) => P.resetWords(x)), ['Cleared ✓', 'Click again to clear', ''], 'the live region says the words of the button, without the symbol');
+  assert.match(markup, /<span class="sr-only" id="reset-live" role="status" aria-live="polite"><\/span>/);
+  assert.match(code, /setText\(\$\('#reset-live'\), resetWords\(rs\)\)/);
+  assert.match(code, /S\.cleared = false; render\(\); \}, 2000\)/);
+});
+
+test('ARC-09-C285 — Reset checkmarks takes two clicks: one clears nothing, a second inside four seconds clears, and a wait, Esc or a click elsewhere takes the first back', () => {
+  // The owner: "protection against pressing it by accident". No dialog: a real button, armed by the first click and amber with a symbol.
+  const flow = P.resetFlow;
+  const armed = flow(0, 'click', 1000);
+  assert.deepEqual(armed, { armedAt: 1000, act: 'arm' }, 'one click clears nothing');
+  // Two clicks inside the window clear; what the clear leaves, and keeps, is the case above.
+  assert.deepEqual(flow(armed.armedAt, 'click', 1100), { armedAt: 0, act: 'clear' });
+  assert.deepEqual(flow(armed.armedAt, 'click', 5000), { armedAt: 0, act: 'clear' }, 'four seconds exactly is inside');
+  // A click, a wait past four seconds, a click: nothing is cleared, and the button is armed again.
+  assert.deepEqual(flow(armed.armedAt, 'click', 5001), { armedAt: 5001, act: 'arm' });
+  // Esc, focus moving away, and a click elsewhere take the first click back; the next click arms again and clears nothing.
+  for (const event of ['esc', 'blur', 'away']) {
+    const gone = flow(armed.armedAt, event, 1500);
+    assert.deepEqual(gone, { armedAt: 0, act: 'cancel' }, event);
+    assert.equal(flow(gone.armedAt, 'click', 1600).act, 'arm', `a click after ${event}`);
+  }
+  assert.deepEqual(flow(0, 'esc', 1500), { armedAt: 0, act: null }, 'Esc with nothing armed does nothing');
+  // The page wires every one of them, and shows none of a browser's own dialogs.
+  assert.match(markup, /<button type="button" class="btn" id="btn-reset">Reset checkmarks<\/button>/);
+  assert.doesNotMatch(code, /\b(?:confirm|alert|prompt)\s*\(/, 'a browser dialog');
+  assert.match(code, /resetFlow\(S\.armedAt, 'click', Date\.now\(\)\)/, 'the page never says click');
+  assert.match(code, /resetFlow\(S\.armedAt, event, Date\.now\(\)\)/, 'the page takes the first click back without asking the flow');
+  for (const event of ['esc', 'blur', 'away']) assert.match(code, new RegExp(`disarm\\('${event}'\\)`), `the page never says ${event}`);
+  assert.match(code, /\$\('#btn-reset'\)\.addEventListener\('blur'/);
+  assert.match(code, /armTimer = setTimeout\(function \(\) \{ S\.armedAt = 0; render\(\); \}, 4000\)/, 'the first click is taken back after four seconds');
+  // Amber, with the symbol in the label: the look is a rule of the page and not the colour alone.
+  assert.match(css, /#btn-reset\.armed, #btn-reset\.armed:hover \{ background: var\(--warn\); color: var\(--on-warn\);/);
 });
 
 test('ARC-09-C285 — the address check does what the handoff says, on the example of the handoff', () => {
@@ -383,7 +453,7 @@ test('ARC-09-C285 — text is at least 4.5 to 1 against what it sits on, in both
   const used = [['ink', 'paper'], ['ink', 'paper-2'], ['ink', 'paper-3'], ['ink', 'accent-soft'], ['ink', 'ok-soft'], ['ink', 'warn-soft'], ['ink', 'bad-soft'],
     ['ink-2', 'paper'], ['ink-2', 'paper-2'], ['ink-2', 'paper-3'], ['ink-2', 'accent-soft'], ['ink-2', 'ok-soft'], ['ink-2', 'warn-soft'], ['ink-2', 'bad-soft'],
     ['ink-3', 'paper'], ['ink-3', 'paper-2'], ['ink-3', 'paper-3'], ['link', 'paper'], ['link', 'paper-2'], ['link', 'accent-soft'], ['link', 'ok-soft'], ['link', 'warn-soft'], ['link', 'bad-soft'],
-    ['accent', 'paper'], ['accent', 'paper-2'], ['paper', 'ink'], ['accent-ink', 'accent'], ['on-ok', 'ok'], ['ok', 'paper-2'], ['warn', 'paper-2'], ['bad', 'paper-2'],
+    ['accent', 'paper'], ['accent', 'paper-2'], ['paper', 'ink'], ['accent-ink', 'accent'], ['on-ok', 'ok'], ['on-warn', 'warn'], ['ok', 'paper-2'], ['warn', 'paper-2'], ['bad', 'paper-2'],
     ['term-fg', 'term-bg'], ['term-dim', 'term-bg'], ['term-dim', 'term-bar'], ['term-typed', 'term-bg'], ['term-fg', 'term-bar']];
   for (const name of ['light', 'dark']) {
     const t = theme(name);
