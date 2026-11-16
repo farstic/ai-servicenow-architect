@@ -254,7 +254,7 @@ test('ARC-09-C263 — citedUnread: what a declaration may look like (case, marku
   }
 });
 
-test('ARC-09-C267 — citedUnread: a page that cat, a batch command, shell code or PowerShell showed, or an MCP file tool read, is read; a grep, an ls and a failed read of it are not', () => {
+test('ARC-09-C267 — citedUnread: a page that cat, grep, rg, a batch command, shell code or PowerShell showed, or an MCP file tool read, is read; an ls, a listing grep and a failed read of it are not', () => {
   const reply = `The escalation is described in (citation: ${CSM}).`;
   const page = PAGEPATH(CSM);
   const dir = page.slice(0, page.lastIndexOf('/'));
@@ -275,13 +275,19 @@ test('ARC-09-C267 — citedUnread: a page that cat, a batch command, shell code 
   assert.deepEqual(open(code('shell', `head -50 ${page}`)), [], 'shell code');
   assert.deepEqual(open(powershell(`Get-Content "${winPage}" -TotalCount 40`)), [], 'PowerShell Get-Content, with a Windows path');
   assert.deepEqual(open(powershell(`gc ${page}`)), [], 'PowerShell gc');
+  // A search shows the lines of the page that match, and lever 2 counts it: it is how an answer reads a long page.
+  assert.deepEqual(open(bash(`grep -n escalation ${page}`)), [], 'grep');
+  assert.deepEqual(open(bash(`rg -n escalation ${page}`)), [], 'rg');
+  assert.deepEqual(open(powershell(`Select-String -Path "${winPage}" -Pattern escalation`)), [], 'PowerShell Select-String');
   // What does not show the page does not clear its citation.
-  assert.deepEqual(open(bash(`grep -l escalation ${page}`)), [CSM], 'grep');
+  assert.deepEqual(open(bash(`grep -l escalation ${page}`)), [CSM], 'grep that lists the file name');
+  assert.deepEqual(open(bash(`grep -c escalation ${page}`)), [CSM], 'grep that counts');
+  assert.deepEqual(open(bash(`rg --files-with-matches escalation ${page}`)), [CSM], 'rg that lists the file name');
+  assert.deepEqual(open(powershell(`Select-String -Path "${winPage}" -Pattern escalation -Quiet`)), [CSM], 'Select-String -Quiet');
   assert.deepEqual(open(bash(`ls ${dir}`)), [CSM], 'ls');
   assert.deepEqual(open(bash(`wc -l ${page}`)), [CSM], 'wc');
-  assert.deepEqual(open(batch(`grep -l escalation ${page}`)), [CSM], 'grep in a batch');
+  assert.deepEqual(open(batch(`grep -l escalation ${page}`)), [CSM], 'a listing grep in a batch');
   assert.deepEqual(open(code('python', `print(open('${page}').read())`)), [CSM], 'python code that opens it');
-  assert.deepEqual(open(powershell(`Select-String -Path "${winPage}" -Pattern escalation`)), [CSM], 'PowerShell Select-String');
   assert.deepEqual(open(powershell(`Get-Content "${winPage}"`, { is_error: true })), [CSM], 'a Get-Content that failed');
   assert.deepEqual(open(bash(`Get-Content ${page}`)), [CSM], 'Get-Content in a Bash call');
   assert.deepEqual(open(bash(`cat ${page}`, { is_error: true })), [CSM], 'a cat that failed');
@@ -367,7 +373,7 @@ test('ARC-09-C263 — the notice ends with the registered tail (496 bytes, sha25
   assert.equal(createHash('sha256').update(REGISTERED_TAIL).digest('hex'), '5c3e7055f08c1d6b978cb580de74dc97ec90d54544f5f728e01a626293627800', 'and the registered hash');
   const r = check('See `markdown/hrsd/c_Missing.md`.');
   assert.deepEqual(namesOf(r, 'citedUnread'), ['markdown/hrsd/c_Missing.md']);
-  assert.equal(r.reasonBody, `${LEAD} Cited but not Read in this session: markdown/hrsd/c_Missing.md. Read each, and keep a citation only where the page says what you cite it for. ${REGISTERED_TAIL}`);
+  assert.equal(r.reasonBody, `${LEAD} Cited, but no page of this session shows it: markdown/hrsd/c_Missing.md. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer. ${REGISTERED_TAIL}`);
   assert.equal(r.reason, `${r.reasonBody}${KEEP_OUT}`, 'our closing words follow the tail');
   // Several kinds asking at once: the tail still comes once, last.
   const many = check('Uses `sensor_reading_x` and `task_sla`; also `Pages read: 9`, unverified. See markdown/itsm/c_Missing.md.');
@@ -588,20 +594,22 @@ test('ARC-09-C263 M5 hook — no new hook entry, and no hook imports the index b
 });
 
 // ---- the data file the measurement sets -----------------------------------------------------------------------------------------
-test('ARC-09-C263 M5 — parseClasses: the committed file is what the pilot set (nothing blocks, 500 pages); unknown kinds drop; garbage means all seven kinds', () => {
+test('ARC-09-C263 M5 — parseClasses: the committed file is what lever 2 set (citedUnread blocks, 500 pages); unknown kinds drop; garbage means nothing blocks', () => {
   const committed = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
   // Phase 0 (C263, R6) judged citedUnread right 39 times in 40, 0.975 against the registered bar of 0.90, and no other class reached it.
-  // The registered pilot, at the final notice text, judged it warranted on 22 of 25 flags, 0.88: under the same bar, so nothing blocks in
-  // this release. A change to this list is a measured decision, made in the file and here together.
-  assert.deepEqual(committed, { blocking: [], ubiquity: DEFAULT_UBIQUITY, source: 'file' });
+  // The registered pilot, at the final notice text, judged it warranted on 22 of 25 flags, 0.88: under the same bar, so nothing blocked in
+  // 2.2.5 and 2.2.6. Lever 2 (ARC-09-C267) asks about that one class, with the read routes of read-routes.mjs; the arm without the ask is this
+  // file with an empty list. A change to this list is a measured decision, made in the file and here together.
+  assert.deepEqual(committed, { blocking: ['citedUnread'], ubiquity: DEFAULT_UBIQUITY, source: 'file' });
   assert.equal(DEFAULT_UBIQUITY, 500);
   assert.deepEqual(parseClasses('{"blocking":["coined","nonsense","falseAbsent"],"ubiquityPages":50}'),
     { blocking: ['falseAbsent', 'coined'], ubiquity: 50, source: 'file' }, 'known kinds only, in the check\'s own order');
   assert.deepEqual(parseClasses('{"blocking":[],"ubiquityPages":1}'), { blocking: [], ubiquity: 1, source: 'file' }, 'an empty list is valid: nothing blocks');
+  // A file that is missing or not this shape asks nothing (it used to ask every class): the check is off when its own data cannot be read.
   for (const bad of [null, undefined, '', '{ nope', '[]', 'null', '"x"', '42']) {
-    assert.deepEqual(parseClasses(bad), { blocking: [...KINDS], ubiquity: 500, source: 'default' }, String(bad));
+    assert.deepEqual(parseClasses(bad), { blocking: [], ubiquity: 500, source: 'default' }, String(bad));
   }
-  assert.deepEqual(parseClasses('{"blocking":"coined","ubiquityPages":0}'), { blocking: [...KINDS], ubiquity: 500, source: 'file' }, 'a wrong type is the default for that field');
+  assert.deepEqual(parseClasses('{"blocking":"coined","ubiquityPages":0}'), { blocking: [], ubiquity: 500, source: 'file' }, 'a wrong type is the default for that field, and the default asks nothing');
   assert.deepEqual(parseClasses('{"ubiquityPages":-3.5}').ubiquity, 500);
 });
 
@@ -618,7 +626,7 @@ test('ARC-09-C263 M5 — options given to groundingFindings override the data (t
   assert.equal(replay.findings.unsourcedPrinted.length, 0, 'the replay\'s ubiquity wins: ubiquity 0 means every name is common');
 });
 
-test('ARC-09-C263 M5 hook — the shipped data, as the pilot set it: nothing is asked about; a page cited and never read, a false absence and a coined name are computed and not asked', async (t) => {
+test('ARC-09-C263 M5 hook — the shipped data, as lever 2 sets it: a page cited that no route showed is asked about; a false absence and a coined name are computed and not asked', async (t) => {
   const skill = [use('sk', 'Skill', { skill: 'csm-specialist' }), res('sk', 'Launching skill: csm-specialist')];
   const ask = async (reply) => {
     const { root, transcript } = install(t, { rows: [U('how does a case escalate?'), ...skill, A(reply)] });
@@ -631,15 +639,20 @@ test('ARC-09-C263 M5 hook — the shipped data, as the pilot set it: nothing is 
   const cited = 'The escalation is described in (citation: markdown/csm/c_Esc.md).';
   assert.equal(await ask(absent), null, 'falseAbsent is grader-only');
   assert.equal(await ask(coined), null, 'coined is grader-only');
-  assert.equal(await ask(cited), null, 'citedUnread is grader-only: the pilot judged it warranted on 22 of 25 flags, under the bar of 0.90');
-  assert.equal(await ask(`${cited}\n${absent}`), null, 'a page cited and never read beside a false absence: still nothing is asked');
-  // Computed all the same, for a replay or a grader: the check still finds the page, and the file's own list lets none of it block.
+  const asked = await ask(cited);
+  assert.equal(asked?.decision, 'block', 'citedUnread asks (lever 2): the pilot, at the old text and the old routes, judged it warranted on 22 of 25 flags');
+  assert.match(asked.reason, /Cited, but no page of this session shows it: markdown\/csm\/c_Esc\.md\./);
+  const both = await ask(`${cited}\n${absent}`);
+  assert.equal(both?.decision, 'block', 'a page cited beside a false absence: asked about');
+  assert.doesNotMatch(both.reason, /is documented|no page of the corpus|not documented/, 'and only the citation is asked: the false absence is computed and not asked');
+  // The file's own list: citedUnread alone blocks; the other classes are computed all the same, for a replay or a grader.
   const committed = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
-  const computed = check(cited, { options: { blocking: committed.blocking, ubiquity: committed.ubiquity } });
-  assert.deepEqual([computed.findings.citedUnread.map((i) => i.path), computed.blocks], [['markdown/csm/c_Esc.md'], []]);
+  const computed = check(`${cited}\n${coined}`, { options: { blocking: committed.blocking, ubiquity: committed.ubiquity } });
+  assert.deepEqual([computed.findings.citedUnread.map((i) => i.path), computed.blocks], [['markdown/csm/c_Esc.md'], ['citedUnread']]);
+  assert.ok(computed.findings.coined.length >= 1, 'the coined name is found, and not asked');
 });
 
-test('ARC-09-C267 hook — the shipped data: a page cited and read only through Bash, PowerShell or an MCP tool is not asked about; read by nothing, or only grepped, it still is', async (t) => {
+test('ARC-09-C267 hook — the shipped data: a page cited and read through Bash, PowerShell or an MCP tool is not asked about; read by nothing, or only listed, it still is', async (t) => {
   const skill = [use('sk', 'Skill', { skill: 'csm-specialist' }), res('sk', 'Launching skill: csm-specialist')];
   const ask = async (reply, calls = []) => {
     const { root, transcript } = install(t, { rows: [U('how does a case escalate?'), ...skill, ...calls, A(reply)] });
@@ -668,16 +681,19 @@ test('ARC-09-C267 hook — the shipped data: a page cited and read only through 
   assert.equal(await ask(cited, batch(`cat ${page}`)), null, 'a command of a batch');
   assert.equal(await ask(cited, code('shell', `head -50 ${page}`)), null, 'shell code');
   assert.equal(await ask(cited, powershell(`Get-Content "${winPage}"`)), null, 'PowerShell Get-Content');
+  assert.equal(await ask(cited, bash(`grep -n escalation ${page}`)), null, 'grep, which shows the lines that match');
+  assert.equal(await ask(cited, powershell(`Select-String -Path "${winPage}" -Pattern escalation`)), null, 'PowerShell Select-String');
   for (const [what, calls] of [
-    ['grep', bash(`grep -l escalation ${page}`)],
+    ['a grep that lists the file name', bash(`grep -l escalation ${page}`)],
+    ['a grep that counts', bash(`grep -c escalation ${page}`)],
     ['ls', bash(`ls ${page.slice(0, page.lastIndexOf('/'))}`)],
     ['a cat that failed', bash(`cat ${page}`, { is_error: true })],
     ['a cat of another file', bash('cat /home/dev/notes/other.md')],
     ['an MCP call that failed', mcp({ path: page }, { is_error: true })],
     ['an MCP call given another file', mcp({ path: '/home/dev/notes/other.md' })],
-    ['a grep in a batch', batch(`grep -l escalation ${page}`)],
+    ['a listing grep in a batch', batch(`grep -l escalation ${page}`)],
     ['python code that opens it', code('python', `print(open('${page}').read())`)],
-    ['a PowerShell Select-String', powershell(`Select-String -Path "${winPage}" -Pattern escalation`)],
+    ['a PowerShell Select-String -Quiet', powershell(`Select-String -Path "${winPage}" -Pattern escalation -Quiet`)],
     ['a PowerShell read that failed', powershell(`Get-Content "${winPage}"`, { is_error: true })],
   ]) {
     const d = await ask(cited, calls);

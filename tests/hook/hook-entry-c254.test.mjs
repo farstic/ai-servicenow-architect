@@ -249,8 +249,9 @@ test('ARC-09-C263 — the written Stop entry blocks a false absence once, then o
 
 // ARC-09-C263 — the measurement sets two values, which classes may block and the ubiquity threshold, and the pre-registration freezes
 // the code: so they are a DATA file the hook reads (tools/snowarch/lib/docs/grounding-classes.json). A one-file diff changes what the
-// written entry asks; a missing or garbage file means the defaults, and the entry exits 0 either way.
-test('ARC-09-C263 — the classes that block and the ubiquity threshold are data the written entry reads; a missing or garbage file means the defaults', (t) => {
+// written entry asks; a missing or garbage file means nothing is asked (ARC-09-C267, lever 2: it used to mean every class), and the entry
+// exits 0 either way.
+test('ARC-09-C263 — the classes that block and the ubiquity threshold are data the written entry reads; a missing or garbage file switches the asks off', (t) => {
   const root = project(t);
   const pin = 'f'.repeat(40);
   put(root, 'engine.config.json', `${JSON.stringify({ docs: { pin } })}\n`);
@@ -272,15 +273,15 @@ test('ARC-09-C263 — the classes that block and the ubiquity threshold are data
   const coined = 'The `sn_zzz_made_up_table` holds it.';
   const common = 'The `task_sla` table holds it.';
 
-  // The committed file, as the pilot left it: no class blocks, 500 pages. So neither reply is asked about, and nor is a page that exists
-  // and that the session never read; a path that is not a page is C254's, and it is sent back as C254 alone sends it.
+  // The committed file, as lever 2 (ARC-09-C267) leaves it: citedUnread alone blocks, 500 pages. So neither reply is asked about, and a
+  // page that exists and that the session never read is; a path that is not a page is C254's, and it is sent back as C254 alone sends it.
   const committed = JSON.parse(readFileSync(classes, 'utf8'));
-  assert.deepEqual(committed.blocking, []);
+  assert.deepEqual(committed.blocking, ['citedUnread']);
   assert.equal(committed.ubiquityPages, 500);
   assert.equal(ask(coined), null, 'coined is computed and not asked');
   assert.equal(ask(common), null, 'unsourcedPrinted is computed and not asked');
   const unread = 'The escalation is described in (citation: markdown/alpha/two.md).';
-  assert.equal(ask(unread), null, 'a page that exists, cited and never read, is computed and not asked');
+  assert.equal(ask(unread)?.decision, 'block', 'a page that exists, cited and that no route of the session showed, is asked about');
   const dead = 'A claim (citation: markdown/alpha/page-two.md).';
   const c254Alone = runEntry(entry, root, stopping(dead));
   assert.equal(JSON.parse(c254Alone.stdout).decision, 'block', 'C254 alone sends the dead citation back');
@@ -294,18 +295,26 @@ test('ARC-09-C263 — the classes that block and the ubiquity threshold are data
   // A one-file diff: only citations block, and a name on 2 or more pages is common. Nothing else changed.
   writeFileSync(classes, `${JSON.stringify({ blocking: ['citedUnread'], ubiquityPages: 2 })}\n`);
   assert.equal(ask(coined), null, 'coined is computed and not asked');
-  assert.equal(ask(unread)?.decision, 'block', 'with citedUnread listed, the page that was not asked about above is asked about: the committed list is what silences it');
+  assert.equal(ask(unread)?.decision, 'block', 'with citedUnread listed, the page that no route showed is asked about');
+  // The other diff, to the list the pilot left: nothing blocks, so the page is not asked about. This is the measurement's arm without the ask.
+  writeFileSync(classes, `${JSON.stringify({ blocking: [], ubiquityPages: 500 })}\n`);
+  assert.equal(ask(unread), null, 'an empty list: the page is computed and not asked');
+  assert.equal(ask(coined), null, 'and neither is the name');
   writeFileSync(classes, `${JSON.stringify({ blocking: ['coined', 'unsourcedPrinted'], ubiquityPages: 2 })}\n`);
   assert.equal(ask(coined)?.decision, 'block');
   assert.equal(ask(common), null, 'on 3 pages, with the threshold at 2, the name is too common to ask about');
   writeFileSync(classes, `${JSON.stringify({ blocking: ['coined', 'unsourcedPrinted'], ubiquityPages: 4 })}\n`);
   assert.equal(ask(common)?.decision, 'block', 'the same name, the threshold at 4');
 
-  // Garbage, wrong types and a missing file: the defaults, and the entry fails open as it always has.
+  // Garbage, wrong types and a missing file: nothing is asked, and the entry fails open as it always has. (Until lever 2 this meant every
+  // class: a check that asks the model to work has to be off when its own data cannot be read.)
   for (const text of ['{ not json', '[]', '"blocking"', '{"blocking":"coined","ubiquityPages":"many"}']) {
     writeFileSync(classes, text);
-    assert.equal(ask(coined)?.decision, 'block', `defaults for ${text}`);
+    assert.equal(ask(coined), null, `nothing is asked for ${text}`);
+    assert.equal(ask(unread), null, `nor a page that no route showed, for ${text}`);
   }
   rmSync(classes);
-  assert.equal(ask(coined)?.decision, 'block', 'a missing file means the defaults');
+  assert.equal(ask(coined), null, 'a missing file switches the asks off');
+  assert.equal(ask(unread), null, 'the page too');
+  assert.equal(JSON.parse(runEntry(entry, root, stopping(dead)).stdout).decision, 'block', 'and C254, which does not read the file, still sends a dead citation back');
 });

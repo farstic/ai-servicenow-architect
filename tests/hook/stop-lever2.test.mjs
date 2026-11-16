@@ -204,6 +204,13 @@ withInstall('ARC-09-C267 lever 2 — a file written in the turn: its unread cita
   // the skip rules apply to the file's lines as to the answer's
   const skipped = `See also ${PAGE.alpha}.\nThe page ${PAGE.beta} (not opened) may say more.\n`;
   silent(await stop(t, { rows: write('w', skipped), message: 'Saved.' }), 'a pointer and a declared-unread page in the file');
+  // a path the corpus does not hold: in the answer it is C254's and this check leaves it; in a file it is asked about like any other, and
+  // opening it tells the model that the path is wrong
+  const gone = 'markdown/it-service-management/c_Gone.md';
+  silent(await stop(t, { rows: [], message: `The rule (citation: ${gone}).` }), 'a dead path in the answer');
+  asked(await stop(t, { rows: write('w', `The rule (citation: ${gone}).\n`), message: 'Saved.' }), gone);
+  // a fenced block in the file is not read for citations, as in the answer
+  silent(await stop(t, { rows: write('w', `Example:\n\`\`\`\n${PAGE.alpha}\n\`\`\`\n`), message: 'Saved.' }), 'a fenced block in the file');
 });
 
 // ---- what is not a claim -----------------------------------------------------------------------------------------------------------

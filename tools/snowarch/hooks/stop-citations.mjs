@@ -31,7 +31,7 @@
 // page, and a line that said the same again was no correction. `decision: "block"` is the form every Claude Code version has; the quieter
 // `hookSpecificOutput.additionalContext` on a Stop hook came with 2.1.163. The root comes from this file's own location,
 // for the reason session-start.mjs gives.
-import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,6 +56,28 @@ function asking(pairs) {
 
 /** The cheapest test that a reply has anything to check: a backtick, a corpus path, an absence or a resting phrase, a page count. */
 const NEEDS_CHECK = /`|markdown\/|not documented|not in the (?:bundled )?corpus|undocumented|citation unavailable|Pages read|un-?verified|not (?:yet )?(?:opened|read|checked|verified)|(?:did|could) not (?:open|read)|budget/i;
+
+/** A transcript over this is not read by the cheap gate below (the same limit as lib/docs/turn-sources.mjs). */
+const MAX_GATE_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Could a file written in this turn carry a citation the answer does not? (ARC-09-C267, lever 2.) Only when the class `citedUnread` may ask
+ * (the classes data, or the test seam's `options.blocking`) and the session's own file has `markdown/` in it at all, which a session that
+ * never met the corpus does not. Two cheap reads; nothing is imported. False on anything it cannot read.
+ */
+function writtenMayCite(input, seams) {
+  try {
+    if (typeof input?.transcript_path !== 'string') return false;
+    let blocking = seams.options?.blocking;
+    if (!Array.isArray(blocking)) {
+      const text = Object.hasOwn(seams, 'classesText') ? seams.classesText : readFileSync(fileURLToPath(new URL('../lib/docs/grounding-classes.json', import.meta.url)), 'utf8');
+      blocking = typeof text === 'string' ? JSON.parse(text)?.blocking : [];
+    }
+    if (!Array.isArray(blocking) || !blocking.includes('citedUnread')) return false;
+    if (statSync(input.transcript_path).size > MAX_GATE_BYTES) return false;
+    return readFileSync(input.transcript_path, 'utf8').includes('markdown/');
+  } catch { return false; }
+}
 
 /** The soft deadline of the grounding part, inside the 10 s the entry is given. */
 const DEADLINE_MS = 6000;
@@ -138,7 +160,7 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
   const stop = () => Date.now() - started > (seams.deadlineMs ?? DEADLINE_MS);
   try {
     const { groundingFindings, residualFindings, parseClasses, LEAD } = await import('../lib/docs/grounding-check.mjs');
-    const { readTranscriptRows } = await import('../lib/docs/turn-sources.mjs');
+    const { readSubagentRows, readTranscriptRows } = await import('../lib/docs/turn-sources.mjs');
     const { loadNamesIndex } = await import('../lib/docs/names-index.mjs');
     const { corpusNamesDir } = await import('../lib/local-paths.mjs');
     const facts = checkoutFacts(root);
@@ -148,10 +170,12 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
     const index = pin ? (seams.loadIndex ?? loadNamesIndex)(corpusNamesDir(root, pin), { pin }) : null;
     // Which classes block and the ubiquity threshold are DATA (grounding-classes.json), so the measurement changes them without a code diff.
     let classesText = null;
-    try { classesText = readFileSync(fileURLToPath(new URL('../lib/docs/grounding-classes.json', import.meta.url)), 'utf8'); } catch { /* missing: the defaults */ }
+    if (Object.hasOwn(seams, 'classesText')) classesText = seams.classesText ?? null;                  // a test's: the file's text, or none
+    else { try { classesText = readFileSync(fileURLToPath(new URL('../lib/docs/grounding-classes.json', import.meta.url)), 'utf8'); } catch { /* missing: nothing asks */ } }
     const classes = parseClasses(classesText);
     const options = { blocking: classes.blocking, ubiquity: classes.ubiquity, builders: facts.builders, rosterSkills: facts.rosterSkills,
-      isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD, ...(seams.options ?? {}) };
+      isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD,
+      sideRows: seams.sideRows ?? (() => readSubagentRows(input.transcript_path, { onDebug: debug })), ...(seams.options ?? {}) };
     if (input.stop_hook_active) {
       const r = residualFindings({ rows: transcript?.rows ?? null, reply: message, index, coverage: index?.coverage ?? null, options });
       return stop() ? null : { residual: r };
@@ -179,7 +203,8 @@ export async function report(input, { root = ROOT, load, seams = {} } = {}) {
   const started = Date.now();
   const debug = seams.debug ?? debugLine;
   const message = input?.last_assistant_message;
-  if (typeof message !== 'string' || !NEEDS_CHECK.test(message)) return none;
+  if (typeof message !== 'string' || !message) return none;
+  if (!NEEDS_CHECK.test(message) && !writtenMayCite(input, seams)) return none;
   if (input?.stop_hook_active) {
     const g = await grounding(input, message, { root, dead: new Set(), started, seams, debug });
     return g?.residual?.text ? { code: 0, stderr: '', stdout: `${JSON.stringify({ systemMessage: g.residual.text })}\n` } : none;

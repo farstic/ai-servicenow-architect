@@ -27,10 +27,14 @@
 // command that finds, lists or counts (`grep`, `rg`, `ls`, `find`, `wc`, `stat`) instead of showing a page, every row of our own hooks.
 //
 // PURE where it can be: `turnSources(rows, options)` does no I/O and reads no clock. `readTurnSources(path)` reads the file.
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { MB } from '../size.mjs';
 import { pageNames } from './name-rules.mjs';
 import { corpusRelative } from './resolve.mjs';
+import { commandReads, isSearchVerb, pagesOfInput, shellWords, walkThread } from './read-routes.mjs';
+
+export { pagesOfInput, shellWords };
 
 /** Over this many bytes a transcript is not read: the check runs on the reply alone. */
 export const MAX_TRANSCRIPT_BYTES = 64 * MB;
@@ -128,108 +132,15 @@ const pathKind = (p) => {
 const CITATION = /markdown\/[A-Za-z0-9_./-]+?\.md/g;
 
 // ---- a page read through a shell or an MCP tool (ARC-09-C267) -----------------------------------------------------------------
-// The Read tool is not the only way a page reaches the model. In auto mode Claude Code's own prompt says to read files with `cat`, `head`
-// and `sed` in Bash; where Git Bash is missing, or `CLAUDE_CODE_USE_POWERSHELL_TOOL` is set, the shell is the PowerShell tool (`Get-Content`,
-// in 2.1.309 and 2.1.318 alike); and the context-mode server's `ctx_execute_file` takes the file as `path` while `ctx_batch_execute` and
-// `ctx_execute` run shell lines. Counting only Read made the check ask about a page the session had read. Each reader below answers one
-// question, from the call alone, with no I/O: which corpus pages did this command or this call show?
+// The readers live in read-routes.mjs (the shell's words and folder, here-documents kept out, the reading verbs, an MCP call's input, a Grep in
+// content mode). `pagesRead` below is the set the NAMES come from: the pages whose lines a command SHOWED, so a `grep` or an `rg`, which show the
+// lines that match and not the page, are left out of it. The question `citedUnread` asks, whether a page reached the session at all, is
+// `reached`: every route, a search that names the page among them.
 
-/** The commands that print the lines of the files they are given. `grep`, `rg`, `ls`, `find`, `wc`, `stat` find, list or count: they show no page. */
-const READING_VERBS = new Set(['cat', 'head', 'tail', 'sed', 'nl', 'less', 'more', 'awk', 'bat']);
-
-/** PowerShell's, compared in lower case: `Get-Content` and its aliases `gc`, `type` and `cat`. `Select-String` and `Get-ChildItem` find and list. */
-const POWERSHELL_VERBS = new Set([...READING_VERBS, 'get-content', 'gc', 'type']);
-
-/**
- * What a path to one corpus page looks like once `corpusRelative` has cut it at the corpus folder. The characters are the ones a citation holds
- * (CITATION above); none of the 51,657 pages of the corpus, measured on 2026-11-08, holds another. So a glob, a brace list, a variable, a
- * comma, a space or a directory is not one page, and which pages it stands for cannot be told from the call.
- */
-const PAGE_PATH = /^markdown\/[A-Za-z0-9_./-]+\.md$/;
-
-/** `markdown/<area>/….md` for a path that names exactly one corpus page, in any spelling a Read would be given; otherwise `null`. */
-const pageAt = (file) => {
-  const rel = corpusRelative(file);
-  return rel && PAGE_PATH.test(rel) ? rel : null;
-};
-
-/**
- * The simple commands of a command line, each as its words with the quotes taken off. The line is cut at an unquoted `|`, `;`, `&`, `(`, `)`
- * or newline, so a `;` inside `sed -n '1,40p;50,60p'` cuts nothing and `x=$(cat f)` has a `cat` in it; for sh a back-tick cuts too. It is not
- * a shell: nothing is expanded, a here-document is read as lines, and an unbalanced quote runs to the end. With `powershell` the line is
- * read as PowerShell reads it: a back-slash is a letter (it parts a Windows path), the back-tick escapes the next character, a quote is
- * written twice to be itself, and a comma parts the items of a list. Pure.
- */
-export function shellWords(command, { powershell = false } = {}) {
-  const s = String(command ?? '');
-  const escape = powershell ? '`' : '\\';
-  const segments = [];
-  let words = [];
-  let word = '';
-  let started = false;                                            // `""` is a word too
-  let quote = '';
-  const endWord = () => { if (started) words.push(word); word = ''; started = false; };
-  const endSegment = () => { endWord(); if (words.length) segments.push(words); words = []; };
-  for (let i = 0; i < s.length; i += 1) {
-    const c = s[i];
-    const next = s[i + 1];
-    if (quote) {
-      if (c === quote) {
-        if (powershell && next === quote) { word += c; i += 1; }                                   // '' and "" are one quote
-        else quote = '';
-      } else if (c === escape && next !== undefined && (powershell ? quote === '"' : quote === '"' && '"\\$`'.includes(next))) { word += next; i += 1; }
-      else word += c;
-    } else if (c === "'" || c === '"') { quote = c; started = true; }
-    else if (c === escape) {
-      if (next === '\n') i += 1;                                  // a line continuation joins the lines
-      else if (next !== undefined) { word += next; started = true; i += 1; }
-    } else if (c === '|' || c === ';' || c === '&' || c === '\n' || c === '(' || c === ')' || (!powershell && c === '`')) endSegment();
-    else if (c === ' ' || c === '\t' || c === '\r' || (powershell && c === ',')) endWord();
-    else { word += c; started = true; }
-  }
-  endSegment();
-  return segments;
-}
-
-/**
- * The corpus pages a command line shows: every file argument of a reading command in it, whether it comes first, after a `&&`, at the head of
- * a pipe or inside `$(…)`. For sh those are `cat`, `head`, `tail`, `sed`, `nl`, `less`, `more`, `awk` and `bat`; with `powershell`, also
- * `Get-Content`, `gc` and `type`, in any case. A command whose verb is anything else shows none, and neither does an argument that is an
- * option, a glob, a variable or a directory. Pure.
- */
-export function pagesOfCommand(command, { powershell = false } = {}) {
-  const verbs = powershell ? POWERSHELL_VERBS : READING_VERBS;
+/** The corpus pages a command line SHOWS (`cat`, `head`, `tail`, `sed`, `nl`, `less`, `more`, `awk`, `bat`; PowerShell's `Get-Content`, `gc`, `type`), a Set. Pure. */
+export function pagesOfCommand(command, { powershell = false, cwd = null, rowCwd = null } = {}) {
   const pages = new Set();
-  for (const words of shellWords(command, { powershell })) {
-    let at = 0;
-    if (!powershell) while (at < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[at])) at += 1;   // FOO=1 cat page.md
-    const verb = String(words[at] ?? '').replace(/^.*[\\/]/, '');                                          // /bin/cat is cat
-    if (!verbs.has(powershell ? verb.toLowerCase() : verb)) continue;
-    for (const word of words.slice(at + 1)) {
-      if (word.startsWith('-')) continue;                                                                  // an option, or `--`
-      const page = pageAt(powershell ? word : word.replace(/^<+/, ''));                                    // cat <page.md
-      if (page) pages.add(page);
-    }
-  }
-  return pages;
-}
-
-/**
- * The corpus pages an MCP call's input shows: the file it names by `path`, `file_path` or `paths`, and what the shell in it shows, run through
- * `pagesOfCommand`: a `command` string, the `command` of each of `commands` (`ctx_batch_execute`), and `code` when `language` is `shell`
- * (`ctx_execute`, `ctx_execute_file`). Code in any other language may open a file; the call does not say so in a form this reads. Pure.
- */
-export function pagesOfInput(input) {
-  const files = [];
-  for (const key of ['path', 'file_path']) if (typeof input?.[key] === 'string') files.push(input[key]);
-  if (Array.isArray(input?.paths)) for (const f of input.paths) if (typeof f === 'string') files.push(f);
-  const pages = new Set();
-  for (const f of files) { const page = pageAt(f); if (page) pages.add(page); }
-  const lines = [];
-  if (typeof input?.command === 'string') lines.push(input.command);
-  if (Array.isArray(input?.commands)) for (const c of input.commands) if (typeof c?.command === 'string') lines.push(c.command);
-  if (input?.language === 'shell' && typeof input?.code === 'string') lines.push(input.code);
-  for (const line of lines) for (const page of pagesOfCommand(line)) pages.add(page);
+  for (const [page, verb] of commandReads(command, { powershell, cwd, rowCwd }).reads) if (!isSearchVerb(verb)) pages.add(page);
   return pages;
 }
 
@@ -257,12 +168,18 @@ export function turnSources(rows, options = {}) {
     pagesRead: new Set(),        // `markdown/<area>/….md`, distinct, after the boundary
     names: { read: new Set(), skill: new Set(), named: new Set(), builder: new Set() },
     savedCitations: new Set(),   // pages cited by saved Envelopes this session read
+    reached: new Map(),          // every corpus page that reached the session, by any route (read-routes.mjs), whenever it did: a compaction does not undo it
+    written: [],                 // [{ tool, text }] the text of the files the current turn wrote (Write, Edit, MultiEdit, NotebookEdit, a heredoc that writes)
+    typed: '',                   // what the user typed, in every prompt of the session, as lower-case text with forward slashes
     envelopeNames: new Set(),    // names a saved Envelope prints (grounded only through the pages it cites)
     searches: [],                // [{ pattern, path, result }]
     feedback: [],                // [{ index, ours }] Stop-hook feedback rows of the current turn
     scope: { rosterSkill: false, corpus: false },
     classes: {},                 // how many rows of each user-row kind, for the debug record
   };
+
+  // The shell's folder and every route by which a page reached the main thread are one walk of its rows (read-routes.mjs).
+  const walked = walkThread(main);
 
   // Pass 1 — the tool calls, by id; and where the current turn begins.
   const uses = new Map();
@@ -353,9 +270,11 @@ export function turnSources(rows, options = {}) {
           out.searches.push({ pattern: String(use.input.pattern ?? ''), path: posix(use.input.path ?? ''), result: body });
           break;
         case 'Bash': case 'PowerShell': {
-          const shown = pagesOfCommand(use.input.command, { powershell: use.name === 'PowerShell' });   // a `cat`, `sed`, `Get-Content`… of a page reads it; any other command is never a source
+          // A `cat`, `sed`, `Get-Content`… of a page reads it (the folder a `cd` set, kept across calls, is the walk's); a search shows lines of
+          // it and a command that lists shows none; any other command is never a source.
+          const shown = [...(walked.calls.get(b.tool_use_id) ?? [])].filter(([, route]) => !isSearchVerb(route)).map(([page]) => page);
           for (const page of shown) out.pagesRead.add(page);
-          if (shown.size) addAll(out.names.read, namesIn(body));
+          if (shown.length) addAll(out.names.read, namesIn(body));
           break;
         }
         case 'Agent': case 'Task':
@@ -371,6 +290,19 @@ export function turnSources(rows, options = {}) {
       }
     }
   });
+  // ARC-09-C267 (lever 2) — what reached the session by any route, over EVERY main-thread row (a compaction does not undo a read), the files
+  // the current turn wrote, and the paths the user typed. A sub-agent's reads are another thread, walked by the caller.
+  for (const [page, how] of walked.reached) out.reached.set(page, how.route);
+  const offset = boundary + 1;
+  const from = out.turnStart < 0 ? 0 : out.turnStart;
+  for (const w of walked.writes) if (w.at - offset >= from) out.written.push({ tool: w.tool, text: w.text });
+  const typed = [];
+  for (const r of main) {
+    if (r.type !== 'user') continue;
+    const t = textOf(r);
+    if (t && classifyUserText(t, r) === 'prompt') typed.push(t);
+  }
+  out.typed = posix(typed.join('\n')).toLowerCase();
   return out;
 }
 
@@ -389,6 +321,42 @@ export function readTranscriptRows(transcriptPath, { read = readFileSync, stat =
   } catch (e) {
     onDebug(`transcript unreadable: ${e instanceof Error ? e.message : String(e)}`);
     return null;
+  }
+}
+
+/**
+ * The rows of each sub-agent of the session whose file is `transcriptPath`: Claude Code keeps them in `<session>/subagents/agent-<id>.jsonl`, beside the
+ * session's own file and not in it, and a workflow's agents one folder deeper (`subagents/workflows/<run>/agent-<id>.jsonl`). An array of row arrays;
+ * `[]` when there are none or the folder is not there. At most `maxFiles` files and `maxBytes` in all are read, then the rest are left (`onDebug` says
+ * so). Read only when a page is unread without them (grounding-check.mjs). Never throws.
+ */
+export function readSubagentRows(transcriptPath, { read = readFileSync, list = readdirSync, stat = statSync, maxBytes = MAX_TRANSCRIPT_BYTES, maxFiles = 200, onDebug = () => {} } = {}) {
+  try {
+    if (typeof transcriptPath !== 'string' || !transcriptPath.endsWith('.jsonl')) return [];
+    const files = [];
+    const find = (dir, depth, top) => {
+      let names;
+      try { names = list(dir).sort(); } catch (e) { if (top && e?.code !== 'ENOENT') throw e; return; }
+      for (const name of names) {
+        if (files.length >= maxFiles) return;
+        const file = join(dir, name);
+        if (/^agent-.+\.jsonl$/.test(name)) files.push(file);
+        else if (depth < 2 && !name.includes('.')) { try { if (stat(file).isDirectory()) find(file, depth + 1, false); } catch { /* not a folder we can read: skipped */ } }
+      }
+    };
+    find(join(transcriptPath.slice(0, -'.jsonl'.length), 'subagents'), 0, true);
+    const out = [];
+    let total = 0;
+    for (const file of files) {
+      total += stat(file).size;
+      if (total > maxBytes) { onDebug(`sub-agent transcripts are over the ${maxBytes} limit: the rest are not read`); break; }
+      const parsed = parseTranscript(read(file, 'utf8'));
+      if (parsed.rows.length) out.push(parsed.rows);
+    }
+    return out;
+  } catch (e) {
+    onDebug(`sub-agent transcripts unreadable: ${e instanceof Error ? e.message : String(e)}`);
+    return [];
   }
 }
 

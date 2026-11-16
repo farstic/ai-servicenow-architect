@@ -11,7 +11,9 @@
 //   unsourcedPrinted  a name the corpus prints, but this session got from no page, skill, request or builder
 //   coined            a name in no source and not in a corpus whose index is whole
 //   unsourced         a name in no source, where the index is sparse or missing: no corpus claim is made
-//   citedUnread       a corpus page cited that this session never Read (not one the line itself says, right after the path, was not read)
+//   citedUnread       a corpus page cited, in the answer or in a file this turn wrote, that reached the session by no read route (read-routes.mjs: a Read,
+//                     a shell command or an MCP call that showed it, a Grep in content mode, a sub-agent's read, a read before a compaction); not one the line
+//                     itself says, right after the path, was not read, not a pointer sentence ("see also", "start with", "read … first"), and not a path the user typed
 //   resting           "unverified" / "not opened" / a spent budget in the final reply
 //   overclaim         `Pages read: <n>` greater than the pages Read
 //
@@ -28,6 +30,7 @@
 import { copyLines } from '../finding-copy.mjs';
 import { ABSENCE_ANYWHERE, CUSTOM, DECLARED, MARKER, PLATFORM_PREFIXES, bare, dotted, markedAbsent, nameSpans, qualifiesWhole } from './name-rules.mjs';
 import { COVERAGE } from './names-index.mjs';
+import { walkThread } from './read-routes.mjs';
 import { namesIn, turnSources } from './turn-sources.mjs';
 
 export const KINDS = Object.freeze(['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced', 'citedUnread', 'resting', 'overclaim']);
@@ -41,12 +44,13 @@ const TAIL = 'Then add one line for each, starting "Correction:", with the page 
 export const MAX_ITEMS = 12;
 
 /**
- * `grounding-classes.json` — which classes block and the ubiquity threshold — as the hook reads it: the defaults for a missing or
- * garbage file, a list of known kinds (an unknown one is dropped; an empty list is valid and means nothing blocks), a positive integer.
- * The measurement sets these two values; the code that reads them does not change. Pure.
+ * `grounding-classes.json` — which classes block and the ubiquity threshold — as the hook reads it: a list of known kinds (an unknown one is
+ * dropped; an empty list is valid and means nothing blocks), a positive integer. A file that is missing, unreadable or not this shape switches
+ * every ask OFF (ARC-09-C267: it used to mean all seven classes, which is the opposite of a safe default for a check that asks the model to
+ * work). The measurement sets these two values; the code that reads them does not change. Pure.
  */
 export function parseClasses(text) {
-  const defaults = { blocking: [...KINDS], ubiquity: DEFAULT_UBIQUITY, source: 'default' };
+  const defaults = { blocking: [], ubiquity: DEFAULT_UBIQUITY, source: 'default' };
   if (typeof text !== 'string') return defaults;
   let data;
   try { data = JSON.parse(text); } catch { return defaults; }
@@ -70,6 +74,19 @@ const CITATION = /markdown\/[A-Za-z0-9_.\-/]+?\.md/g;
 const DECLARED_UNREAD = /^[`*_)\]>"']*\s*(?:[-,;:–—]\s*)?(?:(?:\(|\[)\s*)?(?:found by search,\s*)?(?:(?:was|were|is|are)\s+)?(?:not\s+(?:yet\s+)?(?:read|opened)|unread)\b/i;
 const FILE_TAILS = new Set(['md', 'json', 'mjs', 'js', 'ts', 'yml', 'yaml', 'html', 'css', 'csv', 'txt', 'png', 'svg', 'drawio', 'xml', 'sh', 'pdf', 'docx', 'py', 'io', 'net', 'com', 'org']);
 const FENCE = /^\s*```/;
+/**
+ * Is the citation at `start`…`end` of `line` a pointer and not a claim? Its sentence (cut at a full stop, `!` or `?` followed by a space; a `;` does not
+ * end it) has "see also" or "start with" before it, or "read" before it and "first" after it: "Read X first.", "See also X; Y.", "Start with X."
+ */
+export function isPointer(line, start, end) {
+  const lead = line.slice(0, start);
+  const cut = [...lead.matchAll(/[.!?](?=\s)/g)].pop();
+  const before = cut ? lead.slice(cut.index + 1) : lead;
+  const tail = line.slice(end);
+  const stop = /[.!?](?=\s|$)/.exec(tail);
+  const after = stop ? tail.slice(0, stop.index) : tail;
+  return /\b(?:see also|start(?:s|ing)? with)\b/i.test(before) || (/\bread\b/i.test(before) && /\bfirst\b/i.test(after));
+}
 const prefixOk = (name) => PLATFORM_PREFIXES.includes(name.split(/[_.]/)[0]);
 const norm = (s) => String(s ?? '').replace(/\\_/g, '_').toLowerCase();
 const posix = (p) => String(p ?? '').replace(/\\/g, '/');
@@ -146,7 +163,7 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
   const fullText = live.map(([l]) => l).join('\n');
 
   const absenceAt = live.some(([l]) => ABSENCE_ANYWHERE.test(l));
-  const cites = live.some(([l]) => l.includes('markdown/'));
+  const cites = live.some(([l]) => l.includes('markdown/')) || (turn?.written ?? []).some((w) => w.text.includes('markdown/'));
   const names0 = live.some(([l]) => /`[^`\n]*[_.][^`\n]*`|\[[A-Za-z0-9_.\\]*[_.][A-Za-z0-9_.\\]*\]/.test(l));
   const restingAt = live.some(([l]) => RESTING.test(l));
   const countsAt = /Pages read:/i.test(fullText);
@@ -232,21 +249,43 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
     }
     if (stop()) return result('deadline');
 
-    // Citations: a corpus page cited that this session never Read (a saved Envelope's own citations excepted; a skill-printed one is not).
-    // A match that says itself, right after its path and on the same line, that the page was not read is the answer saying what it did not
-    // do, which is what the ask is for: it is skipped, per match, so a later plain citation of the same page is still asked about.
+    // Citations (ARC-09-C267, lever 2): a corpus page cited, in the answer or in a file the turn wrote, that reached the session by NO route
+    // (read-routes.mjs; a saved Envelope's own citations excepted, a skill-printed one is not). Not claims, and skipped per match: one that says
+    // itself, right after its path and on the same line, that the page was not read (the answer saying what it did not do, which is what the ask
+    // is for), a pointer sentence, and a path the user typed. A later plain citation of the same page is still asked about.
     const dead = options.deadPaths ?? new Set();
+    const typed = turn.typed ?? '';
+    const places = live.map(([l, i]) => [l, i, false]);
+    for (const w of turn.written ?? []) {
+      let fenced = false;
+      for (const l of w.text.split(/\r?\n/)) {
+        if (FENCE.test(l)) { fenced = !fenced; continue; }
+        if (!fenced) places.push([l, -1, true]);
+      }
+    }
     const cited = new Map();
-    for (const [l, i] of live) {
+    for (const [l, i, inFile] of places) {
       const line = posix(l);
       for (const m of line.matchAll(CITATION)) {
         if (DECLARED_UNREAD.test(line.slice(m.index + m[0].length))) continue;
-        if (!cited.has(m[0])) cited.set(m[0], i);
+        if (isPointer(line, m.index, m.index + m[0].length)) continue;
+        if (typed.includes(m[0].toLowerCase())) continue;
+        if (!cited.has(m[0])) cited.set(m[0], { line: i, inFile });
       }
     }
-    for (const [path, line] of cited) {
-      if (turn.pagesRead.has(path) || turn.savedCitations.has(path) || dead.has(path)) continue;
-      findings.citedUnread.push({ kind: 'citedUnread', path, line });
+    // A sub-agent's reads are its own rows, read only when a page is still unread without them.
+    let side = null;
+    const sideReached = () => {
+      if (side) return side;
+      side = new Set();
+      const threads = typeof options.sideRows === 'function' ? options.sideRows() : options.sideRows;
+      for (const rows of Array.isArray(threads) ? threads : []) for (const page of walkThread(rows).reached.keys()) side.add(page);
+      return side;
+    };
+    for (const [path, at] of cited) {
+      if (turn.reached.has(path) || turn.pagesRead.has(path) || turn.savedCitations.has(path) || dead.has(path)) continue;
+      if (sideReached().has(path)) continue;
+      findings.citedUnread.push({ kind: 'citedUnread', path, line: at.line, inFile: at.inFile });
     }
 
     // Overclaim: `Pages read: <n>` more than the distinct corpus pages Read.
@@ -315,7 +354,7 @@ function reasonOf(findings, kinds, max) {
         }
         break;
       case 'citedUnread':
-        clauses.push(`Cited but not Read in this session: ${got.map((i) => i.path).join(', ')}. Read each, and keep a citation only where the page says what you cite it for.`);
+        clauses.push(`Cited, but no page of this session shows it: ${got.map((i) => i.path).join(', ')}. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer.`);
         break;
       case 'resting':
         clauses.push(`Left as not read or not verified: ${got.map((i) => `"${i.excerpt}"`).join('; ')}. Read the page, or search escape-safe and give the marker only to what the search does not find.`);
@@ -376,7 +415,7 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
           || (corrected(i.name) && later.names.read.has(i.name));
       }
       case 'coined': case 'unsourced': return corrections.length > 0 && !text.includes(i.name);
-      case 'citedUnread': return later.pagesRead.has(i.path);
+      case 'citedUnread': return later.reached.has(i.path) || later.pagesRead.has(i.path) || corrections.some((l) => l.includes(norm(i.path)) && /pointer/.test(l));
       case 'resting': case 'overclaim': return corrections.length > 0;
       default: return true;
     }
