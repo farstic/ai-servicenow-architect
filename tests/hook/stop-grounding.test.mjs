@@ -287,7 +287,8 @@ test('ARC-09-C267 — citedUnread: a page that cat, grep, rg, a batch command, s
   assert.deepEqual(open(bash(`ls ${dir}`)), [CSM], 'ls');
   assert.deepEqual(open(bash(`wc -l ${page}`)), [CSM], 'wc');
   assert.deepEqual(open(batch(`grep -l escalation ${page}`)), [CSM], 'a listing grep in a batch');
-  assert.deepEqual(open(code('python', `print(open('${page}').read())`)), [CSM], 'python code that opens it');
+  assert.deepEqual(open(code('python', `print(open('${page}').read())`)), [], 'python code that opens it: another language, the page named in it is counted as shown');
+  assert.deepEqual(open(code('python', 'print(1)')), [CSM], 'python code that names no page');
   assert.deepEqual(open(powershell(`Get-Content "${winPage}"`, { is_error: true })), [CSM], 'a Get-Content that failed');
   assert.deepEqual(open(bash(`Get-Content ${page}`)), [CSM], 'Get-Content in a Bash call');
   assert.deepEqual(open(bash(`cat ${page}`, { is_error: true })), [CSM], 'a cat that failed');
@@ -373,7 +374,7 @@ test('ARC-09-C263 — the notice ends with the registered tail (496 bytes, sha25
   assert.equal(createHash('sha256').update(REGISTERED_TAIL).digest('hex'), '5c3e7055f08c1d6b978cb580de74dc97ec90d54544f5f728e01a626293627800', 'and the registered hash');
   const r = check('See `markdown/hrsd/c_Missing.md`.');
   assert.deepEqual(namesOf(r, 'citedUnread'), ['markdown/hrsd/c_Missing.md']);
-  assert.equal(r.reasonBody, `${LEAD} Cited pages that nothing in this session showed: markdown/hrsd/c_Missing.md. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer. ${REGISTERED_TAIL}`);
+  assert.equal(r.reasonBody, `${LEAD} You cited pages that this session never opened: markdown/hrsd/c_Missing.md. Open each one now. Where a page contradicts your answer, correct the answer. Where a citation only tells the reader where to look, mark it as a pointer on its Correction line. ${REGISTERED_TAIL}`);
   assert.equal(r.reason, `${r.reasonBody}${KEEP_OUT}`, 'our closing words follow the tail');
   // Several kinds asking at once: the tail still comes once, last.
   const many = check('Uses `sensor_reading_x` and `task_sla`; also `Pages read: 9`, unverified. See markdown/itsm/c_Missing.md.');
@@ -641,7 +642,7 @@ test('ARC-09-C263 M5 hook — the shipped data, as lever 2 sets it: a page cited
   assert.equal(await ask(coined), null, 'coined is grader-only');
   const asked = await ask(cited);
   assert.equal(asked?.decision, 'block', 'citedUnread asks (lever 2): the pilot, at the old text and the old routes, judged it warranted on 22 of 25 flags');
-  assert.match(asked.reason, /Cited pages that nothing in this session showed: markdown\/csm\/c_Esc\.md\./);
+  assert.match(asked.reason, /You cited pages that this session never opened: markdown\/csm\/c_Esc\.md\. Open each one now\./);
   const both = await ask(`${cited}\n${absent}`);
   assert.equal(both?.decision, 'block', 'a page cited beside a false absence: asked about');
   assert.doesNotMatch(both.reason, /is documented|no page of the corpus|not documented/, 'and only the citation is asked: the false absence is computed and not asked');
@@ -692,7 +693,7 @@ test('ARC-09-C267 hook — the shipped data: a page cited and read through Bash,
     ['an MCP call that failed', mcp({ path: page }, { is_error: true })],
     ['an MCP call given another file', mcp({ path: '/home/dev/notes/other.md' })],
     ['a listing grep in a batch', batch(`grep -l escalation ${page}`)],
-    ['python code that opens it', code('python', `print(open('${page}').read())`)],
+    ['python code that names no page', code('python', 'print(1)')],
     ['a PowerShell Select-String -Quiet', powershell(`Select-String -Path "${winPage}" -Pattern escalation -Quiet`)],
     ['a PowerShell read that failed', powershell(`Get-Content "${winPage}"`, { is_error: true })],
   ]) {

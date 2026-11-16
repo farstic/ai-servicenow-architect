@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cdOf, commandReads, joinPath, pageAt, pagesInLines, pagesOfGrep, pagesOfInput, shellSegments, shellWords, walkThread,
+  cdOf, commandReads, expandBraces, hasExpansion, inputReads, joinPath, mentionsPage, pageAt, pagesInLines, pagesOfGrep, pagesOfInput, shellSegments, shellWords, walkThread,
 } from '../tools/snowarch/lib/docs/read-routes.mjs';
 import { isPointer } from '../tools/snowarch/lib/docs/grounding-check.mjs';
 import { readSubagentRows, turnSources } from '../tools/snowarch/lib/docs/turn-sources.mjs';
@@ -58,6 +58,22 @@ test('ARC-09-C267 read-routes — shellSegments: words without their quotes, cut
   assert.deepEqual(words(undefined), []);
   const { segments } = shellSegments('cd d && (cd e; cat a.md) | cat b.md');
   assert.deepEqual(segments.map((s) => [s.words.join(' '), s.op, s.depth]), [['cd d', '', 0], ['cd e', '&&', 1], ['cat a.md', ';', 1], ['cat b.md', '|', 0]], 'the operator before each, without the parentheses, and the depth of ( )');
+});
+
+test('ARC-09-C267 read-routes — shellSegments: a segment says whether a word of it has an expansion the shell would make', () => {
+  const x = (c, o) => shellSegments(c, o).segments.map((g) => [g.words[0], g.x]);
+  assert.deepEqual(x('cat $F && ls'), [['cat', true], ['ls', false]]);
+  assert.deepEqual(x('cat \'$F\' && cat "$F"'), [['cat', false], ['cat', true]], 'single quotes keep the dollar, double quotes do not');
+  assert.deepEqual(x('cat ${F} "a/$G.md"'), [['cat', true]]);
+  assert.deepEqual(x('cat $(find .)'), [['cat', true], ['find', false]], 'the outer command is the one with the expansion');
+  assert.deepEqual(x('cat `find .`'), [['cat', true], ['find', false]]);
+  assert.deepEqual(x('cat a.md \\$F 2>&1'), [['cat', false]], 'an escaped dollar is a dollar');
+  assert.deepEqual(x('cat <<EOF\n$F\nEOF'), [['cat', false]], 'a heredoc body is not words');
+  assert.deepEqual(x('Get-Content $f', { powershell: true }), [['Get-Content', true]]);
+  assert.deepEqual(x("Get-Content '$f'", { powershell: true }), [['Get-Content', false]]);
+  assert.deepEqual(x('Write-Output `$f', { powershell: true }), [['Write-Output', false]], 'the back-tick escapes in PowerShell');
+  const owner = shellSegments("python3 - <<'PY'\nprint(1)\nPY\ncat > n.md <<'EOF'\nx\nEOF");
+  assert.deepEqual(owner.heredocs.map((h) => [h.owner[0], h.writes]), [['python3', false], ['cat', true]], 'the words of the line a heredoc belongs to');
 });
 
 test('ARC-09-C267 read-routes — shellSegments: a here-document is text, not commands; it says whether its line writes a file', () => {
@@ -134,13 +150,12 @@ test('ARC-09-C267 read-routes — commandReads: the verbs that show a page, and 
   assert.deepEqual([...commandReads(`sls ${FILE} x`, { powershell: true }).reads].map(([p]) => p), [PAGE], 'sls');
 });
 
-test('ARC-09-C267 read-routes — commandReads: what is not a read — a listing, a count, names only, a write, text, another page, a folder, a glob, other tools', () => {
+test('ARC-09-C267 read-routes — commandReads: what is not a read — a listing, a count, names only, a write, text, another page, a folder, a glob no file system answered, other tools', () => {
   for (const command of [`ls ${FOLDER}`, `ls -l ${FILE}`, `wc -l ${FILE}`, `stat ${FILE}`, `find ${FOLDER} -name '*.md'`, `file ${FILE}`, `test -f ${FILE}`, `du -h ${FILE}`,
     `grep -l escalation ${FILE}`, `grep -c escalation ${FILE}`, `grep -L escalation ${FILE}`, `grep -q escalation ${FILE}`, `grep -rl escalation ${FOLDER} ${FILE}`,
     `grep --files-with-matches x ${FILE}`, `grep --count x ${FILE}`, `rg --files ${FILE}`, `rg -c x ${FILE}`, `rg --count-matches x ${FILE}`, `rg -q x ${FILE}`,
     `grep -n ${FILE} notes.txt`, `grep -e ${FILE} notes.txt`, `echo ${FILE}`, `echo "cat ${FILE}"`, `printf '%s' ${FILE}`, `cp ${FILE} /tmp/x`, `rm ${FILE}`, `touch ${FILE}`,
-    `cat ${FOLDER}`, `cat ${FOLDER}/`, `cat ${FOLDER}/*.md`, `cat ${FOLDER}/c_{Esc,Other}.md`, `cat ${DOCS}/README.md`, `cat /home/dev/notes/other.md`, `python3 -c "print(open('${FILE}').read())"`,
-    `node -e "console.log(require('fs').readFileSync('${FILE}','utf8'))"`, `git show HEAD:vendor/ServiceNowDocs/${PAGE}`, `curl -s ${FILE}`, `cat`, '', '   ', 'true']) {
+    `cat ${FOLDER}`, `cat ${FOLDER}/`, `cat ${FOLDER}/*.md`, `cat ${DOCS}/README.md`, `cat /home/dev/notes/other.md`, `curl -s ${FILE}`, `cat`, '', '   ', 'true']) {
     assert.deepEqual(pagesOf(command), [], command);
   }
   for (const command of [`Get-ChildItem ${FOLDER}`, `Select-String -Path ${FILE} -Pattern x -Quiet`, `Get-Item ${FILE}`, `Test-Path ${FILE}`, `Write-Output ${FILE}`, `Copy-Item ${FILE} x`]) {
@@ -154,7 +169,7 @@ test('ARC-09-C267 read-routes — commandReads: a here-document that writes a fi
   const done = commandReads(`cat > notes.md <<'EOF'\nSee ${FILE}\ncat ${FILE}\nEOF\ncat ${DOCS}/${OTHER}`);
   assert.deepEqual([...done.reads.keys()], [OTHER], 'only the real command after the body');
   assert.deepEqual(done.heredocs.map((h) => h.writes), [true]);
-  assert.deepEqual(pagesOf(`python3 - <<'PY'\nprint(open('${FILE}').read())\nPY`), [], 'a script fed on stdin is not parsed');
+  assert.deepEqual(pagesOf(`python3 - <<'PY'\nprint(open('${FILE}').read())\nPY`), [], 'a script fed on stdin is not parsed for pages: its text is the names rule\'s, below');
   assert.deepEqual(pagesOf(`cat <<EOF\n${FILE}\nEOF`), [], 'a heredoc given to cat prints text the model wrote');
 });
 
@@ -233,6 +248,155 @@ test('ARC-09-C267 read-routes — pagesOfInput: a file an MCP call names, and wh
   assert.deepEqual([...pagesOfInput({ command: `sed -n 1p ${FILE}` })], [PAGE]);
 });
 
+// ---- what cannot be resolved (ARC-09-C267, the architect's ruling of 2026-11-16) ------------------------------------------------------
+test('ARC-09-C267 read-routes — expandBraces: lists, nested lists, ranges; a variable or a lone brace is left alone; a cap', () => {
+  assert.deepEqual(expandBraces('a.md'), ['a.md']);
+  assert.deepEqual(expandBraces('{a,b}.md'), ['a.md', 'b.md']);
+  assert.deepEqual(expandBraces('c_{Esc,Other}.md'), ['c_Esc.md', 'c_Other.md']);
+  assert.deepEqual(expandBraces('{x,y}/{1,2}.md'), ['x/1.md', 'x/2.md', 'y/1.md', 'y/2.md']);
+  assert.deepEqual(expandBraces('c_{Esc,{A,B}}.md'), ['c_Esc.md', 'c_A.md', 'c_B.md']);
+  assert.deepEqual(expandBraces('p{1..3}.md'), ['p1.md', 'p2.md', 'p3.md']);
+  assert.deepEqual(expandBraces('p{a..c}.md'), ['pa.md', 'pb.md', 'pc.md']);
+  assert.deepEqual(expandBraces('p{3..1}.md'), ['p3.md', 'p2.md', 'p1.md']);
+  assert.deepEqual(expandBraces('${HOME}/a.md'), ['${HOME}/a.md'], 'a variable is not a list');
+  assert.deepEqual(expandBraces('{a}.md'), ['{a}.md'], 'one item is not a list');
+  assert.deepEqual(expandBraces('{}.md'), ['{}.md']);
+  assert.deepEqual(expandBraces('x{,y}.md'), ['x.md', 'xy.md'], 'an empty item is an item');
+  assert.equal(expandBraces('{1..9}{1..9}{1..9}.md').length, 256, 'capped, and the cap is the shell\'s answer cut, not an error');
+});
+
+test('ARC-09-C267 read-routes — hasExpansion: a variable, a substitution or a back-tick outside single quotes; not a literal, not a lone dollar', () => {
+  for (const yes of ['cat $F', 'cat ${F}', 'cat $(find . -name x.md)', 'cat `find . -name x.md`', 'cat "$F"', 'cat "a/$F.md"', 'cat $1', 'echo $@']) {
+    assert.equal(hasExpansion(yes), true, yes);
+  }
+  for (const no of ['cat a.md', "cat '$F'", 'cat \\$F', 'grep -n "^foo$" a.md', 'echo $', 'echo "cost: 5$"', "echo 'a `b`'"]) {
+    assert.equal(hasExpansion(no), false, no);
+  }
+  assert.equal(hasExpansion('Get-Content $f', { powershell: true }), true);
+  assert.equal(hasExpansion('Get-Content $(Get-Item a.md)', { powershell: true }), true);
+  assert.equal(hasExpansion("Get-Content 'a$b.md'", { powershell: true }), false, 'a PowerShell single quote is literal');
+  assert.equal(hasExpansion('Write-Output `$x', { powershell: true }), false, 'the back-tick escapes in PowerShell');
+  assert.equal(hasExpansion('Get-Content `a.md', { powershell: true }), false, 'and is not a substitution there');
+  assert.equal(hasExpansion('cat a.md', { powershell: true }), false);
+  assert.equal(hasExpansion(undefined), false);
+});
+
+test('ARC-09-C267 read-routes — mentionsPage: a page\'s bare file name in a text, as a whole name and not inside another', () => {
+  const name = 'c_Esc.md';
+  for (const yes of ['cat c_Esc.md', 'cat ./c_Esc.md', 'cat dir/c_Esc.md', "open('/x/markdown/csm/c_Esc.md')", 'cat "c_Esc.md"', 'a:c_Esc.md', 'for f in c_Esc.md c_Other.md; do', 'see c_Esc.md.', 'C:\\docs\\c_Esc.md']) {
+    assert.equal(mentionsPage(yes, name), true, yes);
+  }
+  for (const no of ['cat xc_Esc.md', 'cat c_Esc.md.bak', 'cat c_Esc.mdx', 'cat -c_Esc.md', 'cat .c_Esc.md', 'cat c_Esc', 'cat c_esc.md', 'cat c_Other.md', '']) {
+    assert.equal(mentionsPage(no, name), false, no);
+  }
+  assert.equal(mentionsPage('cat xc_Esc.md c_Esc.md', name), true, 'a later whole name still counts');
+  assert.equal(mentionsPage(undefined, name), false);
+  assert.equal(mentionsPage('c_Esc.md', ''), false);
+});
+
+test('ARC-09-C267 read-routes — commandReads: a brace list is expanded in a viewer\'s arguments, whether or not a file system is given', () => {
+  assert.deepEqual(pagesOf(`sed -n 1,40p ${FOLDER}/c_{Esc,Other}.md`), [PAGE, OTHER], 'absolute');
+  assert.deepEqual(pagesOf(`cd ${FOLDER} && sed -n 1,40p {c_Esc,c_Other}.md`), [PAGE, OTHER], 'after a cd');
+  assert.deepEqual(pagesOf('sed -n 1,40p {c_Esc,c_Other}.md', { cwd: FOLDER }), [PAGE, OTHER], 'from the folder an earlier call left');
+  assert.deepEqual(pagesOf(`cat ${FOLDER}/c_{Esc,{Other,Gone}}.md`), [PAGE, OTHER, 'markdown/csm/c_Gone.md'], 'nested, and an item that is no file is still a name the shell would try');
+  assert.deepEqual(pagesOf(`Get-Content ${FOLDER}/c_{Esc,Other}.md`, { powershell: true }), [], 'PowerShell does not expand braces');
+});
+
+test('ARC-09-C267 read-routes — commandReads: a glob is asked of the file system the caller gives, from the folder the shell was in, and only under the corpus', () => {
+  const asked = [];
+  const glob = (pattern, o) => { asked.push([pattern, Boolean(o?.ci)]); return pattern.endsWith('/*.md') || pattern.endsWith('/c_*.md') ? [`${FOLDER}/c_Esc.md`, `${FOLDER}/c_Other.md`, `${FOLDER}/index.json`] : []; };
+  assert.deepEqual(pagesOf(`cat ${FOLDER}/*.md`, { glob }), [PAGE, OTHER], 'a pattern that expands to pages; the file that is no page is dropped');
+  assert.deepEqual(asked.at(-1), [`${FOLDER}/*.md`, false]);
+  assert.deepEqual(pagesOf(`cd ${FOLDER} && cat c_*.md`, { glob }), [PAGE, OTHER], 'a relative pattern after a cd');
+  assert.deepEqual(asked.at(-1), [`${FOLDER}/c_*.md`, false]);
+  assert.deepEqual(pagesOf('cat markdown/csm/c_*.md', { glob, cwd: DOCS }), [PAGE, OTHER], 'relative to the folder an earlier call left');
+  assert.deepEqual(pagesOf('cat vendor/ServiceNowDocs/markdown/csm/*.md', { glob, rowCwd: '/home/dev/install' }), [PAGE, OTHER], 'relative to the row\'s folder');
+  const before = asked.length;
+  assert.deepEqual(pagesOf('cat /tmp/*.md', { glob }), [], 'a folder outside the corpus is not asked about');
+  assert.deepEqual(pagesOf('cat *.md', { glob, cwd: '/home/dev' }), []);
+  assert.deepEqual(pagesOf('cat *.md', { glob }), [], 'no folder known: the pattern is not made absolute from the process\'s own');
+  assert.equal(asked.length, before, 'none of those reached the file system');
+  assert.deepEqual(pagesOf(`cat ${FOLDER}/{c_Esc,c_Other}*.md`, { glob }), [], 'a brace and a glob together: each form is asked');
+  assert.deepEqual(asked.slice(before).map(([p]) => p), [`${FOLDER}/c_Esc*.md`, `${FOLDER}/c_Other*.md`]);
+  assert.deepEqual(pagesOf(`cat ${FOLDER}/*.md`), [], 'with no file system the pattern shows nothing it can name');
+  pagesOf(`Get-Content "${FOLDER.replaceAll('/', '\\')}\\*.md"`, { powershell: true, glob });
+  assert.deepEqual(asked.at(-1), [`${FOLDER}/*.md`, true], 'PowerShell: forward slashes, and case does not matter');
+  assert.deepEqual(pagesOf(`grep -n escalation ${FOLDER}/*.md`, { glob }), [PAGE, OTHER], 'a search over a pattern');
+  assert.deepEqual(pagesOf(`grep -l escalation ${FOLDER}/*.md`, { glob }), [], 'a listing search over it shows no page');
+});
+
+test('ARC-09-C267 read-routes — commandReads: what cannot be resolved is returned as the text of the call, for the names rule', () => {
+  const un = (c, o) => commandReads(c, o).unresolved;
+  const names = (c, o) => un(c, o).some((t) => mentionsPage(t, 'c_Esc.md'));
+  // the architect's four, and their relatives
+  for (const command of ['for f in c_Esc.md c_Other.md; do head -20 "$f"; done', 'find . -name c_Esc.md | xargs cat', 'find . -name c_Esc.md -exec cat {} \;', 'find . -name c_Esc.md -execdir head -5 {} +',
+    'cat $(find . -name c_Esc.md)', 'cat `find . -name c_Esc.md`', 'F=c_Esc.md; cat $F', 'while read f; do sed -n 1,5p $f; done <<< c_Esc.md', 'ls c_Esc.md | parallel cat {}',
+    'eval "cat c_Esc.md"', 'bash -c "cat c_Esc.md"', 'sh -c \'head c_Esc.md\'', 'echo c_Esc.md | xargs -I{} sed -n 1,3p {}']) {
+    assert.equal(names(command), true, command);
+  }
+  // another language, by name or through a wrapper, and what a heredoc into it holds
+  for (const command of [`python3 -c "print(open('${FILE}').read())"`, `python -c "open('${FILE}')"`, `node -e "require('fs').readFileSync('${FILE}')"`, `perl -ne 'print' ${FILE}`, `ruby -e 'puts File.read("${FILE}")'`,
+    `php -r 'echo file_get_contents("${FILE}");'`, `nice -n 10 python3 -c "open('${FILE}')"`, `timeout 5 node -e "open('${FILE}')"`, `env LANG=C python3 -c "open('${FILE}')"`,
+    `git show HEAD:vendor/ServiceNowDocs/${PAGE}`, `git -C vendor/ServiceNowDocs cat-file -p HEAD:${PAGE}`, `git blame ${FILE}`, `git log -p -- ${FILE}`,
+    `python3 - <<'PY'\nprint(open('${FILE}').read())\nPY`, `node - <<EOF > out.txt\nrequire('fs').readFileSync('${FILE}')\nEOF`]) {
+    assert.equal(names(command), true, command);
+  }
+  // a variable or a substitution in a viewer's arguments makes the call unresolved, and so does a viewer with nothing to name its pages
+  assert.equal(names('cd "$REPO" && cat "$DOCS"/c_Esc.md && ls'), true, 'the whole call is the text');
+  assert.equal(names('cd "$REPO" && cat c_Esc.md', { cwd: FOLDER }), false, 'a variable in another command of the call is not in a viewer\'s words: the viewer\'s page is the definite one');
+  assert.equal(names('$VIEWER c_Esc.md'), true, 'a verb the shell builds could be anything');
+  assert.equal(names(`FILE=${FILE}; head -50 "$FILE"`), true);
+  assert.equal(names(`cat ${DOCS}/markdown/csm/$(echo c_Esc).md`), false, 'a name the shell builds is not in the text');
+  // PowerShell
+  for (const command of [`Get-ChildItem ${FOLDER} -Filter c_Esc.md | Get-Content`, `gci -Recurse -Filter c_Esc.md | gc`, `Get-ChildItem c_Esc.md | ForEach-Object { Get-Content $_ }`,
+    "foreach ($f in 'c_Esc.md') { Get-Content $f }", `$p = 'c_Esc.md'; Get-Content $p`, `[System.IO.File]::ReadAllText('${FILE}')`, "'c_Esc.md' | % { gc $_ }", `python -c "open('${FILE}')"`, `Invoke-Expression "gc ${FILE}"`]) {
+    assert.equal(names(command, { powershell: true }), true, command);
+  }
+  // not unresolved: a command that cannot show a page, with a variable or not; a definite read
+  for (const command of ['ls $DIR/c_Esc.md', 'echo $HOME c_Esc.md', 'grep -l x $F c_Esc.md', 'cd $REPO && ls c_Esc.md', 'wc -l c_Esc.md', 'cp c_Esc.md $DEST', `cat ${FILE}`, `ls ${FILE}`, 'find . -name c_Esc.md', 'git status c_Esc.md', 'curl -s c_Esc.md']) {
+    assert.deepEqual(un(command), [], command);
+  }
+  assert.deepEqual(un('Get-ChildItem c_Esc.md', { powershell: true }), []);
+  assert.deepEqual(un('Get-Content c_Esc.md | Select-String x', { powershell: true, cwd: FOLDER }), [], 'a read that feeds a pipe is a definite read, and the search after it has no file to name');
+  assert.equal(names('Get-Content c_Esc.md | Get-Content', { powershell: true, cwd: FOLDER }), true, 'a Get-Content with nothing to name reads what the pipe gives it');
+});
+
+test('ARC-09-C267 read-routes — commandReads: the text of an unresolved call has its heredoc bodies when they are a script, not when they are text a command writes', () => {
+  const text = (c) => commandReads(c).unresolved.join('\n');
+  assert.match(text(`python3 - <<'PY'\nopen('c_Esc.md')\nPY`), /open\('c_Esc.md'\)/, 'a script on stdin');
+  assert.match(text(`python3 - > out.txt <<'PY'\nopen('c_Esc.md')\nPY`), /open\('c_Esc.md'\)/, 'even when the interpreter\'s output goes to a file');
+  assert.doesNotMatch(text(`cat > notes.md <<'EOF'\nsee c_Other.md\nEOF\nfind . -name x.md | xargs cat`), /c_Other/, 'a body that a cat writes is the model\'s text, not what the call read');
+  assert.match(text(`cat > notes.md <<'EOF'\nsee c_Other.md\nEOF\nfind . -name x.md | xargs cat`), /x\.md/);
+  assert.deepEqual(commandReads('ls \'$F\' c_Esc.md').unresolved, [], 'a single-quoted dollar is a literal');
+});
+
+test('ARC-09-C267 read-routes — commandReads: a folder the call cannot tell (an unresolvable cd, no cwd at all) leaves a relative .md name unresolved, not lost', () => {
+  const un = (c, o) => commandReads(c, o).unresolved;
+  const lost = commandReads(`cd "$REPO/vendor/ServiceNowDocs/markdown/csm" && sed -n 1,60p c_Esc.md`, { rowCwd: '/home/dev/install' });
+  assert.deepEqual([...lost.reads], [], 'no page it can name');
+  assert.deepEqual(lost.unresolved, ['c_Esc.md'], 'the name the model typed');
+  assert.deepEqual([lost.moved, lost.lost, lost.cwd], [true, true, null], 'and the folder is lost for the calls that follow');
+  assert.deepEqual(un('sed -n 1,60p c_Esc.md', { lost: true, rowCwd: '/home/dev/install' }), ['c_Esc.md'], 'the next call, with the folder still lost');
+  assert.deepEqual(un('cat c_Esc.md notes.txt'), ['c_Esc.md'], 'no folder known at all; a name that is no .md is nothing to match');
+  assert.deepEqual(un('cat notes.md', { cwd: '/home/dev' }), [], 'a folder that is known and is not the corpus: not a page, not unresolved');
+  assert.deepEqual(un(`cat c_Esc.md`, { cwd: FOLDER }), [], 'a folder that is known and is the corpus: a page');
+  const found = commandReads(`cd "$REPO" ; cd ${FOLDER}; cat c_Esc.md`);
+  assert.deepEqual([...found.reads.keys(), found.lost, found.cwd], [PAGE, false, FOLDER], 'a later cd to a folder it can tell ends the loss');
+  assert.deepEqual(un(`cat ${FOLDER}/*.md`, { glob: () => [] }), [`${FOLDER}/*.md`], 'a glob nothing answered');
+});
+
+test('ARC-09-C267 read-routes — inputReads: an MCP call\'s files, its shell lines, and the code of another language as text', () => {
+  const r = inputReads({ language: 'python', code: `print(open('${FILE}').read())` });
+  assert.deepEqual([[...r.pages], r.unresolved], [[], [`print(open('${FILE}').read())`]]);
+  assert.deepEqual([...inputReads({ language: 'shell', code: `head ${FILE}` }).pages], [PAGE]);
+  const batch = inputReads({ commands: [{ label: 'a', command: 'find . -name c_Esc.md | xargs cat' }, { label: 'b', command: `cat ${DOCS}/${OTHER}` }], queries: ['q'] });
+  assert.deepEqual([...batch.pages], [OTHER]);
+  assert.ok(batch.unresolved.some((t) => mentionsPage(t, 'c_Esc.md')));
+  assert.deepEqual([...inputReads({ language: 'shell', code: 'cat *.md' }, { rowCwd: FOLDER, glob: () => [`${FOLDER}/c_Esc.md`] }).pages], [PAGE], 'the file system and the row\'s folder reach an MCP shell line too');
+  assert.deepEqual(inputReads({ language: 'javascript', code: '' }).unresolved, [], 'no code, nothing');
+  assert.deepEqual(inputReads(undefined).unresolved, []);
+});
+
 // ---- one thread --------------------------------------------------------------------------------------------------------------------------
 test('ARC-09-C267 read-routes — walkThread: a call counts only when it came back without an error, and the route that showed the page is kept', () => {
   const rows = [
@@ -268,6 +432,36 @@ test('ARC-09-C267 read-routes — walkThread: a cd that succeeded carries to the
     ...call('c8', 'Bash', { command: 'cat c_Never.md' }),
   ];
   assert.deepEqual([...walkThread(rows).reached.keys()], [PAGE, OTHER, 'markdown/csm/c_Third.md', 'markdown/csm/c_Fourth.md']);
+});
+
+test('ARC-09-C267 read-routes — walkThread: an unresolved call is kept as text with its row, an errored one is not, a lost folder carries and a later cd ends it', () => {
+  const rows = [
+    U('q'),
+    ...call('o1', 'Bash', { command: 'find . -name c_Esc.md | xargs cat' }),
+    ...call('o2', 'Bash', { command: 'python3 -c "open(\'c_Other.md\')"' }, 'Exit code 1', { error: true }),
+    ...call('o3', 'Bash', { command: 'cd "$REPO/vendor/ServiceNowDocs/markdown/csm"' }),
+    ...call('o4', 'Bash', { command: 'sed -n 1,10p c_Third.md' }),
+    ...call('o5', 'Bash', { command: `cd ${FOLDER}` }),
+    ...call('o6', 'Bash', { command: 'head -3 c_Fourth.md' }),
+    ...call('o7', MCP_FILE, { language: 'python', code: "open('c_Fifth.md')" }),
+  ];
+  const { opaque, reached } = walkThread(rows);
+  assert.deepEqual(opaque.map((o) => o.text), ['find . -name c_Esc.md | xargs cat', 'c_Third.md', "open('c_Fifth.md')"], 'the call that failed is not there, the folder was lost for o4 only');
+  assert.deepEqual(opaque.map((o) => o.at), [1, 5, 13], 'and the row of each');
+  assert.deepEqual([...reached.keys()], ['markdown/csm/c_Fourth.md'], 'what the second cd made resolvable is a definite read');
+});
+
+test('ARC-09-C267 read-routes — walkThread and turnSources take the file system the caller gives: a pattern in a call shows the pages it expands to', () => {
+  const asked = [];
+  const glob = (pattern) => { asked.push(pattern); return [`${FOLDER}/c_Esc.md`, `${FOLDER}/c_Other.md`]; };
+  const rows = [U('q'), ...call('g1', 'Bash', { command: `cat ${FOLDER}/*.md` }, '1\tThe sn\\_escalation table.')];
+  assert.deepEqual([...walkThread(rows, { glob }).reached.keys()], [PAGE, OTHER]);
+  assert.deepEqual([...walkThread(rows).reached.keys()], [], 'without one the pattern names nothing');
+  const t = turnSources(rows, { glob });
+  assert.deepEqual([[...t.reached.keys()], [...t.pagesRead], t.names.read.has('sn_escalation')], [[PAGE, OTHER], [PAGE, OTHER], true], 'and the names those pages print are sourced');
+  const text = turnSources([U('q'), ...call('p', 'Bash', { command: 'python3 -c "open(\'c_Esc.md\')"' })]);
+  assert.deepEqual(text.opaque, ['python3 -c "open(\'c_Esc.md\')"'], 'turnSources carries the unresolved texts of every row');
+  assert.ok(asked.length >= 1);
 });
 
 test('ARC-09-C267 read-routes — walkThread: a search\'s printed lines name pages (route search); the shell calls are kept by id, for the names a page\'s text sources', () => {

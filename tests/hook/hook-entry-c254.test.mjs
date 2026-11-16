@@ -317,4 +317,5 @@ test('ARC-09-C263 — the classes that block and the ubiquity threshold are data
   assert.equal(ask(coined), null, 'a missing file switches the asks off');
   assert.equal(ask(unread), null, 'the page too');
   assert.equal(JSON.parse(runEntry(entry, root, stopping(dead)).stdout).decision, 'block', 'and C254, which does not read the file, still sends a dead citation back');
+  assert.deepEqual(ask(dead), JSON.parse(c254Alone.stdout), 'with no classes file and a transcript to read, the dead-path line is sent back byte for byte as C254 alone sends it');
 });

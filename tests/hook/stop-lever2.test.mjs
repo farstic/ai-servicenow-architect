@@ -90,8 +90,8 @@ withInstall('ARC-09-C267 lever 2 — nothing read: the cited page is asked about
   asked(d, PAGE.alpha, PAGE.beta);
   assert.ok(d.reason.startsWith(LEAD));
   assert.ok(d.reason.endsWith(KEEP_OUT));
-  assert.ok(d.reason.includes(`Cited pages that nothing in this session showed: ${PAGE.alpha}, ${PAGE.beta}.`), d.reason);
-  assert.ok(d.reason.includes('Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer.'));
+  assert.ok(d.reason.includes('You cited pages that this session never opened: ' + `${PAGE.alpha}, ${PAGE.beta}. Open each one now. Where a page contradicts your answer, correct the answer. Where a citation only tells the reader where to look, mark it as a pointer on its Correction line.`), d.reason);
+  assert.doesNotMatch(d.reason, /Cited pages that nothing in this session showed/, 'the earlier words are gone');
   // One ask a turn: the continuation of that turn is never asked again, however it ends.
   const again = await stop(t, { rows: [], message: cite(PAGE.alpha), input: { stop_hook_active: true } });
   silent(again, 'the continuation');
@@ -169,7 +169,7 @@ withInstall('ARC-09-C267 lever 2 — a sub-agent\'s reads and the reads before a
   asked(await stop(t, { rows: [...readPage('r1', page), ...compaction()], message: cite(PAGE.gamma) }), PAGE.gamma);
 });
 
-withInstall('ARC-09-C267 lever 2 — what is not a read: a heredoc that writes a file, a failed command, another page, a listing, a grep that lists names, a directory', async (t, i) => {
+withInstall('ARC-09-C267 lever 2 — what is not a read: a heredoc that writes a file, a failed command, another page, a listing, a grep that lists names, a directory, a variable in a command that cannot show a page', async (t, i) => {
   const page = i.abs(PAGE.alpha);
   const heredoc = `cat > ${join(i.root, 'notes.md')} <<'EOF'\ncat ${page}\nSee ${PAGE.alpha} and read ${page}\nEOF`;
   asked(await stop(t, { rows: bash('b', heredoc), message: cite(PAGE.alpha) }), PAGE.alpha);
@@ -180,7 +180,6 @@ withInstall('ARC-09-C267 lever 2 — what is not a read: a heredoc that writes a
   asked(await stop(t, { rows: bash('b', `grep -c escalation ${page}`), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: bash('b', `grep -rn escalation ${i.folder(PAGE.alpha)}`), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: bash('b', `wc -l ${page}`), message: cite(PAGE.alpha) }), PAGE.alpha);
-  asked(await stop(t, { rows: bash('b', `python3 -c "print(open('${page}').read())"`), message: cite(PAGE.alpha) }), PAGE.alpha);
   // a cat that shows the page after a heredoc in the same command line still reads it
   silent(await stop(t, { rows: bash('b', `cat > ${join(i.root, 'n.md')} <<'EOF'\nnotes\nEOF\ncat ${page}`), message: cite(PAGE.alpha) }), 'a cat after the heredoc');
 });
@@ -239,7 +238,7 @@ withInstall('ARC-09-C267 lever 2 — one ask a turn: two pages, one block; the c
   const message = `${cite(PAGE.alpha)} ${cite(PAGE.beta)}`;
   const d = await stop(t, { rows: [], message });
   assert.equal(d.decision, 'block');
-  assert.equal(d.reason.match(/Cited pages that nothing in this session showed/g).length, 1, 'one clause for both pages');
+  assert.equal(d.reason.match(/You cited pages that this session never opened/g).length, 1, 'one clause for both pages');
   // The continuation after our block: our feedback row, then what the model did.
   const feedback = U(`Stop hook feedback:\n${d.reason}`, { isMeta: true });
   const ignored = await stop(t, { rows: [A([{ type: 'text', text: message }]), feedback, A([{ type: 'text', text: 'Understood.' }])], message: `Understood. ${cite(PAGE.alpha)}`, input: { stop_hook_active: true } });
@@ -261,6 +260,141 @@ withInstall('ARC-09-C267 lever 2 — one ask a turn: two pages, one block; the c
   const still = await stop(t, { rows: [...early, A([{ type: 'text', text: message }]), feedback2, A([{ type: 'text', text: 'Understood.' }])], message: 'Understood.', input: { stop_hook_active: true } });
   assert.match(still.systemMessage, new RegExp(PAGE.beta.replaceAll('.', '\\.')), 'the page nobody read stays open');
   assert.doesNotMatch(still.systemMessage, new RegExp(PAGE.alpha.replaceAll('.', '\\.')), 'and the one read before the compaction is not reported');
+});
+
+// ---- what cannot be resolved: the architect's ruling of 2026-11-16, because the pre-registration has a guard of 0 false "unread" claims ----------
+withInstall('ARC-09-C267 lever 2 — a glob or a brace list in a viewer command is expanded against the file system, from the folder the shell is in', async (t, i) => {
+  const folder = i.folder(PAGE.alpha);                 // holds c_Alpha.md and c_Beta.md, and no other file
+  const both = `${cite(PAGE.alpha)} ${cite(PAGE.beta)}`;
+  silent(await stop(t, { rows: bash('b', `cat ${folder}/*.md`), message: both }), 'cat dir/*.md');
+  silent(await stop(t, { rows: bash('b', `cd ${folder} && cat c_*.md`), message: both }), 'a pattern after a cd');
+  silent(await stop(t, { rows: bash('b', `cd ${i.corpus} && head -5 markdown/it-service-management/*.md`), message: both }), 'relative to the corpus folder');
+  silent(await stop(t, { rows: [...bash('b1', `cd ${folder}`), ...bash('b2', 'cat c_?lpha.md c_B[a-z]*.md')], message: both }), 'a cd in the call before, ? and a class');
+  silent(await stop(t, { rows: bash('b', `cd ${folder} && sed -n 1,40p {c_Alpha,c_Beta}.md`), message: both }), 'sed -n 1,40p {a,b}.md');
+  silent(await stop(t, { rows: bash('b', `sed -n 1,40p ${folder}/c_{Alpha,Beta}.md`), message: both }), 'a brace list in an absolute path');
+  silent(await stop(t, { rows: bash('b', `cat ${i.corpus}/markdown/**/c_Alpha.md`), message: cite(PAGE.alpha) }), '**');
+  silent(await stop(t, { rows: bash('b', `grep -n table ${folder}/*.md`), message: both }), 'a search over a pattern');
+  silent(await stop(t, { rows: bash('b', `ls ${folder} && cat ${folder}/c_[AB]*.md | head -5`), message: both }), 'a pattern after a listing, at the head of a pipe');
+  // only the pages the pattern expands to
+  asked(await stop(t, { rows: bash('b', `cat ${folder}/c_B*.md`), message: both }), PAGE.alpha);
+  asked(await stop(t, { rows: bash('b', `cat ${folder}/*.md`), message: cite(PAGE.gamma) }), PAGE.gamma);
+  asked(await stop(t, { rows: bash('b', 'cat /tmp/*.md'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  asked(await stop(t, { rows: bash('b', `grep -l table ${folder}/*.md`), message: both }), PAGE.alpha);
+  asked(await stop(t, { rows: bash('b', `cat ${folder}/*.md`, { error: true }), message: cite(PAGE.alpha) }), PAGE.alpha);
+  // PowerShell takes the same patterns, with back-slashes and any case
+  const win = folder.replaceAll('/', '\\');
+  silent(await stop(t, { rows: powershell('p', `Get-Content "${win}\\*.md" -TotalCount 40`), message: both }), 'Get-Content over a pattern');
+  silent(await stop(t, { rows: powershell('p', `Select-String -Path "${win}\\C_A*.MD" -Pattern table`), message: cite(PAGE.alpha) }), 'Select-String, another case');
+});
+
+withInstall('ARC-09-C267 lever 2 — what cannot be resolved counts every page whose path or bare file name is in the call: a variable, a loop, xargs, a substitution, another language', async (t, i) => {
+  const folder = i.folder(PAGE.alpha);
+  const page = i.abs(PAGE.alpha);
+  const CTX_EXEC = ['mcp', 'context-mode', 'ctx_execute'].join('__');
+  for (const command of [
+    'for f in c_Alpha.md c_Beta.md; do head -20 "$f"; done',
+    'find . -name c_Alpha.md | xargs cat',
+    `find ${folder} -name c_Alpha.md -exec cat {} \;`,
+    `cat $(find ${folder} -name c_Alpha.md)`,
+    `F=${page}; cat "$F"`,
+    `python3 -c "print(open('${page}').read())"`,
+    `node -e "console.log(require('fs').readFileSync('${page}','utf8'))"`,
+    `bash -c "cat ${page}"`,
+    `git -C ${i.corpus} show HEAD:markdown/it-service-management/c_Alpha.md`,
+    `python3 - <<'PY'\nprint(open('${page}').read())\nPY`,
+    `cd "$CORPUS/markdown/it-service-management" && sed -n 1,60p c_Alpha.md`,
+  ]) {
+    silent(await stop(t, { rows: bash('b', command), message: cite(PAGE.alpha) }), command);
+    asked(await stop(t, { rows: bash('b', command), message: cite(PAGE.gamma) }), PAGE.gamma);
+    asked(await stop(t, { rows: bash('b', command, { error: true }), message: cite(PAGE.alpha) }), PAGE.alpha);
+  }
+  silent(await stop(t, { rows: bash('b', 'for f in c_Alpha.md c_Beta.md; do head -20 "$f"; done'), message: `${cite(PAGE.alpha)} ${cite(PAGE.beta)}` }), 'both named in the loop');
+  // the name is a whole name and the call is a command that could show a page
+  for (const command of ['ls $DIR/c_Alpha.md', 'echo $HOME c_Alpha.md', 'cp c_Alpha.md $DEST', 'find . -name c_Alpha.md', 'git status c_Alpha.md', `python3 -c "open('xc_Alpha.md')"`, `python3 -c "open('c_Alpha.md.bak')"`,
+    "cat > notes.md <<'EOF'\nsee c_Alpha.md\nEOF\npython3 -c 'print(1)'"]) {
+    asked(await stop(t, { rows: bash('b', command), message: cite(PAGE.alpha) }), PAGE.alpha);
+  }
+  // another language through an MCP code tool, a batch with xargs, a sub-agent's call, and PowerShell
+  const code = (language, source) => [use('e', CTX_EXEC, { language, code: source }), res('e', [{ type: 'text', text: 'a summary' }])];
+  silent(await stop(t, { rows: code('python', `print(open('${page}').read())`), message: cite(PAGE.alpha) }), 'python code in an MCP tool');
+  silent(await stop(t, { rows: code('javascript', `require('fs').readFileSync('c_Alpha.md')`), message: cite(PAGE.alpha) }), 'javascript code in an MCP tool');
+  asked(await stop(t, { rows: code('python', 'print(1)'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  const batch = [use('c', CTX_BATCH, { commands: [{ label: 'x', command: 'find . -name c_Alpha.md | xargs cat' }], queries: ['q'] }), res('c', [{ type: 'text', text: 'a section' }])];
+  silent(await stop(t, { rows: batch, message: cite(PAGE.alpha) }), 'a batch command with xargs');
+  const agent = [use('a1', 'Agent', { subagent_type: 'general-purpose', prompt: 'read it' }), res('a1', 'It says X.')];
+  silent(await stop(t, { rows: agent, side: { a1: bash('s', 'find . -name c_Alpha.md | xargs cat') }, message: cite(PAGE.alpha) }), 'a sub-agent\'s xargs');
+  asked(await stop(t, { rows: agent, side: { a1: bash('s', 'find . -name c_Alpha.md') }, message: cite(PAGE.alpha) }), PAGE.alpha);
+  for (const command of [`Get-ChildItem ${folder} -Filter c_Alpha.md | Get-Content`, "foreach ($f in 'c_Alpha.md') { Get-Content $f }", `$p = '${page}'; Get-Content $p`, `python -c "open('${page}')"`]) {
+    silent(await stop(t, { rows: powershell('p', command), message: cite(PAGE.alpha) }), command);
+  }
+  asked(await stop(t, { rows: powershell('p', 'Get-ChildItem c_Alpha.md'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  // a folder the call cannot tell, over two calls: the second call's relative name is the first's lost folder
+  silent(await stop(t, { rows: [...bash('b1', 'cd "$CORPUS/markdown/it-service-management"'), ...bash('b2', 'sed -n 1,60p c_Alpha.md')], message: cite(PAGE.alpha) }), 'a lost folder carries');
+  asked(await stop(t, { rows: [...bash('b1', 'cd "$CORPUS/markdown/it-service-management"'), ...bash('b2', 'sed -n 1,60p c_Alpha.md')], message: cite(PAGE.beta) }), PAGE.beta);
+  asked(await stop(t, { rows: [...bash('b1', 'cd "$CORPUS/markdown/it-service-management"'), ...bash('b2', `cd ${folder}`), ...bash('b3', 'sed -n 1,60p c_Beta.md')], message: cite(PAGE.alpha) }), PAGE.alpha);
+});
+
+// ---- what stays open after the ask: the citations recomputed on the final answer ---------------------------------------------------------
+withInstall('ARC-09-C267 lever 2 — the notice recomputes the citations on the final answer after the continuation: one withdrawn is resolved, one still cited and unread stays open', async (t, i) => {
+  const message = `${cite(PAGE.alpha)} ${cite(PAGE.beta)}`;
+  const d = await stop(t, { rows: [], message });
+  const feedback = U(`Stop hook feedback:\n${d.reason}`, { isMeta: true });
+  const after = (text, extra = [], input = {}) => stop(t, { rows: [A([{ type: 'text', text: message }]), feedback, ...extra, A([{ type: 'text', text }])], message: text, input: { stop_hook_active: true, ...input } });
+  const re = (page) => new RegExp(page.replaceAll('.', '\\.'));
+  // it withdrew the first and kept the second
+  const kept = await after(`Correction: the matrix rests on ${PAGE.beta} alone.`);
+  assert.match(kept.systemMessage, re(PAGE.beta));
+  assert.doesNotMatch(kept.systemMessage, re(PAGE.alpha), 'the withdrawn citation is not in the notice');
+  // it withdrew both, without writing either path again, as the ask says
+  silent(await after('Correction: both citations are withdrawn; the answer rests on the skill text.'), 'both withdrawn');
+  // a Correction line that names a page and says it is withdrawn, removed or dropped
+  silent(await after(`Correction: ${PAGE.alpha} withdrawn.\nCorrection: ${PAGE.beta} removed from the answer.`), 'withdrawn and removed, on Correction lines');
+  // a page the continuation marks a pointer, one it withdrew, and a page that first appears now and was not read
+  const mixed = await after(`Correction: ${PAGE.alpha} is a pointer.\nCorrection: ${PAGE.beta} withdrawn.\nThe rest is in ${PAGE.gamma}.`);
+  assert.match(mixed.systemMessage, re(PAGE.gamma));
+  assert.doesNotMatch(mixed.systemMessage, new RegExp(`${PAGE.alpha.replaceAll('.', '\\.')}|${PAGE.beta.replaceAll('.', '\\.')}`));
+  // the answer restated with both citations: both stay open; one of them read after the ask: one
+  const restated = await after(message);
+  assert.match(restated.systemMessage, re(PAGE.alpha));
+  assert.match(restated.systemMessage, re(PAGE.beta));
+  const oneRead = await after(message, readPage('r1', i.abs(PAGE.alpha)));
+  assert.doesNotMatch(oneRead.systemMessage, re(PAGE.alpha), 'read after the ask');
+  assert.match(oneRead.systemMessage, re(PAGE.beta));
+  // By the ruling, a continuation that does not cite a page has withdrawn it: "Understood." and nothing else leaves the notice empty.
+  silent(await after('Understood.'), 'nothing cited in the final answer');
+  // A file the turn wrote follows the same rule: the citations of what the continuation wrote are the ones that count.
+  const file = join(i.root, 'clients', 'acme', 'envelopes', 'e2.md');
+  const write = (id, content) => [use(id, 'Write', { file_path: file, content }), res(id, 'ok')];
+  const saved = await stop(t, { rows: write('w', `The matrix (citation: ${PAGE.alpha}) and ${PAGE.beta}.\n`), message: 'Saved.' });
+  asked(saved, PAGE.alpha, PAGE.beta);
+  const fb = U(`Stop hook feedback:\n${saved.reason}`, { isMeta: true });
+  const rewrite = async (content, text) => stop(t, { rows: [...write('w', `The matrix (citation: ${PAGE.alpha}) and ${PAGE.beta}.\n`), A([{ type: 'text', text: 'Saved.' }]), fb, ...write('w2', content), A([{ type: 'text', text }])], message: text, input: { stop_hook_active: true } });
+  silent(await rewrite('The matrix, with no citation.\n', 'Correction: the citations are removed from the file.'), 'the file rewritten without them');
+  const still = await rewrite(`The matrix (citation: ${PAGE.alpha}).\n`, 'Saved again.');
+  assert.match(still.systemMessage, re(PAGE.alpha));
+  assert.doesNotMatch(still.systemMessage, re(PAGE.beta));
+});
+
+// ---- C254 does not read the classes file --------------------------------------------------------------------------------------------------
+withInstall('ARC-09-C267 lever 2 — with no classes file at all, C254\'s dead-path line in the answer still works, and the grounding asks stay off', async (t, i) => {
+  const dead = 'markdown/it-service-management/wrong-folder/c_Alpha.md';   // the one page of that name is in the cited area: C254 knows where it is
+  const message = `The rule is in (citation: ${dead}).`;
+  for (const classesText of [undefined, null, 'not json', '{"blocking": []}']) {
+    const d = await stop(t, { rows: [], message, shipped: true, seams: { classesText } });
+    assert.equal(d?.decision, 'block', `a dead path with the classes file ${JSON.stringify(classesText)}`);
+    assert.ok(d.reason.includes(`${dead} -> ${PAGE.alpha}`), d.reason);
+    assert.ok(d.reason.endsWith(KEEP_OUT));
+    assert.doesNotMatch(d.reason, /you cited pages that this session never opened/i, 'and only C254 speaks');
+  }
+  // beside a page that nothing read: C254's line alone without the file, both with it, C254 first
+  const both = `${message} And ${cite(PAGE.beta)}`;
+  const none = await stop(t, { rows: [], message: both, shipped: true, seams: { classesText: undefined } });
+  assert.doesNotMatch(none.reason, /never opened/);
+  assert.ok(none.reason.includes(`${dead} -> ${PAGE.alpha}`));
+  const shipped = await stop(t, { rows: [], message: both, shipped: true });
+  assert.ok(shipped.reason.indexOf(`${dead} -> ${PAGE.alpha}`) >= 0 && shipped.reason.indexOf('You cited pages that this session never opened') > shipped.reason.indexOf(dead), 'C254 first, then the grounding ask');
+  assert.ok(shipped.reason.includes(PAGE.beta));
+  assert.ok(!shipped.reason.includes(`never opened: ${dead}`) && !/never opened: .*wrong-folder/.test(shipped.reason), 'the dead path is C254\'s, not asked about twice');
 });
 
 // ---- the classes file --------------------------------------------------------------------------------------------------------------
