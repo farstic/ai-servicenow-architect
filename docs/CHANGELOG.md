@@ -26,8 +26,20 @@ citation over a comma is now the page of that name in that path's folder, and `d
 before the corpus bump of 2026-11-15 it reports the four names that the bump took out of the corpus, which the check passed over;
 on this tree it reads 22 such names, and all of them resolve.
 
+**The Windows install guide has a form that runs from disk.** `docs/AI-Architect-Windows-Install-Guide.html` is one file that opens in Edge or
+Chrome without a server: the steps of `docs/INSTALL-WINDOWS.md`, a Copy button on every command, and helpers that read what a reader pastes back and
+say what is wrong. A reader types a licence file name and an instance label once and every command uses them. Progress stays in the browser and
+nothing leaves the page. The release writer moves its clone tag and its release with every final, the signed manifest covers it, and each GitHub
+Release carries it as an asset, so a reader with nothing installed can download it before cloning.
+
 ### Added
 
+- `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
+  with nothing fetched but its fonts. It has Copy and "ran it" on each of the 49 commands, a contents list that follows the reader, live and
+  design-only, a checklist, a practice for the seven wizard questions, a permissions builder, a problem search, a help message that holds no
+  address and no password, and counters for the four slow commands. `tests/install-windows-guide-html.test.mjs` holds every command to the
+  Markdown guide's, in order, and the version floors, the permission presets, the licence words and the installer's check keys to the product;
+  it runs the page's own checks on the lines `checkLine` and `bannerLine` print (ARC-09-C285).
 - `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
   word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints
   whether the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a
@@ -35,6 +47,12 @@ on this tree it reads 22 such names, and all of them resolve.
 
 ### Changed
 
+- The release writes the interactive Windows guide (`writeGuideRelease`, beside `writeInstallTag`): its clone command, and the `release` field its
+  hero and help message read. A release candidate leaves the page alone, as it leaves the other pages, and a page without the field is refused. The
+  page is in the signed manifest's coverage (`packages/snowarch/src/licence/integrity.ts`), so a distribution carries it, and `release.yml` attaches
+  it to the GitHub Release, which now has eight assets (ARC-09-C285).
+- The pinned-clone guards of `tests/install-page.test.mjs` read the interactive guide too: its clone command quiets git's detached-HEAD advice,
+  names a release, and names the newest one that exists (ARC-09-C285).
 - The corpus map, `vendor/docs-map.md`, no longer shows a release family at the start of an area's title. The corpus is the
   Australia family's, and 45 of its area index titles open with "Brazil", four delta areas with "australia" and one with
   "Australia"; the map copied them and read as a map of the Brazil family's documentation. `scripts/gen-docs-map.mjs` now leaves a

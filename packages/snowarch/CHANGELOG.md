@@ -5,6 +5,10 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**The shipped list names the interactive Windows install guide (ARC-09-C285).** `docs/AI-Architect-Windows-Install-Guide.html` joins the user's
+documentation in the release coverage (`licence/integrity.ts`), beside `docs/INSTALL-WINDOWS.md`, so a distribution carries it and its signed
+manifest covers it. Nothing else in the package changed.
+
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.

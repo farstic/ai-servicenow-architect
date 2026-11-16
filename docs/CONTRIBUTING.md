@@ -1511,7 +1511,8 @@ door, not so that the archive waits on an empty issue list.
 `release.yml` runs on `v*` tags only. It re-runs every gate on ubuntu, macOS and Windows, verifies
 that the tag's message describes the tree it is on, and publishes a GitHub Release with seven
 assets: three `doctor-<os>.json`, three `install-metrics-<os>.json`, and the merged
-`install-metrics.md`. Nothing is published until `assert-assets.mjs` has read every file — a doctor
+`install-metrics.md`; an eighth, the interactive Windows install guide (`docs/AI-Architect-Windows-Install-Guide.html`, ARC-09-C285),
+is the page as it is at the tag. Nothing is published until `assert-assets.mjs` has read every report — a doctor
 report attached to a public Release is permanent in a way a pasted one is not.
 
 **A final from 2.2.1 is released through farstic/snowarch, in this order (ARC-09-C185b):** the rehearsal here, then the
@@ -1558,8 +1559,8 @@ node scripts/release.mjs X.Y.Z-rc.N --tag-only --allow-prerelease --allow-branch
 git push origin vX.Y.Z-rc.N
 ```
 
-Then watch `release.yml`: green on all three OSes, seven assets on the Release (three
-`doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`), and the two
+Then watch `release.yml`: green on all three OSes, eight assets on the Release (three
+`doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, the Windows install guide), and the two
 negatives refused. Afterwards delete the Release, the tag and the branch — locally and on the
 remote — and record what the run showed in the fields below.
 
@@ -1723,7 +1724,7 @@ The checklist, verbatim — paste it into the release pull request's description
 >    ARC-09-C206.** The cut renames that block to the version, holding what was written, and opens the next
 >    Unreleased with its open "Known gap" paragraphs carried. A final whose `packages/snowarch/src` changed since the
 >    previous final, with nothing written there, is refused before anything is written.
-> 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
+> 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md` and the Windows install guide.
 > 7. Update the install page's metrics link if the numbers moved; announce.
 > 8. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
 > 9. **Move `develop` to the next `-dev` version.** This step was missing, and its absence has a
