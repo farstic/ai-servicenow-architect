@@ -10,7 +10,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pagesInLines, pagesOfGrep, walkThread, wordNamesPage } from '../tools/snowarch/lib/docs/read-routes.mjs';
+import { commandReads, pagesInLines, pagesOfGrep, walkThread, wordNamesPage } from '../tools/snowarch/lib/docs/read-routes.mjs';
+import { makeShown } from '../tools/snowarch/lib/docs/grounding-check.mjs';
 import { A, U, res, use } from './helpers/lever2.mjs';
 
 const CORPUS = '/arms/N/clone/vendor/ServiceNowDocs';
@@ -192,4 +193,129 @@ test('ARC-09-C267 replay — the disk is asked once for each page however many l
   const shell = (id) => [use(id, 'Bash', { command: `grep -rn x ${CMDB.split('/')[1]}` }, { cwd: `${CORPUS}/markdown/servicenow-platform` }), res(id, lines.replaceAll(`${CMDB}/`, `${CMDB.split('/')[1]}/`))];
   walkThread([U('how?'), ...shell('b1'), ...shell('b2')], { pageExists });
   assert.ok(asks <= 1, `${asks} asks in a shell search`);
+});
+
+// ---- B4: a name filter names a page only below the folder the search ran on ------------------------------------------------------------------------
+// The architect's check of 88f22769 over the C268 sessions: a kept filter such as `*.md` had no folder, so it named every page of the corpus and one call switched the ask
+// off for the rest of the session (5 of 151 sessions; 5 asks for never-opened citations went with it). (a) a kept filter carries its roots, for B3 and for the filters of
+// items 1 and 2; (b) B3 needs the search to be the only segment that prints; (c) a pattern with no folder that names more pages than the ubiquity counts for none.
+const MD = `${CORPUS}/markdown`;
+const HERE = { cwd: '/home/dev/install', rowCwd: '/home/dev/install' };
+const turnOf = (patterns) => ({ reached: new Map(), pagesRead: new Set(), savedCitations: new Set(), opaque: [], opaqueFailed: [], patterns, patternsFailed: [] });
+const shownBy = (patterns, page, options = {}) => makeShown(turnOf(patterns), options).shown(page);
+const kept = (command, opts = HERE) => { const done = commandReads(command, opts); return [...done.patterns, ...done.searchPatterns]; };
+const afterRun = (command, body, cwd = '/home/dev/install') => walkThread([U('how?'), use('b', 'Bash', { command }, { cwd }), res('b', body)], {}).patterns;
+
+test('ARC-09-C267 replay B4 (a) — a name filter names a page only below the folder the search ran on, in an unresolved call as in B3', () => {
+  const ITSM = `${MD}/it-service-management`;
+  const here = 'markdown/it-service-management/c_Escalation.md';
+  const there = 'markdown/hr-service-delivery/c_Escalation.md';
+  for (const command of [
+    `find ${ITSM} -name 'c_Esc*' | xargs cat`, `find ${ITSM} -iname 'C_ESC*' | xargs cat`, `rg -l -g 'c_Esc*' x ${ITSM} | xargs cat`, `rg --files --iglob 'C_ESC*' ${ITSM} | xargs cat`,
+    `grep -rl --include='c_Esc*' x ${ITSM} | xargs cat`, `fd -g 'c_Esc*' ${ITSM} | xargs cat`, `cd ${ITSM} && find -name 'c_Esc*' | xargs cat`, `cd ${ITSM} && rg --files -g 'c_Esc*' | xargs cat`,
+    `find ${ITSM} -path '*/it-service-management/c_Esc*' -exec cat {} +`,
+  ]) {
+    const got = kept(command);
+    assert.equal(shownBy(got, here), true, command);
+    assert.equal(shownBy(got, there), false, `${command}: a page of another area`);
+  }
+  const ps = { powershell: true, cwd: 'C:/home/dev/install', rowCwd: 'C:/home/dev/install' };
+  const win = 'C:\\home\\dev\\install\\vendor\\ServiceNowDocs\\markdown\\it-service-management';
+  for (const command of [`Get-ChildItem -Path ${win} -Recurse -Filter c_Esc*.md | Get-Content`, `gci -Path ${win} -Recurse -Include c_Esc*.md | Get-Content`]) {
+    const got = kept(command, ps);
+    assert.equal(shownBy(got, here), true, command);
+    assert.equal(shownBy(got, there), false, `${command}: a page of another area`);
+  }
+  // two folders: the pages of both, and of no other
+  const both = kept(`find ${ITSM} ${MD}/customer-service-management -name 'c_Esc*' | xargs cat`);
+  assert.equal(shownBy(both, here), true);
+  assert.equal(shownBy(both, 'markdown/customer-service-management/c_Escalation.md'), true);
+  assert.equal(shownBy(both, there), false);
+  // a regex of find: the folder it names
+  const regex = kept(`find ${ITSM} -regex '.*c_Esc.*' | xargs cat`);
+  assert.equal(shownBy(regex, here), true);
+  assert.equal(shownBy(regex, there), false);
+});
+
+test('ARC-09-C267 replay B4 (a) — with no corpus folder a name filter names nothing: a folder of the project, one outside it, one the call cannot tell', () => {
+  for (const command of ["find . -name 'c_Esc*' | xargs cat", "find /tmp -name 'c_Esc*' | xargs cat", "rg -l -g 'c_Esc*' x clients/acme | xargs cat", "find \"$DOCS\" -name 'c_Esc*' | xargs cat",
+    "find . -regex '.*c_Esc.*' | xargs cat", "find -iregex '.*c_esc.*' | xargs cat", "grep -rl --include='*.md' x /home/dev/notes | xargs cat", "fd -g '*.md' /tmp | xargs cat"]) {
+    assert.deepEqual(kept(command), [], command);
+  }
+  // the project folder is no corpus folder; the corpus folder the shell stands in is
+  assert.deepEqual(kept("find -name 'c_Esc*' | xargs cat").length, 0);
+  assert.equal(shownBy(kept("find -name 'c_Esc*' | xargs cat", { cwd: `${MD}/it-service-management`, rowCwd: '/home/dev/install' }), 'markdown/it-service-management/c_Escalation.md'), true);
+});
+
+test('ARC-09-C267 replay B4 (a) — B3: grep -rh --include=*.md names the pages of the folder it ran on, and only those', () => {
+  const folder = `${MD}/platform-administration`;
+  const got = afterRun(`grep -rh --include='*.md' assign ${folder}`, '1\tassign the incident');
+  assert.equal(shownBy(got, 'markdown/platform-administration/r_BaselineEmailNotifications.md'), true);
+  assert.equal(shownBy(got, 'markdown/platform-administration/user-administration/r_BaseSystemRoles.md'), true, 'below it');
+  assert.equal(shownBy(got, 'markdown/governance-risk-compliance/configure-entity-approvals.md'), false, 'another area');
+  // the soak\'s command still covers its page, and no other area\'s
+  const soak = afterRun(`grep -rh --include='c_AssignmentRules*' -m 3 'assign' ${folder}/table-administration-and-data-management`, '1\tassign');
+  assert.equal(shownBy(soak, 'markdown/platform-administration/table-administration-and-data-management/c_AssignmentRulesModule.md'), true);
+  assert.equal(shownBy(soak, 'markdown/it-service-management/c_AssignmentRulesModule.md'), false);
+  // the shell's own folder
+  const own = afterRun("grep -rh --include='*.md' assign", '1\tassign', `${MD}/platform-administration`);
+  assert.equal(shownBy(own, 'markdown/platform-administration/r_BaselineEmailNotifications.md'), true);
+  assert.equal(shownBy(own, 'markdown/governance-risk-compliance/configure-entity-approvals.md'), false);
+});
+
+// ---- B4 (b): B3 needs the filtered search to be the only segment that prints -----------------------------------------------------------------------
+test('ARC-09-C267 replay B4 (b) — B3 applies only when the filtered search is the call\'s only printing segment: alone, or piped into head, tail, cut, sort or uniq', () => {
+  const folder = `${MD}/it-service-management`;
+  const search = `grep -rh --include='c_Esc*' x ${folder}`;
+  const page = 'markdown/it-service-management/c_Escalation.md';
+  const names = (command) => shownBy(afterRun(command, '1\tx the text'), page);
+  for (const command of [search, `${search} | head -10`, `${search} | tail -3`, `${search} | cut -c1-80`, `${search} | sort`, `${search} | sort | uniq | head`, `cd ${folder} && grep -rh --include='c_Esc*' x . | head`, `${search} 2>/dev/null | head -3`]) {
+    assert.equal(names(command), true, command);
+  }
+  for (const command of [`echo start; ${search}`, `${search}; echo ----`, `${search} | head; echo ----`, `sed -n 1,5p ${folder}/c_Other.md; ${search}`, `cat ${folder}/c_Other.md && ${search}`, `ls ${folder}; ${search}`,
+    `${search}; grep -rl y ${folder}`, `${search} | cat`, `${search} | awk '{print $1}'`, `${search} | wc -l`, `${search} && ${search.replace('c_Esc*', 'c_Other*')}`]) {
+    assert.equal(names(command), false, command);
+  }
+});
+
+test('ARC-09-C267 replay B4 — the two calls of the replay (8ded40bf, 99939ce8) leave no pattern that names a page outside their folders', () => {
+  const cmd1 = String.raw`cd ${MD} && sed -n 1,50p platform-administration/table-administration-and-data-management/t_AssignmentModuleRule.md; echo ----; sed -n 1,40p platform-administration/table-administration-and-data-management/r_BaselineAssignmentRulesExample.md; echo ----; grep -rn -i "support\\\?_group" --include=*.md it-service-management/incident-management configuration-management 2>/dev/null | head -10; echo ----; sed -n 1,40p it-service-management/incident-management/c_IncidentManagementStateModel.md | cut -c1-400; echo; grep -n "P1\|Critical\|1 - Critical" it-service-management/incident-management/def-prio-lookup-rules.md | head`;
+  const body1 = '1\tTo assign a record\n----\n50:    |1 - High|\n';
+  const got1 = afterRun(cmd1, body1);
+  for (const page of ['markdown/platform-administration/r_BaselineEmailNotifications.md', 'markdown/platform-administration/t_DataLookupRule.md', 'markdown/governance-risk-compliance/configure-entity-approvals.md']) {
+    assert.equal(shownBy(got1, page), false, page);
+  }
+  const cmd2 = String.raw`cd ${MD}/governance-risk-compliance && grep -rn -E "risk\\?_asmt\\?_project|project\\?_user|project\\?_reader" --include=*.md . | cut -c1-300 | head -30; echo ----; grep -rln -E "business\\?_user" . | head -30`;
+  const got2 = afterRun(cmd2, '(eval):1: no matches found: --include=*.md\n----\n./a/b.md\n./c.md\n');
+  for (const page of ['markdown/platform-administration/r_BaselineEmailNotifications.md', 'markdown/governance-risk-compliance/configure-entity-approvals.md', 'markdown/reporting-views-from-ram.md', 'markdown/governance-risk-compliance/risk-rollup-ara-concept.md']) {
+    assert.equal(shownBy(got2, page), false, page);
+  }
+});
+
+// ---- B4 (c): a pattern with no folder that names more pages than the ubiquity counts for none ------------------------------------------------------
+test('ARC-09-C267 replay B4 (c) — a pattern with no folder that names more than ubiquityPages pages counts for none; a narrow one, and one with a folder, count', () => {
+  const pages = [];
+  for (let k = 0; k < 600; k += 1) pages.push(`markdown/it-service-management/c_Rule${k}.md`);
+  for (let k = 0; k < 3; k += 1) pages.push(`markdown/hr-service-delivery/c_Esc${k}.md`);
+  pages.push('markdown/customer-service-management/c_Esc.md');
+  const options = { allPages: () => pages, ubiquity: 500 };
+  const cited = 'markdown/it-service-management/c_Rule7.md';
+  const folderless = (command, opts = { cwd: null, rowCwd: null, lost: true }) => kept(command, opts);
+  // no folder known (a cd the call cannot tell): `*.md` and `c_*.md` name the corpus
+  assert.equal(shownBy(folderless('cd "$HOME/x" && cat *.md'), cited, options), false, '*.md');
+  assert.equal(shownBy(folderless('cd "$HOME/x" && cat c_*.md'), cited, options), false, 'c_*.md');
+  assert.equal(shownBy(folderless('for f in **/*.md; do head -3 "$f"; done'), cited, options), false, '**/*.md');
+  assert.equal(shownBy(folderless('python3 -c "import glob; print(glob.glob(\'**/*.md\'))"'), cited, options), false, 'a script token');
+  assert.equal(shownBy(folderless('python3 -c "import glob; print(glob.glob(\'markdown/*/*.md\'))"'), cited, options), false, 'a pattern with only the corpus root for a folder');
+  // narrow: three pages, a folder-less pattern counts
+  assert.equal(shownBy(folderless('cd "$HOME/x" && cat c_Esc*.md'), 'markdown/hr-service-delivery/c_Esc1.md', options), true, 'c_Esc*.md');
+  // a folder: a loop over a big folder opened its pages
+  const withFolder = kept(`for f in ${MD}/it-service-management/c_Rule*.md; do head -3 "$f"; done`);
+  assert.equal(shownBy(withFolder, cited, options), true, 'a pattern with a folder counts however many pages it names');
+  assert.equal(shownBy(kept('for f in it-service-management/c_*.md; do head -3 "$f"; done', { cwd: null, rowCwd: null, lost: true }), cited, options), true, 'a relative folder too');
+  // no listing of the corpus: nothing can be said, and the pattern counts
+  assert.equal(shownBy(folderless('cd "$HOME/x" && cat *.md'), cited, {}), true);
+  assert.equal(shownBy(folderless('cd "$HOME/x" && cat *.md'), cited, { allPages: () => null }), true);
+  // the ubiquity is the classes file's
+  assert.equal(shownBy(folderless('cd "$HOME/x" && cat c_Esc*.md'), 'markdown/hr-service-delivery/c_Esc1.md', { allPages: () => pages, ubiquity: 2 }), false, '4 pages are over a ubiquity of 2');
 });
