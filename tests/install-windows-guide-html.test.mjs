@@ -191,7 +191,9 @@ test('ARC-09-C285 — the licence: the product\'s words, the product\'s line, th
   // A licence for design-only mode: a warning in live mode, which it cannot serve, and nothing to say in design-only.
   assert.equal(P.checkLic(line({ state: 'ok', scope: 'design-only', validUntil: day(90) }), 'live').items.find((i) => i.k === 'Scope').cls, 'oci warn');
   assert.equal(P.checkLic(line({ state: 'ok', scope: 'design-only', validUntil: day(90) }), 'design').items.find((i) => i.k === 'Scope').cls, 'oci ok');
-  assert.ok(P.checkLic(line({ state: 'ok', scope: 'design-only', validUntil: day(90) }), 'live').items.find((i) => i.k === 'Scope').t.includes(`switch with ${CLI} mode design`));
+  // The launcher it tells the reader to switch with is the product's own spelling of it (a page sentence no product line carries, so the launcher audit cannot resolve one written here).
+  const scope = P.checkLic(line({ state: 'ok', scope: 'design-only', validUntil: day(90) }), 'live').items.find((i) => i.k === 'Scope').t;
+  assert.equal(/switch with (\S+) mode design\./.exec(scope)?.[1], CLI);
   assert.doesNotMatch(code, /<=\s*14\b/, 'the page has a rule of its own for when to warn');
 });
 
@@ -329,17 +331,55 @@ test('ARC-09-C285 — each screen line of the page is a line of the Markdown gui
 const lum = (hex) => { const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 
-test('ARC-09-C285 — text is at least 4.5 to 1 against what it sits on, in both themes', () => {
+const css = style.replace(/\/\*[\s\S]*?\*\//g, '');
+const rules = [...css.matchAll(/([^{}@]+)\{([^{}]*)\}/g)].map((m) => [fold(m[1]), m[2]]);
+/** The page's colour tokens in one theme, each `var(--x)` followed to a colour. */
+function themeTokens(name) {
   const sets = { common: {}, light: {}, dark: {} };
-  for (const m of style.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
-    const into = { ':root, [data-theme="light"]': sets.light, '[data-theme="dark"]': sets.dark, ':root': sets.common }[fold(m[1])];
-    if (into) for (const d of m[2].matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) into[d[1]] = fold(d[2]);
+  for (const [sel, body] of rules) {
+    const into = { ':root, [data-theme="light"]': sets.light, '[data-theme="dark"]': sets.dark, ':root': sets.common }[sel];
+    if (into) for (const d of body.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) into[d[1]] = fold(d[2]);
   }
-  const theme = (name) => {
-    const t = { ...sets.common, ...sets[name] };
-    for (let i = 0; i < 3; i++) for (const k of Object.keys(t)) t[k] = t[k].replace(/var\(--([\w-]+)\)/g, (_, n) => t[n] ?? '');
-    return t;
-  };
+  const t = { ...sets.common, ...sets[name] };
+  for (let i = 0; i < 3; i++) for (const k of Object.keys(t)) t[k] = t[k].replace(/var\(--([\w-]+)\)/g, (_, n) => t[n] ?? '');
+  return t;
+}
+/** A colour a declaration names: a hex, or a `var(--token)` (with or without a fallback) in this theme; null for anything else (inherit, rgba, a gradient). */
+const colourOf = (value, t) => {
+  const v = fold(value ?? '');
+  if (/^#[0-9A-Fa-f]{6}$/.test(v)) return v;
+  const m = /^var\(--([\w-]+)(?:\s*,\s*[^)]*)?\)$/.exec(v);
+  return m && /^#[0-9A-Fa-f]{6}$/.test(t[m[1]] ?? '') ? t[m[1]] : null;
+};
+
+test('ARC-09-C285 — a text colour and a background that one rule sets are 4.5 to 1 as the cascade leaves them, in both themes', () => {
+  // The last rule for a selector wins, as it does at equal specificity: the design's own `.done` and `.next.all` came after the page's colour tokens and
+  // put a literal near-black on the green, 3.6 to 1 in the light theme, which a table of token pairs cannot see. So this reads the rules as written.
+  const final = new Map();
+  for (const [sel, body] of rules) {
+    if (/^(?::root|\[data-theme)/.test(sel)) continue;
+    for (const one of sel.split(',').map(fold)) {
+      const have = final.get(one) ?? {};
+      for (const d of body.matchAll(/(?:^|;)\s*(color|background(?:-color)?)\s*:\s*([^;]+)/g)) have[d[1] === 'color' ? 'color' : 'background'] = d[2];
+      final.set(one, have);
+    }
+  }
+  const pairs = [...final].filter(([, d]) => d.color && d.background);
+  assert.ok(pairs.length >= 25, `only ${pairs.length} rules set both: the reader lost some`);
+  // The same for what a style attribute sets: an inline colour is the last word.
+  const inline = [...markup.matchAll(/style="([^"]*)"/g)].map((m) => ({ color: /(?:^|;)\s*color\s*:\s*([^;]+)/.exec(m[1])?.[1], background: /(?:^|;)\s*background\s*:\s*([^;]+)/.exec(m[1])?.[1] })).filter((d) => d.color && d.background);
+  for (const name of ['light', 'dark']) {
+    const t = themeTokens(name);
+    const low = [...pairs, ...inline.map((d, i) => [`style attribute ${i + 1}`, d])].flatMap(([sel, d]) => {
+      const f = colourOf(d.color, t); const b = colourOf(d.background, t);
+      return f && b && ratio(f, b) < 4.5 ? [`${sel}: ${fold(d.color)} on ${fold(d.background)} ${ratio(f, b).toFixed(2)}`] : [];
+    });
+    assert.deepEqual(low, [], `${name}: a rule leaves text below 4.5 to 1`);
+  }
+});
+
+test('ARC-09-C285 — text is at least 4.5 to 1 against what it sits on, in both themes', () => {
+  const theme = themeTokens;
   const used = [['ink', 'paper'], ['ink', 'paper-2'], ['ink', 'paper-3'], ['ink', 'accent-soft'], ['ink', 'ok-soft'], ['ink', 'warn-soft'], ['ink', 'bad-soft'],
     ['ink-2', 'paper'], ['ink-2', 'paper-2'], ['ink-2', 'paper-3'], ['ink-2', 'accent-soft'], ['ink-2', 'ok-soft'], ['ink-2', 'warn-soft'], ['ink-2', 'bad-soft'],
     ['ink-3', 'paper'], ['ink-3', 'paper-2'], ['ink-3', 'paper-3'], ['link', 'paper'], ['link', 'paper-2'], ['link', 'accent-soft'], ['link', 'ok-soft'], ['link', 'warn-soft'], ['link', 'bad-soft'],
@@ -355,8 +395,13 @@ test('ARC-09-C285 — text is at least 4.5 to 1 against what it sits on, in both
 test('ARC-09-C285 — the page respects a reader who asks for less motion, and a narrow screen', () => {
   assert.match(style, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?scroll-behavior: auto[\s\S]*?\.caret \{ animation: none; \}/);
   assert.match(code, /prefers-reduced-motion: reduce/);
-  assert.match(code, /RM \? 'auto' : 'smooth'/);
-  assert.match(code, /if \(RM\) t\.btn\.hidden = true/, 'the typing animation is offered to a reader who asked for none');
+  // Asked when it is used, not once at load: a reader can change the setting while the page is open, and a harness does it after the page has loaded.
+  assert.match(code, /function rm\(\) \{ return !!\(RMQ && RMQ\.matches\); \}/);
+  assert.doesNotMatch(code, /\bRM\b/, 'the setting is read once, at load');
+  assert.match(code, /rm\(\) \? 'auto' : 'smooth'/);
+  assert.match(code, /t\.btn\.hidden = rm\(\);/, 'the typing animation is offered to a reader who asked for none');
+  assert.match(code, /if \(rm\(\) \|\| t\.timer\) return stopTerm\(t\);/, 'Play types for a reader who asked for no motion');
+  assert.match(code, /RMQ\.addEventListener\('change', onRm\)/, 'a change of the setting while the page is open is not followed');
   assert.match(style, /\[hidden\] \{ display: none !important; \}/);
   assert.match(style, /\.stack, \.tool-b[^{]*\{ grid-template-columns: minmax\(0, 1fr\); \}/, 'a long command stretches its cell and the page scrolls sideways');
 });

@@ -128,10 +128,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
 [data-cmd], [data-term], [data-chk], [data-timer] { min-width: 0; max-width: 100%; }
 
 /* ── Parts the design drew with inline styles ────────────────────────────────────────────────────────────────── */
-.done { color: var(--on-ok); }
-.done h3 { color: var(--on-ok); }
-.done .ic { color: #0B0B0A; }
-.next.all { color: var(--on-ok); }
 .gl:focus-visible + .tip { display: block; }
 .mode button { color: var(--ink); }
 .mode button.on { color: var(--accent-ink); }
@@ -270,9 +266,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   .dl > div { padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
   .dl > div:nth-child(odd) { font: 600 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); padding-top: 11px; padding-right: 12px; }
 
-  .done { border: 2px solid var(--line); background: var(--ok); color: #0B0B0A; padding: 20px; margin: 26px 0; box-shadow: var(--shadow-hard); }
+  .done { border: 2px solid var(--line); background: var(--ok); color: var(--on-ok); padding: 20px; margin: 26px 0; box-shadow: var(--shadow-hard); }
   .done h3 { margin: 0 0 6px; font: 900 26px/1 var(--disp); letter-spacing: -0.02em; }
-  .done .ic { background: rgba(255,255,255,.4); }
+  .done .ic { background: var(--paper-2); color: var(--ink); }
   .foot { border-top: 2px solid var(--line); margin-top: 40px; padding-top: 18px; font: 13px/1.6 var(--mono); color: var(--ink-2); }
   .g-wrap { padding-bottom: 140px; }
   .g-nav a em { float: right; font: 600 11px var(--mono); font-style: normal; color: var(--ink-3); margin-left: 6px; }
@@ -301,7 +297,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   .next:active { transform: translate(4px,4px); box-shadow: none; }
   .next small { font: 600 10px var(--mono); letter-spacing: .16em; text-transform: uppercase; opacity: .85; }
   .next b { font: 700 13px var(--mono); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .next.all { background: var(--ok); color: #0B0B0A; box-shadow: var(--shadow-hard); }
+  .next.all { background: var(--ok); color: var(--on-ok); box-shadow: var(--shadow-hard); }
 
   .tool { border: 2px solid var(--line); background: var(--paper-2); box-shadow: var(--shadow-hard); margin: 18px 0; }
   .tool-h { background: var(--ink); color: var(--paper); font: 600 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; padding: 9px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -1029,7 +1025,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
 
       <!-- SAFETY -->
       <section class="sec" id="safety">
-        <div class="sec-head"><div class="num" style="background:var(--ok);color:#0B0B0A">✓</div><div class="t"><small>Read once</small><h2>Your data and safety</h2></div></div>
+        <div class="sec-head"><div class="num" style="background:var(--ok);color:var(--on-ok)">✓</div><div class="t"><small>Read once</small><h2>Your data and safety</h2></div></div>
         <ul>
           <li>Your ServiceNow password is stored only in <code class="ic">.local\instances.json</code> inside your AI Architect folder. It never goes into the chat. Nobody helping you needs it, so never send that file.</li>
           <li>The installer locks that file, and the folder <code class="ic">.local</code> around it, so that only your account and the system can read them (the computer's administrators can always take a file over). <code class="ic">.\snowarch.cmd doctor</code> checks it (check SV-02) and names anyone else who could read the file; <code class="ic">.\snowarch.cmd doctor --fix</code> repairs it after showing what it will change.</li>
@@ -2022,7 +2018,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   var TROUBLE_BY_ID = {};
   D.trouble.forEach(function (r) { TROUBLE_BY_ID[r.id] = r; });
   var SAMPLE_LIC = 'LIC-2026-0000.json';
-  var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // Reduced motion is asked when it is used, not once at load: a reader can change the setting while the page is open.
+  var RMQ = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  function rm() { return !!(RMQ && RMQ.matches); }
 
   /* ── Small helpers ───────────────────────────────────────────────────────────────────────────────────────────── */
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -2040,7 +2038,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   function setText(el, t) { if (el && el.textContent !== t) el.textContent = t; }
   function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
   function toggle(el, show) { if (el) el.hidden = !show; }
-  function scrollTo(el, block) { if (el) el.scrollIntoView({ behavior: RM ? 'auto' : 'smooth', block: block || 'start' }); }
+  function scrollTo(el, block) { if (el) el.scrollIntoView({ behavior: rm() ? 'auto' : 'smooth', block: block || 'start' }); }
 
   /* ── Storage: every access in try/catch; the page works without it ────────────────────────────────────────── */
   function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -2331,7 +2329,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   }
   function stopTerm(t) { clearInterval(t.timer); t.timer = null; t.n = -1; t.c = 0; drawTerm(t); }
   function playTerm(t) {
-    if (t.timer) return stopTerm(t);
+    if (rm() || t.timer) return stopTerm(t);   // reduced motion: the whole text, at once
     t.L = parseTerm(t.text); t.w = 0; t.n = 0; t.c = 0;
     t.timer = setInterval(function () {
       var tl = tlen(t.L[t.n]);
@@ -2352,7 +2350,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     t.btn = h('button', { cls: 'term-play', text: '▶ Play', attrs: { type: 'button' } });
     t.body = h('div', { cls: 'term-body' });
     t.btn.addEventListener('click', function () { playTerm(t); });
-    if (RM) t.btn.hidden = true;
+    t.btn.hidden = rm();
     var wrap = h('div', { cls: 'term' }, [
       h('div', { cls: 'term-bar' }, [h('span', { cls: 'term-lab' }, [h('i'), slot.getAttribute('data-label') || 'On screen']), t.btn]),
       t.body
@@ -2972,6 +2970,10 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     window.addEventListener('resize', onScroll);
     window.addEventListener('storage', function () { readDone(); render(); });
     setInterval(function () { if (Object.keys(S.timers).length) { S.now = Date.now(); renderTimers(); } }, 1000);
+    if (RMQ) {
+      var onRm = function () { terms.forEach(function (t) { t.btn.hidden = rm(); if (rm() && t.timer) stopTerm(t); }); };
+      if (RMQ.addEventListener) RMQ.addEventListener('change', onRm); else if (RMQ.addListener) RMQ.addListener(onRm);
+    }
   }
 
   /* ── Glossary: the section, and the words inside the text ────────────────────────────────────────────────────── */
