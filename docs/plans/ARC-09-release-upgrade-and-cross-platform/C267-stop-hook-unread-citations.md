@@ -44,7 +44,7 @@ A page is closed on the continuation when it was read after the ask, or when a `
 - `tools/snowarch/lib/docs/read-routes.mjs`, new and pure: the shell's words and here-documents, the folder, which command shows a page, what a search printed, one thread of rows. Its tests are `tests/read-routes.test.mjs`.
 - `tools/snowarch/lib/docs/turn-sources.mjs`: `reached` (every page that reached the main thread, whenever), `written` (the files of the current turn), `typed` (what the user typed), and `readSubagentRows`. `pagesRead`, which sources the names a page prints, keeps its earlier meaning: a search shows lines of a page, not the page.
 - `tools/snowarch/lib/docs/grounding-check.mjs` and `tools/snowarch/hooks/stop-citations.mjs`: the check, the clause and the gate.
-- `tests/hook/stop-lever2.test.mjs`: one fixture transcript for each read route and each skip rule, through the hook itself; the C268 case, `cd <folder> && sed -n 1,60p <page>.md`, is one of them. Thirty-three mutations of the code, each breaking one rule on a copy, are all caught by these tests and the unit tests.
+- `tests/hook/stop-lever2.test.mjs`: one fixture transcript for each read route and each skip rule, through the hook itself; the C268 case, `cd <folder> && sed -n 1,60p <page>.md`, is one of them. Thirty-five mutations of the code, each breaking one rule on a copy outside the repository, are all caught by these tests and the unit tests.
 
 ## Cost
 
