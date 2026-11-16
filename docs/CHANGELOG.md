@@ -26,12 +26,27 @@ citation over a comma is now the page of that name in that path's folder, and `d
 before the corpus bump of 2026-11-15 it reports the four names that the bump took out of the corpus, which the check passed over;
 on this tree it reads 22 such names, and all of them resolve.
 
+**`docs outline` browses an area's hierarchy a level at a time.** Every area's `index.md` lists the whole area as a nested list,
+and the larger of them are 0.4 to 2.3 MB: too big to read, with the pages a question needs three to five levels down.
+`./snowarch docs outline <area or page path>` prints the hierarchy below a start node from those files, two levels by default, one
+line per node with its title, its page path and how many nodes are below it. `--under` starts at a page path or a title and
+`--depth` says how many levels; a call that would print more than 120 lines prints the first level only, and says so. It reads the
+corpus on disk and writes nothing. No rule or skill tells the Architect to use it yet.
+
 ### Added
 
 - `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
   word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints
   whether the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a
   second and exits 1 when a term is not printed (ARC-09-C268).
+- `./snowarch docs outline <area or page path> [--under <page path or title>] [--depth N]` prints the hierarchy of an area's
+  `index.md` below a start node: two levels by default, one line per node (indent, title, page path, and `(+K below)` with every
+  node below it), at most 120 lines a call before it falls back to the first level, and at most 200 lines at the first level,
+  where the last line says how many entries were not shown and how to narrow: a level is never cut silently. A page that a
+  sub-folder's `index.md` lists is below that folder's node, a page listed twice is told apart by `path#2`, and a title that names
+  two nodes is refused with their paths. An area of the corpus map that a sparse checkout does not hold is refused as not
+  installed, not as absent, and a path with `..` in it reads nothing. Exit 2 for a bad argument or a node that is not there, 3 for
+  no corpus. On the 96d3212 corpus the first call of an area prints 2 to 98 lines and no call more than 202 (ARC-09-C284).
 
 ### Changed
 

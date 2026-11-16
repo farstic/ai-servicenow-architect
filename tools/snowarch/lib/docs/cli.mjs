@@ -21,6 +21,7 @@ import { verifyTables, formatTables } from './tables.mjs';
 import { docsStatus, formatStatus } from './status.mjs';
 import { syncUpstream, formatUpstream } from './upstream.mjs';
 import { planFamilySwitch, formatPlan, applyFamilySwitch, EXIT_NEEDS_YES } from './family.mjs';
+import { runOutline } from './outline.mjs';
 import { root } from '../config.mjs';
 import { isEngineeringCheckout } from '../engineering-checkout.mjs';
 import { spellings } from '../launcher-spelling.mjs';
@@ -203,12 +204,18 @@ export function runDocs(argv, { spell = spellings() } = {}) {
     return (code);
   }
 
+  if (cmd === 'outline') {
+    // ARC-09-C284 — the hierarchy of an area's index, a few levels at a time; read-only, and it needs only the corpus on disk.
+    return runOutline({ argv: rest, root, spell });
+  }
+
   console.error('usage: node scripts/docs.mjs '
     + '(sync [--mode sparse|full] [--json] [--quiet] [--print-recipe]\n'
     + '     | sync --upstream [--to <sha>] [--json] [--no-verify]\n'
     + '     | verify [--allow-missing] [--json]\n'
     + '     | status [--json]\n'
     + '     | lookup <name or phrase>… [--limit <pages per name>] [--names <names per term>] [--json]\n'
+    + '     | outline <area | page path> [--under <page path | title>] [--depth <1-8>]\n'
     + '     | family <name> [--dry-run | --yes] [--from <name>] [--json])\n'
     + '\nexit: 0 ok · 1 incomplete, the pin moved and citations broke, a roster name is unexcused, or a looked-up term is not printed\n'
     + '      2 plan printed, not applied, or a usage error · 3 corpus (or, for lookup, the names index) missing · 4 working tree not clean\n'

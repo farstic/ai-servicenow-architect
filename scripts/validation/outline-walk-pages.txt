@@ -1,0 +1,20 @@
+# The 18 corpus pages the architect named for ARC-09-C268's phase 1 (the R6 public misses), one path a line.
+# At 96d3212 two of them are gone with their area and one moved: outline-walk says which.
+markdown/order-management/order-mgt-create-an-order-using-customer-portal.md
+markdown/order-management/view-order-timelines.md
+markdown/source-to-pay-operations/sourcing-and-procurement-operations/contracts.md
+markdown/source-to-pay-operations/sourcing-and-procurement-operations/confirm-contract-renewal.md
+markdown/employee-service-management/contract-management-pro/cncore-config-rem-exp-cont.md
+markdown/security-management/security-incident-response/create-process-automated-phishing.md
+markdown/security-management/security-incident-response/getting-started-phishing-playbook.md
+markdown/security-management/security-incident-response/action-phishing-playbook.md
+markdown/customer-service-management/create-consumer-case-from-chat.md
+markdown/conversational-interfaces/virtual-agent/llm-topic-migration.md
+markdown/conversational-interfaces/virtual-agent/how-topic-discovery-works.md
+markdown/conversational-interfaces/advanced-work-assignment/awa-assignment-rules.md
+markdown/conversational-interfaces/advanced-work-assignment/awa-create-queue.md
+markdown/conversational-interfaces/advanced-work-assignment/awa-change-agent-capacity.md
+markdown/field-service-management/dynamic-scheduling.md
+markdown/field-service-management/field-service-scheduling/Configure-dynamic-scheduling.md
+markdown/field-service-management/field-service-manager-workforce/skills-overview-wfo-fsm.md
+markdown/field-service-management/asset-management-for-field-service/configuring-stockrooms.md
