@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import { syncCorpus, planRecipe, readAreas, inspect, resolveMode, SyncError, CORPUS_DIR, EXIT as SYNC_EXIT }
   from './sync.mjs';
 import { indexAfterSync } from './sync-index.mjs';
+import { runLookup } from './lookup.mjs';
 import { verifyCitations, formatResult, EXIT } from './verify.mjs';
 import { verifyIdentifiers, formatIdentifiers } from './identifiers.mjs';
 import { verifyTables, formatTables } from './tables.mjs';
@@ -150,6 +151,11 @@ export function runDocs(argv, { spell = spellings() } = {}) {
     return (cites.code || names.code || cells.code);
   }
 
+  // ARC-09-C268 — which pages print a name, or print it under another word (lookup.mjs); a read, no network, no write.
+  if (cmd === 'lookup') {
+    return (runLookup(rest, { root, corpus: join(root, CORPUS_DIR), pin: config.docs.pin, spell }));
+  }
+
   if (cmd === 'family') {
     // ARC-09-C185a — switching the corpus family re-runs the skills lint and the areas generator, maintainers' tools
     // that live in the engineering checkout. A user's install refuses, saying where the command belongs.
@@ -202,8 +208,10 @@ export function runDocs(argv, { spell = spellings() } = {}) {
     + '     | sync --upstream [--to <sha>] [--json] [--no-verify]\n'
     + '     | verify [--allow-missing] [--json]\n'
     + '     | status [--json]\n'
+    + '     | lookup <name or phrase>… [--limit <pages per name>] [--names <names per term>] [--json]\n'
     + '     | family <name> [--dry-run | --yes] [--from <name>] [--json])\n'
-    + '\nexit: 0 ok · 1 incomplete, the pin moved and citations broke, or a roster name is unexcused · 2 plan printed, not applied\n'
-    + '      3 corpus missing · 4 working tree not clean · 5 git failed · 6 upstream does not have it');
+    + '\nexit: 0 ok · 1 incomplete, the pin moved and citations broke, a roster name is unexcused, or a looked-up term is not printed\n'
+    + '      2 plan printed, not applied, or a usage error · 3 corpus (or, for lookup, the names index) missing · 4 working tree not clean\n'
+    + '      5 git failed · 6 upstream does not have it');
   return (2);
 }

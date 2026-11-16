@@ -26,6 +26,13 @@ citation over a comma is now the page of that name in that path's folder, and `d
 before the corpus bump of 2026-11-15 it reports the four names that the bump took out of the corpus, which the check passed over;
 on this tree it reads 22 such names, and all of them resolve.
 
+### Added
+
+- `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
+  word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints
+  whether the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a
+  second and exits 1 when a term is not printed (ARC-09-C268).
+
 ### Changed
 
 - The corpus map, `vendor/docs-map.md`, no longer shows a release family at the start of an area's title. The corpus is the
@@ -52,6 +59,10 @@ on this tree it reads 22 such names, and all of them resolve.
   MB working tree on Linux and macOS and 293 MB on Windows (293 and 299), and 476 MB Ubuntu, 484 MB macOS and 482 MB Windows with
   `.git` (484, 491 and 489), fetched in about 30 to 45 seconds, the median of five `docs-real.yml` runs of 2026-11-15. The README
   is the page's copy (ARC-09-C279).
+- The names index that E-33 checks, under `.local/corpus-names/`, is format 2: it now also holds the labels the corpus prints
+  beside a name and the page titles, which `docs lookup` reads, and it is about 11.6 MB for the whole corpus at the 96d3212 pin
+  (it was about 9 MB). An index of the old format loads as missing, and E-33 sends the reader to `doctor --fix`, which builds the
+  new one (ARC-09-C268).
 
 ## 2.2.6 — 2026-11-15
 

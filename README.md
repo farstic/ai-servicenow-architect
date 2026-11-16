@@ -289,8 +289,8 @@ once, on its upgrade to 2.2.5: about 150 MB more on disk, measured from a defaul
 `--docs sparse` keeps only the cited areas (about 365 MB on disk) and exists for CI; the Architect cannot
 read the other areas then. Every release re-measures all three platforms and attaches the same table as
 `install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases). The bootstrap also builds a
-names index of the whole corpus, which records which pages print a name: about 9 MB under
-`.local/corpus-names/`, about 15 seconds once for each docs pin, rebuilt by `docs sync` and `doctor --fix`.
+names index of the whole corpus, which records which pages print a name: about 12 MB under
+`.local/corpus-names/`, about 20 seconds once for each docs pin, rebuilt by `docs sync` and `doctor --fix`.
 
 ### Upgrading
 
