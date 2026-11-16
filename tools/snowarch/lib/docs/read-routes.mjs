@@ -108,24 +108,60 @@ const EXPANSION = /\$\{[^}]*\}|\$\([^)]*\)|\$[A-Za-z_][A-Za-z0-9_]*|`[^`]*`/g;
  * word to the folder it knows). Pure.
  */
 export function wordNamesPage(word, page, { ci = false } = {}) {
-  if (typeof word !== 'string' || typeof page !== 'string' || !word || !page) return false;
-  const want = page.split('/');
-  for (const w of expandBraces(posix(word))) {
-    const segs = w.split('/');
-    let i = segs.length - 1;
-    let j = want.length - 1;
-    let fits = null;
-    while (i >= 0 && j >= 0) {
-      const seg = segs[i];
-      if (seg === '**' || seg === '..' || UNKNOWN_SEGMENT.test(seg)) { fits = true; break; }
-      if (seg === '') { fits = false; break; }                                           // the root: the page's folders do not fit above it
-      if (seg === '.') { i -= 1; continue; }
-      // A segment with more wildcards than any real command has can take exponential time to refuse a name: it is taken to match (the side chosen).
-      if ((seg.match(/[*?[]/g) ?? []).length <= MAX_WILDCARDS && !globToRegExp(seg.replace(EXPANSION, '*'), { ci }).test(want[j])) { fits = false; break; }
-      i -= 1; j -= 1;
+  return compileWord(word, { ci })(page);
+}
+
+/**
+ * `wordNamesPage` with the word compiled once: `(page) => boolean`. The brace lists are expanded and each segment's regular expression is built the first time it is
+ * asked, so that a word can be tried against the 51,000 pages of the corpus (`namesMoreThan`). Pure.
+ */
+export function compileWord(word, { ci = false } = {}) {
+  if (typeof word !== 'string' || !word) return () => false;
+  const alternatives = expandBraces(posix(word)).map((w) => w.split('/').map((seg) => ({ seg, re: null })));
+  // A segment with more wildcards than any real command has can take exponential time to refuse a name: it is taken to match (the side chosen).
+  const fits = (entry, name) => {
+    if ((entry.seg.match(/[*?[]/g) ?? []).length > MAX_WILDCARDS) return true;
+    entry.re ??= globToRegExp(entry.seg.replace(EXPANSION, '*'), { ci });
+    return entry.re.test(name);
+  };
+  return (page) => {
+    if (typeof page !== 'string' || !page) return false;
+    const want = page.split('/');
+    for (const segs of alternatives) {
+      let i = segs.length - 1;
+      let j = want.length - 1;
+      let ok = null;
+      while (i >= 0 && j >= 0) {
+        const { seg } = segs[i];
+        if (seg === '**' || seg === '..' || UNKNOWN_SEGMENT.test(seg)) { ok = true; break; }
+        if (seg === '') { ok = false; break; }                                             // the root: the page's folders do not fit above it
+        if (seg === '.') { i -= 1; continue; }
+        if (!fits(segs[i], want[j])) { ok = false; break; }
+        i -= 1; j -= 1;
+      }
+      if (ok === true || (ok === null && (j < 0 || i < 0))) return true;
     }
-    if (fits === true || (fits === null && (j < 0 || i < 0))) return true;
-  }
+    return false;
+  };
+}
+
+/** The folders every page of the corpus is under: a pattern that names no other folder tells nothing about which pages it names. */
+const CORPUS_TOPS = new Set(['markdown', 'ServiceNowDocs', 'vendor']);
+
+// Does this glob or brace word name no folder: no concrete segment above its file name but the corpus's own (a bare `*.md`, `c_*.md`, a recursive `**` pattern,
+// `markdown` with a wildcard folder under it, a folder that is a variable)? With a brace list, when any of its words does not. Such a pattern names pages everywhere,
+// so how many it names is the question (`namesMoreThan`). Pure.
+export function isFolderless(word) {
+  if (typeof word !== 'string' || !word) return false;
+  return expandBraces(posix(word)).some((w) => !w.split('/').slice(0, -1)
+    .some((seg) => seg !== '' && seg !== '.' && seg !== '..' && !/[*?[]/.test(seg) && !UNKNOWN_SEGMENT.test(seg) && !CORPUS_TOPS.has(seg)));
+}
+
+/** Does the word name more than `cap` of `pages` (`markdown/<area>/….md`)? It stops counting at `cap`. Pure. */
+export function namesMoreThan(word, ci, pages, cap) {
+  const names = compileWord(word, { ci });
+  let n = 0;
+  for (const page of pages) if (names(page) && (n += 1) > cap) return true;
   return false;
 }
 
@@ -592,17 +628,23 @@ function benignRunner(key, rest, powershell) {
   return false;
 }
 
+/** The flags of ripgrep and of grep that take their value as the next word (`-g GLOB`, `-m 3`, `-A 2`): the value is neither the pattern nor a file. */
+const RG_VALUE_FLAGS = new Set(['-g', '--glob', '--iglob', '-t', '--type', '-T', '--type-not', '-A', '--after-context', '-B', '--before-context', '-C', '--context', '-m', '--max-count', '-j', '--threads',
+  '-M', '--max-columns', '-E', '--encoding', '-r', '--replace', '--max-depth', '--sort', '--sortr', '--color', '--pre', '--pre-glob', '--path-separator']);
+const GREP_VALUE_FLAGS = new Set(['-A', '--after-context', '-B', '--before-context', '-C', '--context', '-m', '--max-count', '--include', '--exclude', '--exclude-dir', '--exclude-from', '--color', '--label', '-d', '--directories', '-D', '--devices']);
+
 /**
  * The words of a showing or searching command that name files: not a flag, not the value of `-e` or `-f`, and not the pattern of a search or the script of `sed`
  * and `awk` (their first word, unless a flag gave it). PowerShell has no such first word: every word that is not a flag is taken, as it may be a path.
  */
 function fileWords(key, words, searchesFiles, powershell) {
   const out = [];
+  const valued = key === 'rg' ? RG_VALUE_FLAGS : (GREP_VERBS.has(key) ? GREP_VALUE_FLAGS : null);
   let first = !powershell && (searchesFiles || SCRIPTED.has(key))
     && !words.some((w) => w === '-e' || w === '-f' || w.startsWith('--regexp') || w.startsWith('--expression') || w.startsWith('--file'));
   let value = false;
   for (const w of words) {
-    if (w.startsWith('-')) { value = !powershell && (w === '-e' || w === '-f'); continue; }
+    if (w.startsWith('-')) { value = !powershell && (w === '-e' || w === '-f' || Boolean(valued?.has(w))); continue; }
     if (value) { value = false; continue; }
     if (first) { first = false; continue; }
     out.push(w);
@@ -674,6 +716,9 @@ function searchesCwd(info, named, searching, powershell) {
   return false;
 }
 
+/** The commands a search can be piped into without anything else printing: they only cut what the search printed. */
+const PIPE_FILTERS = new Set(['head', 'tail', 'cut', 'sort', 'uniq']);
+
 /** The commands that list the files of a folder. */
 const LISTERS = new Set(['ls', 'dir', 'tree', 'du', 'find', 'fd', 'fdfind', 'get-childitem', 'gci']);
 
@@ -743,7 +788,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
   let flagged = false;                                             // a viewer or a search of the call has an expansion in its words
   const saved = [];
   const patterns = new Map();                                      // { w, ci } by spelling, or { dir }: what a glob, a brace word or a folder of the call could name
-  const printing = new Map();                                      // the name filters of a search under the corpus that prints lines: `searchPatterns` (B3)
+  const printing = [];                                             // the name filters of each search under the corpus that prints lines: `searchPatterns` (B3)
   const runs = new Set();                                          // the base names of the files the call runs (read-routes.mjs, `ranFiles`)
   const segInfo = [];                                              // the words of each segment and the folder it ran in, for the patterns of a call left unresolved
   const add = (page, verb) => { if (!reads.has(page)) reads.set(page, verb); };
@@ -757,11 +802,14 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
     const spellings = asWritten || folderGone || ABSOLUTE.test(w) || bases.length === 0 ? [w] : bases.map((b) => joinPath(b, w));
     for (const spelling of spellings) patterns.set(`${powershell ? 'i' : 's'}\0${spelling}`, { w: spelling, ci: powershell });
   };
-  /** A name filter's pattern as written, with the case its tool gives it: it matches the files below the search root, wherever the shell stands. */
-  const addFilter = (value, ci) => {
-    if (patterns.size >= 64 || value.length > MAX_WORD) return;
+  /**
+   * A name filter's pattern as written, with the case its tool gives it: it matches the files below the search root, wherever the shell stands, and so it names a page
+   * only BELOW the corpus folders the search ran on (`dirs`; the replay, B4: a filter with no folder, `*.md`, named every page of the corpus). With none it names nothing.
+   */
+  const addFilter = (value, ci, dirs) => {
+    if (dirs.length === 0 || patterns.size >= 64 || value.length > MAX_WORD) return;
     const w = posix(value);
-    patterns.set(`${ci ? 'i' : 's'}\0${w}`, { w, ci });
+    patterns.set(`${ci ? 'i' : 's'}\0${w}\0${dirs.join(',')}`, { w, ci, dirs });
   };
   /** Every page under a corpus folder (`markdown/<area>`, or `markdown` for the whole corpus). */
   const addFolder = (dir) => { if (patterns.size < 64) patterns.set(`d\0${dir}`, { dir }); };
@@ -855,14 +903,16 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
     if (searchesFiles) searched.push(at);
     if (searchesFiles && !powershell) {
       const named = nameFiltersOf(key, rest.slice(1), false);
-      if (named.filters.length && rootsOf({ key, words: rest.slice(1), op: seg.op, folder: at, gone: folderLost }, named).size > 0) {
-        for (const f of named.filters) if (printing.size < 16 && f.value.length <= MAX_WORD) printing.set(`${f.ci ? 'i' : 's'}\0${f.value}`, { w: posix(f.value), ci: f.ci });
-      }
+      const dirs = named.filters.length ? [...rootsOf({ key, words: rest.slice(1), op: seg.op, folder: at, gone: folderLost }, named)] : [];
+      if (dirs.length > 0) printing.push(named.filters.filter((f) => f.value.length <= MAX_WORD).slice(0, 16).map((f) => ({ w: posix(f.value), ci: f.ci, dirs })));
     }
     if (powershell && showsLines && files.length === 0 && seg.op === '|') { opaque = true; return; }       // Get-Content reads what the pipe gives it
     for (const w of files) consider(powershell ? w : w.replace(/^<+/, ''), key);                          // cat <page.md
   });
   while (saved.length) [at, folderLost] = saved.pop();                // the line ended inside a subshell: its folder goes with it
+  // B3 applies only when the filtered search is the call's only segment that prints (the replay, B4 (b)): alone, or fed into head, tail, cut, sort or uniq. Any other
+  // segment that prints (sed, cat, echo, a listing, another search) could be where the lines came from.
+  const searchPatterns = printing.length === 1 && segInfo.every((s, n) => n === 0 || (PIPE_FILTERS.has(s.key) && s.op === '|')) ? printing[0] : [];
   if (opaque || flagged) {
     const scripts = [];
     for (const h of heredocs) {
@@ -878,7 +928,8 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
         // A name filter is taken as written, with the case its tool gives it, and matches below the search root (items 1 and 2).
         // A case-sensitive value with no wildcard is a name the call prints, which the names rule already counts (`mentionsPage`); a case-blind one may differ in case.
         const named = nameFiltersOf(info.key, info.words, powershell);
-        for (const f of named.filters) if (f.ci || PATTERN_WORD.test(f.value)) addFilter(f.value, f.ci);
+        const anchors = rootsOf(info, named);                        // the corpus folders the search ran on
+        for (const f of named.filters) if (f.ci || PATTERN_WORD.test(f.value)) addFilter(f.value, f.ci, [...anchors]);
         // The glob and brace words of the call, each as the folder it ran in makes it; the scripts a word cannot be read inside (a quoted `python3 -c "…"`)
         // by the tokens in them, as written. The plain words of a segment that name a folder under the corpus are its roots (item 3).
         info.words.forEach((w, n) => {
@@ -888,18 +939,16 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
         });
         // Folders count when the call has a viewer to feed them to: `git -C <corpus> show HEAD:<page>` names the corpus and reads one page. A lister or searcher
         // given no folder runs on the one the shell stands in (`cd <area> && ls | xargs head`).
-        const roots = viewer ? rootsOf(info, named) : new Set();
-        // A regex filter of find (`-regex`, `-iregex`) is not a glob: it covers what the search covers, which is the folder it names, or every page when none.
+        const roots = viewer ? anchors : new Set();
+        // A regex filter of find (`-regex`, `-iregex`) is not a glob: it covers what the search covers, which is the folders it names (with none, nothing: B4).
         // A name filter narrows a folder's pages (its pattern is the match), so the folder is added only for a segment that has none.
-        if (named.any) {
-          if (roots.size === 0) addFilter('*', named.any.ci);
-          else for (const dir of roots) addFolder(dir);
-        } else if (named.filters.length === 0) for (const dir of roots) addFolder(dir);
+        if (named.any) for (const dir of anchors) addFolder(dir);
+        else if (named.filters.length === 0) for (const dir of roots) addFolder(dir);
       }
       for (const script of scripts) for (const token of patternsInText(script)) addPattern(token, null, true, true);
     }
   }
-  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer, runs: [...runs], patterns: [...patterns.values()], searchPatterns: [...printing.values()] };
+  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer, runs: [...runs], patterns: [...patterns.values()], searchPatterns };
 }
 
 /**
@@ -1039,7 +1088,7 @@ export function walkThread(rows, { glob = null, pageExists = null, pageText = nu
   };
   const output = (b) => posix(textOfResult(b)).slice(0, OUTPUT_CAP);
   const reach = (page, route, at) => { if (!reached.has(page)) reached.set(page, { route, at }); };
-  const keep = (into, list) => { for (const q of list) into.set(q.dir !== undefined ? `d\0${q.dir}` : `${q.ci}\0${q.w}`, q); };
+  const keep = (into, list) => { for (const q of list) into.set(q.dir !== undefined ? `d\0${q.dir}` : `${q.ci}\0${q.w}\0${(q.dirs ?? []).join(',')}`, q); };
   /** A file the session touched that is not a page of the corpus: a bare mention of its name is no citation of a page that has the same name (item 5). */
   const own = (file) => { if (typeof file === 'string' && file && !pageAt(file)) { const name = basename(file).toLowerCase(); if (name) ownFiles.add(name); } };
   /** A call ran the file with this base name: every write of it so far is a script, and the pages it names are pages it may have shown (item 4). */

@@ -48,14 +48,17 @@ test('ARC-09-C267 review 2, items 1 and 2 — a name filter is taken as written,
   // PowerShell: -Filter and -Include, case-blind, a list of patterns, with the project's folder known
   const ps = { powershell: true, cwd: 'C:/home/dev/install', rowCwd: 'C:/home/dev/install' };
   assert.deepEqual(pats('Get-ChildItem -Path C:\\home\\dev\\install\\vendor\\ServiceNowDocs\\markdown -Recurse -Filter c_Esc*.md | Get-Content', ps), ['i:c_Esc*.md']);
-  assert.deepEqual(pats('gci -Recurse -Include c_Esc*.md,t_Other*.md | Get-Content', ps), ['i:c_Esc*.md', 'i:t_Other*.md']);
+  // a filter names a page below the folder the search ran on (B4): here the shell's own, a corpus folder
+  const inCorpus = { powershell: true, cwd: 'C:/home/dev/install/vendor/ServiceNowDocs/markdown', rowCwd: 'C:/home/dev/install' };
+  assert.deepEqual(pats('gci -Recurse -Include c_Esc*.md,t_Other*.md | Get-Content', inCorpus), ['i:c_Esc*.md', 'i:t_Other*.md']);
+  assert.deepEqual(pats('gci -Recurse -Include c_Esc*.md,t_Other*.md | Get-Content', ps), [], 'and from the project folder it names none');
   assert.deepEqual(pats('dir C:\\home\\dev\\install\\vendor\\ServiceNowDocs\\markdown -Filter *cti-demo* -Recurse | Get-Content', ps), ['i:*cti-demo*']);
 });
 
-test('ARC-09-C267 review 2, item 2 — a regex filter of find covers the folder it searches, or every page when no folder is known', () => {
+test('ARC-09-C267 review 2, item 2 — a regex filter of find covers the folder it searches, and names nothing when it searches no corpus folder (B4)', () => {
   assert.deepEqual(pats(`find ${CSM} -iregex '.*cti-demo.*' | xargs head -80`), ['dir:markdown/customer-service-management']);
   assert.deepEqual(pats(`find ${CSM} -regex '.*CTI-demo.*\\.md' -exec cat {} +`), ['dir:markdown/customer-service-management']);
-  assert.deepEqual(pats('find . -regex \'.*x.*\' | xargs cat'), ['s:*'], 'the shell stands in the project folder: no corpus folder is named');
+  assert.deepEqual(pats('find . -regex \'.*x.*\' | xargs cat'), [], 'the shell stands in the project folder: no corpus folder is named, and a regex names no page');
   assert.deepEqual(pats('find . -iregex \'.*x.*\' | xargs cat', { cwd: CSM, rowCwd: '/home/dev/install' }), ['dir:markdown/customer-service-management'], 'the shell stands in the folder');
 });
 

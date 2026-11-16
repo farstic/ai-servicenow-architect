@@ -273,7 +273,7 @@ test('ARC-09-C267 replay B4 (b) — B3 applies only when the filtered search is 
     assert.equal(names(command), true, command);
   }
   for (const command of [`echo start; ${search}`, `${search}; echo ----`, `${search} | head; echo ----`, `sed -n 1,5p ${folder}/c_Other.md; ${search}`, `cat ${folder}/c_Other.md && ${search}`, `ls ${folder}; ${search}`,
-    `${search}; grep -rl y ${folder}`, `${search} | cat`, `${search} | awk '{print $1}'`, `${search} | wc -l`, `${search} && ${search.replace('c_Esc*', 'c_Other*')}`]) {
+    `${search}; grep -rl y ${folder}`, `${search}; head -3 ${folder}/c_Other.md`, `${search} | cat`, `${search} | awk '{print $1}'`, `${search} | wc -l`, `${search} && ${search.replace('c_Esc*', 'c_Other*')}`]) {
     assert.equal(names(command), false, command);
   }
 });
@@ -305,6 +305,7 @@ test('ARC-09-C267 replay B4 (c) — a pattern with no folder that names more tha
   assert.equal(shownBy(folderless('cd "$HOME/x" && cat *.md'), cited, options), false, '*.md');
   assert.equal(shownBy(folderless('cd "$HOME/x" && cat c_*.md'), cited, options), false, 'c_*.md');
   assert.equal(shownBy(folderless('for f in **/*.md; do head -3 "$f"; done'), cited, options), false, '**/*.md');
+  assert.equal(shownBy(folderless('for f in $DIR/*.md; do head -3 "$f"; done'), cited, options), false, 'a folder that is a variable');
   assert.equal(shownBy(folderless('python3 -c "import glob; print(glob.glob(\'**/*.md\'))"'), cited, options), false, 'a script token');
   assert.equal(shownBy(folderless('python3 -c "import glob; print(glob.glob(\'markdown/*/*.md\'))"'), cited, options), false, 'a pattern with only the corpus root for a folder');
   // narrow: three pages, a folder-less pattern counts
@@ -318,4 +319,7 @@ test('ARC-09-C267 replay B4 (c) — a pattern with no folder that names more tha
   assert.equal(shownBy(folderless('cd "$HOME/x" && cat *.md'), cited, { allPages: () => null }), true);
   // the ubiquity is the classes file's
   assert.equal(shownBy(folderless('cd "$HOME/x" && cat c_Esc*.md'), 'markdown/hr-service-delivery/c_Esc1.md', { allPages: () => pages, ubiquity: 2 }), false, '4 pages are over a ubiquity of 2');
+  // exactly the ubiquity is not over it
+  assert.equal(shownBy(folderless('cd "$HOME/x" && cat c_Esc*.md'), 'markdown/hr-service-delivery/c_Esc1.md', { allPages: () => pages, ubiquity: 4 }), true, '4 pages are not more than 4');
+  assert.equal(shownBy(folderless('cd "$HOME/x" && cat c_Esc*.md'), 'markdown/hr-service-delivery/c_Esc1.md', { allPages: () => pages, ubiquity: 3 }), false, '4 pages are more than 3');
 });

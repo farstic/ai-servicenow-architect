@@ -64,7 +64,8 @@ test('ARC-09-C267 review A1 — commandReads returns the glob and brace words of
   assert.deepEqual(pats('cd ~/x/markdown/csm && cat c_Esc*.md'), ['c_Esc*.md'], 'cd ~ loses the folder, and the viewer\'s pattern is the call\'s');
   assert.deepEqual(pats('cd "$HOME/x" && sed -n 1,5p c_Esc*.md c_Other.md'), ['c_Esc*.md']);
   assert.deepEqual(pats(`find ${ABS}/markdown -name 'c_Esc*.md' | xargs cat`, { cwd: '/tmp' }), ['c_Esc*.md'], 'find -name matches base names wherever the shell is');
-  assert.deepEqual(pats('find . -iname "C_*.MD" -o -path "*/csm/*" | xargs cat'), ['*/csm/*', 'C_*.MD']);
+  assert.deepEqual(pats('find . -iname "C_*.MD" -o -path "*/csm/*" | xargs cat', { cwd: `${ABS}/markdown` }), ['*/csm/*', 'C_*.MD'], 'the folder it searches is a corpus folder (B4)');
+  assert.deepEqual(pats('find . -iname "C_*.MD" -o -path "*/csm/*" | xargs cat'), [], 'with no corpus folder a filter names no page');
   assert.deepEqual(pats('find . -name x -exec cat {} \\;'), [], '{} is not a brace list');
   assert.deepEqual(pats('for f in a b; do cat "$f"; done'), []);
   assert.deepEqual(pats(`for f in ${'a'.repeat(5000)}*.md; do cat "$f"; done`), [], 'a word that is a blob and not a path is not kept');

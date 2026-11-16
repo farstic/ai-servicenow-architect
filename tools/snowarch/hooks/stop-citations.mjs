@@ -196,17 +196,20 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
     const classes = parseClasses(classesText);
     // The corpus tree, read once and only if a bare file name needs it (a `c_Name.md` that is a page of the corpus is a citation of every page of the name).
     let tree;
-    const pagesNamed = (name) => {
+    const treeOf = () => {
       if (tree === undefined) { try { tree = (load ?? loadIndex)(join(root, CORPUS_DIR)); } catch { tree = null; } }
-      return tree ? tree.named(name) : [];
+      return tree;
     };
+    const pagesNamed = (name) => treeOf()?.named(name) ?? [];
+    // Every page of the corpus, for the one question how many pages a pattern with no folder names (read-routes.mjs, B4 (c)); null when there is no tree.
+    const allPages = () => treeOf()?.list?.() ?? null;
     // An input cut short asks nothing about citations: the page might have been read in what was lost.
     const incomplete = transcript?.lostLines > 0 ? [`the session file has ${transcript.lostLines} line(s) that do not parse`] : [];
     // The sub-agents' files are read once for the run, whoever asks for them (the check, and the notice, ask more than once).
     let sub;
     const sideRows = () => { if (sub === undefined) sub = (seams.sideRows ?? (() => readSubagents(input.transcript_path, { onDebug: debug, ...(seams.subagentLimits ?? {}) })))(); return sub; };
     const options = { blocking: classes.blocking, ubiquity: classes.ubiquity, builders: facts.builders, rosterSkills: facts.rosterSkills,
-      isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD, askedOnly: true, incomplete, pagesNamed,
+      isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD, askedOnly: true, incomplete, pagesNamed, allPages,
       carryFolder: keepsFolder(seams.env ?? process.env),
       sideRows,
       glob: makeGlob({ shouldStop: stop }), pageExists: (page) => existsSync(join(root, CORPUS_DIR, ...page.split('/'))),

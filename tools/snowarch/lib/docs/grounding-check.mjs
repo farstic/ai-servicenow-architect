@@ -32,7 +32,7 @@
 import { copyLines } from '../finding-copy.mjs';
 import { ABSENCE_ANYWHERE, CUSTOM, DECLARED, MARKER, PLATFORM_PREFIXES, bare, dotted, markedAbsent, nameSpans, qualifiesWhole } from './name-rules.mjs';
 import { COVERAGE } from './names-index.mjs';
-import { mentionsPage, walkThread, wordNamesPage } from './read-routes.mjs';
+import { isFolderless, mentionsPage, namesMoreThan, walkThread, wordNamesPage } from './read-routes.mjs';
 import { namesIn, rowText, turnSources } from './turn-sources.mjs';
 
 export const KINDS = Object.freeze(['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced', 'citedUnread', 'resting', 'overclaim']);
@@ -179,7 +179,24 @@ export function makeShown(turn, options = {}) {
   };
   const onDisk = (path) => typeof options.pageExists === 'function' && options.pageExists(path);
   const mentioned = (list, path) => { const name = path.slice(path.lastIndexOf('/') + 1); return list.some((text) => mentionsPage(text, name)); };
-  const patterned = (list, path) => list.some((q) => (q.dir !== undefined ? path.startsWith(`${q.dir}/`) : wordNamesPage(q.w, path, { ci: q.ci })));
+  // A pattern with no folder that names more pages than the ubiquity names the corpus, and counts for none (the replay, B4 (c)): `*.md`, `c_*.md`, a script's
+  // `glob.glob('**/*.md')`. It needs the list of the pages (`options.allPages`); with none it cannot be told and counts. A filter names a page only below the folders it
+  // carries (`dirs`), and a folder names every page below it.
+  const broadMemo = new Map();
+  const broad = (q) => {
+    const key = `${q.ci}\0${q.w}`;
+    if (!broadMemo.has(key)) {
+      const pages = isFolderless(q.w) && typeof options.allPages === 'function' ? options.allPages() : null;
+      broadMemo.set(key, Array.isArray(pages) && namesMoreThan(q.w, q.ci, pages, options.ubiquity ?? DEFAULT_UBIQUITY));
+    }
+    return broadMemo.get(key);
+  };
+  const named = (q, path) => {
+    if (q.dir !== undefined) return path.startsWith(`${q.dir}/`);
+    if (Array.isArray(q.dirs)) return q.dirs.some((d) => path.startsWith(`${d}/`)) && wordNamesPage(q.w, path, { ci: q.ci });
+    return wordNamesPage(q.w, path, { ci: q.ci }) && !broad(q);
+  };
+  const patterned = (list, path) => list.some((q) => named(q, path));
   const viaMain = (path) => turn.reached.has(path) || turn.pagesRead.has(path) || turn.savedCitations.has(path)
     || mentioned(turn.opaque ?? [], path) || patterned(turn.patterns ?? [], path)
     || (onDisk(path) && (mentioned(turn.opaqueFailed ?? [], path) || patterned(turn.patternsFailed ?? [], path)));
