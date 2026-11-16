@@ -1787,6 +1787,15 @@ The checklist, verbatim — paste it into the release pull request's description
 >    under 2.0.1's heading and a changelog with no 2.0.0 in it. `tests/changelog.test.mjs`'s
 >    *a released version has its section here, and its notes left Unreleased* is the guard, and it
 >    defers when the clone has no tags rather than passing quietly.
+>
+>    **A released section is not edited, and its hash is recorded — ARC-09-C268.** A branch that added bullets to
+>    `## Unreleased` before a release and merges `develop` after it can have them carried, with no conflict, into the section the
+>    release made of that block (#582 had a bullet and a changed E-33 line in `## 2.2.6` that way, through two merges).
+>    `tests/changelog-released-sections.test.mjs` compares every released section with the sha256 recorded in
+>    `tests/fixtures/changelog-released-sections.json`, and with the file at its tag where the clone has the tag. The newest
+>    section may be unrecorded, so a cut passes; the post-release records pull request adds its hash, and the next cut fails on
+>    an older section that has none, with the line to add in the message. Lines a merge put in a released section go back to
+>    `## Unreleased`.
 
 **Step 2 is two-phase because it has to be.** `main` is protected by required status checks with
 `strict: true` — **54** of them after this milestone, generated into
@@ -2237,8 +2246,9 @@ because you need the new corpus in order to repair the citations against it.
 `.local/corpus-names/<pin, 12 characters>/` (`meta.json`, `pages.txt`, `names.tsv`, and since format 2 `labels.tsv` and `titles.txt`) says
 which corpus pages print a name (ARC-09-C263), which name the corpus prints beside a label (`Requested Item \[sc\_req\_item\]`), and what
 each page is titled (ARC-09-C268). Answering that by reading the pages takes about 26 s on a Mac; the index is built once, when the corpus
-changes, and read in milliseconds. For the whole corpus at the pin it holds 51,657 pages, 75,895 names and 13,930 label pairs in
-11,528 KiB, and builds in 14 to 16 s with about 330 MB resident. Four rules keep it cheap and safe:
+changes, and read in milliseconds. For the whole corpus at the 96d3212 pin it holds 51,178 pages, 75,431 names and 13,724 label pairs in
+11,376 KiB, and builds in about 20 s with about 300 MiB resident (three runs on a Mac under a load average of 4: 19.5, 20.1 and
+22.5 s, 286 to 301 MiB). Four rules keep it cheap and safe:
 
 - **One caller builds it, in a child process, never in a session.** `lib/docs/sync-index.mjs` is the only module that names
   `names-index-build.mjs`, and it runs the builder in a child node, so nothing a hook can load can build an index. Bootstrap B02,
