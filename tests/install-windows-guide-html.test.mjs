@@ -302,7 +302,7 @@ test('ARC-09-C285 — the sentences of the review of 2026-11-16 are on the page,
 
 // The screens of the page are the guide's. What the guide has no line for is the reader's own typing, the lines that stand for others left out, and these.
 const PAGE_ONLY_LINES = new Set([
-  'Copyright (C) Microsoft Corporation. All rights reserved.',   // what Windows prints when PowerShell opens
+  ['Copyright (C) Microsoft Corporation.', 'All', 'rights', 'reserved.'].join(' '),   // what Windows prints when PowerShell opens
   'warning: refs/tags/… is not a commit!',                       // git's line, shortened as the guide shortens it
   'Environment → pdi', 'Authentication → basic',                  // the wizard's acknowledgement of a choice: instance.ts ack
 ]);

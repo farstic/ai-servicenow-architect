@@ -51,6 +51,8 @@ Release carries it as an asset, so a reader with nothing installed can download 
   hero and help message read. A release candidate leaves the page alone, as it leaves the other pages, and a page without the field is refused. The
   page is in the signed manifest's coverage (`packages/snowarch/src/licence/integrity.ts`), so a distribution carries it, and `release.yml` attaches
   it to the GitHub Release, which now has eight assets (ARC-09-C285).
+- `.gitattributes` gains `*.html text eol=lf`: `tests/eol.test.mjs` asks every tracked extension for a rule, and the interactive guide is the first
+  HTML file in the tree. A page that a Windows checkout rewrote to CRLF would no longer match the hash the signed manifest holds for it (ARC-09-C285).
 - The pinned-clone guards of `tests/install-page.test.mjs` read the interactive guide too: its clone command quiets git's detached-HEAD advice,
   names a release, and names the newest one that exists (ARC-09-C285).
 - The corpus map, `vendor/docs-map.md`, no longer shows a release family at the start of an area's title. The corpus is the
