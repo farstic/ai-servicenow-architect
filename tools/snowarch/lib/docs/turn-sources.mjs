@@ -298,7 +298,7 @@ export function turnSources(rows, options = {}) {
   out.opaque = walked.opaque.map((o) => o.text);
   out.opaqueFailed = walked.failedOpaque.map((o) => o.text);
   const offset = boundary + 1;
-  const from = Math.max(out.turnStart < 0 ? 0 : out.turnStart, (options.replyAfter ?? -1) + 1);      // after the ask, on the continuation: only what the continuation wrote
+  const from = out.turnStart < 0 ? 0 : out.turnStart;
   for (const w of walked.writes) if (w.at - offset >= from) out.written.push({ tool: w.tool, text: w.text });
   const typed = [];
   for (const r of main) {

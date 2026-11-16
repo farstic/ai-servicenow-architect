@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import {
   cdOf, commandReads, expandBraces, hasExpansion, inputReads, joinPath, mentionsPage, pageAt, pagesInLines, pagesOfGrep, pagesOfInput, shellSegments, shellWords, walkThread,
 } from '../tools/snowarch/lib/docs/read-routes.mjs';
-import { isPointer } from '../tools/snowarch/lib/docs/grounding-check.mjs';
+import { groundingFindings, isPointer } from '../tools/snowarch/lib/docs/grounding-check.mjs';
 import { readSubagentRows, turnSources } from '../tools/snowarch/lib/docs/turn-sources.mjs';
 
 const DOCS = '/home/dev/install/vendor/ServiceNowDocs';
@@ -495,6 +495,20 @@ test('ARC-09-C267 read-routes — walkThread: an unresolved call is kept as text
     'the call that failed is not there (it has no viewer); the folder was lost for o4 only; a call with a viewer leaves its output beside its text; the code of another language leaves its code');
   assert.deepEqual(opaque.map((o) => o.at), [1, 1, 7, 7, 13], 'and the row of each');
   assert.deepEqual([...reached.keys()], ['markdown/csm/c_Fourth.md'], 'what the second cd made resolvable is a definite read');
+});
+
+test('ARC-09-C267 read-routes — walkThread: an MCP call with an unresolved shell line that has a viewer leaves its output beside its text', () => {
+  const batch = { commands: [{ label: 'x', command: 'ls d | xargs head -2' }], queries: ['q'] };
+  const walked = walkThread([U('q'), ...call('m1', MCP_FILE, batch, '==> d/c_Mcp.md <==\n1\tx'), ...call('m2', MCP_FILE, { language: 'python', code: 'print(1)' }, 'c_NotRead.md')]);
+  assert.deepEqual(walked.opaque.map((o) => o.text), ['ls d | xargs head -2', '==> d/c_Mcp.md <==\n1\tx', 'print(1)'], 'the python code leaves its code and not its output: it has no viewer');
+});
+
+test('ARC-09-C267 read-routes — groundingFindings: the text of a failed call shows a cited page only when the page is on disk', () => {
+  const rows = [U('q'), ...call('f', 'Bash', { command: 'for f in c_Esc.md; do head -3 "$f"; done' }, '== c_Esc.md', { error: true })];
+  const unread = (pageExists) => groundingFindings({ rows, reply: `The rule (citation: ${PAGE}).`, options: { blocking: ['citedUnread'], pageExists } }).findings.citedUnread.map((i) => i.path);
+  assert.deepEqual(unread(() => true), [], 'on disk: the failed loop may have printed it');
+  assert.deepEqual(unread(() => false), [PAGE], 'not on disk: it cannot have been');
+  assert.deepEqual(unread(undefined), [PAGE], 'with no way to ask, nothing is widened');
 });
 
 test('ARC-09-C267 read-routes — turnSources carries the texts of the failed and the successful unresolved calls apart, and asks the caller whether a page is on disk', () => {
