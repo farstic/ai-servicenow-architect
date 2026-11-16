@@ -79,6 +79,20 @@ test('ARC-09-C267 glob-fs — makeGlob: ** is zero or more folders, a drive lett
   assert.deepEqual(win.glob(`${CSM}/C_*.MD`, { ci: true }), [`${CSM}/c_Esc.md`, `${CSM}/c_Other.md`], 'and not for PowerShell');
 });
 
+test('ARC-09-C267 glob-fs — makeGlob: the time it may take is limited, by a clock the caller can give', () => {
+  let t = 0;
+  const memory = memoryFs(FILES);
+  let reads = 0;
+  const glob = makeGlob({ readdir: (d) => { reads += 1; t += 400; return memory.readdir(d); }, exists: memory.exists, now: () => t, maxMs: 1000 });
+  assert.equal(glob(`${CSM}/*.md`).length, 3, 'the first pattern costs 400 ms of the 1000');
+  assert.equal(glob(`${CSM}/c_*.md`).length, 2, 'the second 400 more');
+  assert.deepEqual(glob(`${CSM}/t_*.md`), [], 'the third goes over: it answers nothing, and the caller falls back to the names');
+  const after = reads;
+  assert.deepEqual(glob(`${CSM}/index.*`), [], 'and once the time is spent a new pattern reads nothing');
+  assert.equal(reads, after);
+  assert.equal(glob(`${CSM}/*.md`).length, 3, 'but an answer already given is still the answer');
+});
+
 test('ARC-09-C267 glob-fs — makeGlob: an answer is kept, and the reads, the folders and the files it will make are limited', () => {
   const { fs, glob } = make();
   const first = glob(`${CSM}/*.md`);

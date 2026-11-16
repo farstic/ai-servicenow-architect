@@ -46,13 +46,16 @@ const joinp = (dir, name) => (dir.endsWith('/') ? `${dir}${name}` : `${dir}/${na
 /**
  * `glob(pattern, { ci })` for an ABSOLUTE posix pattern (`/…` or `C:/…`): the files and folders it expands to, sorted, frozen, kept for the next call that
  * asks the same. A relative pattern is not the caller's to expand and gives `[]`. `readdir(dir)` gives Dirent-like entries (`name`, `isDirectory()`) or
- * throws; `exists(path)` is a yes or no; `maxDirs` folder reads and `maxEntries` entries listed, over a hook run, are the budget.
+ * throws; `exists(path)` is a yes or no; `maxDirs` folder reads, `maxEntries` entries listed and `maxMs` milliseconds (by `now`), over a hook run, are the
+ * budget: a slow disk must not spend the hook's deadline on patterns.
  */
-export function makeGlob({ readdir = (dir) => readdirSync(dir, { withFileTypes: true }), exists = existsSync, maxDirs = 300, maxEntries = 50_000 } = {}) {
+export function makeGlob({ readdir = (dir) => readdirSync(dir, { withFileTypes: true }), exists = existsSync, maxDirs = 300, maxEntries = 50_000, maxMs = 1500, now = Date.now } = {}) {
   const memo = new Map();
   let dirs = 0;
   let entries = 0;
+  let spent = 0;
   const expand = (pattern, ci) => {
+    const started = now();
     const parts = pattern.split('/');
     let root;
     if (parts[0] === '') root = '/';
@@ -62,12 +65,12 @@ export function makeGlob({ readdir = (dir) => readdirSync(dir, { withFileTypes: 
     const results = [];
     let over = false;
     const list = (dir) => {
-      if (dirs >= maxDirs) { over = true; return []; }
+      if (dirs >= maxDirs || spent + (now() - started) > maxMs) { over = true; return []; }
       dirs += 1;
       let items;
       try { items = readdir(dir); } catch { return []; }
       entries += items.length;
-      if (entries > maxEntries) { over = true; return []; }
+      if (entries > maxEntries || spent + (now() - started) > maxMs) { over = true; return []; }
       return items;
     };
     const walk = (dir, idx) => {
@@ -99,6 +102,7 @@ export function makeGlob({ readdir = (dir) => readdirSync(dir, { withFileTypes: 
       }
     };
     walk(root, 0);
+    spent += now() - started;
     return over ? [] : results.sort();
   };
   return (pattern, { ci = false } = {}) => {

@@ -48,7 +48,7 @@ function install(t) {
   const corpus = join(root, 'vendor', 'ServiceNowDocs');
   // Forward slashes on every platform: a Bash command reads a back-slash as an escape, and a Read or a PowerShell command takes either.
   const fwd = (p) => p.replaceAll('\\', '/');
-  return { root, corpus, abs: (rel) => fwd(join(corpus, rel)), folder: (rel) => fwd(dirname(join(corpus, rel))) };
+  return { root, corpus: fwd(corpus), abs: (rel) => fwd(join(corpus, rel)), folder: (rel) => fwd(dirname(join(corpus, rel))) };
 }
 const A = (blocks, extra = {}) => ({ type: 'assistant', message: { role: 'assistant', content: blocks }, ...extra });
 const U = (content, extra = {}) => ({ type: 'user', message: { role: 'user', content }, ...extra });
