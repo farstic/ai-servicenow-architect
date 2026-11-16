@@ -1787,6 +1787,15 @@ The checklist, verbatim — paste it into the release pull request's description
 >    under 2.0.1's heading and a changelog with no 2.0.0 in it. `tests/changelog.test.mjs`'s
 >    *a released version has its section here, and its notes left Unreleased* is the guard, and it
 >    defers when the clone has no tags rather than passing quietly.
+>
+>    **A released section is not edited, and its hash is recorded — ARC-09-C268.** A branch that added bullets to
+>    `## Unreleased` before a release and merges `develop` after it can have them carried, with no conflict, into the section the
+>    release made of that block (#582 had a bullet and a changed E-33 line in `## 2.2.6` that way, through two merges).
+>    `tests/changelog-released-sections.test.mjs` compares every released section with the sha256 recorded in
+>    `tests/fixtures/changelog-released-sections.json`, and with the file at its tag where the clone has the tag. The newest
+>    section may be unrecorded, so a cut passes; the post-release records pull request adds its hash, and the next cut fails on
+>    an older section that has none, with the line to add in the message. Lines a merge put in a released section go back to
+>    `## Unreleased`.
 
 **Step 2 is two-phase because it has to be.** `main` is protected by required status checks with
 `strict: true` — **54** of them after this milestone, generated into
