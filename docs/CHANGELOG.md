@@ -38,11 +38,11 @@ PowerShell command that shows the page (`cat`, `sed`, `head`, `tail`, `awk`, `nl
 filters that print a file again), from the folder a `cd` set, which the next call keeps, with a brace list or a glob in its arguments expanded
 against the file system; a Grep that printed lines of it; an MCP file read; a sub-agent's read; a read before a compaction. A call that does not
 name its pages (a loop, `xargs`, `find -exec`, `$( )`, a variable, code of another language, `git show`) counts every page whose file name is in
-it as shown. A sentence that only points ("see also", "start with", "read … first"), a path the user typed and a page the answer says it did not
+it as shown, and, if it has a viewer, in its output too; a failed viewer call counts the pages it names that are on disk. A sentence that only points ("see also", "start with", "read … first"), a path the user typed and a page the answer says it did not
 open are not claims. The hook asks the model once, in these words: "You cited pages that this session never opened: …. Open each one now. Where a
 page contradicts your answer, correct the answer. Where a citation only tells the reader where to look, mark it as a pointer on its Correction
-line." After the continuation it tells the user what stayed open, counting only the citations the final answer still makes, and never asks again
-in the turn. `tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
+line." After the continuation it tells the user what stayed open, and never asks again in the turn: a citation of the first answer or of the
+continuation stays open until a page is read or a Correction line names it as a pointer or withdrawn, and silence closes nothing. `tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
 unreadable file, switches the grounding asks off. No `CLAUDE.md`, skill or agent changes. On a 5.3 MB transcript the hook takes the same time as
 before (about 210 to 310 ms in three interleaved runs of each, on a Mac).
 

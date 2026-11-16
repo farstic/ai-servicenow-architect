@@ -14,7 +14,7 @@ The guard of the pre-registration is **0 false "unread" claims**. Telling the mo
 
 ### What reaches the session (a read route)
 
-Each of these counts, on the main thread or in a sub-agent, and a call that came back with an error does not:
+Each of these counts, on the main thread or in a sub-agent. A call that came back with an error does not, except a Bash or PowerShell call with a viewer verb (see the names rule):
 
 - a `Read` of the page;
 - Bash `cat`, `sed`, `head`, `tail`, `awk` (and `gawk`, `mawk`, `nawk`), `nl`, `less`, `more`, `bat`, and the filters that print a file again, cut or ordered (`cut`, `fold`, `tac`, `rev`, `fmt`, `column`, `expand`, `sort`, `uniq`, `paste`), and `grep`, `egrep`, `fgrep`, `rg`, that name it, unless the flags only count or list (`-c`, `-l`, `-L`, `-q`, `--files-with-matches`, `--count`, `--files`); in PowerShell `Get-Content`, `gc`, `type` and `Select-String`, `sls` (not `-Quiet`). A wrapper (`nice -n 10`, `timeout 5`, `env A=b`, `sudo`, `nohup`, `command`) or a reserved word (`then`, `do`, `!`, `{`) in front of the verb is stepped over. A page path may be relative: the shell's folder is the one a `cd`, `pushd` or `Set-Location` set, which the next call of the thread keeps, and the folder the session file records for the row is tried too. A `cd` inside `( … )` or on either side of a `|` does not move it;
@@ -37,6 +37,10 @@ What cannot be resolved is kept as the **text** of the call, and every page whos
 - in PowerShell: `ForEach-Object`, `%`, `foreach`, `Invoke-Expression`, a `Get-Content` with nothing to name that a pipe feeds (`gci … | gc`), a command that begins with `[` or `$`, or one with `::`;
 - a **folder the call cannot tell**: a `cd` whose target has a variable, `~`, a glob or a substitution loses the folder until a `cd` to an absolute folder; a relative `.md` name in a viewer's arguments in that time, or when no folder is known at all, is kept as text. A folder that is known and is not the corpus makes a relative name no page.
 
+**Its output.** When an unresolved call has a viewer verb (a viewer or a search that prints lines, or a runner given one: `xargs head`, `bash -c "cat x.md"`, `find -exec cat`), the pages named in its output count as shown too, by the same whole-name rule: the first 500,000 characters of it. A loop over `$(ls dir)` that heads every file is read through the names its output prints. A call with no viewer verb (`python3` printing a listing, a loop that only echoes, `ls | xargs echo`) is not read for names.
+
+**A call that failed** (a non-zero exit) may have printed part of what it was asked for: `cat a.md missing.md` prints `a.md`. When the call has a viewer verb, the pages it names that are on disk (in the corpus folder of the install) count as shown, and so do its unresolved text and its output for a cited page that is on disk. A failed call with no viewer shows nothing, and no failed call moves the shell's folder or writes a file.
+
 The text is the call without the here-documents that a command writes; a heredoc that feeds an interpreter (`python3 - <<'PY'`) is a script and its body is part of the text. A command that cannot show a page is not unresolved for having a variable: `ls $DIR/c_Alpha.md`, `echo $HOME c_Alpha.md`, `cp`, `wc`, `find` without `-exec`, `git status`.
 
 ### What is not a claim
@@ -51,7 +55,9 @@ The registered opening and closing words of the grounding notice are unchanged; 
 
 ### What stays open after the ask
 
-On the continuation the hook **recomputes the citations on the final answer**: the text the continuation wrote and the files it wrote, with every read of the session. A page is open only if that answer still cites it and no route showed it. So a citation the continuation withdrew is resolved, whether it left the text or a `Correction:` line that names the page says it is a pointer, withdrawn, retracted, removed or dropped; a page read after the ask is resolved; a page that first appears in the continuation and stays unread is open. A continuation that cites nothing leaves the notice empty: this is what the rule gives, and a test says so. A file the continuation left alone is not read again for the notice; one it rewrote is read as it now stands.
+The user still sees the first answer, so the notice takes its citations as a second input (the architect's ruling a, 2026-11-16). A citation of the first answer or of the continuation stays open until a page is read before the turn ends, or a `Correction:` line that names the page says it is a pointer, withdrawn, retracted, removed or dropped. A restated answer that silently drops a citation does not close it, and neither does a withdrawal that names no page: "Understood." leaves every unread citation of the first answer in the notice. A page that first appears in the continuation and stays unread is open, unless a line marks it. A file the turn wrote follows the same rule (left alone, rewritten with no page named: open; the removal said on a line that names the pages: closed).
+
+The registered tail says "do not write a withdrawn name or path again", so a model that withdraws a citation and obeys it names no page, and the item stays open: the rule asks for the path on the line.
 
 ### The data
 
@@ -71,8 +77,9 @@ On the test of a 5.3 MB transcript with an 8.8 MB names index, `report()` takes 
 
 ## Limits
 
-- A call that failed (a non-zero exit) is ignored whole, though it may have printed part of what it was asked for.
+- A call that failed with no viewer verb shows nothing, whatever it printed; and an MCP call that failed shows nothing.
 - A glob over a folder the budget does not cover answers nothing, and the call is then only its names.
-- A name that the shell builds (`$(echo c_Esc).md`) is not in the text; neither is a page named in a file a script reads from a list.
+- A name that the shell builds (`$(echo c_Esc).md`) is not in the text, and appears in the output only if the call prints it; neither is a page named in a file a script reads from a list. The output is read for an unresolved call that has a viewer verb, and only its first 500,000 characters.
 - The names rule counts a page whose file name is in an unresolved call even when the call only mentioned it: `python3 -c 'print(1)  # c_Esc.md'`. This is the side the ruling chose.
+- A file rewritten after the ask with no `Correction:` line naming its pages keeps its citations open: the notice does not read the file's earlier text apart from the new.
 - Sub-agent files are found by Claude Code's present layout; if it changes, sub-agent reads are missed and the hook asks about more pages than it should.
