@@ -308,3 +308,14 @@ test('ARC-09-C284 — a level cut at 200 lines says, on its last line, how many 
   assert.match(fell.lines.at(-1), /^\(depth 2 would print 141 lines/);
   assert.ok(!fell.text.includes('more; use --under'), fell.text);
 });
+
+test('ARC-09-C284 — the note of a cut level sends the reader to a command that docs lists: docs lookup', (t) => {
+  const printed = [];
+  const original = console.error;
+  console.error = (...a) => printed.push(a.join(' '));
+  try { runDocs([], { spell: SPELL }); } finally { console.error = original; }
+  assert.match(printed.join('\n'), /\| lookup </, 'docs lookup is not a docs sub-command, and the outline note sends the reader to it');
+  const kids = Array.from({ length: 250 }, (_, i) => [`Child ${i + 1}`, `markdown/wide/c${i + 1}.md`]);
+  const root = corpus(t, { wide: [['Wide overview', 'markdown/wide/overview.md', kids]] });
+  assert.ok(outline(root, 'wide', '--under', 'Wide overview').lines.at(-1).includes('docs lookup <words>'));
+});
