@@ -135,6 +135,51 @@ test('ARC-09-C140 — a cache that holds another release\'s manifest is fetched 
   assert.equal(readManifestCache(root)?.tag, 'v9.1.0');
 });
 
+// ── A held manifest is never fetched again, wanted or not (ARC-09-C268, the architect's ruling of 2026-11-15) ──────────────────
+
+/** B01 through the real runner with a recorded `ok` whose hash is NOT this tree's: its inputs moved, so the runner wants B01. */
+async function runB01Moved(root, over = {}) {
+  const ctx = ctxFor(root, over);
+  const state = { steps: { B01: { status: 'ok', inputsHash: 'inputs-before-the-move', finishedAt: NOW, durationMs: 0 } },
+    registration: 'project', hooksDisabledByBootstrap: false, checkout: checkoutKey(root, ctx.platform) };
+  const lines = [];
+  const r = await runSteps({ root, ctx, state, steps: [B01], onLine: (l) => lines.push(l), save: () => {} });
+  return { ...r, lines, entry: state.steps.B01 };
+}
+
+test('ARC-09-C268 — inputs moved and the manifest held: B01 runs, fetches nothing, and is ok where the repository cannot be reached', async (t) => {
+  // The repository is unreachable: a fetch would warn "could not be reached", so an ok with no manifest line is proof of no fetch.
+  const root = releaseCheckout(t, '9.1.0', gone(t));
+  cacheWith(root, manifestDoc('v9.1.0', signer), 'v9.1.0');
+  const r = await runB01Moved(root);
+  assert.equal(r.summary.cached, 0, `B01 was cached though its inputs moved:\n${r.lines.join('\n')}`);
+  assert.equal(r.entry.status, 'ok', `${r.entry.status}: ${r.entry.detail}\n${r.lines.join('\n')}`);
+  assert.equal(r.lines.some((l) => l.startsWith('release manifest:')), false, r.lines.join('\n'));
+  assert.equal(readManifestCache(root)?.tag, 'v9.1.0');
+});
+
+test('ARC-09-C268 — inputs moved and the manifest held: the cache is not rewritten where the repository could be reached', async (t) => {
+  const root = releaseCheckout(t, '9.1.0', published(t));
+  cacheWith(root, manifestDoc('v9.1.0', signer), 'v9.1.0');
+  const r = await runB01Moved(root);
+  assert.equal(r.summary.cached, 0, r.lines.join('\n'));
+  assert.equal(r.entry.status, 'ok');
+  assert.equal(r.lines.some((l) => l.startsWith('release manifest:')), false, r.lines.join('\n'));
+  assert.equal(readManifestCache(root)?.checkedAt, NOW, 'a held manifest was fetched again and its cache rewritten');
+});
+
+test('ARC-09-C268 — inputs moved and no manifest held, or another release\'s: B01 still fetches it', async (t) => {
+  const none = releaseCheckout(t, '9.1.0', published(t));
+  const first = await runB01Moved(none);
+  assert.ok(first.lines.includes('release manifest: v9.1.0 fetched (1 file)'), first.lines.join('\n'));
+  assert.equal(readManifestCache(none)?.tag, 'v9.1.0');
+  const other = releaseCheckout(t, '9.1.0', published(t));
+  cacheWith(other, manifestDoc('v9.0.0', signer), 'v9.0.0');
+  const second = await runB01Moved(other);
+  assert.ok(second.lines.includes('release manifest: v9.1.0 fetched (1 file)'), second.lines.join('\n'));
+  assert.equal(readManifestCache(other)?.tag, 'v9.1.0');
+});
+
 test('ARC-09-C140 — no network: B01 warns with the reason, E-32 is missing with the remedy, and nothing throws', async (t) => {
   const root = releaseCheckout(t, '9.1.0', gone(t));
   const r = await runB01(root);
