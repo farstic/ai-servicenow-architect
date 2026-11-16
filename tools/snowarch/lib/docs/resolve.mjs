@@ -67,7 +67,8 @@ export function indexOf(paths) {
     if (same) same.push(p);
     else byName.set(nameOf(p), [p]);
   }
-  return { size: pages.size, has: (p) => pages.has(p), named: (name) => byName.get(name) ?? [] };
+  let all = null;
+  return { size: pages.size, has: (p) => pages.has(p), named: (name) => byName.get(name) ?? [], list: () => (all ??= [...pages]) };
 }
 
 /**
