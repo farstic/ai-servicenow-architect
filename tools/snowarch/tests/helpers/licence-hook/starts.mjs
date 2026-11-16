@@ -23,6 +23,13 @@
  * the innermost scope first, so one test's `env` or `target` lends nothing to another test's start; only a name
  * with no binding visible from its place falls back to every binding in the file.
  *
+ * ARC-09-C286 — A START THROUGH A HARNESS THAT TAKES THE WHOLE ARGV. `runInPty(argv, options)`, imported from a relative module, starts
+ * `argv[0]` with the rest in a pseudo-terminal, and its own call to `child_process` takes the command from a parameter in a file that names no
+ * entry point, so the reader passed over every start made through it: the live suite's two pty cases ran the package CLI with no licence, and
+ * the nightly found it. A call to a function named in `ARGV_STARTERS`, imported from a relative module, is a start whose command is its first
+ * argument's first element and whose arguments are the rest of that array and the options after it. A function of that name that is not
+ * imported from a relative module is not.
+ *
  * A start is a PRODUCT START when that value names an entry point: the CLI (`snowarch.mjs`), the package CLI
  * (`dist/cli/index.js`, behind the same gate from step 4b), the server (`server.js`) or a launcher (`snowarch`,
  * `snowarch.cmd`). When the program cannot be followed (a command,
@@ -37,6 +44,8 @@ import { dirname, join, relative, resolve } from 'node:path';
 
 const CHILD_PROCESS = new Set(['node:child_process', 'child_process']);
 const SPAWNERS = new Set(['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync', 'fork']);
+/** Harnesses that start `argv[0]` with the rest of the first argument: ARC-09-C286. */
+const ARGV_STARTERS = new Set(['runInPty']);
 const SOURCE = /\.(mjs|js|cjs|ts|mts)$/;
 /** A script the call names by its file, wherever its directory is. */
 const SCRIPT_FILE = /\.(?:mjs|cjs|js|ts|cmd|bat|sh|ps1|py)$/;
@@ -103,7 +112,7 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
   const parse = (file) => {
     if (parsed.has(file)) return parsed.get(file);
     const src = ts.createSourceFile(file, read(file), ts.ScriptTarget.Latest, true);
-    const p = { src, bindings: new Map(), imports: new Map(), spawners: new Set(), namespaces: new Set(), transport: null,
+    const p = { src, bindings: new Map(), imports: new Map(), spawners: new Set(), namespaces: new Set(), argvStarters: new Set(), transport: null,
       dynamic: null };
     const add = (name, node) => p.bindings.set(name, [...(p.bindings.get(name) ?? []), node]);
     const loaded = new Set();
@@ -125,6 +134,7 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
             for (const el of named.elements) {
               const imported = (el.propertyName ?? el.name).text;
               if (imported === 'StdioClientTransport') p.transport = el.name.text;
+              if (ARGV_STARTERS.has(imported) && spec.startsWith('.')) p.argvStarters.add(el.name.text);
               p.imports.set(el.name.text, { spec, imported });
             }
           }
@@ -343,14 +353,14 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
    * code included, read as text). `named` is the entry points it names; `unknown` when it does not follow to a
    * value: a parameter, or arguments the reader cannot see into.
    */
-  const scriptOf = (file, args) => {
+  const scriptOf = (file, args, skip = 0) => {
     const arr = arrayOf(file, args);
     if (!arr) {
       const e = expand(file, args);
       return { named: names(e.values), unknown: e.lost.length > 0 };
     }
     let code = false;
-    for (const el of arr.node.elements) {
+    for (const el of arr.node.elements.slice(skip)) {
       const expr = ts.isSpreadElement(el) ? el.expression : el;
       if (!code && ts.isStringLiteralLike(expr)) {
         // `node --test` starts the test runner; the test files' own starts are read where they are written.
@@ -377,9 +387,18 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
   };
 
   /** What a start starts: the entry points it names, `presumed`, or `null` for a program that is not the product. */
-  const classify = (file, node, fileNames) => {
+  const classify = (file, node, fileNames, viaArgv = false) => {
     let cmd = node.arguments?.[0];
     let args = node.arguments?.[1] && !ts.isObjectLiteralExpression(node.arguments[1]) ? node.arguments[1] : null;
+    let skip = 0;
+    if (viaArgv) {
+      // `runInPty([program, script, ...rest], options)`: the program is the array's first element and the rest is the script's arguments.
+      const arr = cmd ? arrayOf(file, cmd) : null;
+      if (!arr) return fileNames ? 'presumed' : null;
+      const [first] = arr.node.elements;
+      if (!first) return null;
+      [file, cmd, args, skip] = [arr.file, first, arr.node, 1];
+    }
     if (ts.isNewExpression(node) && cmd && ts.isObjectLiteralExpression(cmd)) {
       const prop = (k) => cmd.properties.find((pr) => ts.isPropertyAssignment(pr) && pr.name.getText() === k)?.initializer
         ?? cmd.properties.find((pr) => ts.isShorthandPropertyAssignment(pr) && pr.name.text === k)?.name ?? null;
@@ -394,7 +413,7 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
     if (named.length) return named.join('+');
     if (!RUNNER.test(c.text)) return fileNames && c.lost.length ? 'presumed' : null;
     if (!args) return null;
-    const s = scriptOf(at, args);
+    const s = scriptOf(at, args, skip);
     if (s.named.length) return s.named.join('+');
     return fileNames && s.unknown ? 'presumed' : null;
   };
@@ -419,12 +438,14 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
   for (const file of files) {
     const p = parse(file);
     if (p.dynamic) unresolved.push(`${relative(base, file)}: ${p.dynamic}`);
-    if (!p.spawners.size && !p.namespaces.size && !p.transport) continue;
+    if (!p.spawners.size && !p.namespaces.size && !p.transport && !p.argvStarters.size) continue;
     const fileNames = names(expand(file, p.src).values).length > 0;
     const visit = (node) => {
       let isStart = false;
+      let viaArgv = false;
       if (ts.isCallExpression(node)) {
         const c = node.expression;
+        if (ts.isIdentifier(c) && p.argvStarters.has(c.text)) { isStart = true; viaArgv = true; }
         if (ts.isIdentifier(c) && p.spawners.has(c.text)) isStart = true;
         if (ts.isPropertyAccessExpression(c) && ts.isIdentifier(c.expression) && p.namespaces.has(c.expression.text)
           && SPAWNERS.has(c.name.text)) isStart = true;
@@ -433,7 +454,7 @@ export async function scanProductStarts({ roots = [], base = process.cwd(), read
         isStart = true;
       }
       if (isStart) {
-        const entry = classify(file, node, fileNames);
+        const entry = classify(file, node, fileNames, viaArgv);
         if (entry) {
           const args = (node.arguments ?? []).map((a) => expand(file, a).text).join('\n');
           const licensed = /\blicensedEnv\(/.test(args);
