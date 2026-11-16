@@ -1023,8 +1023,11 @@ export function walkThread(rows, { glob = null, pageExists = null, pageText = nu
   let aborted = false;
   let cwd = null;
   let lost = false;
-  const onDisk = typeof pageExists === 'function' ? pageExists : () => false;
-  const seams = typeof pageExists === 'function' ? { pageExists } : {};
+  // The disk is asked once for each page for the whole walk: a Grep result has thousands of lines that name a few pages.
+  const asked = new Map();
+  const known = typeof pageExists === 'function' ? (page) => { if (!asked.has(page)) asked.set(page, Boolean(pageExists(page))); return asked.get(page); } : null;
+  const onDisk = known ?? (() => false);
+  const seams = known ? { pageExists: known } : {};
   const evidence = new Map();                                       // page → its lines long enough to be evidence that a result holds them
   /** Does the text of a result hold a line of this page (B2)? Needs the page's text (`pageText`), which the hook reads from the corpus folder. */
   const holdsLineOf = (said, page) => {
