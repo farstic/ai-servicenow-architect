@@ -354,7 +354,7 @@ function reasonOf(findings, kinds, max) {
         }
         break;
       case 'citedUnread':
-        clauses.push(`Cited, but no page of this session shows it: ${got.map((i) => i.path).join(', ')}. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer.`);
+        clauses.push(`Cited pages that nothing in this session showed: ${got.map((i) => i.path).join(', ')}. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer.`);
         break;
       case 'resting':
         clauses.push(`Left as not read or not verified: ${got.map((i) => `"${i.excerpt}"`).join('; ')}. Read the page, or search escape-safe and give the marker only to what the search does not find.`);

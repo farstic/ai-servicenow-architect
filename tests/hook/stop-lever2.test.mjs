@@ -90,7 +90,7 @@ withInstall('ARC-09-C267 lever 2 — nothing read: the cited page is asked about
   asked(d, PAGE.alpha, PAGE.beta);
   assert.ok(d.reason.startsWith(LEAD));
   assert.ok(d.reason.endsWith(KEEP_OUT));
-  assert.ok(d.reason.includes(`Cited, but no page of this session shows it: ${PAGE.alpha}, ${PAGE.beta}.`), d.reason);
+  assert.ok(d.reason.includes(`Cited pages that nothing in this session showed: ${PAGE.alpha}, ${PAGE.beta}.`), d.reason);
   assert.ok(d.reason.includes('Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer.'));
   // One ask a turn: the continuation of that turn is never asked again, however it ends.
   const again = await stop(t, { rows: [], message: cite(PAGE.alpha), input: { stop_hook_active: true } });
@@ -239,7 +239,7 @@ withInstall('ARC-09-C267 lever 2 — one ask a turn: two pages, one block; the c
   const message = `${cite(PAGE.alpha)} ${cite(PAGE.beta)}`;
   const d = await stop(t, { rows: [], message });
   assert.equal(d.decision, 'block');
-  assert.equal(d.reason.match(/Cited, but no page of this session shows it/g).length, 1, 'one clause for both pages');
+  assert.equal(d.reason.match(/Cited pages that nothing in this session showed/g).length, 1, 'one clause for both pages');
   // The continuation after our block: our feedback row, then what the model did.
   const feedback = U(`Stop hook feedback:\n${d.reason}`, { isMeta: true });
   const ignored = await stop(t, { rows: [A([{ type: 'text', text: message }]), feedback, A([{ type: 'text', text: 'Understood.' }])], message: `Understood. ${cite(PAGE.alpha)}`, input: { stop_hook_active: true } });

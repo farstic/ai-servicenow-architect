@@ -31,7 +31,7 @@ A citation is skipped when its line says right after the path that the page was 
 
 The registered opening and closing words of the grounding notice are unchanged; the clause between them is new (the architect to review this wording):
 
-> Cited, but no page of this session shows it: `<paths>`. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer.
+> Cited pages that nothing in this session showed: `<paths>`. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer.
 
 A page is closed on the continuation when it was read after the ask, or when a `Correction:` line that names its path says it is a pointer.
 

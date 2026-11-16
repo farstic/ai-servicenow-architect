@@ -373,7 +373,7 @@ test('ARC-09-C263 — the notice ends with the registered tail (496 bytes, sha25
   assert.equal(createHash('sha256').update(REGISTERED_TAIL).digest('hex'), '5c3e7055f08c1d6b978cb580de74dc97ec90d54544f5f728e01a626293627800', 'and the registered hash');
   const r = check('See `markdown/hrsd/c_Missing.md`.');
   assert.deepEqual(namesOf(r, 'citedUnread'), ['markdown/hrsd/c_Missing.md']);
-  assert.equal(r.reasonBody, `${LEAD} Cited, but no page of this session shows it: markdown/hrsd/c_Missing.md. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer. ${REGISTERED_TAIL}`);
+  assert.equal(r.reasonBody, `${LEAD} Cited pages that nothing in this session showed: markdown/hrsd/c_Missing.md. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer. ${REGISTERED_TAIL}`);
   assert.equal(r.reason, `${r.reasonBody}${KEEP_OUT}`, 'our closing words follow the tail');
   // Several kinds asking at once: the tail still comes once, last.
   const many = check('Uses `sensor_reading_x` and `task_sla`; also `Pages read: 9`, unverified. See markdown/itsm/c_Missing.md.');
@@ -641,7 +641,7 @@ test('ARC-09-C263 M5 hook — the shipped data, as lever 2 sets it: a page cited
   assert.equal(await ask(coined), null, 'coined is grader-only');
   const asked = await ask(cited);
   assert.equal(asked?.decision, 'block', 'citedUnread asks (lever 2): the pilot, at the old text and the old routes, judged it warranted on 22 of 25 flags');
-  assert.match(asked.reason, /Cited, but no page of this session shows it: markdown\/csm\/c_Esc\.md\./);
+  assert.match(asked.reason, /Cited pages that nothing in this session showed: markdown\/csm\/c_Esc\.md\./);
   const both = await ask(`${cited}\n${absent}`);
   assert.equal(both?.decision, 'block', 'a page cited beside a false absence: asked about');
   assert.doesNotMatch(both.reason, /is documented|no page of the corpus|not documented/, 'and only the citation is asked: the false absence is computed and not asked');
