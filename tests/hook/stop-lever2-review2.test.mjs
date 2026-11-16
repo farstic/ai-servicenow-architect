@@ -211,3 +211,21 @@ withInstall('ARC-09-C267 review 2, item 6 — when the continuation opens every 
   const fixed = pages.map((p) => `Correction: ${p} says what the file cites.`).join('\n');
   silent(await stop(t, { rows: [...wrote, text('Saved.'), feedback, ...reads, text(fixed)], message: fixed, input: { stop_hook_active: true } }), 'every page read');
 });
+
+withInstall('ARC-09-C267 review 2, item 3 — a folder a call lists without naming it is the one the shell stands in: cd <area> && ls | xargs head', async (t, i) => {
+  const area = i.folder(PAGE.alpha);
+  const both = `${cite(PAGE.alpha)} ${cite(PAGE.beta)}`;
+  for (const command of [`cd ${area} && ls | xargs head -3`, `cd ${area} && rg -l table | xargs cat`, `cd ${area} && grep -rl table | xargs sed -n 1,3p`, `cd ${area} && find -type f | xargs cat`,
+    `cd ${area} && for f in $(ls); do head -2 "$f"; done`, `cd ${area} && rg --files | xargs head -2`]) {
+    silent(await stop(t, { rows: bash('b', command), message: both }), command);
+    asked(await stop(t, { rows: bash('b', command), message: cite(PAGE.gamma) }), PAGE.gamma);
+  }
+  // the folder the call names, a pipe as the input, and a list nobody reads show nothing of it
+  for (const command of [`cd ${area} && ls /tmp | xargs head -3`, `cd ${area} && echo x | grep -l table | xargs cat`, `cd ${area} && ls | xargs wc -l`, 'ls | xargs head -3']) {
+    asked(await stop(t, { rows: bash('b', command), message: cite(PAGE.alpha) }), PAGE.alpha);
+  }
+  // PowerShell: Set-Location, then a recursive listing read by Get-Content
+  const win = area.replaceAll('/', '\\');
+  silent(await stop(t, { rows: powershell('p', `Set-Location "${win}"; Get-ChildItem -Recurse | Get-Content`), message: both }), 'Set-Location, Get-ChildItem -Recurse | Get-Content');
+  asked(await stop(t, { rows: powershell('p', `Set-Location "${win}"; Get-ChildItem -Recurse | Get-Content`), message: cite(PAGE.gamma) }), PAGE.gamma);
+});

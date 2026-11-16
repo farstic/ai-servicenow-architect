@@ -302,3 +302,32 @@ test('ARC-09-C267 review 2, item 5 — a name that stands right after a slash is
   assert.deepEqual(find(rowsOf(), `${BETA} was not read. c_Beta.md is only a pointer.`).items, [], 'a path the answer says it did not read, and its name: one page, declared');
   assert.deepEqual(find(rowsOf(), 'See c_Beta.md.').items.map((i) => i.path), ['c_Beta.md'], 'a name alone is a citation');
 });
+
+// ---- item 3, the folder a call lists without naming it: the one the shell stands in ------------------------------------------------------------
+test('ARC-09-C267 review 2, item 3 — a lister or searcher that is given no folder runs on the one the shell stands in, and that folder is covered when a viewer reads its list', () => {
+  const inArea = { cwd: CSM, rowCwd: '/home/dev/install' };
+  const area = ['dir:markdown/customer-service-management'];
+  for (const command of ['ls | xargs head -3', 'ls -la | xargs -I{} head -3 {}', 'find -type f | xargs cat', 'find | xargs cat', 'rg -l escal | xargs cat', 'rg --files | xargs cat', 'grep -rl escal | xargs cat',
+    'grep -R escal | xargs sed -n 1,3p', 'grep --recursive -l escal | xargs cat', 'fd c_ | xargs cat', 'tree | xargs cat', 'for f in $(ls); do head -3 "$f"; done', 'cat `ls`']) {
+    assert.deepEqual(pats(command, inArea), area, command);
+  }
+  // not the folder: the call names another one, or its input is a pipe, or no viewer reads the list
+  for (const command of ['ls /tmp | xargs head -3', 'find /tmp -type f | xargs cat', 'rg -l escal /tmp | xargs cat', 'rg --files /tmp | xargs cat', 'grep -rl escal /tmp | xargs cat', 'fd c_ /tmp | xargs cat',
+    'echo x | grep -l escal | xargs cat', 'echo x | rg escal | xargs cat', 'grep -l escal | xargs cat', 'ls | xargs wc -l', 'find -type f | xargs grep -l x', 'rg -l escal']) {
+    assert.deepEqual(pats(command, inArea), [], command);
+  }
+  // the project folder is no corpus folder
+  assert.deepEqual(pats('ls | xargs head -3'), []);
+  assert.deepEqual(pats('rg -l escal | xargs cat', { cwd: '/home/dev/install', rowCwd: '/home/dev/install' }), []);
+  // a name filter makes its pattern the match, with or without a folder
+  assert.deepEqual(pats("rg --files -g 'c_Esc*.md' | xargs cat", inArea), ['s:c_Esc*.md']);
+  assert.deepEqual(pats("find -iname 'c_esc*' | xargs cat", inArea), ['i:c_esc*']);
+  // PowerShell
+  const ps = { powershell: true, cwd: 'C:/home/dev/install/vendor/ServiceNowDocs/markdown/customer-service-management', rowCwd: 'C:/home/dev/install' };
+  assert.deepEqual(pats('Get-ChildItem -Recurse | Get-Content', ps), area);
+  assert.deepEqual(pats('gci -Recurse -Depth 2 | Get-Content', ps), area);
+  assert.deepEqual(pats('dir | Get-Content', ps), area);
+  assert.deepEqual(pats('Get-ChildItem -Recurse -Filter c_Esc*.md | Get-Content', ps), ['i:c_Esc*.md']);
+  assert.deepEqual(pats('Get-ChildItem C:\\tmp -Recurse | Get-Content', ps), []);
+  assert.deepEqual(pats('Get-ChildItem -Path C:\\tmp | Get-Content', ps), []);
+});
