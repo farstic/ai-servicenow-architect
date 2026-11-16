@@ -233,6 +233,18 @@ that one workflow, and a sixth, or one of them elsewhere, fails the suite.
 Locally the same values come from a `0600` file pointed at by `SNOW_ENV_FILE`, never a `.env` in the
 working directory: a file the tools pick up by walking the tree is a file that ends up in a tarball.
 
+**What a live case may spell, and what it must be given.** The file runs only at night and only with an instance, and until 2026-11-15 the
+schedule ran a branch from September, so a case written by hand drifts from the product unseen (ARC-09-C278, ARC-09-C286).
+
+- **None of the wizard's words.** A pattern a case waits for and a line it asserts is asked of the product: `probe-text.ts` for a probe line,
+  `wizard-scripts.ts` for the prompts of the pseudo-terminal cases (`PASSWORD_PROMPT`, `authFailedRetry(n)`, the retry menu's own order). A unit
+  test runs each of them through the real wizard in every pull request (`probe-text.test.ts`, `wizard-scripts.test.ts`); a script that waits for
+  words the wizard does not print stops there, naming the prompt, and does not wait out a timeout at night.
+- **A licence, for every start of the CLI.** From step 4b the CLI refuses `instance` without one (exit 3). The cases that go through `cli()`
+  and those that go through `runInPty` take `licensed()`, the fixture licence of `licensedEnv`: signed by a key made for the run and trusted through
+  a `NODE_OPTIONS` hook, so a CI job needs no licence of its own, no secret and no file in the repository. The spawn-class guard
+  (`tools/snowarch/tests/licence-spawn-class.test.mjs`) reads a call to `runInPty` as a start, as it reads one to `child_process`.
+
 ## Secret scanning
 
 CI runs `gitleaks` over the **full history** on every push. Two allowances, and they are different kinds:
