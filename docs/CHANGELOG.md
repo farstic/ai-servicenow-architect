@@ -83,6 +83,23 @@ Release carries it as an asset, so a reader with nothing installed can download 
   beside a name and the page titles, which `docs lookup` reads, and it is about 11.6 MB for the whole corpus at the 96d3212 pin
   (it was about 9 MB). An index of the old format loads as missing, and E-33 sends the reader to `doctor --fix`, which builds the
   new one (ARC-09-C268).
+- The Architect says that something is not documented in the corpus only after `./snowarch docs lookup <names or words>` has shown it
+  ABSENT, and it opens a page the lookup lists before it answers. Measured over 54 answers in each of two arms, the text without the
+  sentence and with it: false "not documented" claims fell from 9 to 2, and the rest held: the key page was read and cited in 52 answers
+  of 54 in both, no cited page was missing, no name was invented, the verdict letters were the same, and the median time of an
+  answer did not move. The rule is one sentence that ends the grounding rule's first sentence in `CLAUDE.md` (line 12): 100 bytes, so
+  the file is 20,961 bytes against a cap of 21,000. The owner confirmed the edit on 2026-11-16 (ARC-09-C268).
+- The checkout's `.claude/settings.json` lets a session run that one command without asking, as `Bash(./snowarch docs lookup *)`
+  and, for the PowerShell tool on Windows, `PowerShell(.\snowarch.cmd docs lookup *)`; no other command of the launcher is
+  allowed. The two entries are generated from the launcher spelling, like the rest of `permissions` (ARC-09-C268).
+
+### Fixed
+
+- B01 fetches the release manifest only when the cache does not hold it. A release's manifest is signed once and the revocation
+  list is fetched separately, so a held manifest stays valid. B01 used to fetch whenever it ran on a release tree, so a bootstrap
+  that ran it because its inputs had moved (a changed `.claude/settings.json`, say) printed
+  `release manifest: could not be reached` with the licences repository out of reach, though the manifest was held and E-32
+  verified, and with the repository reachable it fetched the manifest again and rewrote the cache (ARC-09-C268).
 
 ## 2.2.6 — 2026-11-15
 

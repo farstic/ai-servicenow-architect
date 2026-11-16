@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { fillLauncher } from '../../packages/contract/lib/contract.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { ruleAllows } from '../helpers/permission-rule.mjs';
 
 import { APPROVAL_PER_RECORD, APPROVAL_WITH_CAPTURE, CAPTURE_OBJECTS, PREFLIGHT_STOP, PREFLIGHT_UNKNOWN_GATE }
   from '../../packages/contract/gen/rule-file.mjs';
@@ -398,7 +399,10 @@ test('ARC-05-S07 criterion 1 — every read tool allowed, every mutating tool as
   const dir = tree();
   try {
     run(dir, ['--only', 'permissions']);
-    const { allow, ask } = settingsOf(dir).permissions;
+    // ARC-09-C268: the product's own `docs lookup` pair heads the generated entries and has its own test below; this one is
+    // about the tools of the contract, so it reads the MCP entries.
+    const { allow: allowAll, ask } = settingsOf(dir).permissions;
+    const allow = allowAll.filter((e) => e.startsWith('mcp__'));
     const c = realContract();
     const reads = c.tools.filter((t) => !t.mutates && !t.sessionMutates);
     const writes = c.tools.filter((t) => t.mutates || t.sessionMutates);
@@ -484,6 +488,98 @@ test('ARC-09-C123 — the web tools are denied to every session, once, after a u
   assert.deepEqual(committed.permissions.deny, ['WebFetch', 'WebSearch']);
 });
 
+// ARC-09-C268 phase B — the product's one non-MCP allow entry. In design-only mode there is no tool to read the corpus with but the
+// shell, and the gateways tell a session to run `docs lookup` before it calls a construct absent; a prompt on each lookup would
+// sit in the middle of grounding. The entry is generated, and these cases read what the generator wrote.
+const LOOKUP_RULES = () => {
+  const posix = spellings({ platform: 'linux', env: {} });
+  const windows = spellings({ platform: 'win32', env: {} });
+  return { posix, windows, want: [`Bash(${posix.cli} docs lookup *)`, `PowerShell(${windows.cli} docs lookup *)`] };
+};
+const notMcp = (list) => list.filter((e) => !e.startsWith('mcp__'));
+
+test('ARC-09-C268 — the generator writes the lookup entry for each shell, once, after a user\'s own entries, and a hand edit is found', () => {
+  const { want } = LOOKUP_RULES();
+
+  // A fresh file carries the pair and no other command, and the deny list is the web tools alone.
+  const fresh = tree();
+  try {
+    run(fresh, ['--only', 'permissions']);
+    const { allow, ask, deny } = settingsOf(fresh).permissions;
+    assert.deepEqual(notMcp(allow), want);
+    assert.deepEqual(notMcp(ask), [], 'a shell command is on the ask list');
+    assert.deepEqual(deny, ['WebFetch', 'WebSearch']);
+    // Over its own output the pair is not written twice, and the check says the file is current.
+    run(fresh, ['--only', 'permissions']);
+    assert.deepEqual(notMcp(settingsOf(fresh).permissions.allow), want);
+    assert.equal(run(fresh, ['--check', '--only', 'permissions']).code, 0);
+  } finally { cleanup(fresh); }
+
+  // A user's own entries keep the head of the list. A file that already has the pair, in another place and the other way round, ends
+  // with it once, after them.
+  const owned = tree(({ write }) => {
+    write(SETTINGS, `${JSON.stringify({ permissions: { allow: [want[1], 'Bash(git status)', want[0], 'mcp__other__thing'], ask: [], deny: [] } }, null, 2)}\n`);
+  });
+  try {
+    run(owned, ['--only', 'permissions']);
+    assert.deepEqual(notMcp(settingsOf(owned).permissions.allow), ['Bash(git status)', ...want]);
+    assert.equal(settingsOf(owned).permissions.allow[1], 'mcp__other__thing', 'a stranger\'s MCP rule kept its place at the head');
+  } finally { cleanup(owned); }
+
+  // The committed file with one of the two entries cut out is stale, and the diff names the entry.
+  for (const [i, entry] of want.entries()) {
+    const edited = tree(({ write }) => {
+      const committed = JSON.parse(readFileSync(join(root, SETTINGS), 'utf8'));
+      committed.permissions.allow = committed.permissions.allow.filter((e) => e !== want[i]);
+      write(SETTINGS, `${JSON.stringify(committed, null, 2)}\n`);
+    });
+    try {
+      const r = run(edited, ['--check', '--only', 'permissions']);
+      assert.equal(r.code, 1, `a settings file without ${entry} was called current`);
+      assert.ok(r.out.split('\n').some((l) => l.startsWith('+') && l.includes(JSON.stringify(entry))), `the diff does not name ${entry}:\n${r.out}`);
+    } finally { cleanup(edited); }
+  }
+});
+
+test('ARC-09-C268 — the committed settings allow the lookup and only the lookup, for the launcher each shell types', () => {
+  const { posix, windows, want } = LOOKUP_RULES();
+  const { allow, ask, deny } = JSON.parse(readFileSync(join(root, SETTINGS), 'utf8')).permissions;
+  assert.deepEqual(notMcp(allow), want, 'the committed settings file does not carry the generated lookup pair: run npm run gen');
+  assert.deepEqual(notMcp(ask), []);
+  assert.deepEqual(deny, ['WebFetch', 'WebSearch']);
+
+  const [bash, powershell] = want;
+  for (const [tool, rule, cli] of [['Bash', bash, posix.cli], ['PowerShell', powershell, windows.cli]]) {
+    // What a session types: the command, the words or names after it, flags after them, and the bare command (it prints its usage).
+    for (const typed of [`${cli} docs lookup requested item`, `${cli} docs lookup sc_req_item --json`, `${cli} docs lookup incident.assigned_to --names 5`, `${cli} docs lookup`]) {
+      assert.ok(ruleAllows(rule, tool, typed), `${rule} does not cover what a session types: ${typed}`);
+    }
+    // And no other command of the launcher, nor a longer word that begins like the verb.
+    for (const other of [cli, `${cli} docs`, `${cli} docs lookupx`, `${cli} docs sync`, `${cli} docs verify`, `${cli} docs status`, `${cli} doctor`,
+      `${cli} status`, `${cli} upgrade`, `${cli} instance set-credentials x`, `${cli} licence check`]) {
+      assert.ok(!ruleAllows(rule, tool, other), `${rule} covers more than the lookup: ${other}`);
+    }
+  }
+  // Each rule is for its own shell's launcher and its own tool. (The strings are built here and passed by name: the launcher audit reads a
+  // launcher spelled inside an assertion as a sentence the product must also print, and these are test data.)
+  const windowsTyped = `${windows.cli} docs lookup x`;
+  const posixTyped = `${posix.cli} docs lookup x`;
+  assert.ok(!ruleAllows(bash, 'Bash', windowsTyped), 'the Bash rule covers the Windows launcher');
+  assert.ok(!ruleAllows(powershell, 'PowerShell', posixTyped), 'the PowerShell rule covers the POSIX launcher');
+  assert.ok(!ruleAllows(powershell, 'Bash', windowsTyped), 'a PowerShell rule is read as a Bash rule');
+
+  // The instrument can fail: a broader rule WOULD cover what the loop above refuses, and a rule of another shape is not read at all.
+  const broad = `Bash(${posix.cli} *)`;
+  const middle = `Bash(${posix.cli} * lookup)`;
+  const colon = `Bash(${posix.cli} docs lookup:*)`;
+  const doctor = `${posix.cli} doctor`;
+  const lookup = `${posix.cli} docs lookup`;
+  assert.ok(ruleAllows(broad, 'Bash', doctor), 'the matcher does not tell a broad rule from a narrow one');
+  assert.ok(ruleAllows('Bash(git *)', 'Bash', 'git'), 'a trailing star matches the bare command');
+  assert.ok(!ruleAllows(middle, 'Bash', lookup), 'a star in the middle is not read as a trailing one');
+  assert.ok(!ruleAllows(colon, 'Bash', posixTyped), 'the colon form is not a shape this product writes');
+});
+
 test('ARC-05-S07 criterion 3 — a flipped `mutates` names the entry that moved', () => {
   const dir = tree();
   try {
@@ -542,7 +638,8 @@ test('ARC-05-S07 criterion 7 — the glob path renders, and is not what is selec
   const dir = tree((s) => { s.config.mcp.permissions.allowStyle = 'glob'; });
   try {
     run(dir, ['--only', 'permissions']);
-    const { allow } = settingsOf(dir).permissions;
+    // The MCP entries only: the product's own `docs lookup` pair is not a tool glob (ARC-09-C268).
+    const allow = settingsOf(dir).permissions.allow.filter((e) => e.startsWith('mcp__'));
     assert.ok(allow.every((e) => e.endsWith('_*')), 'a glob run emitted an explicit entry');
     assert.ok(allow.length < 60, `${allow.length} globs is not a reduction`);
     // Every read tool is still matched by one of them — the property a glob has to keep.

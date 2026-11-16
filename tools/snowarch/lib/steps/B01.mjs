@@ -119,9 +119,14 @@ export const run = async (ctx) => {
   // fetched, it warns with the reason, and E-32's remedy is the refresh; a development version has none to fetch, and
   // a config that names no licences repository says nothing, as the revocation list's refresh does.
   const tag = releaseTagOf(ctx.root);
+  // ARC-09-C268 — ONLY WHEN IT IS NOT HELD (the architect's ruling of 2026-11-15, option A): a release's manifest is signed once
+  // and the revocation list is fetched separately, so a manifest the cache holds for this tag stays valid, and B01 running for
+  // another reason (its inputs moved: the generated permission entries are one) must not fetch it again. Before this it did,
+  // and with the licences repository out of reach it warned "could not be reached" for a manifest it had. `outputMissing` is the
+  // question the runner and E-32 ask, so the three agree on what "held" means.
   // `licenceKeys` is the test seam E-31 and E-32 have: a suite injects the keys it generated. Nothing in the product
   // sets it.
-  const fetched = tag ? refreshManifest(ctx.root, { config: ctx.config, tag, env: ctx.env ?? process.env,
+  const fetched = tag && outputMissing(ctx) ? refreshManifest(ctx.root, { config: ctx.config, tag, env: ctx.env ?? process.env,
     keys: ctx.licenceKeys ?? PRODUCT_KEYS }) : null;
   const manifest = fetched?.outcome === 'unconfigured' ? null : fetched;
   if (manifest) {

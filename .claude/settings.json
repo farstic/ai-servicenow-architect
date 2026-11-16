@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "Bash(./snowarch docs lookup *)",
+      "PowerShell(.\\snowarch.cmd docs lookup *)",
       "mcp__servicenow__snow_agile_epics_index",
       "mcp__servicenow__snow_agile_scrum_tasks_index",
       "mcp__servicenow__snow_agile_stories_index",
