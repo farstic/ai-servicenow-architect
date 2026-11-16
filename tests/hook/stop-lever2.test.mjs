@@ -257,7 +257,7 @@ withInstall('ARC-09-C267 lever 2 — one ask a turn: two pages, one block; the c
   asked(first, PAGE.beta);
   assert.doesNotMatch(first.reason, new RegExp(PAGE.alpha.replaceAll('.', '\\.')), 'the page read before the compaction is not in the ask');
   const feedback2 = U(`Stop hook feedback:\n${first.reason}`, { isMeta: true });
-  const still = await stop(t, { rows: [...early, A([{ type: 'text', text: message }]), feedback2, A([{ type: 'text', text: 'Understood.' }])], message: 'Understood.', input: { stop_hook_active: true } });
+  const still = await stop(t, { rows: [...early, A([{ type: 'text', text: message }]), feedback2, A([{ type: 'text', text: message }])], message, input: { stop_hook_active: true } });
   assert.match(still.systemMessage, new RegExp(PAGE.beta.replaceAll('.', '\\.')), 'the page nobody read stays open');
   assert.doesNotMatch(still.systemMessage, new RegExp(PAGE.alpha.replaceAll('.', '\\.')), 'and the one read before the compaction is not reported');
 });

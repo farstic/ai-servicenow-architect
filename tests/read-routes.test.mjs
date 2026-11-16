@@ -80,7 +80,9 @@ test('ARC-09-C267 read-routes — shellSegments: a here-document is text, not co
   const doc = (command, o) => shellSegments(command, o);
   const plain = doc("cat > notes.md <<'EOF'\ncat vendor/ServiceNowDocs/markdown/csm/c_Esc.md\nsee markdown/csm/c_Esc.md\nEOF\nls");
   assert.deepEqual(plain.segments.map((s) => s.words), [['cat', '>', 'notes.md'], ['ls']], 'the body is not parsed as commands');
-  assert.deepEqual(plain.heredocs, [{ body: 'cat vendor/ServiceNowDocs/markdown/csm/c_Esc.md\nsee markdown/csm/c_Esc.md', writes: true }], '> makes it a written file');
+  assert.deepEqual(plain.heredocs.map(({ body, writes }) => ({ body, writes })), [{ body: 'cat vendor/ServiceNowDocs/markdown/csm/c_Esc.md\nsee markdown/csm/c_Esc.md', writes: true }], '> makes it a written file');
+  assert.deepEqual(plain.heredocs[0].owner, ['cat', '>', 'notes.md'], 'and the words of the command it feeds');
+  assert.equal(plain.bare, "cat > notes.md <<'EOF'\nls", 'the line without the body');
   assert.equal(doc('tee out.md <<EOF\nbody\nEOF').heredocs[0].writes, true, 'tee');
   assert.equal(doc('cat >>out.md <<EOF\nbody\nEOF').heredocs[0].writes, true, '>>');
   assert.equal(doc('cat <<EOF\nbody\nEOF').heredocs[0].writes, false, 'a heredoc to a command that prints does not write');
@@ -102,7 +104,7 @@ test('ARC-09-C267 read-routes — shellSegments with powershell: a back-slash is
   assert.deepEqual(ps("Get-Content 'it''s.md', b.md").segments.map((s) => s.words), [['Get-Content', "it's.md", 'b.md']], 'a doubled quote is one, a comma parts the items');
   assert.deepEqual(ps('Write-Output a`;b "x`"y"').segments.map((s) => s.words), [['Write-Output', 'a;b', 'x"y']], 'a back-tick escapes the next character');
   const here = ps("@'\nGet-Content C:\\a\\c_Esc.md\n'@ | Set-Content out.md");
-  assert.deepEqual(here.heredocs, [{ body: 'Get-Content C:\\a\\c_Esc.md', writes: true }], 'a here-string is text, and Set-Content writes it');
+  assert.deepEqual(here.heredocs.map(({ body, writes }) => ({ body, writes })), [{ body: 'Get-Content C:\\a\\c_Esc.md', writes: true }], 'a here-string is text, and Set-Content writes it');
   assert.deepEqual(ps('Get-Content a.md; Get-Content b.md').segments.map((s) => s.words), [['Get-Content', 'a.md'], ['Get-Content', 'b.md']]);
 });
 
@@ -143,6 +145,12 @@ test('ARC-09-C267 read-routes — commandReads: the verbs that show a page, and 
   assert.deepEqual([...commandReads(`cat ${FILE} ${DOCS}/${OTHER}`).reads], [[PAGE, 'cat'], [OTHER, 'cat']], 'several files');
   assert.deepEqual(pagesOf(`head -3 ${FILE} | grep -n x`), [PAGE], 'at the head of a pipe; the grep has no file');
   assert.deepEqual(pagesOf(`echo start && cat ${FILE} ; echo end`), [PAGE]);
+  // a wrapper, a reserved word or an assignment in front of the verb is not the verb
+  for (const [command, verb] of [[`nice -n 10 cat ${FILE}`, 'cat'], [`timeout 5 head -3 ${FILE}`, 'head'], [`env LANG=C sed -n 1p ${FILE}`, 'sed'], [`sudo -n tail ${FILE}`, 'tail'],
+    [`nohup nl ${FILE}`, 'nl'], [`command cat ${FILE}`, 'cat'], [`time cat ${FILE}`, 'cat'], [`if true; then cat ${FILE}; fi`, 'cat'], [`! cat ${FILE}`, 'cat'], [`{ cat ${FILE}; }`, 'cat'],
+    [`for x in 1; do cat ${FILE}; done`, 'cat'], [`A=1 B=2 nice cat ${FILE}`, 'cat']]) {
+    assert.deepEqual([...commandReads(command).reads], [[PAGE, verb]], command);
+  }
   assert.deepEqual(pagesOf(`x=$(sed -n 1p ${FILE})`), [PAGE], 'inside a substitution');
   assert.deepEqual([...commandReads(`Get-Content "C:\\i\\vendor\\ServiceNowDocs\\markdown\\csm\\c_Esc.md" -TotalCount 40`, { powershell: true }).reads], [[PAGE, 'get-content']]);
   assert.deepEqual([...commandReads(`gc ${FILE}; type ${DOCS}/${OTHER}`, { powershell: true }).reads], [[PAGE, 'gc'], [OTHER, 'type']]);
@@ -343,7 +351,8 @@ test('ARC-09-C267 read-routes — commandReads: what cannot be resolved is retur
   }
   // a variable or a substitution in a viewer's arguments makes the call unresolved, and so does a viewer with nothing to name its pages
   assert.equal(names('cd "$REPO" && cat "$DOCS"/c_Esc.md && ls'), true, 'the whole call is the text');
-  assert.equal(names('cd "$REPO" && cat c_Esc.md', { cwd: FOLDER }), false, 'a variable in another command of the call is not in a viewer\'s words: the viewer\'s page is the definite one');
+  assert.equal(names('echo $HOME && cat c_Esc.md', { cwd: FOLDER }), false, 'a variable in another command of the call is not in a viewer\'s words: the viewer\'s page is the definite one');
+  assert.equal(names('cd "$REPO" && cat c_Esc.md', { cwd: FOLDER }), true, 'but a cd with a variable loses the folder, and the viewer\'s relative name is then the text');
   assert.equal(names('$VIEWER c_Esc.md'), true, 'a verb the shell builds could be anything');
   assert.equal(names(`FILE=${FILE}; head -50 "$FILE"`), true);
   assert.equal(names(`cat ${DOCS}/markdown/csm/$(echo c_Esc).md`), false, 'a name the shell builds is not in the text');
@@ -447,7 +456,7 @@ test('ARC-09-C267 read-routes — walkThread: an unresolved call is kept as text
   ];
   const { opaque, reached } = walkThread(rows);
   assert.deepEqual(opaque.map((o) => o.text), ['find . -name c_Esc.md | xargs cat', 'c_Third.md', "open('c_Fifth.md')"], 'the call that failed is not there, the folder was lost for o4 only');
-  assert.deepEqual(opaque.map((o) => o.at), [1, 5, 13], 'and the row of each');
+  assert.deepEqual(opaque.map((o) => o.at), [1, 7, 13], 'and the row of each');
   assert.deepEqual([...reached.keys()], ['markdown/csm/c_Fourth.md'], 'what the second cd made resolvable is a definite read');
 });
 

@@ -162,6 +162,7 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
   try {
     const { groundingFindings, residualFindings, parseClasses, LEAD } = await import('../lib/docs/grounding-check.mjs');
     const { readSubagentRows, readTranscriptRows } = await import('../lib/docs/turn-sources.mjs');
+    const { makeGlob } = await import('../lib/docs/glob-fs.mjs');
     const { loadNamesIndex } = await import('../lib/docs/names-index.mjs');
     const { corpusNamesDir } = await import('../lib/local-paths.mjs');
     const facts = checkoutFacts(root);
@@ -176,7 +177,7 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
     const classes = parseClasses(classesText);
     const options = { blocking: classes.blocking, ubiquity: classes.ubiquity, builders: facts.builders, rosterSkills: facts.rosterSkills,
       isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD,
-      sideRows: seams.sideRows ?? (() => readSubagentRows(input.transcript_path, { onDebug: debug })), ...(seams.options ?? {}) };
+      sideRows: seams.sideRows ?? (() => readSubagentRows(input.transcript_path, { onDebug: debug })), glob: makeGlob(), ...(seams.options ?? {}) };
     if (input.stop_hook_active) {
       const r = residualFindings({ rows: transcript?.rows ?? null, reply: message, index, coverage: index?.coverage ?? null, options });
       return stop() ? null : { residual: r };

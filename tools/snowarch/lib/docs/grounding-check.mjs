@@ -30,7 +30,7 @@
 import { copyLines } from '../finding-copy.mjs';
 import { ABSENCE_ANYWHERE, CUSTOM, DECLARED, MARKER, PLATFORM_PREFIXES, bare, dotted, markedAbsent, nameSpans, qualifiesWhole } from './name-rules.mjs';
 import { COVERAGE } from './names-index.mjs';
-import { walkThread } from './read-routes.mjs';
+import { mentionsPage, walkThread } from './read-routes.mjs';
 import { namesIn, turnSources } from './turn-sources.mjs';
 
 export const KINDS = Object.freeze(['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced', 'citedUnread', 'resting', 'overclaim']);
@@ -273,18 +273,28 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
         if (!cited.has(m[0])) cited.set(m[0], { line: i, inFile });
       }
     }
-    // A sub-agent's reads are its own rows, read only when a page is still unread without them.
+    // A sub-agent's reads are its own rows, read only when a page is still unread without them. A call that may have shown a page without naming
+    // it (a loop, xargs, code of another language, a folder the call lost: read-routes.mjs) shows every page whose bare file name is in its text,
+    // here and in the sub-agents' rows: a missed ask costs less than telling the model it did not open a page it read.
     let side = null;
-    const sideReached = () => {
+    const sideThreads = () => {
       if (side) return side;
-      side = new Set();
+      side = { pages: new Set(), opaque: [] };
       const threads = typeof options.sideRows === 'function' ? options.sideRows() : options.sideRows;
-      for (const rows of Array.isArray(threads) ? threads : []) for (const page of walkThread(rows).reached.keys()) side.add(page);
+      for (const rows of Array.isArray(threads) ? threads : []) {
+        const walked = walkThread(rows, { glob: options.glob });
+        for (const page of walked.reached.keys()) side.pages.add(page);
+        for (const o of walked.opaque) side.opaque.push(o.text);
+      }
       return side;
+    };
+    const named = (path) => {
+      const name = path.slice(path.lastIndexOf('/') + 1);
+      return (turn.opaque ?? []).some((text) => mentionsPage(text, name)) || sideThreads().opaque.some((text) => mentionsPage(text, name));
     };
     for (const [path, at] of cited) {
       if (turn.reached.has(path) || turn.pagesRead.has(path) || turn.savedCitations.has(path) || dead.has(path)) continue;
-      if (sideReached().has(path)) continue;
+      if (sideThreads().pages.has(path) || named(path)) continue;
       findings.citedUnread.push({ kind: 'citedUnread', path, line: at.line, inFile: at.inFile });
     }
 
@@ -354,7 +364,7 @@ function reasonOf(findings, kinds, max) {
         }
         break;
       case 'citedUnread':
-        clauses.push(`Cited pages that nothing in this session showed: ${got.map((i) => i.path).join(', ')}. Open each page and correct what it contradicts in your answer; where a citation only points to where to look, say on its Correction line that it is a pointer.`);
+        clauses.push(`You cited pages that this session never opened: ${got.map((i) => i.path).join(', ')}. Open each one now. Where a page contradicts your answer, correct the answer. Where a citation only tells the reader where to look, mark it as a pointer on its Correction line.`);
         break;
       case 'resting':
         clauses.push(`Left as not read or not verified: ${got.map((i) => `"${i.excerpt}"`).join('; ')}. Read the page, or search escape-safe and give the marker only to what the search does not find.`);
@@ -402,6 +412,10 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
   if (was.skipped || was.items.length === 0) return { ours: true, open: [], text: null };
 
   const later = turnSources(after, options);
+  // The citations recomputed on the final answer after the continuation (the architect's ruling of 2026-11-16): a page is still open only if the
+  // answer as it now stands, the continuation's text and the files it wrote, still cites it and no read of the session showed it.
+  const now = groundingFindings({ rows, reply, index, coverage, options: { ...options, replyAfter: first.index } });
+  const stillCited = new Set(now.findings.citedUnread.map((i) => i.path));
   const blocks = later.replyBlocks.slice();
   if (typeof reply === 'string' && reply && !(blocks.length && blocks[blocks.length - 1] === reply)) blocks.push(reply);
   const cont = blocks.flatMap((b) => b.split(/\r?\n/));
@@ -417,14 +431,13 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
           || (corrected(i.name) && later.names.read.has(i.name));
       }
       case 'coined': case 'unsourced': return corrections.length > 0 && !text.includes(i.name);
-      case 'citedUnread': return later.reached.has(i.path) || later.pagesRead.has(i.path) || corrections.some((l) => l.includes(norm(i.path)) && /pointer/.test(l));
+      case 'citedUnread': return !stillCited.has(i.path) || later.reached.has(i.path) || later.pagesRead.has(i.path) || corrections.some((l) => l.includes(norm(i.path)) && /pointer|withdr|retract|remov|dropp/.test(l));
       case 'resting': case 'overclaim': return corrections.length > 0;
       default: return true;
     }
   };
   const open = was.items.filter((i) => !resolved(i));
   const wasKeys = new Set(was.items.map(keyOf));
-  const now = groundingFindings({ rows, reply, index, coverage, options: { ...options, replyAfter: first.index } });
   for (const i of now.items) if (!wasKeys.has(keyOf(i))) open.push(i);
   if (open.length === 0) return { ours: true, open: [], text: null };
   const shown = open.slice(0, 6).map((i) => DESCRIBE[i.kind](i));

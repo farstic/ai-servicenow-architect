@@ -271,11 +271,11 @@ test('ARC-09-C267 — the command line is cut at | ; && || & and a newline, and 
   assert.deepEqual([...pagesOfCommand(`cat ${PAGE} ${PAGE}`)], [REL], 'a page once');
 });
 
-test('ARC-09-C267 — grep, rg, ls, find, wc, stat, echo, a glob, a variable and a cat of any other file show no page', () => {
+test('ARC-09-C267 — grep, rg, ls, find, wc, stat, echo, a glob with no file system, a variable and a cat of any other file show no page', () => {
   const hidden = [
     `grep -l sn_shown_name ${PAGE}`, `grep -n '' ${PAGE}`, `rg sn_shown_name ${PAGE}`, `ls ${DIR}`, `ls -l ${PAGE}`, `find ${DIR} -name c_Example.md`,
     `wc -l ${PAGE}`, `stat ${PAGE}`, `echo "cat ${PAGE}"`, `printf '%s' ${PAGE}`, `git log -3 -- ${PAGE}`,
-    'cat /home/dev/notes/readme.md', `cat ${DIR}/*.md`, `cat ${DIR}/c_{Example,Other}.md`, `cat ${DIR}/c_Exampl?.md`, `cat ${DIR}/c_[E]xample.md`,
+    'cat /home/dev/notes/readme.md', `cat ${DIR}/*.md`, `cat ${DIR}/c_Exampl?.md`, `cat ${DIR}/c_[E]xample.md`,
     'cat "$PAGE"', 'cat $(git rev-parse --show-toplevel)/vendor/x.md', `cat ${DIR}/index.json`, `cat ${DIR}`, `cat vendor/ServiceNowDocs/README.md`,
     'cat --help', 'cat', 'cat ""', '', '   ',
   ];
@@ -284,6 +284,17 @@ test('ARC-09-C267 — grep, rg, ls, find, wc, stat, echo, a glob, a variable and
     assert.equal(t.pagesRead.size, 0, JSON.stringify(command));
     assert.deepEqual(heldBy(t, 'sn_shown_name'), [], `${JSON.stringify(command)}: a command that shows no page is no source`);
   }
+});
+
+// The architect's ruling of 2026-11-16: a brace list in a viewer's arguments is expanded, and a glob is asked of the file system the caller gives.
+test('ARC-09-C267 — a brace list in a cat is expanded, and a glob is expanded by the file system the caller gives', () => {
+  const braces = sourcesOf(bash('b', `cat ${DIR}/c_{Example,Gone}.md`, '1\tThe sn_shown_name table'));
+  assert.deepEqual([...braces.pagesRead].sort(), ['markdown/itsm/c_Example.md', 'markdown/itsm/c_Gone.md'], 'both names the shell would try');
+  assert.deepEqual(heldBy(braces, 'sn_shown_name'), ['read']);
+  const glob = (pattern) => (pattern.endsWith('/*.md') ? [PAGE, `${DIR}/c_Second.md`, `${DIR}/index.json`] : []);
+  const globbed = turnSources(bash('b', `cat ${DIR}/*.md`, '1\tThe sn_shown_name table'), { ...OPTIONS, glob });
+  assert.deepEqual([...globbed.pagesRead].sort(), ['markdown/itsm/c_Example.md', 'markdown/itsm/c_Second.md'], 'the pages the pattern expands to; the file that is no page is dropped');
+  assert.deepEqual(heldBy(globbed, 'sn_shown_name'), ['read']);
 });
 
 test('ARC-09-C267 — a Bash or MCP result that failed never counts, whatever it was asked to show', () => {
