@@ -41,14 +41,14 @@ the file system; a Grep that printed lines of it; an MCP file read; a sub-agent'
 pages (a loop, `xargs`, `find -exec`, `$( )`, a variable, code of another language, `git show`) counts every page whose file name is in it as
 shown, and every page that a glob or brace word of it could name (`for f in dir/c_Esc*.md`, `find . -name 'c_Esc*.md' | xargs cat`, a folder lost by
 `cd ~`), and, if it has a viewer, every page named in its output; a failed viewer call counts the pages it names that are on disk. A bare file name that a
-corpus page has (`c_CaseRouting.md`, "(citation: `x.md`)") is a citation of every page of that name, shown if any was. A sentence that only points
+corpus page has (`c_CaseRouting.md`, "(citation: `x.md`)") is a citation of every page of that name, shown if any was. A search's name filter (`find -iname`, `-ipath`, `rg -g`, `--glob`, `--iglob`, `grep --include`, `fd -g`, `Get-ChildItem -Filter`, `-Include`) is read as written, with the case its tool gives it; a folder under the corpus that a call with a viewer names (`rg -l X dir | xargs cat`, `for f in $(ls dir); do head "dir/$f"; done`) covers its pages; a call that only lists, counts or echoes (`xargs grep -l`, `xargs wc -l`, a loop that echoes) covers none. A file the turn wrote and then ran is a script, not a document: what it names is not a citation, and the pages it names count as shown. A file outside the corpus that the session read, wrote or edited, or a name the answer gives a path to, is not a citation of a corpus page of the same name (`incident.md`). A sentence that only points
 ("see also", "start with", "read … first"), a path the user typed, a page the answer says it did not open and a page that is not on disk (C254's) are
 not claims. An input cut short (more than 200 sub-agent files or 64 MB of them, a line of the session file that does not parse) asks nothing and says
 why when `SNOWARCH_HOOK_DEBUG` is set; so does a run that passes its 3 s deadline. The hook asks the model once, in these words: "You cited pages that this session never opened: …. Open each one now. Where a
 page contradicts your answer, correct the answer. Where a citation only tells the reader where to look, mark it as a pointer on its Correction
 line." After the continuation it tells the user what stayed open, and never asks again in the turn: a citation of the first answer or of the
 continuation stays open until a page is read, by any route the ask counted, or a Correction line names it as a pointer or withdrawn, and silence
-closes nothing; it lists no item that the ask did not name. `tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
+closes nothing; it lists no item that the ask did not name (the first twelve it listed, and a count of the rest). `tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
 unreadable file, switches the grounding asks off. No `CLAUDE.md`, skill or agent changes. On a 63 MB session file the hook takes 0.5 to 1.1 s, and the
 continuation about 1.1 s; the first build took 2.4 to 3.9 s, and 10 s for the continuation. The names that a session's pages print, which were nearly all of
 that time, are now collected only for a class that asks for them.
@@ -72,7 +72,9 @@ that time, are now collected only for a class that asks for them.
   loop, `xargs`, code of another language) count as reads; a pointer sentence, a path the user typed and a page the answer says it did not open do
   not need one. A page that is still cited and unread after the ask is told to the user, never to the model again (ARC-09-C267). The review of #600
   adds the glob and brace words of an unresolved call, a folder reset before each call of a sub-agent, an input cut short that asks nothing, a glob
-  budget for each pattern, a notice that closes a page by the rules of the ask, and a bare file name as a citation.
+  budget for each pattern, a notice that closes a page by the rules of the ask, and a bare file name as a citation. The second review adds a name filter of
+  any search read as written, a folder fed to a viewer, a script the turn wrote and ran, a client file named like a page, a notice that lists what the ask listed,
+  and a call that only lists.
 
 ### Changed
 
