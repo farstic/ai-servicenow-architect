@@ -17,9 +17,13 @@
 //   UNKNOWN       the same on a sparse checkout, whose index says nothing about the areas it does not hold: no claim either way
 //   NO MATCH      a phrase that is no label, no synonym and no title word set of any page
 //   then, per name, `<name>: <n> pages (<how it was reached>)` and, per page, `<path>:<line>: <the line>` — grep's own shape.
+// UNDER THE HEADER, once for the call, `corpus: <the corpus folder, absolute, as the platform writes it> (open a page with the Read tool at this folder plus its
+// path below; …)` (ARC-09-C287). A page path is relative to the corpus, so a reader had to build the path to read a page, or `cd` into the corpus and read it
+// with `sed`; a `cd` compound is what the permission rules of the C268 sitting refused, a Read of a project file is never asked about. `--json` has the
+// folder as `corpus`. Page lines are unchanged.
 // Exit: 0 every term PRINTED · 1 some term is not · 2 usage · 3 no corpus or no index for this pin (the remedy is printed).
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { bare, dotted } from './name-rules.mjs';
 import { GENERIC, contentWords, normalisePhrase, parseSynonyms, wordsOf } from './label-rules.mjs';
 import { COVERAGE, loadNamesIndex } from './names-index.mjs';
@@ -309,9 +313,13 @@ const sayCoverage = (idx) => (idx.coverage === COVERAGE.full
   ? 'the whole corpus at the pin'
   : 'a sparse checkout: only the areas it holds');
 
-/** The result as plain lines. One status line per term, one line per name, one `path:line: text` line per page. */
-export function formatLookup(results, { pin, idx }) {
+/**
+ * The result as plain lines. The header, then `corpus: <folder>` (when a corpus folder is given: ARC-09-C287; printed absolute, as the platform writes it), then
+ * one status line per term, one line per name, one `path:line: text` line per page.
+ */
+export function formatLookup(results, { pin, idx, corpus = null }) {
   const out = [`lookup pin=${String(pin).slice(0, 12)} coverage=${idx.coverage} pages=${idx.pageCount} names=${idx.nameCount}`];
+  if (corpus) out.push(`corpus: ${resolve(corpus)} (open a page with the Read tool at this folder plus its path below; offset and limit select lines)`);
   for (const r of results) {
     const named = r.names.map((n) => n.name);
     let head;
@@ -387,9 +395,9 @@ export function runLookup(argv, { root, corpus, pin, spell, out = console.log, e
   } catch { synonyms = null; }
   const results = lookupTerms(terms, { idx, page, synonyms, limit, maxNames });
   if (json) {
-    out(JSON.stringify({ pin, coverage: idx.coverage, pages: idx.pageCount, names: idx.nameCount, terms: results }, null, 2));
+    out(JSON.stringify({ pin, coverage: idx.coverage, pages: idx.pageCount, names: idx.nameCount, corpus: resolve(corpus), terms: results }, null, 2));
   } else {
-    for (const line of formatLookup(results, { pin, idx })) out(line);
+    for (const line of formatLookup(results, { pin, idx, corpus })) out(line);
     if (!idx.wordsOk) err(`docs lookup: the labels or titles of the names index are short or garbled (${spell.cli} doctor --fix rebuilds them)`);
   }
   return results.every((r) => r.status === STATUS.printed) ? LOOKUP_EXIT.ok : LOOKUP_EXIT.notPrinted;
