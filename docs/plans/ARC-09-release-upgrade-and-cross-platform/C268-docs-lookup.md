@@ -1,6 +1,6 @@
 # ARC-09-C268 — a lookup before an absence claim (phases A and B)
 
-**Status:** phase A built and merged (#582: the lookup and its offline check). Phase B reworked on 2026-11-16 (#585, a draft): one sentence in `CLAUDE.md:12` makes the Architect call it before any absence claim, the generated permission entries let it run without a prompt, and the B01 fix that the entries made necessary is in. The six gateway clauses of the first build and validation case T-48 are dropped. The measurement of phase B is the architect's and is not claimed here.
+**Status:** phase A built and merged (#582: the lookup and its offline check). Phase B reworked on 2026-11-16 (#585): one sentence in `CLAUDE.md:12` makes the Architect call it before any absence claim, the generated permission entries let it run without a prompt, and the B01 fix that the entries made necessary is in. The six gateway clauses of the first build and validation case T-48 are dropped. The architect measured phase B in a sitting read on 2026-11-16 and ruled it ship: it ships in 2.2.7, and the numbers are in "What phase B measured" below.
 
 ## Why
 
@@ -32,7 +32,7 @@ At the moment of an absence claim, for every claim and not only in the six gatew
 
 What the tests hold is the agreement of the generated entries with the launcher each shell types (`tests/contract/gen-governance.test.mjs`, with a reader of that one rule shape in `tests/helpers/permission-rule.mjs`), and that the grounding rule carries the sentence and names the lookup once (`tests/claude-md.test.mjs`, with the sentence on the guard's list of what works). **What they do not hold:** Claude Code's own matcher was not run, and neither was the Windows PowerShell spelling in particular: the permissions page does not say how the PowerShell tool matches a command named by a path (`.\snowarch.cmd`). S-16 (2026-09-07, Claude Code 2.1.258) found that a command wrapped in a second statement (`… 2>&1; echo "EXIT: $?"`) is judged part by part and the wrapper part prompts; that was not measured again, so a session may still be asked about a wrapper and not about the lookup.
 
-**How it is measured** is the architect's, in a sitting he pre-registers; no run is part of this change.
+**How it was measured** is the architect's, in a sitting he pre-registered; no run is part of this change, and its result is in "What phase B measured" below.
 
 ## How phase B is measured (the architect's)
 
@@ -40,6 +40,22 @@ What the tests hold is the agreement of the generated entries with the launcher 
 - **Primary:** the key page is read and cited.
 - **Guards:** no new dead paths (`turn-report.mjs`: cited pages missing, 0); no invented names (names printed that no page read and no request gives); no more false absences (a "not documented" about a name the index says the corpus prints: `markedAbsent` over the answer, with the index); the §1.1 verdict letters unchanged, prompt by prompt.
 - **Arms:** the current text, and the current text with the instruction. No sitting is part of phase A, and none was run for the build of phase B.
+
+## What phase B measured (the architect's sitting, read on 2026-11-16)
+
+The two arms above, over a prompt class where the user's words differ from the corpus's: **54 answers in each arm.** The architect ruled it ship.
+
+| Measure | The current text | With the sentence |
+|---|---|---|
+| Answers that read and cite the key page (the primary) | 52 of 54 | 52 of 54 |
+| False "not documented" claims | 9 | 2 |
+| Refused shell calls an answer | 0.15 | 0.33 |
+
+- **The primary was flat at its ceiling:** 52 of 54 in each arm, so the sentence is not shown to raise the share of answers that read and cite the key page. What it changes is the claim of absence: nine false "not documented" claims fell to two.
+- **How the claims were judged:** blind, in two passes of six readers each, over the 200 lines under test; the two passes agreed on 190 of the 200.
+- **The guards held:** no cited page was missing (0), no name was invented (0), the section 1.1 verdict letters were the same prompt by prompt (by hand), and the median time of an answer did not move (74.0 s and 73.8 s).
+- **Watched, and not ruled out:** refused shell calls rose from 0.15 to 0.33 an answer, and each one is a permission prompt for a user. Three were the lookup called as `cd … && ./../../snowarch docs lookup`, which the allow entry does not match; the rest were compound `sed` and `grep` reads. Nothing here changes it: a separate row will take it up.
+- **Still not measured:** Claude Code's own matching of the allow entries, and the PowerShell spelling in particular (see "The permission" above).
 
 ## The offline retrieval check (phase A)
 
