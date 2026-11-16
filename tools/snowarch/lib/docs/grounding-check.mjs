@@ -145,10 +145,10 @@ const NOT_PAGES = new Set(['skill.md', 'claude.md', 'readme.md', 'changelog.md',
 const MAX_PAGES_OF_A_NAME = 5;
 /** A bare corpus file name in a line: not a part of a longer name or of a path (`markdown/a/c_X.md` is the citation of its path). */
 const BARE_NAME = /(?<![A-Za-z0-9_.\-/\\])[A-Za-z0-9][A-Za-z0-9_.\-]*\.md(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/g;
-/** A `.md` name anywhere, with a folder in front of it or not: an answer that has one may cite a corpus page by its name or by a partial path (B7). */
-const HAS_MD_NAME = /[A-Za-z0-9][A-Za-z0-9_.\-]*\.md(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/;
-/** A `.md` name with its folders in front, as written (`clients/acme/incident.md`, `.../x.md`, `folder/x.md`): `[1]` is the folders, ending with a slash, `[2]` the name. */
-const PATH_WITH_NAME = /(?<![A-Za-z0-9_.\-~…])((?:[A-Za-z0-9_.\-~…]+\/)+)([A-Za-z0-9][A-Za-z0-9_.\-]*\.md)(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/g;
+/** A `.md` name anywhere, with a folder in front of it or not: an answer that has one may cite a corpus page by its name or by a partial path (B7). Anchored at the start of a word, as BARE_NAME is: without it a word of 40,000 characters took 3 s. */
+const HAS_MD_NAME = /(?<![A-Za-z0-9_.\-])[A-Za-z0-9][A-Za-z0-9_.\-]*\.md(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/;
+/** A `.md` name with its folders in front, as written (`clients/acme/incident.md`, `.../x.md`, `folder/x.md`): `[1]` is the folders, ending with a slash, `[2]` the name. At most twelve folders before the name (the last twelve, of a deeper path), so that a run of path segments is read in linear time. */
+const PATH_WITH_NAME = /(?<![A-Za-z0-9_.\-~…])((?:[A-Za-z0-9_.\-~…]+\/){1,12})([A-Za-z0-9][A-Za-z0-9_.\-]*\.md)(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/g;
 
 /**
  * Which corpus pages the session SHOWED, by the one set of rules the ask uses and the notice that follows it must use as well (the architect's review of
