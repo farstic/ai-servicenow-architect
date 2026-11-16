@@ -129,7 +129,9 @@ export const INPUTS = Object.freeze({
     why: 'ALSO RUNS WHEN ITS OUTPUT IS GONE (ARC-09-C140): on a release tree, when `.local/release-manifest.json` holds '
       + 'no signed manifest that verifies and is this release\'s, B01 runs and fetches it, whatever its inputs say. '
       + 'The cache is what B01 writes, so it is not hashed here: a hash taken before the fetch would differ from the '
-      + 'one after it, and B01 would run again on the next bootstrap.',
+      + 'one after it, and B01 would run again on the next bootstrap. The other way round, B01 running for another '
+      + 'reason (its inputs moved) with the manifest held fetches nothing (ARC-09-C268): a release\'s manifest is '
+      + 'signed once and the revocation list is fetched separately, so a held one stays valid.',
     resolve: (ctx) => [FILE('.mcp.json'), FILE('.claude/settings.json'), TEXT(`mode=${ctx.mode}`)],
   },
 
