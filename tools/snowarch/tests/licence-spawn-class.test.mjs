@@ -122,6 +122,42 @@ test('the reader — the package CLI is a start: a resolved path, a join of its 
   ]);
 });
 
+/**
+ * ARC-09-C286 — a start through a harness. `runInPty(argv, options)` (packages/snowarch/tests/helpers/pty.ts) starts its first argument in a
+ * pseudo-terminal, and the live suite's two pty cases handed it the package CLI with `env()`, no licence: from step 4b the CLI refuses
+ * `instance` then, with exit 3, and the nightly of 2026-11-16 failed both cases on ubuntu and macOS (Windows has no pty, and its cases go
+ * through `cli()`, which gives `licensedEnv`). The reader found only calls to `child_process` itself, and the one in pty.ts takes its command
+ * from a parameter in a file that names no entry point, so a start made through the harness was nobody's.
+ */
+test('the reader — a pty start: runInPty takes the whole argv, and is licensed only when licensedEnv is in its arguments', async () => {
+  const PTY = "import { runInPty } from '../helpers/pty.js';\n";
+  const CLI = "const CLI = resolve(here, '../../dist/cli/index.js');\n";
+  assert.deepEqual(await scan({
+    'bare.test.mjs': `${PTY}${CLI}await runInPty([process.execPath, CLI, 'instance', 'add', 'x'], { env: env() });\n`,
+    'licensed.test.mjs': `${PTY}${CLI}await runInPty([process.execPath, CLI, 'instance', 'add'], { env: licensedEnv(env()) });\n`,
+    'wrapped.test.mjs': `${PTY}${CLI}const addIn = (args) => runInPty([process.execPath, CLI, 'instance', 'add', ...args], { env: env() });\n`,
+    'built.test.mjs': `${PTY}${CLI}const ptyEnv = () => licensedEnv({ ...env(), CLAUDE_PROJECT_DIR: dir });\nawait runInPty([process.execPath, CLI, 'instance'], { env: ptyEnv() });\n`,
+    'declared.test.mjs': `${PTY}${CLI}// unlicensed start: the refusal itself, a pty with no licence on purpose\nawait runInPty([process.execPath, CLI, 'instance'], {});\n`,
+    'seam.test.mjs': `${PTY}${CLI}const go = (argv) => runInPty(argv, { env: env() });\n`,
+    'python.test.mjs': `${PTY}await runInPty(['python3', '-c', 'print(1)']);\n`,
+    'code.test.mjs': `${PTY}await runInPty([process.execPath, '-e', 'process.stdout.write("x")'], {});\n`,
+  }), [
+    { file: 'bare.test.mjs', line: 3, entry: 'package-cli', licensed: false, declared: null },
+    { file: 'licensed.test.mjs', line: 3, entry: 'package-cli', licensed: true, declared: null },
+    { file: 'wrapped.test.mjs', line: 3, entry: 'package-cli', licensed: false, declared: null },
+    { file: 'built.test.mjs', line: 4, entry: 'package-cli', licensed: true, declared: null },
+    { file: 'declared.test.mjs', line: 4, entry: 'package-cli', licensed: false, declared: 'the refusal itself, a pty with no licence on purpose' },
+    { file: 'seam.test.mjs', line: 3, entry: 'presumed', licensed: false, declared: null },
+  ]);
+});
+
+test('the reader — runInPty is a start only as the harness the tests import; a function of that name from a package, or none, is not', async () => {
+  assert.deepEqual(await scan({
+    'package.test.mjs': "import { runInPty } from 'some-package';\nconst CLI = resolve(here, '../../dist/cli/index.js');\nawait runInPty([process.execPath, CLI], {});\n",
+    'local.test.mjs': "const runInPty = (a) => a;\nconst CLI = resolve(here, '../../dist/cli/index.js');\nrunInPty([process.execPath, CLI], {});\n",
+  }), []);
+});
+
 test('the reader — the launcher by either spelling, and a seam whose program is a parameter is presumed', async () => {
   assert.deepEqual(await scan({
     'launcher.test.mjs': `${CP}const launcher = join(ROOT, WIN ? 'snowarch.cmd' : 'snowarch');\nspawnSync(launcher, ['version']);\n`,

@@ -13,6 +13,7 @@ import { expectedProbeText } from './probe-text.js';
 import { ptyAvailable, runInPty, stdinPayload } from '../helpers/pty.js';
 import { trackTempDir } from '../helpers/server-child.js';
 import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
+import { happyPathScript, threeFailuresScript } from './wizard-scripts.js';
 
 /**
  * ARC-07-S11 — the CLI against a REAL instance, behind `RUN_LIVE_E2E=1`.
@@ -63,28 +64,30 @@ const env = (extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({
 
 // ARC-11-C6 — `instance` runs only with a licence in force (step 4b): the fixture licence, in a project directory
 // of the run's own, which the CLI reads as the server does.
+//
+// ARC-09-C286 — EVERY START OF THE CLI GETS IT, THE PSEUDO-TERMINAL ONES TOO. Cases 1 and 3 start the CLI through `runInPty` and were
+// given `env()` alone: the CLI refused with exit 3 and "licence missing (Code: LICENCE_NOT_VALID)" on ubuntu and macOS (Windows has no
+// pty and runs the cases that go through `cli()`), the nightly of 2026-11-16. The spawn-class guard now reads `runInPty` as a start.
+const licensed = (extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv =>
+  licensedEnv({ ...env(extra), CLAUDE_PROJECT_DIR: join(base, 'project') });
+
 const cli = (args: readonly string[], input?: string, extra: NodeJS.ProcessEnv = {}) =>
   spawnSync(process.execPath, [CLI, ...args], {
-    encoding: 'utf8', env: licensedEnv({ ...env(extra), CLAUDE_PROJECT_DIR: join(base, 'project') }),
+    encoding: 'utf8', env: licensed(extra),
     ...(input === undefined ? {} : { input }),
   });
 
 const readStore = (): Record<string, never> => JSON.parse(readFileSync(store, 'utf8'));
 
-/** One `add` through a pseudo-terminal, answering the prompts the wizard actually asks. */
+/**
+ * One `add` through a pseudo-terminal, answering the prompts the wizard actually asks. The script is `wizard-scripts.ts`'s, whose patterns
+ * are the product's own strings and which a unit test runs through the wizard in every pull request (ARC-09-C286); the review screen's
+ * footer is the one witness it matches, since ARC-07-C14.
+ */
 const addInPty = (args: readonly string[], password: string, onStart?: (pid: number | undefined) => void) =>
   runInPty([process.execPath, CLI, 'instance', 'add', ...args], {
-    env: env(),
-    script: [
-      { waitFor: /Password:/, send: `${password}\n` },
-      // The review screen: Enter applies the proposal as shown.
-      //
-      // ARC-07-C14 renamed the footer, and the `|Applying:` alternative this line used to carry is
-      // GONE rather than updated: the only call site is an `--env pdi` add with no `--yes`, so the
-      // unlocked screen always prints: matching the line after it meant the footer could change --
-      // as it just did -- while the case still passed. One witness, and it is the real one.
-      { waitFor: /Enter = apply as shown/, send: '\n' },
-    ],
+    env: licensed(),
+    script: happyPathScript(password),
     ...(onStart ? { onStart } : {}),
   });
 
@@ -175,14 +178,8 @@ describe.skipIf(!ready)('ARC-07-S11 live E2E — the wizard against a real insta
         [process.execPath, CLI, 'instance', 'add', 'e2e-bad', '--url', c().url, '--env', 'pdi',
           '--auth', 'basic', '--username', c().username, '--preset', 'read-only'],
         {
-          env: env(),
-          script: [
-            { waitFor: /Password:/, send: `${wrong}\n` },
-            { waitFor: /attempt 2 of 3/, send: 'y\n' },
-            { waitFor: /Password:/, send: `${wrong}\n` },
-            { waitFor: /attempt 3 of 3/, send: 'y\n' },
-            { waitFor: /Password:/, send: `${wrong}\n` },
-          ],
+          env: licensed(),
+          script: threeFailuresScript(wrong),
         });
       transcripts.push({ name: 'case 3 — three failures', text: run.output });
       expect(run.code).toBe(1);
