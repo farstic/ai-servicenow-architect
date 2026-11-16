@@ -48,7 +48,7 @@ withInstall('ARC-09-C267 replay B2 — a refused call shows nothing, and one tha
     asked(await stop(t, { rows: failedCall('g', `for f in ${i.folder(PAGE.alpha)}/c_Alp*.md; do head -3 "$f"; done`, text), message: cite(PAGE.alpha) }), PAGE.alpha);
   }
   // it ran: "Exit code N"
-  silent(await stop(t, { rows: failedCall('b', `cat ${page} missing.md`, 'Exit code 1\ncat: missing.md: No such file or directory'), message: cite(PAGE.alpha) }), 'a viewer that ran and failed');
+  silent(await stop(t, { rows: failedCall('b', `cat ${page} missing.md`, 'Exit code 1\n1\tThe sn\\_example table.\ncat: missing.md: No such file or directory'), message: cite(PAGE.alpha) }), 'a viewer that ran and failed');
   silent(await stop(t, { rows: failedCall('l', 'for f in c_Alpha.md c_Beta.md; do head -20 "$f"; done', 'Exit code 1'), message: cite(PAGE.alpha) }), 'a loop that ran and failed');
   // the prefix is not relied on: the result holds a line of the page
   silent(await stop(t, { rows: failedCall('b', `cat ${page} missing.md`, '1\tThe sn\\_example table.\ncat: missing.md: No such file or directory'), message: cite(PAGE.alpha) }), 'a result with the page\'s lines');
@@ -59,7 +59,7 @@ withInstall('ARC-09-C267 replay B2 — a refused call shows nothing, and one tha
   const agent = [use('a1', 'Agent', { subagent_type: 'general-purpose', prompt: 'read it' }), res('a1', 'It says X.')];
   const held = '1\tThe sn\\_example table.\ncat: missing.md: No such file or directory';
   silent(await stop(t, { rows: agent, side: { a1: failedCall('s', `cat ${page} missing.md`, held) }, message: cite(PAGE.alpha) }), 'a sub-agent\'s failed cat whose result holds the page\'s line');
-  silent(await stop(t, { rows: agent, side: { a1: failedCall('s', `cat ${page} missing.md`, 'Exit code 1') }, message: cite(PAGE.alpha) }), 'a sub-agent\'s failed cat that ran');
+  silent(await stop(t, { rows: agent, side: { a1: failedCall('s', `cat ${page} missing.md`, 'Exit code 1\n1\tThe sn\\_example table.') }, message: cite(PAGE.alpha) }), 'a sub-agent\'s failed cat that ran');
   asked(await stop(t, { rows: agent, side: { a1: failedCall('s', `cat ${page} missing.md`, 'This command requires approval') }, message: cite(PAGE.alpha) }), PAGE.alpha);
 });
 
@@ -168,7 +168,4 @@ withInstall('ARC-09-C267 replay B7 — a partial path to a corpus page (`.../x.m
   // a path outside the corpus is that file\'s, even when a corpus page has the same name
   silent(await stop(t, { rows: [], message: 'The RACI is in clients/acme/incident.md.' }), 'a client file named like a page');
   silent(await stop(t, { rows: [], message: 'Updated .claude/skills/csm-specialist/SKILL.md.' }), 'SKILL.md');
-  // a file the turn wrote cites it too
-  const file = join(i.root, 'clients', 'acme', 'hld.md');
-  asked(await stop(t, { rows: [use('w', 'Write', { file_path: file, content: `The limit is in ${ellipsis}\n` }), res('w', 'ok')], message: 'Saved.' }), 'domain-separation-remote-tables.md');
 });

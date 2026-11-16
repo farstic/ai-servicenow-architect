@@ -388,6 +388,23 @@ test('ARC-09-C267 replay B7 — a partial path to a corpus page (`.../x.md`, `fo
   assert.deepEqual(find('See also .../domain-separation-remote-tables.md for the rest.'), []);
   assert.deepEqual(find('.../domain-separation-remote-tables.md was not read.'), []);
   assert.deepEqual(find('Domain separation (`.../domain-separation-remote-tables.md`).', [U('what about .../domain-separation-remote-tables.md?')]), []);
+  // a file the turn wrote cites it too
+  const wrote = rows([use('w', 'Write', { file_path: '/home/dev/install/clients/acme/hld.md', content: 'The limit is in `.../domain-separation-remote-tables.md`.\n' }, { cwd: '/home/dev/install' }), res('w', 'ok')]);
+  assert.deepEqual(find('Saved.', wrote), ['domain-separation-remote-tables.md']);
   // the answer also gives the full path: one citation, under the path
   assert.deepEqual(find(`Domain separation (\`.../domain-separation-remote-tables.md\`, ${REMOTE}).`), [REMOTE]);
+  // the answer gives the full path and, elsewhere, the bare name: the path is the citation, and the name is no second one
+  assert.deepEqual(find(`${REMOTE} holds it. The rule is in domain-separation-remote-tables.md.`), [REMOTE]);
+  // `.../incident.md` abbreviates the path of the client file the session wrote: the session's own file, not the corpus page of that name
+  const mine = rows([use('w', 'Write', { file_path: '/home/dev/install/clients/acme/incident.md', content: 'RACI.\n' }, { cwd: '/home/dev/install' }), res('w', 'ok')]);
+  assert.deepEqual(find('Saved as `.../incident.md`.', mine), []);
+  assert.deepEqual(find('Saved as `.../incident.md`.'), ['incident.md'], 'without the write it is the corpus page');
+  // an area index or a skill file is no page, whatever folder is written in front of it
+  const indexes = (name) => (name === 'index.md' ? ['markdown/csm/index.md'] : name === 'SKILL.md' ? ['markdown/csm/SKILL.md'] : []);
+  assert.deepEqual(find('The area is described in `.../csm/index.md`.', rows(), { pagesNamed: indexes }), []);
+  assert.deepEqual(find('See `csm/SKILL.md`.', rows(), { pagesNamed: indexes }), []);
+  // a name that more than five pages carry names none (`.../c_Many.md` is any of them); five are asked about under the name
+  const many = (n) => (name) => (name === 'c_Many.md' ? Array.from({ length: n }, (_, k) => `markdown/area${k}/c_Many.md`) : []);
+  assert.deepEqual(find('See `.../c_Many.md`.', rows(), { pagesNamed: many(6) }), []);
+  assert.deepEqual(find('See `.../c_Many.md`.', rows(), { pagesNamed: many(5) }), ['c_Many.md']);
 });

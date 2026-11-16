@@ -1011,6 +1011,9 @@ export function pagesInLines(body, bases = [], { pageExists = null } = {}) {
   return pages;
 }
 
+/** What a Grep in content mode returns that is not a line of a page: no match, an omitted long line, a group separator, a pagination footer. */
+const NOT_A_MATCH = /^(?:No matches found\.?|\[Omitted long matching line\]|--|\[?Showing results with pagination.*)$/i;
+
 /**
  * The corpus pages a Grep in content mode showed: the pages on the lines it returned, and the one page it searched when `path` names a file (its
  * lines carry no path). A Grep that only lists files or counts shows no line. A relative line is below the SESSION's folder (`rowCwd`), which is tried before
@@ -1019,6 +1022,8 @@ export function pagesInLines(body, bases = [], { pageExists = null } = {}) {
 export function pagesOfGrep(input, body, rowCwd = null, seams = {}) {
   const pages = new Set();
   if (input?.output_mode !== 'content' || typeof body !== 'string' || !body.trim()) return pages;
+  // "No matches found" is a result and not a line, and an omitted line is not the text of the page: with no match line nothing was shown, the page named by `path` included (B5).
+  if (!body.split(/\r?\n/).some((l) => l.trim() !== '' && !NOT_A_MATCH.test(l.trim()))) return pages;
   const one = pageAt(input.path);
   if (one) pages.add(one);
   for (const page of pagesInLines(body, [rowCwd, input.path], seams)) pages.add(page);
@@ -1077,15 +1082,16 @@ export function walkThread(rows, { glob = null, pageExists = null, pageText = nu
   const known = typeof pageExists === 'function' ? (page) => { if (!asked.has(page)) asked.set(page, Boolean(pageExists(page))); return asked.get(page); } : null;
   const onDisk = known ?? (() => false);
   const seams = known ? { pageExists: known } : {};
-  const evidence = new Map();                                       // page → its lines long enough to be evidence that a result holds them
-  /** Does the text of a result hold a line of this page (B2)? Needs the page's text (`pageText`), which the hook reads from the corpus folder. */
-  const holdsLineOf = (said, page) => {
+  const evidence = new Map();
+  /** The lines of a page long enough to be evidence that a result holds it (B2); none without the page's text (`pageText`, which the hook reads from the corpus folder). */
+  const linesOf = (page) => {
     if (!evidence.has(page)) {
       const text = typeof pageText === 'function' ? pageText(page) : null;
       evidence.set(page, typeof text === 'string' ? text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= MIN_EVIDENCE).slice(0, 300) : []);
     }
-    return evidence.get(page).some((line) => said.includes(line));
+    return evidence.get(page);
   };
+  const holdsLineOf = (said, page) => linesOf(page).some((line) => said.includes(line));
   const output = (b) => posix(textOfResult(b)).slice(0, OUTPUT_CAP);
   const reach = (page, route, at) => { if (!reached.has(page)) reached.set(page, { route, at }); };
   const keep = (into, list) => { for (const q of list) into.set(q.dir !== undefined ? `d\0${q.dir}` : `${q.ci}\0${q.w}\0${(q.dirs ?? []).join(',')}`, q); };
@@ -1126,8 +1132,11 @@ export function walkThread(rows, { glob = null, pageExists = null, pageText = nu
         // A REFUSED call (permission, parse) never ran and shows nothing (the replay over the C268 sessions, B2). One that ran and failed says "Exit code N", or its
         // result holds a line of a page it names: the prefix is not relied on alone, since a wording that changes would show every failed call as a refusal.
         const said = textOfResult(b);
-        if (!RAN.test(said) && ![...done.reads.keys()].some((page) => holdsLineOf(said, page))) continue;
-        for (const [page, verb] of done.reads) if (onDisk(page)) reach(page, verb, use.at);
+        const ranIt = RAN.test(said);
+        if (!ranIt && ![...done.reads.keys()].some((page) => holdsLineOf(said, page))) continue;
+        // The prefix says that the call ran, not which of its commands did: zsh stops a list at an expansion error (`echo ======`), and the seds after it never ran (B6). A page
+        // counts when the result holds a line of it; one with no line to hold (no seam, a page of short lines) is the prefix's, as before.
+        for (const [page, verb] of done.reads) if (onDisk(page) && (linesOf(page).length > 0 ? holdsLineOf(said, page) : ranIt)) reach(page, verb, use.at);
         for (const text of done.unresolved) failedOpaque.push({ text: posix(text), at: use.at });
         if (done.unresolved.length) failedOpaque.push({ text: output(b), at: use.at });
         keep(failedPatterns, done.patterns);

@@ -145,9 +145,10 @@ const NOT_PAGES = new Set(['skill.md', 'claude.md', 'readme.md', 'changelog.md',
 const MAX_PAGES_OF_A_NAME = 5;
 /** A bare corpus file name in a line: not a part of a longer name or of a path (`markdown/a/c_X.md` is the citation of its path). */
 const BARE_NAME = /(?<![A-Za-z0-9_.\-/\\])[A-Za-z0-9][A-Za-z0-9_.\-]*\.md(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/g;
-const HAS_BARE_NAME = new RegExp(BARE_NAME.source);
-/** A `.md` name with a folder in front of it (`clients/acme/incident.md`): the name is that file's. */
-const PATH_TO_NAME = /(?<=[A-Za-z0-9_.\-~]\/)([A-Za-z0-9][A-Za-z0-9_.\-]*\.md)(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/g;
+/** A `.md` name anywhere, with a folder in front of it or not: an answer that has one may cite a corpus page by its name or by a partial path (B7). */
+const HAS_MD_NAME = /[A-Za-z0-9][A-Za-z0-9_.\-]*\.md(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/;
+/** A `.md` name with its folders in front, as written (`clients/acme/incident.md`, `.../x.md`, `folder/x.md`): `[1]` is the folders, ending with a slash, `[2]` the name. */
+const PATH_WITH_NAME = /(?<![A-Za-z0-9_.\-~…])((?:[A-Za-z0-9_.\-~…]+\/)+)([A-Za-z0-9][A-Za-z0-9_.\-]*\.md)(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/g;
 
 /**
  * Which corpus pages the session SHOWED, by the one set of rules the ask uses and the notice that follows it must use as well (the architect's review of
@@ -253,7 +254,7 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
   const names0 = wantNames && live.some(([l]) => /`[^`\n]*[_.][^`\n]*`|\[[A-Za-z0-9_.\\]*[_.][A-Za-z0-9_.\\]*\]/.test(l));
   const restingAt = live.some(([l]) => RESTING.test(l));
   const countsAt = /Pages read:/i.test(fullText);
-  const bareAt = typeof options.pagesNamed === 'function' && (live.some(([l]) => HAS_BARE_NAME.test(posix(l).replace(CITATION, ''))) || docs.some((w) => HAS_BARE_NAME.test(posix(w.text).replace(CITATION, ''))));
+  const bareAt = typeof options.pagesNamed === 'function' && (live.some(([l]) => HAS_MD_NAME.test(posix(l).replace(CITATION, ''))) || docs.some((w) => HAS_MD_NAME.test(posix(w.text).replace(CITATION, ''))));
   if (!(names0 || cites || absenceAt || restingAt || countsAt || bareAt)) return result('nothing-to-check');
 
   const declared = new Set([...fullText.matchAll(DECLARED)].map((m) => m[1].toLowerCase()));
@@ -356,6 +357,15 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
     const cited = new Map();
     const bareCited = new Map();
     const tails = new Set();                                       // names the answer or a document gives a path for (`clients/acme/incident.md`, a corpus page's)
+    const partialCited = new Map();                                // names a partial path to a corpus page cites (`.../x.md`, `folder/x.md`), with the pages below that folder
+    /** The pages named `name` that stand below the folders `dir` ends with (an elided prefix `.../` or `…/` is any); none when `dir` leads to no page of that name. */
+    const pagesOfPartial = (dir, name) => {
+      const all = options.pagesNamed(name) ?? [];
+      const elided = /^(?:\.\.\.|…)(?:\/|$)/.test(dir);
+      const rest = dir.replace(/\/+$/, '').replace(/^(?:\.\.\.|…)\/?/, '');
+      if (elided && rest === '') return all;
+      return all.filter((p) => { const folder = p.slice(0, p.lastIndexOf('/')); return folder === rest || folder.endsWith(`/${rest}`); });
+    };
     for (const [l, i, inFile] of places) {
       const line = posix(l);
       for (const m of line.matchAll(CITATION)) {
@@ -365,7 +375,16 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
         if (!cited.has(m[0])) cited.set(m[0], { line: i, inFile });
       }
       if (typeof options.pagesNamed !== 'function') continue;
-      for (const m of line.matchAll(PATH_TO_NAME)) tails.add(m[1].toLowerCase());
+      for (const m of line.matchAll(PATH_WITH_NAME)) {
+        const [, dir, name] = m;
+        if (/(?:^|\/)markdown\//.test(dir)) { tails.add(name.toLowerCase()); continue; }               // a corpus path: CITATION's
+        const pages = pagesOfPartial(dir, name);
+        if (pages.length === 0) { tails.add(name.toLowerCase()); continue; }                            // a path outside the corpus: that file's
+        // A partial path to a corpus page (`.../x.md`, `folder/x.md`) cites the pages of that name below it, with the skips of a path (the replay, B7).
+        const end = m.index + m[0].length;
+        if (NOT_PAGES.has(name.toLowerCase()) || DECLARED_UNREAD.test(line.slice(end)) || isPointer(line, m.index, end) || typed.includes(name.toLowerCase())) continue;
+        if (!partialCited.has(name)) partialCited.set(name, { pages, line: i, inFile });
+      }
       for (const m of line.matchAll(BARE_NAME)) {
         const name = m[0];
         if (NOT_PAGES.has(name.toLowerCase())) continue;
@@ -406,6 +425,14 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
         if (pages.length === 0 || pages.some(shownPage)) continue;
         if (unsure()) { unsureAt = true; continue; }
         findings.citedUnread.push({ kind: 'citedUnread', path: name, line: at.line, inFile: at.inFile, bare: true });
+      }
+      for (const [name, at] of partialCited) {
+        if ([...cited.keys()].some((c) => c.endsWith(`/${name}`)) || own.has(name.toLowerCase())) continue;      // the answer gives the full path, or the file is the session's own
+        let pages = at.pages;
+        if (typeof options.pageExists === 'function') pages = pages.filter(onDisk);
+        if (pages.length === 0 || pages.length > MAX_PAGES_OF_A_NAME || pages.some(shownPage)) continue;
+        if (unsure()) { unsureAt = true; continue; }
+        if (!findings.citedUnread.some((f) => f.path === name)) findings.citedUnread.push({ kind: 'citedUnread', path: name, line: at.line, inFile: at.inFile, bare: true });
       }
       if (unsureAt) notes.push(`citedUnread: some pages not asked, a sub-agent input was cut short: ${incomplete().join('; ')}`);
     }
