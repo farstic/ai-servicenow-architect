@@ -408,3 +408,24 @@ test('ARC-09-C267 replay B7 — a partial path to a corpus page (`.../x.md`, `fo
   assert.deepEqual(find('See `.../c_Many.md`.', rows(), { pagesNamed: many(6) }), []);
   assert.deepEqual(find('See `.../c_Many.md`.', rows(), { pagesNamed: many(5) }), ['c_Many.md']);
 });
+
+// ---- B7, found by the author while measuring: the two name patterns were quadratic ----------------------------------------------------------------------
+// The test for "an answer has a .md name" had no start-of-word anchor (the bare-name pattern has one), and the partial-path pattern tried every depth from every start:
+// one word of 40,000 characters took 3 s, and 40,000 path segments took 12 s. The hook is synchronous and runs at the end of every turn, on the answer and on each file written.
+test('ARC-09-C267 replay B7 — a line of tens of thousands of characters is read in linear time, as one word or as a run of path segments', () => {
+  const named = (name) => (name === 'c_Page.md' ? ['markdown/csm/c_Page.md'] : []);
+  const timed = (reply) => {
+    const t = performance.now();
+    const out = groundingFindings({ rows: [U('how?')], reply, options: { blocking: ['citedUnread'], pagesNamed: named } });
+    return { ms: performance.now() - t, paths: out.items.map((i) => i.path) };
+  };
+  const word = timed(`${'a'.repeat(60_000)}\n`);
+  assert.deepEqual(word.paths, []);
+  assert.ok(word.ms < 1000, `one word of 60,000 characters took ${word.ms.toFixed(0)} ms`);
+  const segments = timed(`See c_Page.md.\n${'a/'.repeat(30_000)}z\n`);
+  assert.deepEqual(segments.paths, ['c_Page.md']);
+  assert.ok(segments.ms < 1000, `30,000 path segments took ${segments.ms.toFixed(0)} ms`);
+  // the same line with a name at its end is read in the same time
+  const named_ = timed(`${'a/'.repeat(30_000)}c_Page.md\n`);
+  assert.ok(named_.ms < 1000, `30,000 path segments and a name took ${named_.ms.toFixed(0)} ms`);
+});
