@@ -26,31 +26,55 @@ citation over a comma is now the page of that name in that path's folder, and `d
 before the corpus bump of 2026-11-15 it reports the four names that the bump took out of the corpus, which the check passed over;
 on this tree it reads 22 such names, and all of them resolve.
 
+**The Windows install guide has a form that runs from disk.** `docs/AI-Architect-Windows-Install-Guide.html` is one file that opens in Edge or
+Chrome without a server: the steps of `docs/INSTALL-WINDOWS.md`, a Copy button on every command, and helpers that read what a reader pastes back and
+say what is wrong. A reader types a licence file name and an instance label once and every command uses them. Progress stays in the browser and
+nothing leaves the page. The release writer moves its clone tag and its release with every final, the signed manifest covers it, and each GitHub
+Release carries it as an asset, so a reader with nothing installed can download it before cloning.
+
 **The Stop hook asks once about a corpus page that an answer cites and the session never opened.** At the end of a turn it lists the
 pages that the final answer, or a file written in that turn, cites and that no read route of the session showed: a `Read`; a Bash or
-PowerShell command that shows the page (`cat`, `sed`, `head`, `tail`, `awk`, `nl`, `grep`, `rg`, `Get-Content`, `Select-String`),
-from the folder a `cd` set, which the next call keeps; a Grep that printed lines of it; an MCP file read; a sub-agent's read; a read
-before a compaction. A sentence that only points ("see also", "start with", "read … first"), a path the user typed and a page the answer
-says it did not open are not claims. The hook asks the model once, to open each page and correct what it contradicts or to say on its
-Correction line that a citation is a pointer, tells the user what stayed open, and never asks again in the turn.
-`tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
-unreadable file, switches the grounding asks off. No `CLAUDE.md`, skill or agent changes. On a 5.3 MB transcript the hook takes 323 ms
-where it took 312 ms (median of three interleaved runs on a Mac).
+PowerShell command that shows the page (`cat`, `sed`, `head`, `tail`, `awk`, `nl`, `grep`, `rg`, `Get-Content`, `Select-String`, and the
+filters that print a file again), from the folder a `cd` set, which the next call keeps, with a brace list or a glob in its arguments expanded
+against the file system; a Grep that printed lines of it; an MCP file read; a sub-agent's read; a read before a compaction. A call that does not
+name its pages (a loop, `xargs`, `find -exec`, `$( )`, a variable, code of another language, `git show`) counts every page whose file name is in
+it as shown. A sentence that only points ("see also", "start with", "read … first"), a path the user typed and a page the answer says it did not
+open are not claims. The hook asks the model once, in these words: "You cited pages that this session never opened: …. Open each one now. Where a
+page contradicts your answer, correct the answer. Where a citation only tells the reader where to look, mark it as a pointer on its Correction
+line." After the continuation it tells the user what stayed open, counting only the citations the final answer still makes, and never asks again
+in the turn. `tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
+unreadable file, switches the grounding asks off. No `CLAUDE.md`, skill or agent changes. On a 5.3 MB transcript the hook takes the same time as
+before (about 210 to 310 ms in three interleaved runs of each, on a Mac).
 
 ### Added
 
+- `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
+  with nothing fetched but its fonts. It has Copy and "ran it" on each of the 49 commands, a contents list that follows the reader, live and
+  design-only, a checklist, a practice for the seven wizard questions, a permissions builder, a problem search, a help message that holds no
+  address and no password, and counters for the four slow commands. `tests/install-windows-guide-html.test.mjs` holds every command to the
+  Markdown guide's, in order, and the version floors, the permission presets, the licence words and the installer's check keys to the product;
+  it runs the page's own checks on the lines `checkLine` and `bannerLine` print (ARC-09-C285).
 - `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
   word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints
   whether the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a
   second and exits 1 when a term is not printed (ARC-09-C268).
 - The Stop hook asks once at the end of a turn about a corpus page cited in the answer, or in a file written in that turn, that no read
-  route of the session showed (`lib/docs/read-routes.mjs`, `turn-sources.mjs`, `grounding-check.mjs`, `hooks/stop-citations.mjs`; the
-  data in `lib/docs/grounding-classes.json`). A sub-agent's reads, the reads before a compaction, a `cd` and a relative path, and the lines
-  of a recursive `grep` or Grep count as reads; a pointer sentence, a path the user typed and a page the answer says it did not open do not
-  need one. A page that is still unread after the ask is told to the user, never to the model again (ARC-09-C267).
+  route of the session showed (`lib/docs/read-routes.mjs`, `glob-fs.mjs`, `turn-sources.mjs`, `grounding-check.mjs`, `hooks/stop-citations.mjs`;
+  the data in `lib/docs/grounding-classes.json`). A sub-agent's reads, the reads before a compaction, a `cd` and a relative path, a brace list or
+  a glob expanded against the file system, the lines of a recursive `grep` or Grep, and every page named in a call that cannot be resolved (a
+  loop, `xargs`, code of another language) count as reads; a pointer sentence, a path the user typed and a page the answer says it did not open do
+  not need one. A page that is still cited and unread after the ask is told to the user, never to the model again (ARC-09-C267).
 
 ### Changed
 
+- The release writes the interactive Windows guide (`writeGuideRelease`, beside `writeInstallTag`): its clone command, and the `release` field its
+  hero and help message read. A release candidate leaves the page alone, as it leaves the other pages, and a page without the field is refused. The
+  page is in the signed manifest's coverage (`packages/snowarch/src/licence/integrity.ts`), so a distribution carries it, and `release.yml` attaches
+  it to the GitHub Release, which now has eight assets (ARC-09-C285).
+- `.gitattributes` gains `*.html text eol=lf`: `tests/eol.test.mjs` asks every tracked extension for a rule, and the interactive guide is the first
+  HTML file in the tree. A page that a Windows checkout rewrote to CRLF would no longer match the hash the signed manifest holds for it (ARC-09-C285).
+- The pinned-clone guards of `tests/install-page.test.mjs` read the interactive guide too: its clone command quiets git's detached-HEAD advice,
+  names a release, and names the newest one that exists (ARC-09-C285).
 - The corpus map, `vendor/docs-map.md`, no longer shows a release family at the start of an area's title. The corpus is the
   Australia family's, and 45 of its area index titles open with "Brazil", four delta areas with "australia" and one with
   "Australia"; the map copied them and read as a map of the Brazil family's documentation. `scripts/gen-docs-map.mjs` now leaves a

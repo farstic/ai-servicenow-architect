@@ -120,6 +120,28 @@ export function writeInstallTag(text, version, file = 'the install page') {
   return { ok: true, text: out, count };
 }
 
+/**
+ * The interactive Windows guide's release (ARC-09-C285): its clone command and the release it names.
+ *
+ * ONE PAGE, TWO SPELLINGS, BOTH THE WRITER'S. The page is one HTML file whose data is one JSON block. The clone command there is the line
+ * `writeInstallTag` already rewrites (`--branch v<x.y.z>`), and the page's hero and its help message take the release from a field of the same
+ * block (`"release": "v<x.y.z>"`). A writer that moved the first and not the second would leave a guide that clones one release and calls
+ * itself another, which is what tests/install-windows-guide-html.test.mjs asserts it cannot.
+ *
+ * A PRERELEASE LEAVES THE PAGE ALONE, for the reason `writeInstallTag` gives (ARC-09-C65), and the answer says so the same way. The page is
+ * refused when it has no release field: a writer that reports success on a page it did not change is how a stale tag ships (ARC-09-C60).
+ */
+export function writeGuideRelease(text, version, file = 'the interactive Windows guide') {
+  const tagged = writeInstallTag(text, version, file);
+  if (!tagged.ok || tagged.skipped) return tagged;
+  const FIELD = /("release"\s*:\s*")v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?(")/g;
+  const found = tagged.text.match(FIELD);
+  if (!found) {
+    return { ok: false, message: `release: ${file} has no "release": "v<x.y.z>" field to update` };
+  }
+  return { ok: true, text: tagged.text.replace(FIELD, (_, open, close) => `${open}v${version}${close}`), count: tagged.count + found.length };
+}
+
 export function writeHead(text, version) {
   let out = text;
   if (HEAD_VERSION.test(out)) {
@@ -186,6 +208,8 @@ const WRITTEN_HERE = Object.freeze([
   'docs/MIGRATION.md',
   // ARC-09-C271 — the Windows page's clone command, the same line on a page the README does not generate.
   'docs/INSTALL-WINDOWS.md',
+  // ARC-09-C285 — the interactive form of that guide: its clone command and its release, written by `writeGuideRelease`.
+  'docs/AI-Architect-Windows-Install-Guide.html',
 ]);
 
 export const STAGED = Object.freeze([...new Set([
@@ -249,6 +273,7 @@ export function applyWrites({ root, version, date, run, from = null, tag = {}, g
     ['docs/INSTALL.md', (t) => writeInstallTag(t, version, 'docs/INSTALL.md')],
     ['docs/MIGRATION.md', (t) => writeInstallTag(t, version, 'docs/MIGRATION.md')],
     ['docs/INSTALL-WINDOWS.md', (t) => writeInstallTag(t, version, 'docs/INSTALL-WINDOWS.md')],
+    ['docs/AI-Architect-Windows-Install-Guide.html', (t) => writeGuideRelease(t, version, 'docs/AI-Architect-Windows-Install-Guide.html')],
   ]) {
     const result = fn(read(file));
     if (!result.ok) return { ok: false, message: result.message, touched };

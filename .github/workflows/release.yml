@@ -261,6 +261,11 @@ jobs:
       # `gh` is present on GitHub-hosted runner images. That is a runner-image fact rather than a
       # documented guarantee, and the rehearsal run is what proves it; if it is ever absent, this
       # step becomes `actions/github-script` calling `repos.createRelease` with the same assets.
+      #
+      # ARC-09-C285 — THE LAST ASSET IS THE INTERACTIVE WINDOWS INSTALL GUIDE, as it is at this tag: a reader who has nothing installed
+      # yet cannot open a page inside a clone they have not made, so the Release carries the one page they need first. It is not a
+      # doctor report, so `assert-assets.mjs` above does not read it; the release writer moves its clone tag with the release
+      # (`writeGuideRelease`), and tests/install-windows-guide-html.test.mjs holds that tag to the Markdown guide's.
       - name: Publish
         shell: bash
         env:
@@ -272,4 +277,4 @@ jobs:
           --notes-file release-notes.md
           doctor-ubuntu-latest.json doctor-macos-latest.json doctor-windows-latest.json
           install-metrics-ubuntu-latest.json install-metrics-macos-latest.json
-          install-metrics-windows-latest.json install-metrics.md
+          install-metrics-windows-latest.json install-metrics.md docs/AI-Architect-Windows-Install-Guide.html
