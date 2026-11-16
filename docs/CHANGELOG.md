@@ -26,12 +26,28 @@ citation over a comma is now the page of that name in that path's folder, and `d
 before the corpus bump of 2026-11-15 it reports the four names that the bump took out of the corpus, which the check passed over;
 on this tree it reads 22 such names, and all of them resolve.
 
+**The Stop hook asks once about a corpus page that an answer cites and the session never opened.** At the end of a turn it lists the
+pages that the final answer, or a file written in that turn, cites and that no read route of the session showed: a `Read`; a Bash or
+PowerShell command that shows the page (`cat`, `sed`, `head`, `tail`, `awk`, `nl`, `grep`, `rg`, `Get-Content`, `Select-String`),
+from the folder a `cd` set, which the next call keeps; a Grep that printed lines of it; an MCP file read; a sub-agent's read; a read
+before a compaction. A sentence that only points ("see also", "start with", "read … first"), a path the user typed and a page the answer
+says it did not open are not claims. The hook asks the model once, to open each page and correct what it contradicts or to say on its
+Correction line that a citation is a pointer, tells the user what stayed open, and never asks again in the turn.
+`tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
+unreadable file, switches the grounding asks off. No `CLAUDE.md`, skill or agent changes. On a 5.3 MB transcript the hook takes 323 ms
+where it took 312 ms (median of three interleaved runs on a Mac).
+
 ### Added
 
 - `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
   word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints
   whether the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a
   second and exits 1 when a term is not printed (ARC-09-C268).
+- The Stop hook asks once at the end of a turn about a corpus page cited in the answer, or in a file written in that turn, that no read
+  route of the session showed (`lib/docs/read-routes.mjs`, `turn-sources.mjs`, `grounding-check.mjs`, `hooks/stop-citations.mjs`; the
+  data in `lib/docs/grounding-classes.json`). A sub-agent's reads, the reads before a compaction, a `cd` and a relative path, and the lines
+  of a recursive `grep` or Grep count as reads; a pointer sentence, a path the user typed and a page the answer says it did not open do not
+  need one. A page that is still unread after the ask is told to the user, never to the model again (ARC-09-C267).
 
 ### Changed
 
