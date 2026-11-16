@@ -33,15 +33,21 @@ test('ARC-09-C267 review A1 — wordNamesPage: a glob or a brace word may name a
     [`${ABS}/markdown/customer-service-management/c_Escalation*.md`, ESC], [`${ABS}/markdown/**/c_Esc*.md`, ESC], [`${ABS}/**/c_Esc*.md`, DEEP],
     ['C:/Users/dev/install/vendor/ServiceNowDocs/markdown/customer-service-management/c_Esc*.md', ESC],
     ['$CORPUS/markdown/customer-service-management/c_Esc*.md', ESC], ['~/install/vendor/ServiceNowDocs/markdown/*/c_Esc*.md', ESC], ['${DIR}/c_Esc*.md', ESC],
+    ['~/c_Esc*.md', ESC], ['~dev/c_Esc*.md', ESC], ['$HOME/c_Esc*.md', ESC], ['${HOME}/c_Esc*.md', ESC],
     ['c_$NAME*.md', ESC], ['markdown/{customer-service-management,hr-service-delivery}/c_{Escalation,Other}.md', ESC],
     ['markdown/{customer-service-management,hr-service-delivery}/c_{Escalation,Other}.md', OTHER], ['../customer-service-management/c_Esc*.md', ESC],
   ]) assert.equal(wordNamesPage(word, page), true, `${word} names ${page}`);
   for (const [word, page] of [
     ['c_Other*.md', ESC], ['c_Esc*.txt', ESC], ['hr-service-delivery/c_Esc*.md', ESC], ['sub/dir/c_Esc*.md', ESC], [`${ABS.replace('/vendor/ServiceNowDocs', '')}/docs/*.md`, ESC],
     ['/c_Escalation*.md', ESC], ['markdown/*/c_Escalation.md', DEEP], ['markdown/c_Escalation*.md', ESC], ['c_Esc*/', ESC], ['c_{Other,Third}.md', ESC], ['docs/*.md', ESC],
-    ['C:/c_Esc*.md', ESC], ['$X/c_Other*.md', ESC],
+    ['C:/c_Esc*.md', ESC], ['$X/c_Other*.md', ESC], ['~dev/docs/c_Esc*.md', ESC], ['$HOME/x/y/c_Esc*.md', ESC],
   ]) assert.equal(wordNamesPage(word, page), false, `${word} does not name ${page}`);
   assert.equal(wordNamesPage('C_ESC*.MD', ESC), false, 'case matters by default');
+  // a segment with more wildcards than any command has can take exponential time to refuse a name: it is not tried, and taken to match
+  const started = Date.now();
+  assert.equal(wordNamesPage('*a*a*a*a*a*a*a*a*a*a*a*a*b.md', 'markdown/x/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.md'), true);
+  assert.ok(Date.now() - started < 1000, 'and at once');
+  assert.equal(wordNamesPage('*a*b.md', 'markdown/x/aaaa.md'), false, 'a few wildcards are tried');
   assert.equal(wordNamesPage('C_ESC*.MD', ESC, { ci: true }), true, 'and not for PowerShell');
   assert.equal(wordNamesPage('', ESC), false);
   assert.equal(wordNamesPage('c_{', ESC), false, 'an unclosed brace is just text');
@@ -61,6 +67,7 @@ test('ARC-09-C267 review A1 — commandReads returns the glob and brace words of
   assert.deepEqual(pats('find . -iname "C_*.MD" -o -path "*/csm/*" | xargs cat'), ['*/csm/*', 'C_*.MD']);
   assert.deepEqual(pats('find . -name x -exec cat {} \\;'), [], '{} is not a brace list');
   assert.deepEqual(pats('for f in a b; do cat "$f"; done'), []);
+  assert.deepEqual(pats(`for f in ${'a'.repeat(5000)}*.md; do cat "$f"; done`), [], 'a word that is a blob and not a path is not kept');
   // a call that is not unresolved returns none: what the file system answered, a plain read, a listing
   const glob = () => [`${ABS}/markdown/csm/c_Esc.md`];
   assert.deepEqual(pats(`cat ${ABS}/markdown/csm/c_Es*.md`, { glob }), []);
@@ -168,6 +175,24 @@ test('ARC-09-C267 review C — a run that is stopped stops the walk of the rows:
   const w = walkThread(many, { shouldStop: stopAt(2) });
   assert.equal(w.aborted, true);
   assert.equal(walkThread(many, {}).aborted, false);
+  // turnSources' own loops stop too, when the walk of the read routes did not: 129 rows are checked by the walk at 0, 64 and 128 (the first three calls),
+  // and by turnSources' loop at its 64th row (the fourth)
+  const mid = [U('how?'), ...Array.from({ length: 64 }, (_, k) => readPage(`m${k}`, PAGE)).flat()];
+  assert.equal(mid.length, 129);
+  calls = 0;
+  const own = turnSources(mid, { shouldStop: () => { calls += 1; return calls > 3; } });
+  assert.equal(own.aborted, true, 'the rows of turnSources are stopped by its own check');
+  calls = 0;
+  assert.equal(turnSources(mid, { shouldStop: () => { calls += 1; return false; } }).aborted, false);
+});
+
+test('ARC-09-C267 review C — groundingFindings that finds its rows stopped asks nothing, even if the stop is over by the time it looks again', () => {
+  let calls = 0;
+  const stopFirst = () => { calls += 1; return calls === 1; };                  // true during the walk, false after
+  const r = groundingFindings({ rows: SESSION, reply: CITE(BETA), options: { blocking: ['citedUnread'], shouldStop: stopFirst } });
+  assert.equal(r.skipped, 'deadline');
+  assert.deepEqual(r.items, []);
+  assert.match(r.notes.join('\n'), /deadline/);
 });
 
 // ---- B1 and D: what groundingFindings says is shown --------------------------------------------------------------------------------------------

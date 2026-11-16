@@ -78,6 +78,10 @@ export function mentionsPage(text, name) {
 const PATTERN_WORD = /[*?[]|(?<!\$)\{[^{}]*(?:,|\.\.)[^{}]*\}/;
 /** A path segment that is, or starts with, an expansion (`~`, `$DIR`, `${DIR}`, a substitution): the folders above it are not known. */
 const UNKNOWN_SEGMENT = /^(?:~|\$|`)/;
+/** More wildcards than this in one path segment is no command's, and the match of such a pattern is not tried (`wordNamesPage`). */
+const MAX_WILDCARDS = 8;
+/** A word longer than this is not a path: it is not kept as a pattern (a blob in a command line, never a glob). */
+const MAX_WORD = 4096;
 /** The expansions inside a segment, each one standing for some run of characters. */
 const EXPANSION = /\$\{[^}]*\}|\$\([^)]*\)|\$[A-Za-z_][A-Za-z0-9_]*|`[^`]*`/g;
 
@@ -86,7 +90,7 @@ const EXPANSION = /\$\{[^}]*\}|\$\([^)]*\)|\$[A-Za-z_][A-Za-z0-9_]*|`[^`]*`/g;
  * system: the word's brace lists are expanded, then its segments are matched from the LAST against the page's, a wildcard meaning what the shell gives it
  * (glob-fs.mjs, `globToRegExp`), until one is used up. A word that is used up first is relative and its folder is not known here, so what is left of the
  * page may be that folder; a page that is used up first leaves the word's folders above the corpus, whatever they are. `**` and a segment that is an
- * expansion (`~`, `$DIR`) cover the folders above them. The root, a drive letter and a trailing `/` do not fit a page. `ci` is PowerShell's case-blind
+ * expansion (`~`, `$DIR`) cover the folders above them. The root, a drive letter and a word that ends in `/` (a folder) do not fit a page. `ci` is PowerShell's case-blind
  * match. Over-counting is the side chosen: a pattern of another area's folder, joined or not, is the caller's to narrow (`commandReads` joins a relative
  * word to the folder it knows). Pure.
  */
@@ -95,7 +99,6 @@ export function wordNamesPage(word, page, { ci = false } = {}) {
   const want = page.split('/');
   for (const w of expandBraces(posix(word))) {
     const segs = w.split('/');
-    if (segs[segs.length - 1] === '') continue;                                          // a folder
     let i = segs.length - 1;
     let j = want.length - 1;
     let fits = null;
@@ -104,7 +107,8 @@ export function wordNamesPage(word, page, { ci = false } = {}) {
       if (seg === '**' || seg === '..' || UNKNOWN_SEGMENT.test(seg)) { fits = true; break; }
       if (seg === '') { fits = false; break; }                                           // the root: the page's folders do not fit above it
       if (seg === '.') { i -= 1; continue; }
-      if (!globToRegExp(seg.replace(EXPANSION, '*'), { ci }).test(want[j])) { fits = false; break; }
+      // A segment with more wildcards than any real command has can take exponential time to refuse a name: it is taken to match (the side chosen).
+      if ((seg.match(/[*?[]/g) ?? []).length <= MAX_WILDCARDS && !globToRegExp(seg.replace(EXPANSION, '*'), { ci }).test(want[j])) { fits = false; break; }
       i -= 1; j -= 1;
     }
     if (fits === true || (fits === null && (j < 0 || i < 0))) return true;
@@ -120,7 +124,7 @@ export function patternsInText(text) {
   const out = new Set();
   for (const m of String(text ?? '').matchAll(/[A-Za-z0-9_.\-/\\~$@%+:{}[\]*?,!^]+/g)) {
     const token = m[0].replace(/^[,:]+|[,:]+$/g, '');
-    if (token && /\.md/i.test(token) && PATTERN_WORD.test(token)) out.add(token);
+    if (token && token.length <= MAX_WORD && /\.md/i.test(token) && PATTERN_WORD.test(token)) out.add(token);
   }
   return [...out];
 }
@@ -496,7 +500,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
   const add = (page, verb) => { if (!reads.has(page)) reads.set(page, verb); };
   /** A pattern word as the shell would have seen it: joined to the folder it ran in (those it knows), or as written when no folder is known or it is lost. */
   const addPattern = (word, folder, folderGone, asWritten = false) => {
-    if (patterns.size >= 64) return;
+    if (patterns.size >= 64 || word.length > MAX_WORD) return;
     const w = posix(word);
     const bases = [];
     if (folder !== null) bases.push(folder);

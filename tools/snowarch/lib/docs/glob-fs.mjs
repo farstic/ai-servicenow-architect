@@ -68,7 +68,7 @@ export function makeGlob({ readdir = (dir) => readdirSync(dir, { withFileTypes: 
     const results = [];
     let over = false;
     const list = (dir) => {
-      if (dirs >= maxDirs || now() - started > maxMs || shouldStop()) { over = true; return []; }
+      if (dirs >= maxDirs || shouldStop()) { over = true; return []; }
       dirs += 1;
       let items;
       try { items = readdir(dir); } catch { return []; }
