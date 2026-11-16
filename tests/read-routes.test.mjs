@@ -339,7 +339,7 @@ test('ARC-09-C267 read-routes — commandReads: what cannot be resolved is retur
   // the architect's four, and their relatives
   for (const command of ['for f in c_Esc.md c_Other.md; do head -20 "$f"; done', 'find . -name c_Esc.md | xargs cat', 'find . -name c_Esc.md -exec cat {} \;', 'find . -name c_Esc.md -execdir head -5 {} +',
     'cat $(find . -name c_Esc.md)', 'cat `find . -name c_Esc.md`', 'F=c_Esc.md; cat $F', 'while read f; do sed -n 1,5p $f; done <<< c_Esc.md', 'ls c_Esc.md | parallel cat {}',
-    'eval "cat c_Esc.md"', 'bash -c "cat c_Esc.md"', 'sh -c \'head c_Esc.md\'', 'echo c_Esc.md | xargs -I{} sed -n 1,3p {}']) {
+    'eval "cat c_Esc.md"', 'while read -r line; do echo "$line"; done < c_Esc.md', 'bash -c "cat c_Esc.md"', 'sh -c \'head c_Esc.md\'', 'echo c_Esc.md | xargs -I{} sed -n 1,3p {}']) {
     assert.equal(names(command), true, command);
   }
   // another language, by name or through a wrapper, and what a heredoc into it holds
