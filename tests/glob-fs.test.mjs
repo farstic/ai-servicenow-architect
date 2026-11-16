@@ -109,3 +109,46 @@ test('ARC-09-C267 glob-fs — makeGlob: an answer is kept, and the reads, the fo
   assert.deepEqual(broken('/x/*.md'), [], 'a folder that cannot be read costs nothing');
   assert.deepEqual(makeGlob()('/this/folder/does/not/exist/*.md'), [], 'the real file system, a folder that is not there');
 });
+
+// ---- the review of #600 (A4): a budget for each pattern ---------------------------------------------------------------------------------------
+test('ARC-09-C267 review A4 — the budget is one for each pattern: a pattern does not spend another\'s, and one over its own answers null, kept', () => {
+  const { fs, glob } = make({ maxDirs: 2 });
+  // three patterns that read one folder each: a budget of two shared by all three is spent at the third
+  assert.deepEqual(glob(`${CSM}/c_E*.md`), [`${CSM}/c_Esc.md`]);
+  assert.deepEqual(glob(`${CSM}/c_O*.md`), [`${CSM}/c_Other.md`]);
+  assert.deepEqual(glob(`${CSM}/t_*.md`), [`${CSM}/t_Setup.md`]);
+  // a pattern over its own budget (markdown, csm and hr: three folders) is not "nothing matches": it is not answered
+  const wide = '/i/vendor/ServiceNowDocs/markdown/*/c_E*.md';
+  assert.equal(glob(wide), null);
+  const reads = fs.calls;
+  assert.equal(glob(wide), null, 'and the answer is kept');
+  assert.equal(fs.calls, reads, 'so it reads nothing again');
+  assert.deepEqual(glob(`${CSM}/index.*`), [`${CSM}/index.json`], 'and the pattern after it has a budget of its own');
+  assert.deepEqual(glob(`${CSM}/nope/*.md`), [], 'a folder that is not there is an answer: nothing matches');
+});
+
+test('ARC-09-C267 review A4 — the entries and the time are limited for each pattern as well, by a clock the caller can give', () => {
+  const few = make({ maxEntries: 3 });
+  assert.equal(few.glob(`${CSM}/*.md`), null, 'over the entry limit a pattern is not answered');
+  assert.deepEqual(few.glob(`${CSM}/c_Esc.md`), [`${CSM}/c_Esc.md`], 'a name with no wildcard lists nothing, and is answered');
+  let t = 0;
+  const memory = memoryFs(FILES);
+  const glob = makeGlob({ readdir: (d) => { t += 400; return memory.readdir(d); }, exists: memory.exists, now: () => t, maxMs: 1000 });
+  assert.equal(glob(`${CSM}/*.md`).length, 3, 'the first pattern costs 400 ms of its 1000');
+  assert.equal(glob(`${CSM}/c_*.md`).length, 2, 'the second has 1000 of its own');
+  assert.equal(glob(`${CSM}/t_*.md`).length, 1, 'and the third');
+  assert.equal(glob('/i/vendor/ServiceNowDocs/markdown/*/c_*.md'), null, 'three folders at 400 ms are over 1000 for one pattern');
+  assert.equal(glob(`${CSM}/index.*`).length, 1, 'and the next pattern is not the worse for it');
+  assert.equal(glob(`${CSM}/*.md`).length, 3, 'an answer already given is still the answer');
+});
+
+test('ARC-09-C267 review A4 — a run that is stopped asks the file system nothing more: every pattern after it is not answered', () => {
+  const memory = memoryFs(FILES);
+  let stopped = false;
+  const glob = makeGlob({ readdir: memory.readdir, exists: memory.exists, shouldStop: () => stopped });
+  assert.equal(glob(`${CSM}/c_E*.md`).length, 1);
+  stopped = true;
+  const reads = memory.calls;
+  assert.equal(glob(`${CSM}/c_O*.md`), null);
+  assert.equal(memory.calls, reads);
+});
