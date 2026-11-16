@@ -52,19 +52,28 @@ const PREFIXES = Object.freeze([
 
 const FLAGS = ['isMeta', 'isSynthetic', 'isCompactSummary', 'isVisibleInTranscriptOnly'];
 
-/** Rows parsed from the text of a transcript: CRLF and a BOM tolerated, a line that does not parse counted and skipped. */
+/**
+ * Rows parsed from the text of a transcript: CRLF and a BOM tolerated, a line that does not parse counted and skipped (`badLines`). `lostLines` are
+ * those that were not the LAST line of the file: a write in progress tears the last line, and nothing was lost with it that a reader of the rows could
+ * have used; a bad line before it held something (a read, a page cited) and is gone (the architect's review of #600, A3).
+ */
 export function parseTranscript(text) {
   const rows = [];
   let badLines = 0;
+  let lostLines = 0;
   const body = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
-  for (const line of body.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    try {
-      const row = JSON.parse(line);
-      if (row && typeof row === 'object' && !Array.isArray(row)) rows.push(row); else badLines += 1;
-    } catch { badLines += 1; }
-  }
-  return { rows, badLines, crlf: text.includes('\r\n') };
+  const lines = body.split(/\r?\n/);
+  let last = lines.length - 1;
+  while (last >= 0 && !lines[last].trim()) last -= 1;
+  lines.forEach((line, at) => {
+    if (!line.trim()) return;
+    let row = null;
+    try { row = JSON.parse(line); } catch { /* counted below */ }
+    if (row && typeof row === 'object' && !Array.isArray(row)) { rows.push(row); return; }
+    badLines += 1;
+    if (at !== last) lostLines += 1;
+  });
+  return { rows, badLines, lostLines, crlf: text.includes('\r\n') };
 }
 
 /** The shape of Claude Code's session JSONL: at least one row with a string `type`, and most lines parse. */
@@ -83,6 +92,8 @@ const textOfResult = (b) => {
   return '';
 };
 const textOf = (row) => blocksOf(row).filter((b) => b.type === 'text' && typeof b.text === 'string').map((b) => b.text).join('\n');
+/** The text blocks of a row, joined: what a hook's feedback row says. */
+export const rowText = textOf;
 const posix = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/{2,}/g, '/');
 
 /** Which flags a row carries, for the record. */
@@ -111,6 +122,7 @@ export function namesIn(text) {
 }
 
 const addAll = (set, names) => { for (const n of names) set.add(n); };
+const NO_NAMES = Object.freeze(new Set());
 
 // What a Read path is, by its tail: the install's root is not needed, only the folder names the product owns.
 const PATH_KINDS = Object.freeze([
@@ -147,11 +159,14 @@ export function pagesOfCommand(command, { powershell = false, cwd = null, rowCwd
 /**
  * The session's sources, from its rows. `rows` are session-JSONL rows (or stream-json rows converted to that shape).
  * `options`: `builders` — the subagent_type names of the roster builders (.claude/agents/), `rosterSkills` — the roster's skill names,
- * `lead` — the opening words of our own block reason, to know a continuation is ours. Pure.
+ * `lead` — the opening words of our own block reason, to know a continuation is ours; `names: false` — the names a page prints are not collected (no class
+ * that asks for them blocks, and collecting them is nearly all of the walk's time: 2 s of 2.1 s on a 63 MB session); `carryFolder: false` — the main
+ * thread's folder is reset before every Bash call; `shouldStop()` — the run's deadline, `aborted` says it was reached. Pure.
  */
 export function turnSources(rows, options = {}) {
   const builders = options.builders ?? new Set();
   const rosterSkills = options.rosterSkills ?? new Set();
+  const wantNames = options.names !== false;
   const main = (Array.isArray(rows) ? rows : []).filter(isMainRow);
 
   // The last compact boundary: nothing before it is a source, a request or a prior reply.
@@ -178,15 +193,33 @@ export function turnSources(rows, options = {}) {
     feedback: [],                // [{ index, ours }] Stop-hook feedback rows of the current turn
     scope: { rosterSkill: false, corpus: false },
     classes: {},                 // how many rows of each user-row kind, for the debug record
+    patterns: [],                // the glob and brace words of the calls that could not be resolved, `{ w, ci }` (read-routes.mjs, `wordNamesPage`)
+    patternsFailed: [],          // the same for a call with a viewer verb that failed; the caller uses it only for a page that is on disk
+    aborted: false,              // the run's deadline was reached before the rows were walked
+    stats: { namesScanned: 0 },  // how many bodies were scanned for names: 0 when no class that asks for them blocks
+  };
+  const scan = (text) => {
+    if (!wantNames) return NO_NAMES;
+    out.stats.namesScanned += 1;
+    return namesIn(text);
+  };
+  let ticks = 0;
+  const stopped = () => {
+    if (!options.shouldStop || out.aborted) return out.aborted;
+    ticks += 1;
+    if (ticks % 64 === 0 && options.shouldStop()) out.aborted = true;
+    return out.aborted;
   };
 
   // The shell's folder and every route by which a page reached the main thread are one walk of its rows (read-routes.mjs).
-  const walked = walkThread(main, { glob: options.glob, pageExists: options.pageExists });
+  const walked = walkThread(main, { glob: options.glob, pageExists: options.pageExists, carryFolder: options.carryFolder !== false, shouldStop: options.shouldStop });
+  if (walked.aborted) out.aborted = true;
 
   // Pass 1 — the tool calls, by id; and where the current turn begins.
   const uses = new Map();
   let lastResult = -1;
   live.forEach((r, i) => {
+    if (stopped()) return;
     if (r.type === 'user' && blocksOf(r).some((b) => b.type === 'tool_result')) lastResult = i;
     if (r.type === 'assistant') {
       for (const b of blocksOf(r)) if (b.type === 'tool_use' && b.id) uses.set(b.id, { name: b.name, input: b.input ?? {}, at: i });
@@ -206,6 +239,7 @@ export function turnSources(rows, options = {}) {
   };
 
   live.forEach((r, i) => {
+    if (stopped()) return;
     if (r.type === 'assistant') {
       if (i > out.turnStart && i > (options.replyAfter ?? -1)) {
         for (const b of blocksOf(r)) {
@@ -231,14 +265,14 @@ export function turnSources(rows, options = {}) {
       const kind = classifyUserText(text, r);
       out.classes[kind] = (out.classes[kind] ?? 0) + 1;
       switch (kind) {
-        case 'prompt': out.request.push(text); addAll(out.names.named, namesIn(text)); break;
+        case 'prompt': out.request.push(text); addAll(out.names.named, scan(text)); break;
         case 'skill-body':
-          addAll(out.names.skill, namesIn(text));
+          addAll(out.names.skill, scan(text));
           if (/[/\\]\.claude[/\\]skills[/\\]/.test(text.slice(0, 400))) out.scope.rosterSkill = true;
           break;
         case 'task-notification': {
           const id = /<tool-use-id>\s*([^<\s]+)\s*<\/tool-use-id>/.exec(text)?.[1];
-          if (classOfAgent(id ? uses.get(id) : null) === 'builder') addAll(out.names.builder, namesIn(text));
+          if (classOfAgent(id ? uses.get(id) : null) === 'builder') addAll(out.names.builder, scan(text));
           break;
         }
         case 'hook-feedback': {
@@ -258,12 +292,12 @@ export function turnSources(rows, options = {}) {
         case 'Read': {
           const file = use.input.file_path;
           const rel = corpusRelative(file);
-          if (rel && rel.endsWith('.md')) { out.pagesRead.add(rel); addAll(out.names.read, namesIn(body)); break; }
+          if (rel && rel.endsWith('.md')) { out.pagesRead.add(rel); addAll(out.names.read, scan(body)); break; }
           const kind = pathKind(file);
-          if (kind === 'skill') { addAll(out.names.skill, namesIn(body)); out.scope.rosterSkill = true; }
-          else if (kind === 'named') addAll(out.names.named, namesIn(body));
+          if (kind === 'skill') { addAll(out.names.skill, scan(body)); out.scope.rosterSkill = true; }
+          else if (kind === 'named') addAll(out.names.named, scan(body));
           else if (kind === 'envelope') {
-            addAll(out.envelopeNames, namesIn(body));
+            addAll(out.envelopeNames, scan(body));
             for (const m of body.replace(/\\/g, '/').matchAll(CITATION)) out.savedCitations.add(m[0]);
           }
           break;
@@ -276,17 +310,17 @@ export function turnSources(rows, options = {}) {
           // it and a command that lists shows none; any other command is never a source.
           const shown = [...(walked.calls.get(b.tool_use_id) ?? [])].filter(([, route]) => !isSearchVerb(route)).map(([page]) => page);
           for (const page of shown) out.pagesRead.add(page);
-          if (shown.length) addAll(out.names.read, namesIn(body));
+          if (shown.length) addAll(out.names.read, scan(body));
           break;
         }
         case 'Agent': case 'Task':
-          if (classOfAgent(use) === 'builder') addAll(out.names.builder, namesIn(body));
+          if (classOfAgent(use) === 'builder') addAll(out.names.builder, scan(body));
           break;
         default:
           if (typeof use.name === 'string' && use.name.startsWith('mcp__')) {
             const given = pagesOfInput(use.input);                            // a file tool given a corpus page reads it; any other MCP result is only named
             for (const page of given) out.pagesRead.add(page);
-            addAll(given.size ? out.names.read : out.names.named, namesIn(body));
+            addAll(given.size ? out.names.read : out.names.named, scan(body));
           }
           break;                                                              // Glob, Write, Workflow, WebFetch…: never a source
       }
@@ -297,6 +331,8 @@ export function turnSources(rows, options = {}) {
   for (const [page, how] of walked.reached) out.reached.set(page, how.route);
   out.opaque = walked.opaque.map((o) => o.text);
   out.opaqueFailed = walked.failedOpaque.map((o) => o.text);
+  out.patterns = walked.patterns;
+  out.patternsFailed = walked.failedPatterns;
   const offset = boundary + 1;
   const from = out.turnStart < 0 ? 0 : out.turnStart;
   for (const w of walked.writes) if (w.at - offset >= from) out.written.push({ tool: w.tool, text: w.text });
@@ -330,39 +366,51 @@ export function readTranscriptRows(transcriptPath, { read = readFileSync, stat =
 
 /**
  * The rows of each sub-agent of the session whose file is `transcriptPath`: Claude Code keeps them in `<session>/subagents/agent-<id>.jsonl`, beside the
- * session's own file and not in it, and a workflow's agents one folder deeper (`subagents/workflows/<run>/agent-<id>.jsonl`). An array of row arrays;
- * `[]` when there are none or the folder is not there. At most `maxFiles` files and `maxBytes` in all are read, then the rest are left (`onDebug` says
- * so). Read only when a page is unread without them (grounding-check.mjs). Never throws.
+ * session's own file and not in it, and a workflow's agents one folder deeper (`subagents/workflows/<run>/agent-<id>.jsonl`). `{ threads, incomplete }`:
+ * `threads` is an array of row arrays, `[]` when there are none or the folder is not there; `incomplete` is a list of reasons (each also told to
+ * `onDebug`) why what is in `threads` may not be all there was: more than `maxFiles` files, more than `maxBytes` in all (the rest are left), a file
+ * that could not be read, a line of a file that does not parse. A caller that needs to know a page was NOT read in any sub-agent must not trust an answer
+ * that is incomplete (the architect's review of #600, A3). Read only when a page is unread without them (grounding-check.mjs). Never throws.
  */
-export function readSubagentRows(transcriptPath, { read = readFileSync, list = readdirSync, stat = statSync, maxBytes = MAX_TRANSCRIPT_BYTES, maxFiles = 200, onDebug = () => {} } = {}) {
+export function readSubagents(transcriptPath, { read = readFileSync, list = readdirSync, stat = statSync, maxBytes = MAX_TRANSCRIPT_BYTES, maxFiles = 200, onDebug = () => {} } = {}) {
+  const incomplete = [];
+  const say = (reason) => { incomplete.push(reason); onDebug(reason); };
   try {
-    if (typeof transcriptPath !== 'string' || !transcriptPath.endsWith('.jsonl')) return [];
+    if (typeof transcriptPath !== 'string' || !transcriptPath.endsWith('.jsonl')) return { threads: [], incomplete };
     const files = [];
+    let more = false;
     const find = (dir, depth, top) => {
       let names;
       try { names = list(dir).sort(); } catch (e) { if (top && e?.code !== 'ENOENT') throw e; return; }
       for (const name of names) {
-        if (files.length >= maxFiles) return;
+        if (more) return;
         const file = join(dir, name);
-        if (/^agent-.+\.jsonl$/.test(name)) files.push(file);
+        if (/^agent-.+\.jsonl$/.test(name)) { if (files.length >= maxFiles) more = true; else files.push(file); }
         else if (depth < 2 && !name.includes('.')) { try { if (stat(file).isDirectory()) find(file, depth + 1, false); } catch { /* not a folder we can read: skipped */ } }
       }
     };
     find(join(transcriptPath.slice(0, -'.jsonl'.length), 'subagents'), 0, true);
-    const out = [];
+    if (more) say(`sub-agent transcripts: more than ${maxFiles} files, the rest are not read`);
+    const threads = [];
     let total = 0;
     for (const file of files) {
       total += stat(file).size;
-      if (total > maxBytes) { onDebug(`sub-agent transcripts are over the ${maxBytes} limit: the rest are not read`); break; }
-      const parsed = parseTranscript(read(file, 'utf8'));
-      if (parsed.rows.length) out.push(parsed.rows);
+      if (total > maxBytes) { say(`sub-agent transcripts are over the ${maxBytes} limit: the rest are not read`); break; }
+      let parsed;
+      try { parsed = parseTranscript(read(file, 'utf8')); } catch (e) { say(`a sub-agent transcript is unreadable: ${e instanceof Error ? e.message : String(e)}`); continue; }
+      if (parsed.lostLines > 0) say(`a sub-agent transcript has ${parsed.lostLines} line(s) that do not parse`);
+      else if (parsed.rows.length === 0 && parsed.badLines > 0) say('a sub-agent transcript has no line that parses');
+      if (parsed.rows.length) threads.push(parsed.rows);
     }
-    return out;
+    return { threads, incomplete };
   } catch (e) {
-    onDebug(`sub-agent transcripts unreadable: ${e instanceof Error ? e.message : String(e)}`);
-    return [];
+    say(`sub-agent transcripts unreadable: ${e instanceof Error ? e.message : String(e)}`);
+    return { threads: [], incomplete };
   }
 }
+
+/** The rows of each sub-agent of the session (`readSubagents`' threads), for a caller that does not need to know whether they are all there. */
+export const readSubagentRows = (transcriptPath, opts) => readSubagents(transcriptPath, opts).threads;
 
 /** The transcript's rows and the sources in them (`readTranscriptRows` + `turnSources`), or `null`. The architect's replay calls this. */
 export function readTurnSources(transcriptPath, { options = {}, ...io } = {}) {

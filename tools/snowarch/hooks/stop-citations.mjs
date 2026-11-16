@@ -17,13 +17,17 @@
 //
 //   IT NEVER FAILS A TURN ON ITS OWN ACCOUNT. Any exception exits 0 with nothing on stderr. A citation the gate cannot read
 //   (a second brace group) is skipped with its line, and the other lines are still read. ARC-09-C263's grounding part (below) sits
-//   in its own try/catch with a 6 s soft deadline inside the 10 s the entry is given: an error, an unreadable transcript or the
-//   deadline leaves the citation part alone.
+//   in its own try/catch with a 3 s deadline for the whole run (DEADLINE_MS), inside the 10 s the entry is given: an error, an unreadable
+//   transcript, an input cut short (a sub-agent folder past its cap, a lost line of the session file) or the deadline leaves the citation part alone,
+//   and a debug line says why when SNOWARCH_HOOK_DEBUG is set.
 //
 //   IT IS FAST. It runs at the end of every turn. A reply with no backtick, no `markdown/`, no absence phrase, no resting phrase
 //   and no `Pages read` exits having imported nothing; one whose citations are all on disk looks at the disk and nothing else; one
 //   that cites a path that is not reads the corpus tree once (lib/docs/resolve.mjs). The grounding part reads the transcript once
-//   and the names index (built at docs sync, never here) when a name or an absence phrase needs it.
+//   (a Stop reads the session file once, whoever asks first) and the names index (built at docs sync, never here) when a name or an absence
+//   phrase needs it. When `citedUnread` may ask (lever 2, ARC-09-C267) a reply with a `.md` name in it, or a session whose file holds `markdown/`,
+//   goes to the check although its words show nothing: a bare file name is a citation, and a file the turn wrote may cite. The names a session's
+//   pages print are collected only for a class that asks for them, so the walk of a 63 MB session file takes about half a second.
 //
 // It says nothing for a citation that cannot be resolved, or that is alive (a real page this install did not check out
 // is alive: ARC-09-C239), and nothing for a dead path whose page the reply already carries: the floor run found a model that
@@ -62,11 +66,12 @@ const NEEDS_CHECK = /`|markdown\/|not documented|not in the (?:bundled )?corpus|
 const MAX_GATE_BYTES = 64 * MB;
 
 /**
- * Could a file written in this turn carry a citation the answer does not? (ARC-09-C267, lever 2.) Only when the class `citedUnread` may ask
- * (the classes data, or the test seam's `options.blocking`) and the session's own file has `markdown/` in it at all, which a session that
- * never met the corpus does not. Two cheap reads; nothing is imported. False on anything it cannot read.
+ * Could the turn have cited a corpus page the answer's own words do not show? (ARC-09-C267, lever 2.) Only when the class `citedUnread` may ask (the
+ * classes data, or the test seam's `options.blocking`) and either the answer holds a `.md` name (a bare `c_Name.md` is a citation) or the session's own
+ * file has `markdown/` in it at all (a file the turn wrote may cite; a session that never met the corpus has none). The file is read through `readOnce`,
+ * which the check shares, so a Stop reads it once. Nothing is imported. False on anything it cannot read.
  */
-function writtenMayCite(input, seams) {
+function writtenMayCite(input, seams, readOnce, message = '') {
   try {
     if (typeof input?.transcript_path !== 'string') return false;
     let blocking = seams.options?.blocking;
@@ -75,13 +80,18 @@ function writtenMayCite(input, seams) {
       blocking = typeof text === 'string' ? JSON.parse(text)?.blocking : [];
     }
     if (!Array.isArray(blocking) || !blocking.includes('citedUnread')) return false;
+    if (/[A-Za-z0-9_-]\.md\b/.test(message)) return true;
     if (statSync(input.transcript_path).size > MAX_GATE_BYTES) return false;
-    return readFileSync(input.transcript_path, 'utf8').includes('markdown/');
+    return readOnce(input.transcript_path, 'utf8').includes('markdown/');
   } catch { return false; }
 }
 
-/** The soft deadline of the grounding part, inside the 10 s the entry is given. */
-const DEADLINE_MS = 6000;
+/**
+ * The deadline of the whole grounding part, inside the 10 s the entry is given: past it nothing is asked and a debug line says so. The walk of a session
+ * file takes a few hundred milliseconds on the largest ones measured (the names a page prints are not collected, which was nearly all of it), so this is
+ * a ceiling for the unforeseen (a slow disk under the glob, a very large sub-agent folder) and not a budget a Stop is meant to use.
+ */
+export const DEADLINE_MS = 3000;
 
 /** One debug line, only when asked for: a hook that fails open says nothing on stderr unless `SNOWARCH_HOOK_DEBUG` is set. */
 const debugLine = (line) => { if (process.env.SNOWARCH_HOOK_DEBUG) process.stderr.write(`stop-citations: ${line}\n`); };
@@ -153,22 +163,30 @@ function checkoutFacts(root) {
   };
 }
 
+/** Claude Code returns a Bash tool to the project folder after each command when this is set: a `cd` is then not the next call's. */
+const keepsFolder = (env) => !/^(?:1|true|yes|on)$/i.test(String(env?.CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR ?? '').trim());
+
 /**
  * The grounding part (ARC-09-C263): the answer's names and citations against what this session read. Its own try/catch and its own
- * deadline; `null` leaves the citation part alone. `{ findings }` for a first Stop, `{ residual }` on the continuation.
+ * deadline; `null` leaves the citation part alone. `{ findings }` for a first Stop, `{ residual }` on the continuation. It asks nothing, and says why
+ * on stderr when asked to, if the deadline passed or an input was cut short.
  */
-async function grounding(input, message, { root, dead, started, seams = {}, debug }) {
-  const stop = () => Date.now() - started > (seams.deadlineMs ?? DEADLINE_MS);
+async function grounding(input, message, { root, dead, started, seams = {}, debug, load, readOnce }) {
+  const limit = seams.deadlineMs ?? DEADLINE_MS;
+  const stop = () => Date.now() - started > limit;
+  const late = () => { debug(`deadline: the grounding check passed its ${limit} ms and asked nothing`); return null; };
   try {
     const { groundingFindings, residualFindings, parseClasses, LEAD } = await import('../lib/docs/grounding-check.mjs');
-    const { readSubagentRows, readTranscriptRows } = await import('../lib/docs/turn-sources.mjs');
+    const { readSubagents, readTranscriptRows } = await import('../lib/docs/turn-sources.mjs');
     const { makeGlob } = await import('../lib/docs/glob-fs.mjs');
     const { CORPUS_DIR } = await import('../lib/docs/sync.mjs');
     const { loadNamesIndex } = await import('../lib/docs/names-index.mjs');
     const { corpusNamesDir } = await import('../lib/local-paths.mjs');
+    const { loadIndex } = await import('../lib/docs/resolve.mjs');
     const facts = checkoutFacts(root);
     const read = seams.readRows ?? readTranscriptRows;
-    const transcript = typeof input.transcript_path === 'string' ? read(input.transcript_path, { onDebug: debug }) : null;
+    const transcript = typeof input.transcript_path === 'string' ? read(input.transcript_path, { onDebug: debug, read: readOnce }) : null;
+    if (stop()) return late();
     const pin = facts.pin();
     const index = pin ? (seams.loadIndex ?? loadNamesIndex)(corpusNamesDir(root, pin), { pin }) : null;
     // Which classes block and the ubiquity threshold are DATA (grounding-classes.json), so the measurement changes them without a code diff.
@@ -176,15 +194,31 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
     if (Object.hasOwn(seams, 'classesText')) classesText = seams.classesText ?? null;                  // a test's: the file's text, or none
     else { try { classesText = readFileSync(fileURLToPath(new URL('../lib/docs/grounding-classes.json', import.meta.url)), 'utf8'); } catch { /* missing: nothing asks */ } }
     const classes = parseClasses(classesText);
+    // The corpus tree, read once and only if a bare file name needs it (a `c_Name.md` that is a page of the corpus is a citation of every page of the name).
+    let tree;
+    const pagesNamed = (name) => {
+      if (tree === undefined) { try { tree = (load ?? loadIndex)(join(root, CORPUS_DIR)); } catch { tree = null; } }
+      return tree ? tree.named(name) : [];
+    };
+    // An input cut short asks nothing about citations: the page might have been read in what was lost.
+    const incomplete = transcript?.lostLines > 0 ? [`the session file has ${transcript.lostLines} line(s) that do not parse`] : [];
+    // The sub-agents' files are read once for the run, whoever asks for them (the check, and the notice, ask more than once).
+    let sub;
+    const sideRows = () => { if (sub === undefined) sub = (seams.sideRows ?? (() => readSubagents(input.transcript_path, { onDebug: debug, ...(seams.subagentLimits ?? {}) })))(); return sub; };
     const options = { blocking: classes.blocking, ubiquity: classes.ubiquity, builders: facts.builders, rosterSkills: facts.rosterSkills,
-      isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD,
-      sideRows: seams.sideRows ?? (() => readSubagentRows(input.transcript_path, { onDebug: debug })), glob: makeGlob(), pageExists: (page) => existsSync(join(root, CORPUS_DIR, ...page.split('/'))), ...(seams.options ?? {}) };
+      isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD, askedOnly: true, incomplete, pagesNamed,
+      carryFolder: keepsFolder(seams.env ?? process.env),
+      sideRows,
+      glob: makeGlob({ shouldStop: stop }), pageExists: (page) => existsSync(join(root, CORPUS_DIR, ...page.split('/'))), ...(seams.options ?? {}) };
     if (input.stop_hook_active) {
       const r = residualFindings({ rows: transcript?.rows ?? null, reply: message, index, coverage: index?.coverage ?? null, options });
-      return stop() ? null : { residual: r };
+      for (const n of r.notes ?? []) debug(n);
+      return stop() ? late() : { residual: r };
     }
     const f = groundingFindings({ rows: transcript?.rows ?? null, reply: message, index, coverage: index?.coverage ?? null, options });
-    return stop() ? null : { findings: f };
+    for (const n of f.notes ?? []) debug(n);
+    debug(`names scanned: ${f.stats?.namesScanned ?? 0}`);
+    return stop() ? late() : { findings: f };
   } catch (e) {
     debug(`grounding failed open: ${e instanceof Error ? e.message : String(e)}`);
     return null;
@@ -207,13 +241,22 @@ export async function report(input, { root = ROOT, load, seams = {} } = {}) {
   const debug = seams.debug ?? debugLine;
   const message = input?.last_assistant_message;
   if (typeof message !== 'string' || !message) return none;
-  if (!NEEDS_CHECK.test(message) && !writtenMayCite(input, seams)) return none;
+  // The session file is read once for a Stop, whoever asks for it first.
+  const fileRead = seams.read ?? readFileSync;
+  const texts = new Map();
+  const readOnce = (path, encoding) => {
+    if (!texts.has(path)) texts.set(path, fileRead(path, encoding));
+    return texts.get(path);
+  };
+  // The continuation of a turn goes to the check whatever it says: what it reports is what the ask left open, and that is in the session file (a bare file
+  // name cited, with no `markdown/` anywhere in it, is such a case), not in the words of "Understood.".
+  if (!input?.stop_hook_active && !NEEDS_CHECK.test(message) && !writtenMayCite(input, seams, readOnce, message)) return none;
   if (input?.stop_hook_active) {
-    const g = await grounding(input, message, { root, dead: new Set(), started, seams, debug });
+    const g = await grounding(input, message, { root, dead: new Set(), started, seams, debug, load, readOnce });
     return g?.residual?.text ? { code: 0, stderr: '', stdout: `${JSON.stringify({ systemMessage: g.residual.text })}\n` } : none;
   }
   const { pairs, dead } = await deadCitations(message, { root, load });
-  const g = await grounding(input, message, { root, dead, started, seams, debug });
+  const g = await grounding(input, message, { root, dead, started, seams, debug, load, readOnce });
   const body = g?.findings?.reasonBody ?? null;
   if (pairs.length === 0 && !body) return none;
   const reason = !body ? asking(pairs)

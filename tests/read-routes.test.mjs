@@ -504,8 +504,10 @@ test('ARC-09-C267 read-routes — walkThread: an MCP call with an unresolved she
 });
 
 test('ARC-09-C267 read-routes — groundingFindings: the text of a failed call shows a cited page only when the page is on disk', () => {
-  const rows = [U('q'), ...call('f', 'Bash', { command: 'for f in c_Esc.md; do head -3 "$f"; done' }, '== c_Esc.md', { error: true })];
-  const unread = (pageExists) => groundingFindings({ rows, reply: `The rule (citation: ${PAGE}).`, options: { blocking: ['citedUnread'], pageExists } }).findings.citedUnread.map((i) => i.path);
+  // The citation is in a file the turn wrote: a page the ANSWER cites that is not on disk is C254's and is not asked about (review B2), a file's is.
+  const rows = [U('q'), ...call('f', 'Bash', { command: 'for f in c_Esc.md; do head -3 "$f"; done' }, '== c_Esc.md', { error: true }),
+    ...call('w', 'Write', { file_path: '/c/e.md', content: `The rule (citation: ${PAGE}).\n` })];
+  const unread = (pageExists) => groundingFindings({ rows, reply: 'Saved.', options: { blocking: ['citedUnread'], pageExists } }).findings.citedUnread.map((i) => i.path);
   assert.deepEqual(unread(() => true), [], 'on disk: the failed loop may have printed it');
   assert.deepEqual(unread(() => false), [PAGE], 'not on disk: it cannot have been');
   assert.deepEqual(unread(undefined), [PAGE], 'with no way to ask, nothing is widened');

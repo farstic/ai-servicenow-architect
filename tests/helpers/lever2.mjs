@@ -60,7 +60,8 @@ export async function stop(t, { rows, side = {}, message, prompt = 'how does a c
   const stamp = (r) => (cwd && r.type === 'assistant' && r.cwd === undefined ? { ...r, cwd: root } : r);
   const body = [U(prompt), ...rows].map(stamp).map((r) => JSON.stringify(r)).join('\n');
   writeFileSync(join(dir, `${session}.jsonl`), `${body}\n`);
-  for (const [name, subRows] of Object.entries(side)) writeFileSync(join(dir, session, 'subagents', `agent-${name}.jsonl`), `${subRows.map((r) => JSON.stringify({ isSidechain: true, ...r })).join('\n')}\n`);
+  // A sub-agent's file is its rows, or a string written as it is (a file with a line that does not parse).
+  for (const [name, subRows] of Object.entries(side)) writeFileSync(join(dir, session, 'subagents', `agent-${name}.jsonl`), typeof subRows === 'string' ? subRows : `${subRows.map((r) => JSON.stringify({ isSidechain: true, ...r })).join('\n')}\n`);
   const stdin = { hook_event_name: 'Stop', last_assistant_message: message, transcript_path: join(dir, `${session}.jsonl`), stop_hook_active: false, ...input };
   const out = await report(stdin, { root, seams: shipped ? seams : { ...seams, options: { blocking: ['citedUnread'], ...seams.options } } });
   return out.stdout ? JSON.parse(out.stdout) : null;

@@ -185,8 +185,9 @@ test('ARC-09-C267 review B1 — groundingFindings answers shown(path) by the rul
   assert.equal(find(loop('for f in c_Alpha.md c_Beta.md; do head -3 "$f"; done')).shown(BETA), true, 'a name in a loop');
   assert.equal(find(loop('for f in /x/ServiceNowDocs/markdown/it-service-management/c_B*.md; do head -3 "$f"; done')).shown(BETA), true, 'a pattern in a loop');
   assert.equal(find(loop('for f in /x/ServiceNowDocs/markdown/it-service-management/c_A*.md; do head -3 "$f"; done')).shown(BETA), false, 'another pattern');
-  const side = [[A([{ type: 'tool_use', id: 's', name: 'Bash', input: { command: 'for f in c_B*.md; do head -3 "$f"; done' } }], { cwd: '/home/dev/install' }), res('s', 'x')]];
+  const side = [[A([{ type: 'tool_use', id: 's', name: 'Bash', input: { command: 'for f in vendor/ServiceNowDocs/markdown/it-service-management/c_B*.md; do head -3 "$f"; done' } }], { cwd: '/home/dev/install' }), res('s', 'x')]];
   assert.equal(find([U('how?')], { sideRows: () => side }).shown(BETA), true, 'a sub-agent\'s pattern');
+  assert.equal(find([U('how?')], { sideRows: () => ({ threads: side, incomplete: [] }) }).shown(ALPHA), false, 'and not another page');
 });
 
 test('ARC-09-C267 review B2 — a page the answer cites that is not on disk is dead in the answer (C254\'s), and asked about in a file; shown(path) is true for the dead one', () => {
@@ -210,12 +211,15 @@ test('ARC-09-C267 review A3 — an input cut short asks nothing about citations 
   assert.deepEqual(fine.items.map((i) => i.path), [BETA], 'and a complete one asks');
 });
 
-test('ARC-09-C267 review C — with only citedUnread to ask, no name is collected; with every class, names are', () => {
-  const lean = groundingFindings({ rows: SESSION, reply: CITE(BETA), options: { blocking: ['citedUnread'] } });
+test('ARC-09-C267 review C — a caller that only asks (askedOnly) collects no name when only citedUnread asks; a replay or a grader still computes every class', () => {
+  const lean = groundingFindings({ rows: SESSION, reply: CITE(BETA), options: { blocking: ['citedUnread'], askedOnly: true } });
   assert.equal(lean.stats.namesScanned, 0);
-  const all = groundingFindings({ rows: SESSION, reply: CITE(BETA), options: {} });
-  assert.ok(all.stats.namesScanned >= 1);
   assert.deepEqual(lean.items.map((i) => i.path), [BETA]);
+  const replay = groundingFindings({ rows: SESSION, reply: CITE(BETA), options: { blocking: ['citedUnread'] } });
+  assert.ok(replay.stats.namesScanned >= 1, 'not asked and still computed, for a replay');
+  assert.deepEqual(replay.items.map((i) => i.path), [BETA]);
+  const names = groundingFindings({ rows: SESSION, reply: CITE(BETA), options: { blocking: ['coined', 'citedUnread'], askedOnly: true } });
+  assert.ok(names.stats.namesScanned >= 1, 'a name class that asks is computed');
 });
 
 test('ARC-09-C267 review D — a bare file name that a corpus page has is a citation of every page of the name', () => {

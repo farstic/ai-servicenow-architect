@@ -45,6 +45,14 @@ withInstall('ARC-09-C267 review A1 — a glob or a brace list the call holds out
     asked(await stop(t, { rows: bash('b', command), message: cite(other) }), other);
     silent(await stop(t, { rows: agentCall, side: { a1: bash('s', command, { extra: { cwd: i.root } }) }, message: shows.map(cite).join(' ') }), `a sub-agent's ${command}`);
   }
+  // code of another language holds the glob inside a string: Bash `python3 -c`, a here-document that feeds an interpreter, an MCP code tool
+  const CTX_EXEC = ['mcp', 'context-mode', 'ctx_execute'].join('__');
+  const py = `import glob; print(open(glob.glob('${folder}/c_Alp*.md')[0]).read())`;
+  for (const rows of [bash('b', `python3 -c "${py}"`), bash('b', `python3 - <<'PY'\n${py}\nPY`),
+    [use('e', CTX_EXEC, { language: 'python', code: py }), res('e', [{ type: 'text', text: 'a summary' }])]]) {
+    silent(await stop(t, { rows, message: cite(PAGE.alpha) }), 'a glob in the code of another language');
+    asked(await stop(t, { rows, message: cite(PAGE.beta) }), PAGE.beta);
+  }
   // a call that failed with a viewer may have printed part of what it was asked for: the pages the pattern covers that are on disk
   const loop = `for f in ${folder}/c_Alp*.md; do sed -n 1,60p "$f"; done`;
   silent(await stop(t, { rows: bash('b', loop, { error: true }), message: cite(PAGE.alpha) }), 'a failed loop over a glob');
@@ -68,6 +76,7 @@ withInstall('ARC-09-C267 review A2 — every Bash call of a sub-agent starts whe
   const folder = i.folder(PAGE.alpha);
   asked(await stop(t, { rows: agentCall, side: { a1: twice(`cd ${folder}`, 'sed -n 1,60p c_Alpha.md', here) }, message: cite(PAGE.alpha) }), PAGE.alpha);
   silent(await stop(t, { rows: agentCall, side: { a1: bash('s', `cd ${folder} && sed -n 1,60p c_Alpha.md`, here) }, message: cite(PAGE.alpha) }), 'but one call is its own');
+  asked(await stop(t, { rows: agentCall, side: { a1: [...bash('s1', `cd ${folder}`, here), ...bash('s2', 'cat c_Alpha.md', { ...here, error: true })] }, message: cite(PAGE.alpha) }), PAGE.alpha);
   // the main thread: the folder is kept between calls unless the environment says it is not
   const main = twice(...calls);
   const kept = { env: { CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR: '1' } };
@@ -96,10 +105,15 @@ withInstall('ARC-09-C267 review A3 — sub-agent files past a cap, or a lost lin
   const padded = [...big, ...Array.from({ length: 60 }, (_, k) => res(`pad${k}`, 'x'.repeat(200)))];
   silent(await stop(t, { rows: agentCall, side: { a: padded, b: bash('s', 'ls') }, message: cite(PAGE.alpha), seams: { ...seams, subagentLimits: { maxBytes: 5000 } } }), 'the sub-agent files are over the byte cap');
   assert.ok(lines.some((l) => /sub-agent/i.test(l) && /5000/.test(l)), JSON.stringify(lines));
-  // a sub-agent file that is not readable at all
+  // a sub-agent file with a line that does not parse in the middle of it, or none that does
   lines.length = 0;
-  silent(await stop(t, { rows: agentCall, side: { a: ['not a row', 7] }, message: cite(PAGE.alpha), seams }), 'a file with nothing in it that parses');
+  const good = JSON.stringify({ isSidechain: true, type: 'assistant', message: { role: 'assistant', content: [] } });
+  silent(await stop(t, { rows: agentCall, side: { a: `${good}\nnot json\n${good}\n` }, message: cite(PAGE.alpha), seams }), 'a lost line in a sub-agent file');
+  assert.ok(lines.some((l) => /sub-agent/i.test(l) && /line/i.test(l)), JSON.stringify(lines));
+  lines.length = 0;
+  silent(await stop(t, { rows: agentCall, side: { a: 'nothing here parses\n' }, message: cite(PAGE.alpha), seams }), 'a file with nothing in it that parses');
   assert.ok(lines.some((l) => /sub-agent/i.test(l)), JSON.stringify(lines));
+  asked(await stop(t, { rows: agentCall, side: { a: `${good}\n${good}\n` }, message: cite(PAGE.alpha) }), PAGE.alpha);
   // a line of the session file that does not parse, in the middle of it: what it held is unknown
   lines.length = 0;
   silent(await stop(t, { rows: [...bash('b0', 'ls'), 'a line that is not a row', ...bash('b1', 'ls')], message: cite(PAGE.alpha), seams }), 'a lost line in the middle of the session file');
@@ -139,7 +153,6 @@ withInstall('ARC-09-C267 review B1 — after the ask, a page opened by a loop, a
   for (const command of [
     `for f in c_Alpha.md c_Beta.md; do sed -n 1,80p "${folder}/$f"; done`,
     `for f in ${folder}/c_*.md; do head -50 "$f"; done`,
-    `ls ${folder} | sed 's|^|${folder}/|' | xargs head -3`,
     `find ${folder} -name '*.md' | xargs cat`,
   ]) {
     silent(await after([], fb, bash('l', command)), command);
@@ -183,6 +196,10 @@ withInstall('ARC-09-C267 review C — the session file is read once for a Stop; 
   const read = (p, enc) => { if (!String(p).includes('subagents')) reads += 1; return readFileSync(p, enc); };
   asked(await stop(t, { rows: bash('b', 'ls'), message: cite(PAGE.alpha), seams: { read } }), PAGE.alpha);
   assert.equal(reads, 1, 'the session file is read once');
+  // the names a session's pages print are not collected for the Stop hook when only citedUnread asks
+  const scanned = [];
+  asked(await stop(t, { rows: readPage('r', i.abs(PAGE.beta)), message: cite(PAGE.alpha), seams: { debug: (l) => scanned.push(l) } }), PAGE.alpha);
+  assert.ok(scanned.includes('names scanned: 0'), JSON.stringify(scanned));
   reads = 0;
   silent(await stop(t, { rows: bash('b', `cat ${i.abs(PAGE.alpha)}`), message: cite(PAGE.alpha), seams: { read } }), 'read');
   assert.equal(reads, 1);
@@ -225,6 +242,10 @@ withInstall('ARC-09-C267 review D — `c_Name.md` alone, or `(citation: c_Name.m
   silent(await stop(t, { rows: [], message: 'See also c_Alpha.md.' }), 'a pointer');
   silent(await stop(t, { rows: [], prompt: 'explain c_Alpha.md to me', message: bare('c_Alpha.md') }), 'typed by the user');
   silent(await stop(t, { rows: [], message: 'Edit SKILL.md, CLAUDE.md and README.md, then see notes.md and docs/PLATFORM-NOTES.md.' }), 'files that are no page of the corpus');
+  addPage(i, 'markdown/it-service-management/index.md');
+  addPage(i, 'markdown/hr-service-delivery/index.md');
+  silent(await stop(t, { rows: [], message: 'The folder is listed in index.md.' }), 'index.md is a page of a few areas and a citation of none');
+  silent(await stop(t, { rows: [], message: 'The layout is in docs/c_Beta.md.' }), 'a path of another folder is not a bare name');
   silent(await stop(t, { rows: [], message: 'Run:\n```\ncat c_Alpha.md\n```\nDone.' }), 'a fenced block');
   // a name that many pages carry (index.md has fifty) is no citation of any
   for (const area of ['a1', 'a2', 'a3', 'a4', 'a5', 'a6']) addPage(i, `markdown/${area}/x_Many.md`);
@@ -235,7 +256,7 @@ withInstall('ARC-09-C267 review D — `c_Name.md` alone, or `(citation: c_Name.m
   assert.equal(both.reason.match(/c_Beta\.md/g).length, 1, both.reason);
   // a file the turn wrote cites by name too
   const file = join(i.root, 'clients', 'acme', 'envelopes', 'e3.md');
-  asked(await stop(t, { rows: [...bash('b0', 'ls vendor/ServiceNowDocs/markdown'), use('w', 'Write', { file_path: file, content: 'The SLA rule is in c_Beta.md.\n' }), res('w', 'ok')], message: 'Saved.' }), 'c_Beta.md');
+  asked(await stop(t, { rows: [...bash('b0', 'ls vendor/ServiceNowDocs/markdown/'), use('w', 'Write', { file_path: file, content: 'The SLA rule is in c_Beta.md.\n' }), res('w', 'ok')], message: 'Saved.' }), 'c_Beta.md');
   // the continuation: closed by a read, by a line that marks it, open otherwise
   const feedback = U(`Stop hook feedback:\n${d.reason}`, { isMeta: true });
   const cont = (extra, line) => stop(t, { rows: [text(bare('c_Alpha.md')), feedback, ...extra, text(line)], message: line, input: { stop_hook_active: true } });

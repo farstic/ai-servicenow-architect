@@ -5,16 +5,19 @@
 // A `cat dir/*.md` shows every page the shell expands the pattern to, and the transcript keeps the pattern and not the pages. The architect's ruling of
 // 2026-11-16 (the pre-registration has a guard of 0 false "unread" claims): expand it against the file system, from the folder the shell was in. This is
 // that expansion and nothing else. It is the one place in the Stop hook's reading of a transcript that touches the disk, so it takes its file system as a
-// seam (the module is exercised over an in-memory one), and it is limited: a number of folder reads for a hook run, a number of directory entries, and an
-// answer for each pattern that is kept, so that a session of a hundred `cat` calls over the same folder reads that folder once.
+// seam (the module is exercised over an in-memory one), and it is limited, for EACH PATTERN: a number of folder reads, a number of directory entries and
+// a time (a budget that the whole session shared was spent by the patterns of its first turns, and every later one was then reported as "nothing";
+// the architect's review of #600, A4), and the answer for a pattern is kept, so that a session of a hundred `cat` calls over the same folder reads that
+// folder once. A run that is stopped (the hook's deadline) answers no more patterns.
 //
 // What a pattern means here is what bash and zsh give it: `*` any run of characters but `/`, `?` one, `[abc]` `[a-c]` `[!a]` `[^a]` a class, `**` as a whole
 // folder name zero or more folders, a name that starts with a dot only by a pattern that starts with one. PowerShell's wildcards are the same four and not
 // case-sensitive, which is the `ci` flag. Brace lists are not a file system's business: they are expanded before the pattern gets here
 // (read-routes.mjs, `expandBraces`).
 //
-// An answer is `[]` when nothing matches, when the folder cannot be read, and when a limit was reached: the caller then falls back to the names in the
-// call, which is the safe side (a page counted as shown that was not costs a missed ask; the other way costs a false claim to the model).
+// An answer is `[]` when nothing matches or a folder cannot be read, and `null` when a limit was reached or the run was stopped: the pattern is then NOT
+// answered, and the caller falls back to matching the pattern's own words against a page's path and file name (read-routes.mjs, `wordNamesPage`), which
+// is the safe side: a page counted as shown that was not costs a missed ask; the other way costs a false claim to the model.
 import { existsSync, readdirSync } from 'node:fs';
 
 const META = /[*?[]/;
@@ -45,17 +48,17 @@ const joinp = (dir, name) => (dir.endsWith('/') ? `${dir}${name}` : `${dir}/${na
 
 /**
  * `glob(pattern, { ci })` for an ABSOLUTE posix pattern (`/…` or `C:/…`): the files and folders it expands to, sorted, frozen, kept for the next call that
- * asks the same. A relative pattern is not the caller's to expand and gives `[]`. `readdir(dir)` gives Dirent-like entries (`name`, `isDirectory()`) or
- * throws; `exists(path)` is a yes or no; `maxDirs` folder reads, `maxEntries` entries listed and `maxMs` milliseconds (by `now`), over a hook run, are the
- * budget: a slow disk must not spend the hook's deadline on patterns.
+ * asks the same; `null` when the pattern went over its budget or the run was stopped, kept the same way. A relative pattern is not the caller's to expand
+ * and gives `[]`. `readdir(dir)` gives Dirent-like entries (`name`, `isDirectory()`) or throws; `exists(path)` is a yes or no; `maxDirs` folder reads,
+ * `maxEntries` entries listed and `maxMs` milliseconds (by `now`) are the budget OF ONE PATTERN: a slow disk must not spend the hook's deadline on a
+ * pattern, and one pattern must not spend another's. `shouldStop()` is the run's own deadline.
  */
-export function makeGlob({ readdir = (dir) => readdirSync(dir, { withFileTypes: true }), exists = existsSync, maxDirs = 300, maxEntries = 50_000, maxMs = 1500, now = Date.now } = {}) {
+export function makeGlob({ readdir = (dir) => readdirSync(dir, { withFileTypes: true }), exists = existsSync, maxDirs = 300, maxEntries = 50_000, maxMs = 1500, now = Date.now, shouldStop = () => false } = {}) {
   const memo = new Map();
-  let dirs = 0;
-  let entries = 0;
-  let spent = 0;
   const expand = (pattern, ci) => {
     const started = now();
+    let dirs = 0;
+    let entries = 0;
     const parts = pattern.split('/');
     let root;
     if (parts[0] === '') root = '/';
@@ -65,12 +68,12 @@ export function makeGlob({ readdir = (dir) => readdirSync(dir, { withFileTypes: 
     const results = [];
     let over = false;
     const list = (dir) => {
-      if (dirs >= maxDirs || spent + (now() - started) > maxMs) { over = true; return []; }
+      if (dirs >= maxDirs || now() - started > maxMs || shouldStop()) { over = true; return []; }
       dirs += 1;
       let items;
       try { items = readdir(dir); } catch { return []; }
       entries += items.length;
-      if (entries > maxEntries || spent + (now() - started) > maxMs) { over = true; return []; }
+      if (entries > maxEntries || now() - started > maxMs) { over = true; return []; }
       return items;
     };
     const walk = (dir, idx) => {
@@ -102,13 +105,13 @@ export function makeGlob({ readdir = (dir) => readdirSync(dir, { withFileTypes: 
       }
     };
     walk(root, 0);
-    spent += now() - started;
-    return over ? [] : results.sort();
+    return over ? null : results.sort();
   };
   return (pattern, { ci = false } = {}) => {
     const key = `${ci ? 'i' : 's'}:${pattern}`;
     if (memo.has(key)) return memo.get(key);
-    const answer = Object.freeze(expand(String(pattern ?? ''), ci));
+    const got = expand(String(pattern ?? ''), ci);
+    const answer = got === null ? null : Object.freeze(got);
     memo.set(key, answer);
     return answer;
   };

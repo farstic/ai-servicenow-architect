@@ -30,8 +30,8 @@
 import { copyLines } from '../finding-copy.mjs';
 import { ABSENCE_ANYWHERE, CUSTOM, DECLARED, MARKER, PLATFORM_PREFIXES, bare, dotted, markedAbsent, nameSpans, qualifiesWhole } from './name-rules.mjs';
 import { COVERAGE } from './names-index.mjs';
-import { mentionsPage, walkThread } from './read-routes.mjs';
-import { namesIn, turnSources } from './turn-sources.mjs';
+import { mentionsPage, walkThread, wordNamesPage } from './read-routes.mjs';
+import { namesIn, rowText, turnSources } from './turn-sources.mjs';
 
 export const KINDS = Object.freeze(['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced', 'citedUnread', 'resting', 'overclaim']);
 export const LEAD = 'Before this answer stands, check these against the corpus; there is no page limit.';
@@ -135,8 +135,64 @@ export function candidatePages(name, index, { tables = [], areas = new Set() } =
   return paths.slice().sort(cmp).slice(0, 2);
 }
 
+/** The classes that need the names the pages of a session print. */
+const NAME_KINDS = Object.freeze(['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced']);
+/** Files that are no page of the corpus, whatever the corpus holds: a bare mention of one is never a citation (and the corpus tree is not read for it). */
+const NOT_PAGES = new Set(['skill.md', 'claude.md', 'readme.md', 'changelog.md', 'examples.md', 'agents.md', 'memory.md', 'license.md', 'licence.md', 'index.md', 'contributing.md']);
+/** A name that more pages than this carry (`index.md` has fifty-three) is no citation of any of them. */
+const MAX_PAGES_OF_A_NAME = 5;
+/** A bare corpus file name in a line: not a part of a longer name or of a path (`markdown/a/c_X.md` is the citation of its path). */
+const BARE_NAME = /(?<![A-Za-z0-9_.\-/\\])[A-Za-z0-9][A-Za-z0-9_.\-]*\.md(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/g;
+const HAS_BARE_NAME = new RegExp(BARE_NAME.source);
+
 /**
- * The findings for one answer. Pure. Returns `{ skipped, findings, blocks, items, reasonBody, reason, pagesRead, coverage, notes }`.
+ * Which corpus pages the session SHOWED, by the one set of rules the ask uses and the notice that follows it must use as well (the architect's review of
+ * #600, B1): a page that reached the main thread by a read route, a saved Envelope's citation, a name or a pattern in a call that could not be resolved
+ * (read-routes.mjs: `mentionsPage`, `wordNamesPage`), and the same in a sub-agent's rows, which are read only when they are needed. `turn` is `turnSources`'
+ * answer for ALL the rows; `options` carries `sideRows` (an array of threads, or `{ threads, incomplete }`), `glob`, `pageExists`, `pagesNamed`.
+ * `{ shown(path), shownPage(path), unsure() }`: `shown` takes a page's path or a bare file name (shown if a page of that name is); `unsure()` is true when the
+ * sub-agent input was cut short, so that a page that is not shown might have been in what was left out. Pure.
+ */
+export function makeShown(turn, options = {}) {
+  let side = null;
+  const sideThreads = () => {
+    if (side) return side;
+    side = { pages: new Set(), opaque: [], opaqueFailed: [], patterns: [], failedPatterns: [], incomplete: [] };
+    const got = typeof options.sideRows === 'function' ? options.sideRows() : options.sideRows;
+    const threads = Array.isArray(got) ? got : (Array.isArray(got?.threads) ? got.threads : []);
+    if (!Array.isArray(got) && Array.isArray(got?.incomplete)) side.incomplete = got.incomplete.slice();
+    for (const rows of threads) {
+      // A sub-agent's folder is reset before every Bash call (carryFolder: false).
+      const walked = walkThread(rows, { glob: options.glob, pageExists: options.pageExists, carryFolder: false, shouldStop: options.shouldStop });
+      for (const page of walked.reached.keys()) side.pages.add(page);
+      for (const o of walked.opaque) side.opaque.push(o.text);
+      for (const o of walked.failedOpaque) side.opaqueFailed.push(o.text);
+      side.patterns.push(...walked.patterns);
+      side.failedPatterns.push(...walked.failedPatterns);
+      if (walked.aborted) side.incomplete.push('the run was stopped while the sub-agent rows were read');
+    }
+    return side;
+  };
+  const onDisk = (path) => typeof options.pageExists === 'function' && options.pageExists(path);
+  const mentioned = (list, path) => { const name = path.slice(path.lastIndexOf('/') + 1); return list.some((text) => mentionsPage(text, name)); };
+  const patterned = (list, path) => list.some((q) => wordNamesPage(q.w, path, { ci: q.ci }));
+  const viaMain = (path) => turn.reached.has(path) || turn.pagesRead.has(path) || turn.savedCitations.has(path)
+    || mentioned(turn.opaque ?? [], path) || patterned(turn.patterns ?? [], path)
+    || (onDisk(path) && (mentioned(turn.opaqueFailed ?? [], path) || patterned(turn.patternsFailed ?? [], path)));
+  const viaSide = (path) => {
+    const sub = sideThreads();
+    return sub.pages.has(path) || mentioned(sub.opaque, path) || patterned(sub.patterns, path)
+      || (onDisk(path) && (mentioned(sub.opaqueFailed, path) || patterned(sub.failedPatterns, path)));
+  };
+  const shownPage = (path) => viaMain(path) || viaSide(path);
+  const pagesNamed = (name) => (typeof options.pagesNamed === 'function' ? options.pagesNamed(name) : null) ?? [];
+  const shown = (path) => (String(path).includes('/') ? shownPage(path) : pagesNamed(path).some(shownPage));
+  return { shown, shownPage, unsure: () => sideThreads().incomplete.length > 0, incomplete: () => sideThreads().incomplete };
+}
+
+/**
+ * The findings for one answer. Pure. Returns `{ skipped, findings, blocks, items, reasonBody, reason, pagesRead, coverage, notes, shown, stats }`; `shown(path)`
+ * says whether the session showed a page by the rules of the ask (`makeShown`).
  * `blocks` are the kinds that are non-empty and allowed to block (`options.blocking`, default all); `items` are their items, in order.
  */
 export function groundingFindings({ rows = null, reply = null, index = null, coverage = null, options = {} } = {}) {
@@ -144,10 +200,17 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
   const notes = [];
   const result = (skipped, extra = {}) => ({
     skipped, findings: Object.fromEntries(KINDS.map((k) => [k, []])), blocks: [], items: [], reasonBody: null, reason: null,
-    pagesRead: 0, coverage: coverage ?? index?.coverage ?? null, notes, ...extra,
+    pagesRead: 0, coverage: coverage ?? index?.coverage ?? null, notes, shown: () => false, stats: { namesScanned: 0 }, ...extra,
   });
+  const late = () => { notes.push('deadline: the check was not finished'); return result('deadline'); };
   const cov = coverage ?? index?.coverage ?? null;
-  const turn = Array.isArray(rows) ? turnSources(rows, options) : null;
+  const allowed = options.blocking ? new Set(options.blocking) : new Set(KINDS);
+  // A caller that only ASKS (the Stop hook) says so with `askedOnly`, and the names a session's pages print are then collected only for a class that asks for
+  // them: nearly all of the walk's time is spent on them. A replay or a grader computes every class, whatever blocks.
+  const wantNames = options.askedOnly ? NAME_KINDS.some((k) => allowed.has(k)) : true;
+  const turn = Array.isArray(rows) ? turnSources(rows, { ...options, names: wantNames }) : null;
+  if (turn?.aborted) { notes.push('deadline: the rows were not all walked'); return result('deadline'); }
+  const made = turn ? makeShown(turn, options) : null;
 
   // The reply: every main-thread text block of the turn the file holds, then the final text unless the file already ends with it.
   const blocks = turn ? turn.replyBlocks.slice() : [];
@@ -164,18 +227,19 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
 
   const absenceAt = live.some(([l]) => ABSENCE_ANYWHERE.test(l));
   const cites = live.some(([l]) => l.includes('markdown/')) || (turn?.written ?? []).some((w) => w.text.includes('markdown/'));
-  const names0 = live.some(([l]) => /`[^`\n]*[_.][^`\n]*`|\[[A-Za-z0-9_.\\]*[_.][A-Za-z0-9_.\\]*\]/.test(l));
+  const names0 = wantNames && live.some(([l]) => /`[^`\n]*[_.][^`\n]*`|\[[A-Za-z0-9_.\\]*[_.][A-Za-z0-9_.\\]*\]/.test(l));
   const restingAt = live.some(([l]) => RESTING.test(l));
   const countsAt = /Pages read:/i.test(fullText);
-  if (!(names0 || cites || absenceAt || restingAt || countsAt)) return result('nothing-to-check');
+  const bareAt = typeof options.pagesNamed === 'function' && (live.some(([l]) => HAS_BARE_NAME.test(posix(l).replace(CITATION, ''))) || (turn?.written ?? []).some((w) => HAS_BARE_NAME.test(posix(w.text).replace(CITATION, ''))));
+  if (!(names0 || cites || absenceAt || restingAt || countsAt || bareAt)) return result('nothing-to-check');
 
   const declared = new Set([...fullText.matchAll(DECLARED)].map((m) => m[1].toLowerCase()));
   const isTool = options.isToolName ?? null;
   const cands = [];
-  for (const [l, i] of live) for (const c of candidatesOf(l, i, { declared, isTool })) cands.push({ ...c, text: l, marked: false });
+  if (wantNames) for (const [l, i] of live) for (const c of candidatesOf(l, i, { declared, isTool })) cands.push({ ...c, text: l, marked: false });
   for (const c of cands) c.marked = markedAbsent(c.text, { start: c.start, end: c.end });
   // Pass 2 of the marker: the span positions are the line's, so attribution used the raw line.
-  if (stop()) return result('deadline');
+  if (stop()) return late();
 
   const fullScope = Boolean(turn && (turn.scope.rosterSkill || turn.scope.corpus)) || cites || absenceAt;
   const names = turn?.names ?? null;
@@ -225,7 +289,7 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
       findings.falseAbsent.push({ kind: 'falseAbsent', name: c.name, line: c.line, opening: opening(c.text, index), pages, escapeNote });
     }
   }
-  if (stop()) return result('deadline');
+  if (stop()) return late();
 
   if (turn) {
     for (const c of cands) {
@@ -247,12 +311,15 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
         findings.unsourced.push({ kind: 'unsourced', name: c.name, line: c.line, seg: c.name.split(/[_.]/)[0], opening: opening(c.text, index) });
       }
     }
-    if (stop()) return result('deadline');
+    if (stop()) return late();
 
     // Citations (ARC-09-C267, lever 2): a corpus page cited, in the answer or in a file the turn wrote, that reached the session by NO route
     // (read-routes.mjs; a saved Envelope's own citations excepted, a skill-printed one is not). Not claims, and skipped per match: one that says
     // itself, right after its path and on the same line, that the page was not read (the answer saying what it did not do, which is what the ask
     // is for), a pointer sentence, and a path the user typed. A later plain citation of the same page is still asked about.
+    // A bare file name (`c_CaseRouting.md`, "(citation: `x.md`)") that a corpus page has is a citation of every page of that name, shown if any of
+    // them was, and asked under the name as written (the architect's review of #600, D); a name that is no page of the corpus, or that more than
+    // five pages carry, is none.
     const dead = options.deadPaths ?? new Set();
     const typed = turn.typed ?? '';
     const places = live.map(([l, i]) => [l, i, false]);
@@ -264,6 +331,7 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
       }
     }
     const cited = new Map();
+    const bareCited = new Map();
     for (const [l, i, inFile] of places) {
       const line = posix(l);
       for (const m of line.matchAll(CITATION)) {
@@ -272,33 +340,46 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
         if (typed.includes(m[0].toLowerCase())) continue;
         if (!cited.has(m[0])) cited.set(m[0], { line: i, inFile });
       }
+      if (typeof options.pagesNamed !== 'function') continue;
+      for (const m of line.matchAll(BARE_NAME)) {
+        const name = m[0];
+        if (NOT_PAGES.has(name.toLowerCase())) continue;
+        const end = m.index + name.length;
+        if (DECLARED_UNREAD.test(line.slice(end))) continue;
+        if (isPointer(line, m.index, end)) continue;
+        if (typed.includes(name.toLowerCase())) continue;
+        if (!bareCited.has(name)) bareCited.set(name, { line: i, inFile });
+      }
     }
     // A sub-agent's reads are its own rows, read only when a page is still unread without them. A call that may have shown a page without naming
-    // it (a loop, xargs, code of another language, a folder the call lost: read-routes.mjs) shows every page whose bare file name is in its text,
-    // here and in the sub-agents' rows: a missed ask costs less than telling the model it did not open a page it read.
-    let side = null;
-    const sideThreads = () => {
-      if (side) return side;
-      side = { pages: new Set(), opaque: [], opaqueFailed: [] };
-      const threads = typeof options.sideRows === 'function' ? options.sideRows() : options.sideRows;
-      for (const rows of Array.isArray(threads) ? threads : []) {
-        const walked = walkThread(rows, { glob: options.glob, pageExists: options.pageExists });
-        for (const page of walked.reached.keys()) side.pages.add(page);
-        for (const o of walked.opaque) side.opaque.push(o.text);
-        for (const o of walked.failedOpaque) side.opaqueFailed.push(o.text);
-      }
-      return side;
-    };
+    // it (a loop, xargs, code of another language, a folder the call lost: read-routes.mjs) shows every page whose bare file name is in its text, or
+    // that one of its glob or brace words could name, here and in the sub-agents' rows: a missed ask costs less than telling the model it did not
+    // open a page it read. Everything the session showed is makeShown's, which the notice after the ask uses as well.
+    const { shownPage, unsure, incomplete } = made;
     const onDisk = (path) => typeof options.pageExists === 'function' && options.pageExists(path);
-    const named = (path) => {
-      const name = path.slice(path.lastIndexOf('/') + 1);
-      const hit = (list) => list.some((text) => mentionsPage(text, name));
-      return hit(turn.opaque ?? []) || hit(sideThreads().opaque) || (onDisk(path) && (hit(turn.opaqueFailed ?? []) || hit(sideThreads().opaqueFailed)));
-    };
-    for (const [path, at] of cited) {
-      if (turn.reached.has(path) || turn.pagesRead.has(path) || turn.savedCitations.has(path) || dead.has(path)) continue;
-      if (sideThreads().pages.has(path) || named(path)) continue;
-      findings.citedUnread.push({ kind: 'citedUnread', path, line: at.line, inFile: at.inFile });
+    // A page the answer cites that is not on disk cannot be opened, and is C254's (it reads the answer's paths; this reads the same disk, so the first
+    // ask and the notice after it agree); in a file the turn wrote it is asked about like any other.
+    const deadHere = (path, at) => dead.has(path) || (!at.inFile && typeof options.pageExists === 'function' && !options.pageExists(path));
+    const cutShort = Array.isArray(options.incomplete) ? options.incomplete : [];
+    if (cutShort.length) notes.push(`citedUnread: nothing asked, an input was cut short: ${cutShort.join('; ')}`);
+    else {
+      let unsureAt = false;
+      for (const [path, at] of cited) {
+        if (deadHere(path, at) || shownPage(path)) continue;
+        if (unsure()) { unsureAt = true; continue; }
+        findings.citedUnread.push({ kind: 'citedUnread', path, line: at.line, inFile: at.inFile });
+      }
+      const haveNames = new Set([...cited.keys()].map((c) => c.slice(c.lastIndexOf('/') + 1)));
+      for (const [name, at] of bareCited) {
+        if (haveNames.has(name)) continue;
+        let pages = options.pagesNamed(name) ?? [];
+        if (pages.length === 0 || pages.length > MAX_PAGES_OF_A_NAME) continue;
+        if (typeof options.pageExists === 'function') pages = pages.filter(onDisk);
+        if (pages.length === 0 || pages.some(shownPage)) continue;
+        if (unsure()) { unsureAt = true; continue; }
+        findings.citedUnread.push({ kind: 'citedUnread', path: name, line: at.line, inFile: at.inFile, bare: true });
+      }
+      if (unsureAt) notes.push(`citedUnread: some pages not asked, a sub-agent input was cut short: ${incomplete().join('; ')}`);
     }
 
     // Overclaim: `Pages read: <n>` more than the distinct corpus pages Read.
@@ -323,13 +404,13 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
     findings.resting.push({ kind: 'resting', line: i, excerpt: maskUnheld(l.replace(/[`*]/g, '').trim().slice(0, 70), index) });
   }
 
-  const allowed = options.blocking ? new Set(options.blocking) : new Set(KINDS);
   const blocking = KINDS.filter((k) => findings[k].length > 0 && allowed.has(k));
   const all = blocking.flatMap((k) => findings[k]);
   const reasonBody = all.length ? reasonOf(findings, blocking, options.maxItems ?? MAX_ITEMS) : null;
   return {
     skipped: null, findings, blocks: blocking, items: all, reasonBody, reason: reasonBody ? `${reasonBody}${KEEP_OUT}` : null,
     pagesRead: turn?.pagesRead.size ?? 0, coverage: cov, notes, turn: turn ? { startedBy: turn.startedBy, feedback: turn.feedback } : null,
+    shown: made ? made.shown : () => false, stats: turn?.stats ?? { namesScanned: 0 },
   };
 }
 
@@ -399,12 +480,22 @@ const DESCRIBE = Object.freeze({
  * What stayed open after our one block. Pure. Called on the continuation's Stop (`stop_hook_active`), where the hook never blocks again:
  * the first block's items are recomputed from the transcript (the rows before our feedback row, no state file), each is checked against
  * the continuation and the Reads after the block, and what is still open — with what first appears in the continuation — is a notice to
- * the USER (a `systemMessage`), never to the model. `{ ours, open, text }`: `ours` is false when no feedback row of ours is in the turn.
+ * the USER (a `systemMessage`), never to the model. `{ ours, open, text, notes }`: `ours` is false when no feedback row of ours is in the turn.
+ *
+ * The notice agrees with the ask (the architect's review of #600, B1 and B2): a page is closed by the rules the ask used (`makeShown`: any read route, a
+ * name or a pattern in a call that could not be resolved, a sub-agent's rows), over ALL the rows, so a folder set before the answer, or a loop that
+ * opened the pages after it, close them; a page the answer cites that is not on disk is C254's and is in neither pass (the disk is the same on both); and
+ * a citation the continuation adds is not listed when the ask itself named the page (C254 gives the right path of a dead one, and asks for it).
  */
 export function residualFindings({ rows = null, reply = null, index = null, coverage = null, options = {} } = {}) {
   const none = { ours: false, open: [], text: null };
+  const withNotes = (r, notes) => (notes.length ? { ...r, notes } : r);
   if (!Array.isArray(rows)) return none;
-  const whole = turnSources(rows, options);
+  const allowed = options.blocking ? new Set(options.blocking) : new Set(KINDS);
+  const wantNames = options.askedOnly ? NAME_KINDS.some((k) => allowed.has(k)) : true;
+  // What the notice needs of the whole session is our feedback row and what the session showed: not the names its pages print.
+  const whole = turnSources(rows, { ...options, names: false });
+  if (whole.aborted) return withNotes(none, ['deadline: the rows were not all walked']);
   const first = whole.feedback.find((f) => f.ours);
   if (!first) return none;
   // The original rows, cut at our feedback row, and not only the live ones: a page read before a compaction was read, and the first block did not ask about it.
@@ -412,9 +503,11 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
   const before = cut >= 0 ? rows.slice(0, cut) : whole.live.slice(0, first.index);
   const after = cut >= 0 ? rows.slice(cut + 1) : whole.live.slice(first.index + 1);
   const was = groundingFindings({ rows: before, reply: null, index, coverage, options });
-  if (was.skipped || was.items.length === 0) return { ours: true, open: [], text: null };
+  if (was.skipped || was.items.length === 0) return withNotes({ ours: true, open: [], text: null }, was.notes);
 
-  const later = turnSources(after, options);
+  const later = turnSources(after, { ...options, names: wantNames });
+  if (later.aborted) return withNotes({ ours: true, open: [], text: null }, [...was.notes, 'deadline: the rows were not all walked']);
+  const made = makeShown(whole, options);
   // What the continuation cites is a second input beside what the first answer cited (the architect's ruling of 2026-11-16): the user still sees the
   // first answer, so a citation of either stays open until a page is read before the turn ends, or a Correction line names it as a pointer or withdrawn.
   // A restated answer that silently drops a citation does not close it, and neither does "Understood.".
@@ -435,16 +528,22 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
           || (corrected(i.name) && later.names.read.has(i.name));
       }
       case 'coined': case 'unsourced': return corrections.length > 0 && !text.includes(i.name);
-      case 'citedUnread': return later.reached.has(i.path) || later.pagesRead.has(i.path) || marked(i.path);
+      case 'citedUnread': return made.shown(i.path) || marked(i.path);
       case 'resting': case 'overclaim': return corrections.length > 0;
       default: return true;
     }
   };
   const open = was.items.filter((i) => !resolved(i));
   const wasKeys = new Set(was.items.map(keyOf));
-  for (const i of now.items) if (!wasKeys.has(keyOf(i)) && !(i.kind === 'citedUnread' && marked(i.path))) open.push(i);
-  if (open.length === 0) return { ours: true, open: [], text: null };
+  const asked = norm(rowText(whole.live[first.index]));
+  for (const i of now.items) {
+    if (wasKeys.has(keyOf(i))) continue;
+    if (i.kind === 'citedUnread' && (marked(i.path) || asked.includes(norm(i.path)))) continue;
+    open.push(i);
+  }
+  const notes = [...was.notes, ...now.notes];
+  if (open.length === 0) return withNotes({ ours: true, open: [], text: null }, notes);
   const shown = open.slice(0, 6).map((i) => DESCRIBE[i.kind](i));
   const more = open.length > shown.length ? `; and ${open.length - shown.length} more` : '';
-  return { ours: true, open, text: `Grounding check: ${open.length} item(s) in this answer were not corrected after one request — ${shown.join('; ')}${more}. Check them before relying on this answer.` };
+  return { ours: true, open, ...(notes.length ? { notes } : {}), text: `Grounding check: ${open.length} item(s) in this answer were not corrected after one request — ${shown.join('; ')}${more}. Check them before relying on this answer.` };
 }

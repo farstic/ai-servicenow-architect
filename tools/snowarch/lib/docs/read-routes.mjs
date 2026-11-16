@@ -19,10 +19,16 @@
 //     returned as TEXT, `unresolved`, and the caller counts every page whose bare file name is in it as shown (`mentionsPage`); when the call has a
 //     viewer verb the pages named in its OUTPUT count too (a loop over `$(ls dir)` that heads every file);
 //   - a call that FAILED may still have printed part of what it was asked for (`cat a.md missing.md`): when it has a viewer verb, the pages it names
-//     that are on disk (`pageExists`, the caller's) count as shown, and so do its unresolved text and output; a failed call with no viewer shows nothing.
+//     that are on disk (`pageExists`, the caller's) count as shown, and so do its unresolved text and output; a failed call with no viewer shows nothing;
+//   - the glob and brace WORDS of a call that cannot be resolved, or of a viewer's pattern the file system did not answer, are returned as `patterns`, and
+//     `wordNamesPage` says whether one could name a page, from the page's path and file name alone and with no disk (the architect's review of #600, A1):
+//     `for f in dir/c_Esc*.md`, `find . -name 'c_Esc*.md' | xargs cat`, `cd ~/x && cat c_Esc*.md` hold no page's bare name, and a pattern is not a name;
+//   - a thread whose folder Claude Code resets before every Bash call (a sub-agent's, and the main thread's when it is told to) starts each call at the
+//     folder its row records (`carryFolder: false`); a `cd` of one call is then not the next call's (A2).
 //
 // PURE: every function reads its arguments and nothing else (no file, no clock, no global); the file system is the caller's `glob`.
 import { corpusRelative } from './resolve.mjs';
+import { globToRegExp } from './glob-fs.mjs';
 
 const posix = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/{2,}/g, '/');
 const blocksOf = (row) => {
@@ -66,6 +72,57 @@ export function mentionsPage(text, name) {
     return true;
   }
   return false;
+}
+
+/** A word with a wildcard (`* ? [`) or a brace list (`{a,b}`, `{1..3}`): `{}` of `find -exec` and `${VAR}` are neither. */
+const PATTERN_WORD = /[*?[]|(?<!\$)\{[^{}]*(?:,|\.\.)[^{}]*\}/;
+/** A path segment that is, or starts with, an expansion (`~`, `$DIR`, `${DIR}`, a substitution): the folders above it are not known. */
+const UNKNOWN_SEGMENT = /^(?:~|\$|`)/;
+/** The expansions inside a segment, each one standing for some run of characters. */
+const EXPANSION = /\$\{[^}]*\}|\$\([^)]*\)|\$[A-Za-z_][A-Za-z0-9_]*|`[^`]*`/g;
+
+/**
+ * Could the glob or brace word `word` of a call name the corpus page `page` (`markdown/<area>/….md`)? Decided from the two spellings alone, with no file
+ * system: the word's brace lists are expanded, then its segments are matched from the LAST against the page's, a wildcard meaning what the shell gives it
+ * (glob-fs.mjs, `globToRegExp`), until one is used up. A word that is used up first is relative and its folder is not known here, so what is left of the
+ * page may be that folder; a page that is used up first leaves the word's folders above the corpus, whatever they are. `**` and a segment that is an
+ * expansion (`~`, `$DIR`) cover the folders above them. The root, a drive letter and a trailing `/` do not fit a page. `ci` is PowerShell's case-blind
+ * match. Over-counting is the side chosen: a pattern of another area's folder, joined or not, is the caller's to narrow (`commandReads` joins a relative
+ * word to the folder it knows). Pure.
+ */
+export function wordNamesPage(word, page, { ci = false } = {}) {
+  if (typeof word !== 'string' || typeof page !== 'string' || !word || !page) return false;
+  const want = page.split('/');
+  for (const w of expandBraces(posix(word))) {
+    const segs = w.split('/');
+    if (segs[segs.length - 1] === '') continue;                                          // a folder
+    let i = segs.length - 1;
+    let j = want.length - 1;
+    let fits = null;
+    while (i >= 0 && j >= 0) {
+      const seg = segs[i];
+      if (seg === '**' || seg === '..' || UNKNOWN_SEGMENT.test(seg)) { fits = true; break; }
+      if (seg === '') { fits = false; break; }                                           // the root: the page's folders do not fit above it
+      if (seg === '.') { i -= 1; continue; }
+      if (!globToRegExp(seg.replace(EXPANSION, '*'), { ci }).test(want[j])) { fits = false; break; }
+      i -= 1; j -= 1;
+    }
+    if (fits === true || (fits === null && (j < 0 || i < 0))) return true;
+  }
+  return false;
+}
+
+/**
+ * The glob and brace tokens, with a literal `.md`, inside a text a word-by-word reading cannot see into: the code of another language, the script a
+ * here-document feeds an interpreter, a quoted script (`python3 -c "glob.glob('…/c_Esc*.md')"`). As written, in order, without duplicates. Pure.
+ */
+export function patternsInText(text) {
+  const out = new Set();
+  for (const m of String(text ?? '').matchAll(/[A-Za-z0-9_.\-/\\~$@%+:{}[\]*?,!^]+/g)) {
+    const token = m[0].replace(/^[,:]+|[,:]+$/g, '');
+    if (token && /\.md/i.test(token) && PATTERN_WORD.test(token)) out.add(token);
+  }
+  return [...out];
 }
 
 // ---- the shell: words, operators, depth, expansions, and the here-documents that are text and not commands --------------------------------
@@ -366,6 +423,8 @@ const POWERSHELL_OPAQUE = new Set(['foreach-object', '%', 'foreach', 'where-obje
 const KEYWORDS = new Set(['do', 'then', 'else', 'elif', '!', '{', 'time', 'coproc']);
 const WRAPPERS = new Set(['command', 'builtin', 'exec', 'env', 'nice', 'nohup', 'sudo', 'doas', 'timeout', 'stdbuf', 'ionice', 'caffeinate', 'unbuffer']);
 const ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/;
+/** The tests of `find` that take a pattern for a file's base name or whole path: it matches the same wherever the shell stands. */
+const FIND_NAME_FLAGS = new Set(['-name', '-iname', '-path', '-ipath', '-wholename', '-iwholename', '-regex', '-iregex', '-lname', '-ilname']);
 
 /** The words of a command from its verb on: the reserved words, assignments and wrappers (`nice -n 10`, `timeout 5`, `env A=b`) in front are left out. */
 function unwrap(words, powershell) {
@@ -410,7 +469,9 @@ function opaqueVerb(key, rest, powershell, x) {
  * PowerShell, which has none); a glob is asked of `glob`, only under the corpus and only when the pattern is absolute.
  * `{ reads, cwd, lost, moved, heredocs, searched, unresolved, viewer }`: `viewer` says that the call has a viewer or a search that prints lines, or a
  * runner that is given one (`xargs head`, `bash -c "cat x.md"`), so that what it printed may name pages; `moved` is true when the line changed the folder for the calls that follow, and `cwd`
- * (`null` when not known) and `lost` are where it stands then. `searched` is the folder each search that prints lines (`grep`, `rg`, `Select-String`,
+ * (`null` when not known) and `lost` are where it stands then. `patterns` are the glob and brace words of a call that cannot be resolved (`{ w, ci }`: the
+ * word as the folder it stood in makes it, or as written when that folder is not known, or for a `find -name` pattern, which matches base names), and a
+ * viewer's pattern that `glob` did not answer: `wordNamesPage` says which pages one could name. `searched` is the folder each search that prints lines (`grep`, `rg`, `Select-String`,
  * without `-c`, `-l`, `-L` or `-q`) ran in: the lines such a search prints over a folder or several files begin with the path of their page
  * (`pagesInLines`). `unresolved` is a list of texts, each of which may show a page the call does not name: a relative `.md` name when the folder is not
  * known, a pattern nothing answered, and the whole call (without the here-documents that are text a command writes) when a loop, `xargs`, an
@@ -430,7 +491,19 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
   let viewer = false;                                              // the call has a viewer or a search that prints lines, or a runner that is given one
   let flagged = false;                                             // a viewer or a search of the call has an expansion in its words
   const saved = [];
+  const patterns = new Map();                                      // { w, ci } by spelling: what a glob or a brace word of the call could name
+  const segInfo = [];                                              // the words of each segment and the folder it ran in, for the patterns of a call left unresolved
   const add = (page, verb) => { if (!reads.has(page)) reads.set(page, verb); };
+  /** A pattern word as the shell would have seen it: joined to the folder it ran in (those it knows), or as written when no folder is known or it is lost. */
+  const addPattern = (word, folder, folderGone, asWritten = false) => {
+    if (patterns.size >= 64) return;
+    const w = posix(word);
+    const bases = [];
+    if (folder !== null) bases.push(folder);
+    if (rowCwd !== null && rowCwd !== folder) bases.push(rowCwd);
+    const spellings = asWritten || folderGone || ABSOLUTE.test(w) || bases.length === 0 ? [w] : bases.map((b) => joinPath(b, w));
+    for (const spelling of spellings) patterns.set(`${powershell ? 'i' : 's'}\0${spelling}`, { w: spelling, ci: powershell });
+  };
   const consider = (raw, key) => {
     for (const arg of powershell ? [raw] : expandBraces(raw)) {
       const globby = /[*?[]/.test(arg);
@@ -448,7 +521,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
           const page = pageAt(full);
           if (page) { add(page, key); found = true; }
         } else if (glob && ABSOLUTE.test(posix(full)) && /ServiceNowDocs\/markdown(?:\/|$)/.test(posix(full))) {
-          for (const file of glob(posix(full), { ci: powershell })) {
+          for (const file of glob(posix(full), { ci: powershell }) ?? []) {          // null: the pattern went over its budget, and is the call's words
             const page = pageAt(file);
             if (page) { add(page, key); found = true; }
           }
@@ -457,6 +530,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       const typed = globby ? null : pageAt(arg);                  // `vendor/ServiceNowDocs/markdown/….md`, from wherever
       if (typed) { add(typed, key); found = true; }
       if (!found && (globby || (at === null && /\.md$/i.test(arg)))) unresolved.push(arg);
+      if (!found && globby) addPattern(arg, at, folderLost);
     }
   };
   segments.forEach((seg, k) => {
@@ -476,6 +550,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       return;
     }
     const key = powershell ? basename(rest[0]).toLowerCase() : basename(rest[0]);
+    segInfo.push({ words: rest.slice(1), key, folder: at, gone: folderLost });
     if (opaqueVerb(key, rest, powershell, seg.x)) { opaque = true; if (givesViewer(rest, showing, searching, powershell)) viewer = true; return; }
     const showsLines = showing.has(key);
     const searchesFiles = searching.has(key);
@@ -503,17 +578,29 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       if (owner.length && opaqueVerb(powershell ? basename(owner[0]).toLowerCase() : basename(owner[0]), owner, powershell, false)) scripts.push(h.body);
     }
     unresolved.push([bare, ...scripts].join('\n'));
+    // The glob and brace words of every command of the call, each as the folder it ran in makes it; the scripts a word cannot be read inside (a quoted
+    // `python3 -c "…"`, a here-document that feeds an interpreter) by the tokens in them, as written.
+    for (const info of segInfo) {
+      info.words.forEach((w, n) => {
+        if (w.startsWith('-')) return;
+        if (/\s/.test(w)) { for (const token of patternsInText(w)) addPattern(token, null, true, true); return; }
+        if (PATTERN_WORD.test(w)) addPattern(w, info.folder, info.gone, info.key === 'find' && FIND_NAME_FLAGS.has(info.words[n - 1]));
+      });
+    }
+    for (const script of scripts) for (const token of patternsInText(script)) addPattern(token, null, true, true);
   }
-  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer };
+  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer, patterns: [...patterns.values()] };
 }
 
 /**
  * The corpus pages an MCP call's input shows, and what it leaves unresolved: a file it names by `path`, `file_path` or `paths`, what the shell in it
- * shows (`command`, the `commands` of a batch, shell `code`), and the `code` of any other language as text, for the names rule. `{ pages, unresolved, viewer }`.
+ * shows (`command`, the `commands` of a batch, shell `code`), and the `code` of any other language as text, for the names rule, and the glob tokens in
+ * it as `patterns`. `{ pages, unresolved, viewer, patterns }`.
  */
 export function inputReads(input, { cwd = null, rowCwd = null, glob = null } = {}) {
   const pages = new Set();
   const unresolved = [];
+  const patterns = [];
   let viewer = false;
   const files = [];
   for (const key of ['path', 'file_path']) if (typeof input?.[key] === 'string') files.push(input[key]);
@@ -524,15 +611,16 @@ export function inputReads(input, { cwd = null, rowCwd = null, glob = null } = {
   if (Array.isArray(input?.commands)) for (const c of input.commands) if (typeof c?.command === 'string') lines.push(c.command);
   if (typeof input?.code === 'string' && input.code) {
     if (input.language === 'shell') lines.push(input.code);
-    else if (typeof input.language === 'string') unresolved.push(input.code);
+    else if (typeof input.language === 'string') { unresolved.push(input.code); for (const token of patternsInText(input.code)) patterns.push({ w: posix(token), ci: false }); }
   }
   for (const line of lines) {
     const done = commandReads(line, { cwd, rowCwd, glob });
     for (const page of done.reads.keys()) pages.add(page);
     unresolved.push(...done.unresolved);
+    patterns.push(...done.patterns);
     if (done.viewer) viewer = true;
   }
-  return { pages, unresolved, viewer };
+  return { pages, unresolved, viewer, patterns };
 }
 
 /** The corpus pages an MCP call's input shows: a file it names by `path`, `file_path` or `paths`, and what the shell in it shows. */
@@ -592,27 +680,38 @@ const WRITERS = Object.freeze({
  * for (`cat a.md missing.md`): the pages it names that `pageExists(page)` says are on disk are reached, and its unresolved text and its output are kept
  * apart in `failedOpaque`, for the caller to use only for a page that is on disk. A failed call with no viewer shows nothing, and no failed call moves the
  * shell's folder or writes a file. The folder is tracked across the calls of the thread: a `cd` that succeeded moves it, and one the call cannot tell
- * loses it until a `cd` it can. `glob` is the file system for patterns. Nothing is cut at a compaction boundary: a page read before it was read. Pure.
+ * loses it until a `cd` it can. `glob` is the file system for patterns. `carryFolder: false` is a thread whose folder Claude Code resets before every Bash
+ * call (a sub-agent's, and the main thread's when CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR is set): each call starts at the folder its row records, and
+ * nothing a `cd` set is the next call's. `patterns` are the glob and brace words of the calls that could not be resolved (`commandReads`), those of a
+ * failed viewer call apart in `failedPatterns`. `shouldStop()` is the run's deadline: the walk stops at the next row, `aborted` says so. Nothing is
+ * cut at a compaction boundary: a page read before it was read. Pure.
  */
-export function walkThread(rows, { glob = null, pageExists = null } = {}) {
+export function walkThread(rows, { glob = null, pageExists = null, carryFolder = true, shouldStop = null } = {}) {
   const uses = new Map();
   const reached = new Map();
   const writes = [];
   const calls = new Map();
   const opaque = [];
   const failedOpaque = [];
+  const patterns = new Map();
+  const failedPatterns = new Map();
+  let aborted = false;
   let cwd = null;
   let lost = false;
   const onDisk = typeof pageExists === 'function' ? pageExists : () => false;
   const output = (b) => posix(textOfResult(b)).slice(0, OUTPUT_CAP);
   const reach = (page, route, at) => { if (!reached.has(page)) reached.set(page, { route, at }); };
-  (Array.isArray(rows) ? rows : []).forEach((r, at) => {
-    if (!r || typeof r !== 'object') return;
+  const keep = (into, list) => { for (const q of list) into.set(`${q.ci}\0${q.w}`, q); };
+  const all = Array.isArray(rows) ? rows : [];
+  for (let at = 0; at < all.length; at += 1) {
+    if (shouldStop && at % 64 === 0 && shouldStop()) { aborted = true; break; }
+    const r = all[at];
+    if (!r || typeof r !== 'object') continue;
     if (r.type === 'assistant') {
       for (const b of blocksOf(r)) if (b.type === 'tool_use' && b.id) uses.set(b.id, { name: b.name, input: b.input ?? {}, rowCwd: typeof r.cwd === 'string' ? r.cwd : null, at });
-      return;
+      continue;
     }
-    if (r.type !== 'user') return;
+    if (r.type !== 'user') continue;
     for (const b of blocksOf(r)) {
       if (b.type !== 'tool_result') continue;
       const failed = b.is_error === true;
@@ -621,15 +720,18 @@ export function walkThread(rows, { glob = null, pageExists = null } = {}) {
       const { name, input } = use;
       if (failed) {
         if (name !== 'Bash' && name !== 'PowerShell') continue;
+        if (!carryFolder) { cwd = null; lost = false; }
         const done = commandReads(input.command, { powershell: name === 'PowerShell', cwd, rowCwd: use.rowCwd, lost, glob });
         if (!done.viewer) continue;
         for (const [page, verb] of done.reads) if (onDisk(page)) reach(page, verb, use.at);
         for (const text of done.unresolved) failedOpaque.push({ text: posix(text), at: use.at });
         if (done.unresolved.length) failedOpaque.push({ text: output(b), at: use.at });
+        keep(failedPatterns, done.patterns);
         continue;
       }
       if (name === 'Read') { const page = pageAt(input.file_path); if (page) reach(page, 'Read', use.at); continue; }
       if (name === 'Bash' || name === 'PowerShell') {
+        if (!carryFolder) { cwd = null; lost = false; }
         const done = commandReads(input.command, { powershell: name === 'PowerShell', cwd, rowCwd: use.rowCwd, lost, glob });
         const shown = new Map(done.reads);
         if (done.searched.length) for (const page of pagesInLines(textOfResult(b), [...done.searched, use.rowCwd])) if (!shown.has(page)) shown.set(page, 'search');
@@ -638,6 +740,7 @@ export function walkThread(rows, { glob = null, pageExists = null } = {}) {
         if (done.moved) { cwd = done.cwd; lost = done.lost; }
         for (const text of done.unresolved) opaque.push({ text: posix(text), at: use.at });
         if (done.viewer && done.unresolved.length) opaque.push({ text: output(b), at: use.at });
+        keep(patterns, done.patterns);
         for (const h of done.heredocs) if (h.writes && h.body) writes.push({ tool: name, text: h.body, at: use.at });
         continue;
       }
@@ -647,10 +750,11 @@ export function walkThread(rows, { glob = null, pageExists = null } = {}) {
         for (const page of done.pages) reach(page, 'mcp', use.at);
         for (const text of done.unresolved) opaque.push({ text: posix(text), at: use.at });
         if (done.viewer && done.unresolved.length) opaque.push({ text: output(b), at: use.at });
+        keep(patterns, done.patterns);
         continue;
       }
       if (Object.hasOwn(WRITERS, name)) for (const text of WRITERS[name](input)) writes.push({ tool: name, text, at: use.at });
     }
-  });
-  return { reached, writes, calls, opaque, failedOpaque };
+  }
+  return { reached, writes, calls, opaque, failedOpaque, patterns: [...patterns.values()], failedPatterns: [...failedPatterns.values()], aborted };
 }

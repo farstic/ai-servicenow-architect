@@ -470,6 +470,8 @@ function install(t, { rows = null, raw = null, indexed = true } = {}) {
   const corpus = join(root, 'tmp-corpus');
   const pages = ['markdown/csm/c_Esc.md', 'markdown/itsm/c_Sla.md'];
   for (const [i, p] of pages.entries()) { mkdirSync(dirname(join(corpus, p)), { recursive: true }); writeFileSync(join(corpus, p), i === 0 ? 'sn\\_customerservice\\_escalation here\n' : 'task\\_sla and contract\\_sla\n'); }
+  // The same pages on disk in the install's own corpus folder: a page the answer cites that is not on disk cannot be opened, and the check leaves it to C254.
+  for (const [i, p] of pages.entries()) { const file = join(root, 'vendor', 'ServiceNowDocs', p); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, i === 0 ? 'sn\\_customerservice\\_escalation here\n' : 'task\\_sla and contract\\_sla\n'); }
   if (indexed) writeNamesIndex(corpusNamesDir(root, PIN), buildNamesIndex({ corpus, pin: PIN, pages, tree: pages }));
   let transcript;
   if (raw !== null || rows) {
@@ -591,7 +593,7 @@ test('ARC-09-C263 M5 hook — no new hook entry, and no hook imports the index b
   assert.ok(stop >= 1, 'the Stop entry exists');
   const hooks = readFileSync(join(ROOT, 'tools/snowarch/hooks/stop-citations.mjs'), 'utf8');
   assert.doesNotMatch(hooks, /names-index-build|sync-index/);
-  assert.match(hooks, /DEADLINE_MS = 6000/);
+  assert.match(hooks, /DEADLINE_MS = 3000/);   // ARC-09-C267 review C: the whole run has a budget of about 3 s, of the 10 s the entry is given
 });
 
 // ---- the data file the measurement sets -----------------------------------------------------------------------------------------
@@ -688,19 +690,21 @@ test('ARC-09-C267 hook — the shipped data: a page cited and read through Bash,
     ['a grep that lists the file name', bash(`grep -l escalation ${page}`)],
     ['a grep that counts', bash(`grep -c escalation ${page}`)],
     ['ls', bash(`ls ${page.slice(0, page.lastIndexOf('/'))}`)],
-    ['a cat that failed', bash(`cat ${page}`, { is_error: true })],
     ['a cat of another file', bash('cat /home/dev/notes/other.md')],
     ['an MCP call that failed', mcp({ path: page }, { is_error: true })],
     ['an MCP call given another file', mcp({ path: '/home/dev/notes/other.md' })],
     ['a listing grep in a batch', batch(`grep -l escalation ${page}`)],
     ['python code that names no page', code('python', 'print(1)')],
     ['a PowerShell Select-String -Quiet', powershell(`Select-String -Path "${winPage}" -Pattern escalation -Quiet`)],
-    ['a PowerShell read that failed', powershell(`Get-Content "${winPage}"`, { is_error: true })],
   ]) {
     const d = await ask(cited, calls);
     assert.equal(d?.decision, 'block', `${what} does not clear the citation`);
     assert.ok(d.reason.includes('markdown/csm/c_Esc.md'), `${what}: ${d.reason}`);
   }
+  // A Bash or PowerShell viewer call that FAILED may have printed part of what it was asked for, and the page is on disk (the architect's ruling d of
+  // 2026-11-16): it clears the citation. An MCP call that failed shows nothing (above).
+  assert.equal(await ask(cited, bash(`cat ${page}`, { is_error: true })), null, 'a cat that failed, of a page on disk');
+  assert.equal(await ask(cited, powershell(`Get-Content "${winPage}"`, { is_error: true })), null, 'a PowerShell read that failed, of a page on disk');
 });
 
 // ---- time ----------------------------------------------------------------------------------------------------------------------------
