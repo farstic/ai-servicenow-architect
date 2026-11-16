@@ -175,3 +175,21 @@ test('ARC-09-C267 replay B3 — a resolved search that prints lines without a fi
   assert.equal(inArea("rg -I -g 'c_AssignmentRules*' assign"), true);
   assert.equal(inArea("echo x | grep -h --include='c_AssignmentRules*' assign"), false, 'a pipe is its input');
 });
+
+// ---- the disk is asked once for each page --------------------------------------------------------------------------------------------------------
+test('ARC-09-C267 replay — the disk is asked once for each page however many lines name it, within a call and across calls (a Grep result has thousands of lines)', () => {
+  let asks = 0;
+  const pageExists = (page) => { asks += 1; return page === CMDB_PAGE; };
+  const lines = Array.from({ length: 500 }, (_, k) => `${CMDB}/cmdb-table-property-descriptions.md:${k + 1}:text`).join('\n');
+  const grepRow = (id) => [use(id, 'Grep', { pattern: 'x', path: `${CORPUS}/markdown/${CMDB}`, output_mode: 'content' }, { cwd: `${CORPUS}/markdown` }), res(id, lines)];
+  assert.deepEqual([...walkThread([U('how?'), ...grepRow('g1')], { pageExists }).reached.keys()], [CMDB_PAGE]);
+  assert.equal(asks, 1, `${asks} asks for one page in one call`);
+  asks = 0;
+  walkThread([U('how?'), ...grepRow('g1'), ...grepRow('g2'), ...grepRow('g3')], { pageExists });
+  assert.equal(asks, 1, `${asks} asks for one page across three calls`);
+  // a shell search the same
+  asks = 0;
+  const shell = (id) => [use(id, 'Bash', { command: `grep -rn x ${CMDB.split('/')[1]}` }, { cwd: `${CORPUS}/markdown/servicenow-platform` }), res(id, lines.replaceAll(`${CMDB}/`, `${CMDB.split('/')[1]}/`))];
+  walkThread([U('how?'), ...shell('b1'), ...shell('b2')], { pageExists });
+  assert.ok(asks <= 1, `${asks} asks in a shell search`);
+});
