@@ -16,6 +16,7 @@ import { mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync,
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { candidate, pageNames } from './name-rules.mjs';
+import { MAX_IDS_PER_PAIR, labelPairsOf, titleOf } from './label-rules.mjs';
 import { diskPages, treePages } from './resolve.mjs';
 import { corpusNamesDir } from '../local-paths.mjs';
 import { COVERAGE, FILES, NAMES_INDEX_VERSION, loadNamesIndex } from './names-index.mjs';
@@ -23,8 +24,10 @@ import { COVERAGE, FILES, NAMES_INDEX_VERSION, loadNamesIndex } from './names-in
 const areaOf = (page) => page.split('/')[1];
 
 /**
- * The index of the pages at `corpus`, in memory: `{ meta, pages, names }`, `names` a Map from a name to the ascending ids of
- * the pages that print it. `pages` and `tree` are given by a test; `read` too.
+ * The index of the pages at `corpus`, in memory: `{ meta, pages, names, labels, titles }`, `names` a Map from a name to the ascending ids of
+ * the pages that print it, `labels` a Map from a label key to a Map from a name to `{ count, ids }` (the pages that print
+ * `Label \[name\]`, the first MAX_IDS_PER_PAIR ids of them), `titles` the page titles by id (ARC-09-C268). `pages` and `tree` are
+ * given by a test; `read` too.
  */
 export function buildNamesIndex({ corpus, pin, pages = null, tree, now = new Date(), read = readFileSync }) {
   const disk = (pages ?? diskPages(corpus)).slice().sort();
@@ -32,15 +35,29 @@ export function buildNamesIndex({ corpus, pin, pages = null, tree, now = new Dat
   const sameAsTree = Array.isArray(inTree) && inTree.length === disk.length
     && (() => { const t = new Set(inTree); return disk.every((p) => t.has(p)); })();
   const names = new Map();
+  const labels = new Map();
+  const titles = [];
   const push = (name, id) => {
     const ids = names.get(name);
     if (ids) ids.push(id); else names.set(name, [id]);
   };
+  const pushLabel = (key, name, id) => {
+    let byName = labels.get(key);
+    if (!byName) { byName = new Map(); labels.set(key, byName); }
+    const e = byName.get(name);
+    if (!e) byName.set(name, { count: 1, ids: [id] });
+    else { e.count += 1; if (e.ids.length < MAX_IDS_PER_PAIR) e.ids.push(id); }
+  };
   disk.forEach((page, id) => {
-    const { tokens, dotted } = pageNames(read(join(corpus, ...page.split('/')), 'utf8'));
+    const raw = read(join(corpus, ...page.split('/')), 'utf8');
+    const { tokens, dotted } = pageNames(raw);
     for (const t of tokens) push(t, id);
     for (const d of dotted) if (candidate(d.split('.')[0])) push(d, id);
+    titles.push(titleOf(raw));
+    for (const { key, name } of labelPairsOf(raw)) pushLabel(key, name, id);
   });
+  let labelRows = 0;
+  for (const byName of labels.values()) labelRows += byName.size;
   const meta = {
     v: NAMES_INDEX_VERSION,
     pin,
@@ -48,9 +65,10 @@ export function buildNamesIndex({ corpus, pin, pages = null, tree, now = new Dat
     areas: sameAsTree ? null : [...new Set(disk.map(areaOf))].sort(),
     pages: disk.length,
     names: names.size,
+    labels: labelRows,
     built: now.toISOString(),
   };
-  return { meta, pages: disk, names };
+  return { meta, pages: disk, names, labels, titles };
 }
 
 /** Writes `built` as the index in `dir`, atomically. Returns the number of bytes written. */
@@ -62,12 +80,24 @@ export function writeNamesIndex(dir, built) {
     .map(([name, ids]) => `${name}\t${ids.length}\t${ids.join(',')}`);
   const pagesText = `${built.pages.join('\n')}\n`;
   const namesText = rows.length ? `${rows.join('\n')}\n` : '';
+  const labelRows = [];
+  for (const key of [...(built.labels ?? new Map()).keys()].sort()) {
+    const byName = built.labels.get(key);
+    for (const name of [...byName.keys()].sort()) {
+      const e = byName.get(name);
+      labelRows.push(`${key}\t${name}\t${e.count}\t${e.ids.join(',')}`);
+    }
+  }
+  const labelsText = labelRows.length ? `${labelRows.join('\n')}\n` : '';
+  const titlesText = `${built.pages.map((_, i) => built.titles?.[i] ?? '').join('\n')}\n`;
   writeFileSync(join(tmp, FILES.pages), pagesText);
   writeFileSync(join(tmp, FILES.names), namesText);
+  writeFileSync(join(tmp, FILES.labels), labelsText);
+  writeFileSync(join(tmp, FILES.titles), titlesText);
   writeFileSync(join(tmp, FILES.meta), `${JSON.stringify(built.meta, null, 2)}\n`);
   rmSync(dir, { recursive: true, force: true });
   renameSync(tmp, dir);
-  return Buffer.byteLength(pagesText) + Buffer.byteLength(namesText);
+  return Buffer.byteLength(pagesText) + Buffer.byteLength(namesText) + Buffer.byteLength(labelsText) + Buffer.byteLength(titlesText);
 }
 
 /** The siblings of `dir` (other pins' indexes), removed: an index for a pin that is gone names pages that may not exist. */
