@@ -5,12 +5,12 @@
 // a page with CRLF line ends (a Windows checkout). The real corpus is read only by the last case, where one is whole.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { buildNamesIndex, writeNamesIndex } from '../tools/snowarch/lib/docs/names-index-build.mjs';
 import { loadNamesIndex } from '../tools/snowarch/lib/docs/names-index.mjs';
-import { LOOKUP_EXIT, STATUS, classify, lookupTerms, runLookup } from '../tools/snowarch/lib/docs/lookup.mjs';
+import { LOOKUP_EXIT, STATUS, classify, formatLookup, lookupTerms, runLookup } from '../tools/snowarch/lib/docs/lookup.mjs';
 import { contentWords, labelPairsOf, normalisePhrase, parseSynonyms, singular, titleOf, wordsOf } from '../tools/snowarch/lib/docs/label-rules.mjs';
 import { corpusNamesDir } from '../tools/snowarch/lib/local-paths.mjs';
 import { spellings } from '../tools/snowarch/lib/launcher-spelling.mjs';
@@ -49,12 +49,17 @@ function world(t, { files = FILES, full = true } = {}) {
   return { root, corpus };
 }
 
-/** The command, as the docs frame calls it, with its output collected. */
+/**
+ * The command, as the docs frame calls it, with its output collected. `raw` is every line it printed; `out` is the lookup's own lines, as the cases of ARC-09-C268
+ * read them, without the line that says where the corpus is (ARC-09-C287), which has cases of its own and is `corpusLine`.
+ */
 function run(w, argv) {
-  const out = [];
+  const raw = [];
   const err = [];
-  const code = runLookup(argv, { root: w.root, corpus: w.corpus, pin: PIN, spell: SPELL, out: (l) => out.push(l), err: (l) => err.push(l) });
-  return { code, out, err, text: out.join('\n') };
+  const code = runLookup(argv, { root: w.root, corpus: w.corpus, pin: PIN, spell: SPELL, out: (l) => raw.push(l), err: (l) => err.push(l) });
+  const at = raw.findIndex((l) => l.startsWith('corpus: '));
+  const out = at < 0 ? raw : raw.filter((_, i) => i !== at);
+  return { code, out, raw, corpusLine: at < 0 ? null : raw[at], err, text: out.join('\n') };
 }
 
 test('ARC-09-C268 — a name the corpus prints only with escaped underscores is found, with its page and its line', (t) => {
@@ -332,4 +337,70 @@ test('ARC-09-C268 — the index holds the label pairs and the titles, and an ind
   const short = loadNamesIndex(corpusNamesDir(w3.root, PIN), { pin: PIN });
   assert.ok(short, 'the names still load');
   assert.equal(short.wordsOk, false);
+});
+
+// ---- ARC-09-C287: the lookup says where the corpus is, so a page it names is opened with the Read tool ---------------------------------------------
+const HINT = '(open a page with the Read tool at this folder plus its path below; offset and limit select lines)';
+
+test('ARC-09-C287 — under its header the lookup says where the corpus is: once, as the absolute folder the platform writes, and the Read tool takes it with a printed path', (t) => {
+  const w = world(t);
+  const r = run(w, ['sc_req_item', 'sn_made_up_table', 'cmdb_ci']);
+  assert.match(r.raw[0], /^lookup pin=c10276e95345 coverage=full pages=10 names=\d+$/, 'the header is the first line, as it was');
+  assert.equal(r.raw[1], `corpus: ${w.corpus} ${HINT}`, 'the second line');
+  assert.equal(r.raw.filter((l) => l.startsWith('corpus: ')).length, 1, 'once for the call, not once for each term');
+  assert.ok(isAbsolute(w.corpus));
+  assert.equal(w.corpus, join(w.root, 'vendor', 'ServiceNowDocs'), 'the folder the platform writes');
+  if (process.platform === 'win32') assert.ok(r.raw[1].includes('\\'), 'a Windows folder keeps its backslashes');
+  // ready to use: the folder and a path the lookup printed name a file that is there
+  const pageLines = r.out.filter((l) => /^ {2}markdown\//.test(l));
+  assert.ok(pageLines.length >= 3, 'the lookup printed pages');
+  for (const line of pageLines) {
+    const path = line.trim().split(':')[0];
+    assert.ok(existsSync(join(w.corpus, ...path.split('/'))), `${path} is under the folder printed`);
+  }
+  // the lines the lookup has always printed are as they were: no page line carries the folder
+  assert.ok(r.out.every((l) => !l.includes(w.corpus)), 'the folder is on its own line only');
+});
+
+test('ARC-09-C287 — the line is there whatever the answers are, with --limit and --names; a usage error and a missing corpus print none', (t) => {
+  const w = world(t);
+  for (const argv of [['sn_made_up_table'], ['quantum entanglement'], ['sc_req_item', '--limit', '1'], ['requested_item', '--names', '1', '--limit', '1']]) {
+    const r = run(w, argv);
+    assert.equal(r.corpusLine, `corpus: ${w.corpus} ${HINT}`, JSON.stringify(argv));
+    assert.equal(r.raw.indexOf(r.corpusLine), 1, JSON.stringify(argv));
+  }
+  const sparse = run(world(t, { full: false }), ['sn_made_up_table']);
+  assert.match(sparse.raw[0], /coverage=disk/);
+  assert.ok(sparse.raw[1].startsWith('corpus: '), 'on a sparse checkout too');
+  const usage = run(w, []);
+  assert.equal(usage.code, LOOKUP_EXIT.usage);
+  assert.deepEqual(usage.raw, [], 'nothing on the output in a usage error');
+  const bare = tempDir('lookup-bare-c287-', t);
+  mkdirSync(join(bare, 'vendor', 'ServiceNowDocs', 'markdown'), { recursive: true });
+  const missing = run({ root: bare, corpus: join(bare, 'vendor', 'ServiceNowDocs') }, ['sc_task']);
+  assert.equal(missing.code, LOOKUP_EXIT.missing);
+  assert.deepEqual(missing.raw, [], 'nothing on the output when the names index is not built');
+});
+
+test('ARC-09-C287 — --json carries the folder as `corpus`, absolute, and the rest of the result is as it was', (t) => {
+  const w = world(t);
+  const doc = JSON.parse(run(w, ['sc_req_item', '--json']).raw.join('\n'));
+  assert.equal(doc.corpus, w.corpus);
+  assert.ok(isAbsolute(doc.corpus));
+  assert.deepEqual(Object.keys(doc), ['pin', 'coverage', 'pages', 'names', 'corpus', 'terms']);
+  assert.equal(doc.terms[0].status, STATUS.printed);
+  assert.ok(doc.terms[0].names[0].pages.every((p) => typeof p.path === 'string' && !p.path.includes(w.corpus)), 'a page path is still relative to the corpus');
+});
+
+test('ARC-09-C287 — formatLookup prints the line when it is given a folder, as an absolute path, and not when it is given none', (t) => {
+  const w = world(t);
+  const idx = loadNamesIndex(corpusNamesDir(w.root, PIN), { pin: PIN });
+  const results = lookupTerms(['sc_task'], { idx, page: () => null, synonyms: null, limit: 5, maxNames: 3 });
+  const without = formatLookup(results, { pin: PIN, idx });
+  assert.ok(without.every((l) => !l.startsWith('corpus: ')), 'no folder, no line');
+  const withIt = formatLookup(results, { pin: PIN, idx, corpus: w.corpus });
+  assert.equal(withIt.length, without.length + 1);
+  assert.deepEqual(withIt.filter((l) => !l.startsWith('corpus: ')), without, 'every other line is as it was');
+  const relative = formatLookup(results, { pin: PIN, idx, corpus: join('vendor', 'ServiceNowDocs') });
+  assert.equal(relative[1], `corpus: ${resolve('vendor', 'ServiceNowDocs')} ${HINT}`, 'a relative folder is printed absolute');
 });
