@@ -2288,6 +2288,12 @@ usage, 3 when the corpus or the index is missing. Its pages are ranked by title,
 more than 300 pages is ranked on titles and pairs only, so the number of pages it reads is bounded. A format change is a new
 `NAMES_INDEX_VERSION`: an index of another version loads as `null` and E-33 sends the reader to `doctor --fix`.
 
+Under its header the lookup prints `corpus: <folder>`, once for the call: the corpus folder as an absolute path in the platform's own spelling (backslashes on
+Windows), and the way to open a page, which is the Read tool at that folder plus the path printed below, with `offset` and `limit` for lines (ARC-09-C287).
+A page path is relative to the corpus, so a reader had to build the Read path, or go into the corpus with `cd` and read with `sed`; a compound with a `cd` is what
+the permission rules of the C268 sitting refused, and a Read of a project file is not asked about. `--json` has the folder as `corpus`; the page lines are
+unchanged, and none carries the folder. A usage error, a missing corpus and a missing index print nothing on the output, so there is no line either.
+
 A fixer id is taken once: `doctor --fix`'s F9 is the store lock (ARC-09-C272) and the index's is F10. When two branches add a fixer,
 the second to merge takes the next free id and says so in its pull request.
 

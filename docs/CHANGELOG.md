@@ -32,6 +32,12 @@ say what is wrong. A reader types a licence file name and an instance label once
 nothing leaves the page. The release writer moves its clone tag and its release with every final, the signed manifest covers it, and each GitHub
 Release carries it as an asset, so a reader with nothing installed can download it before cloning.
 
+**`docs lookup` says where the corpus is.** Under its header it prints `corpus: <folder>`, the corpus folder as an absolute path in the platform's spelling, and
+says that a page is opened with the Read tool at that folder plus the path printed below (`offset` and `limit` select lines); `--json` has the folder as
+`corpus`. The page lines are unchanged. A path the lookup printed is relative to the corpus, so a reader built the Read path or went into the folder with `cd` and
+read with `sed`, and a compound with a `cd` is what the permission rules of the C268 sitting refused: 15 of its 39 refused calls touched the corpus, 3 of them
+lookups run from inside it (ARC-09-C287).
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -47,6 +53,8 @@ Release carries it as an asset, so a reader with nothing installed can download 
 
 ### Changed
 
+- `./snowarch docs lookup` prints `corpus: <folder>` under its header, once, as an absolute path in the platform's spelling, with how to open a page with the
+  Read tool, and `--json` has a `corpus` field; the page lines are unchanged and carry no folder. No allow entry, `CLAUDE.md` or skill changes (ARC-09-C287).
 - The release writes the interactive Windows guide (`writeGuideRelease`, beside `writeInstallTag`): its clone command, and the `release` field its
   hero and help message read. A release candidate leaves the page alone, as it leaves the other pages, and a page without the field is refused. The
   page is in the signed manifest's coverage (`packages/snowarch/src/licence/integrity.ts`), so a distribution carries it, and `release.yml` attaches
