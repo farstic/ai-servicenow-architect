@@ -15,9 +15,16 @@
  * Everything that is not an MCP entry of this server is preserved exactly — other `allow` rules,
  * `env`, `hooks`, and any key this renderer has never heard of. ARC-06-S01 merges its own blocks
  * into this file; it does not write over it.
+ *
+ * ONE NON-MCP ENTRY PAIR IS OURS (ARC-09-C268 phase B): `docs lookup`, the read-only search of the bundled corpus that the six
+ * gateways tell a session to run before it calls a construct absent. In `design-only` mode there is no MCP tool to read the
+ * corpus with, so the lookup runs through the shell, and a prompt on every lookup is a prompt in the middle of grounding. The
+ * entry is written here, never by hand, so `npm run gen` regenerates it and `gen:check` finds a hand edit. It is exactly the
+ * command and nothing broader: not `./snowarch *`, not `docs *`, not a bare `Bash`.
  */
 
 import { askList } from '../lib/contract.mjs';
+import { spellings } from '../../../tools/snowarch/lib/launcher-spelling.mjs';
 
 /** Two entries, in the order they appear in the JSON. Sorted inside each. */
 function entries(tools, prefix, style) {
@@ -35,6 +42,26 @@ export const target = '.claude/settings.json';
 
 /** The Claude Code tools denied to every session in this checkout (ARC-09-C123). */
 export const WEB_TOOLS = ['WebFetch', 'WebSearch'];
+
+/**
+ * The one product command a session may run without asking (ARC-09-C268 phase B): the two words after the launcher.
+ *
+ * TWO ENTRIES, ONE PER SHELL TOOL, because a `Bash` rule does not cover the `PowerShell` tool: Claude Code gives each its own
+ * rule namespace, and on Windows the model types `.\snowarch.cmd`, which only the PowerShell tool runs. Each launcher is read
+ * from the one definition (`launcher-spelling.mjs`) with its platform PINNED, like every other generator that spells one: this
+ * file is committed, so its bytes are the same on every runner, and it renders both shells on purpose.
+ *
+ * THE SHAPE is the documented one: a trailing ` *` after the subcommand, which also matches the bare command and does not match
+ * `docs lookupx` (the `ls *` / `lsof` row of Claude Code's permissions page). Claude Code's own "don't ask again" writes the same
+ * form. Compound commands are split and every part is judged on its own, so a rule for this command lets nothing else through.
+ */
+export const LOOKUP_COMMAND = 'docs lookup';
+const POSIX_CLI = spellings({ platform: 'linux', env: {} }).cli;
+const WINDOWS_CLI = spellings({ platform: 'win32', env: {} }).cli;
+export const LOOKUP_ALLOW = Object.freeze([
+  `Bash(${POSIX_CLI} ${LOOKUP_COMMAND} *)`,
+  `PowerShell(${WINDOWS_CLI} ${LOOKUP_COMMAND} *)`,
+]);
 
 export function render(ctx) {
   const { contract, serverKey, config, current, retired } = ctx;
@@ -79,7 +106,10 @@ export function render(ctx) {
   const asked = new Set(writes.map((t) => t.name));
   const reads = contract.tools.filter((t) => !asked.has(t.name));
 
-  settings.permissions.allow = [...keep(settings.permissions.allow), ...entries(reads, prefix, style.allowStyle)];
+  // A user's own entries keep the head of the list; the lookup pair is written once after them, so a file that already has it
+  // (the committed one, on every regeneration) does not gain a second copy; the MCP entries follow.
+  settings.permissions.allow = [...keep(settings.permissions.allow).filter((e) => !LOOKUP_ALLOW.includes(e)),
+    ...LOOKUP_ALLOW, ...entries(reads, prefix, style.allowStyle)];
   settings.permissions.ask = [...keep(settings.permissions.ask), ...entries(writes, prefix, style.askStyle)];
   // ARC-09-C123: the main thread is denied the web tools, as ARC-09-C115 took them from the sub-agents. A user's own
   // deny entries keep their place at the head; these two are written once, after them.
