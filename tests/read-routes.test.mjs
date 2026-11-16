@@ -394,6 +394,42 @@ test('ARC-09-C267 read-routes — commandReads: a folder the call cannot tell (a
   assert.deepEqual(un(`cat ${FOLDER}/*.md`, { glob: () => [] }), [`${FOLDER}/*.md`], 'a glob nothing answered');
 });
 
+test('ARC-09-C267 read-routes — commandReads: viewer — a call with a viewer or a search that prints lines, or a runner that is given one', () => {
+  const v = (c, o) => commandReads(c, o).viewer;
+  for (const yes of [`cat ${FILE}`, 'grep -n x c_Esc.md', 'rg x c_Esc.md', 'for f in a; do head -3 $f; done', 'ls | xargs head -2', 'find . -exec cat {} \;', 'find . -name x.md -execdir sed -n 1p {} +',
+    'bash -c "cat x.md"', 'xargs -I{} sed -n 1p {}', 'ls | parallel awk 1 {}', 'sort $F', 'eval "tail -3 x.md"']) {
+    assert.equal(v(yes), true, yes);
+  }
+  for (const no of ['ls dir', 'grep -l x a.md', 'grep -c x a.md', 'python3 -c "print(1)"', 'python3 -c "print(\'cat\')"', 'echo $F', 'find . -name x.md', 'cp a b', 'wc -l a.md', 'git show HEAD:x', 'ls | xargs echo', 'for f in a; do echo $f; done', '']) {
+    assert.equal(v(no), false, no);
+  }
+  for (const yes of ['Get-Content a.md', 'gci | gc', 'Select-String x a.md', "foreach ($f in 'a') { Get-Content $f }", 'gci | ForEach-Object { Get-Content $_ }']) assert.equal(v(yes, { powershell: true }), true, yes);
+  for (const no of ['Get-ChildItem', 'Select-String x a.md -Quiet', 'Write-Output a.md', 'python -c "print(1)"']) assert.equal(v(no, { powershell: true }), false, no);
+});
+
+test('ARC-09-C267 read-routes — walkThread: a failed viewer call shows the pages it names that are on disk, and an unresolved call with a viewer shows the pages its output names', () => {
+  const exists = (page) => page !== 'markdown/csm/c_Gone.md';
+  const rows = [
+    U('q'),
+    ...call('f1', 'Bash', { command: `cat ${FILE} ${FOLDER}/c_Gone.md` }, 'cat: c_Gone.md: No such file or directory', { error: true }),
+    ...call('f2', 'Bash', { command: 'python3 -c "open(\'c_Other.md\')"' }, 'Traceback', { error: true }),
+    ...call('f3', 'Bash', { command: `cd ${FOLDER} && false` }, '', { error: true }),
+    ...call('f4', 'Bash', { command: 'cat c_Third.md' }, 'x'),
+    ...call('u1', 'Bash', { command: 'for f in $(ls d); do echo "== $f"; head -3 d/$f; done' }, '== c_Fifth.md\n1\tx'),
+    ...call('u2', 'Bash', { command: 'python3 -c "print(1)"' }, 'c_Sixth.md'),
+    ...call('u3', 'Bash', { command: 'for f in $(ls d); do head -3 d/$f; done' }, '== c_Seventh.md', { error: true }),
+    ...call('u4', 'Bash', { command: `cd ${FOLDER}; head -2 c_Eighth.md c_Gone.md` }, '==> c_Eighth.md <==', { error: true }),
+  ];
+  const walked = walkThread(rows, { pageExists: exists });
+  assert.deepEqual([...walked.reached.keys()], [PAGE, 'markdown/csm/c_Eighth.md'], 'a.md of a failed cat, and the page of a failed head; not the one that is not on disk, not the python call, not what a failed cd would have set');
+  assert.deepEqual(walked.opaque.map((o) => o.text), ['c_Third.md', 'x', 'for f in $(ls d); do echo "== $f"; head -3 d/$f; done', '== c_Fifth.md\n1\tx', 'python3 -c "print(1)"'],
+    'the cat after the failed cd had no folder, so its name and its output; the loop and its output; the python call, whose output is not read, for it has no viewer');
+  assert.deepEqual(walked.failedOpaque.map((o) => o.text), ['for f in $(ls d); do head -3 d/$f; done', '== c_Seventh.md'], 'what a failed call with a viewer leaves, apart');
+  assert.deepEqual([...walkThread(rows).reached.keys()], [], 'with no way to ask whether a page is on disk a failed call shows nothing');
+  const long = walkThread([U('q'), ...call('l', 'Bash', { command: 'for f in $(ls d); do head -3 d/$f; done' }, `${'x'.repeat(600_000)} c_Late.md`)]);
+  assert.ok(long.opaque[1].text.length <= 500_000, 'an output is kept to its first 500,000 characters');
+});
+
 test('ARC-09-C267 read-routes — inputReads: an MCP call\'s files, its shell lines, and the code of another language as text', () => {
   const r = inputReads({ language: 'python', code: `print(open('${FILE}').read())` });
   assert.deepEqual([[...r.pages], r.unresolved], [[], [`print(open('${FILE}').read())`]]);
@@ -458,6 +494,17 @@ test('ARC-09-C267 read-routes — walkThread: an unresolved call is kept as text
   assert.deepEqual(opaque.map((o) => o.text), ['find . -name c_Esc.md | xargs cat', 'c_Third.md', "open('c_Fifth.md')"], 'the call that failed is not there, the folder was lost for o4 only');
   assert.deepEqual(opaque.map((o) => o.at), [1, 7, 13], 'and the row of each');
   assert.deepEqual([...reached.keys()], ['markdown/csm/c_Fourth.md'], 'what the second cd made resolvable is a definite read');
+});
+
+test('ARC-09-C267 read-routes — turnSources carries the texts of the failed and the successful unresolved calls apart, and asks the caller whether a page is on disk', () => {
+  const rows = [U('q'),
+    ...call('a', 'Bash', { command: 'cat c_Esc.md c_Gone.md' }, 'x', { error: true, row: { cwd: FOLDER } }),
+    ...call('b', 'Bash', { command: 'ls d | xargs head -2' }, '==> d/c_Other.md <=='),
+    ...call('c', 'Bash', { command: 'for f in c_Third.md; do head -3 "$f"; done' }, 'out', { error: true })];
+  const t = turnSources(rows, { pageExists: (p) => !p.endsWith('c_Gone.md') });
+  assert.deepEqual([...t.reached.keys()], [PAGE], 'the failed cat shows the page that is on disk, from the folder the row records');
+  assert.deepEqual(t.opaque, ['ls d | xargs head -2', '==> d/c_Other.md <==']);
+  assert.deepEqual(t.opaqueFailed, ['for f in c_Third.md; do head -3 "$f"; done', 'out']);
 });
 
 test('ARC-09-C267 read-routes — walkThread and turnSources take the file system the caller gives: a pattern in a call shows the pages it expands to', () => {

@@ -55,7 +55,7 @@ const U = (content, extra = {}) => ({ type: 'user', message: { role: 'user', con
 const use = (id, name, input, extra = {}) => A([{ type: 'tool_use', id, name, input }], extra);
 const res = (id, content, extra = {}) => U([{ type: 'tool_result', tool_use_id: id, content, ...(extra.is_error ? { is_error: true } : {}) }]);
 const bash = (id, command, { error = false, extra = {} } = {}) => [use(id, 'Bash', { command, description: 'x' }, extra), res(id, error ? 'Exit code 1' : '1\tThe sn\\_example table.', { is_error: error })];
-const powershell = (id, command, extra = {}) => [use(id, 'PowerShell', { command, description: 'x' }, extra), res(id, '1\tThe table.')];
+const powershell = (id, command, extra = {}, { error = false } = {}) => [use(id, 'PowerShell', { command, description: 'x' }, extra), res(id, error ? 'Exit code 1' : '1\tThe table.', { is_error: error })];
 const readPage = (id, file, extra = {}) => [use(id, 'Read', { file_path: file }, extra), res(id, '1\tThe sn\\_example table.')];
 const compaction = () => [{ type: 'system', subtype: 'compact_boundary', content: 'Conversation compacted' },
   U('This session is being continued from a previous conversation that ran out of context. Summary: ...', { isCompactSummary: true })];
@@ -169,17 +169,17 @@ withInstall('ARC-09-C267 lever 2 — a sub-agent\'s reads and the reads before a
   asked(await stop(t, { rows: [...readPage('r1', page), ...compaction()], message: cite(PAGE.gamma) }), PAGE.gamma);
 });
 
-withInstall('ARC-09-C267 lever 2 — what is not a read: a heredoc that writes a file, a failed command, another page, a listing, a grep that lists names, a directory, a variable in a command that cannot show a page', async (t, i) => {
+withInstall('ARC-09-C267 lever 2 — what is not a read: a heredoc that writes a file, a failed command that is no viewer, another page, a listing, a grep that lists names, a directory, a variable in a command that cannot show a page', async (t, i) => {
   const page = i.abs(PAGE.alpha);
   const heredoc = `cat > ${join(i.root, 'notes.md')} <<'EOF'\ncat ${page}\nSee ${PAGE.alpha} and read ${page}\nEOF`;
   asked(await stop(t, { rows: bash('b', heredoc), message: cite(PAGE.alpha) }), PAGE.alpha);
-  asked(await stop(t, { rows: bash('b', `cat ${page}`, { error: true }), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: bash('b', `cat ${i.abs(PAGE.beta)}`), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: bash('b', `ls ${i.folder(PAGE.alpha)}`), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: bash('b', `grep -l escalation ${page}`), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: bash('b', `grep -c escalation ${page}`), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: bash('b', `grep -rn escalation ${i.folder(PAGE.alpha)}`), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: bash('b', `wc -l ${page}`), message: cite(PAGE.alpha) }), PAGE.alpha);
+  asked(await stop(t, { rows: bash('b', `ls ${page}`, { error: true }), message: cite(PAGE.alpha) }), PAGE.alpha);
   // a cat that shows the page after a heredoc in the same command line still reads it
   silent(await stop(t, { rows: bash('b', `cat > ${join(i.root, 'n.md')} <<'EOF'\nnotes\nEOF\ncat ${page}`), message: cite(PAGE.alpha) }), 'a cat after the heredoc');
 });
@@ -291,22 +291,24 @@ withInstall('ARC-09-C267 lever 2 — what cannot be resolved counts every page w
   const folder = i.folder(PAGE.alpha);
   const page = i.abs(PAGE.alpha);
   const CTX_EXEC = ['mcp', 'context-mode', 'ctx_execute'].join('__');
-  for (const command of [
-    'for f in c_Alpha.md c_Beta.md; do head -20 "$f"; done',
-    'find . -name c_Alpha.md | xargs cat',
-    `find ${folder} -name c_Alpha.md -exec cat {} \;`,
-    `cat $(find ${folder} -name c_Alpha.md)`,
-    `F=${page}; cat "$F"`,
-    `python3 -c "print(open('${page}').read())"`,
-    `node -e "console.log(require('fs').readFileSync('${page}','utf8'))"`,
-    `bash -c "cat ${page}"`,
-    `git -C ${i.corpus} show HEAD:markdown/it-service-management/c_Alpha.md`,
-    `python3 - <<'PY'\nprint(open('${page}').read())\nPY`,
-    `cd "$CORPUS/markdown/it-service-management" && sed -n 1,60p c_Alpha.md`,
+  // [the call, whether it has a viewer verb]: a call that failed counts when it has one, since it may have printed part of what it was asked for
+  for (const [command, viewer] of [
+    ['for f in c_Alpha.md c_Beta.md; do head -20 "$f"; done', true],
+    ['find . -name c_Alpha.md | xargs cat', true],
+    [`find ${folder} -name c_Alpha.md -exec cat {} \;`, true],
+    [`cat $(find ${folder} -name c_Alpha.md)`, true],
+    [`F=${page}; cat "$F"`, true],
+    [`python3 -c "print(open('${page}').read())"`, false],
+    [`node -e "console.log(require('fs').readFileSync('${page}','utf8'))"`, false],
+    [`bash -c "cat ${page}"`, true],
+    [`git -C ${i.corpus} show HEAD:markdown/it-service-management/c_Alpha.md`, false],
+    [`python3 - <<'PY'\nprint(open('${page}').read())\nPY`, false],
+    [`cd "$CORPUS/markdown/it-service-management" && sed -n 1,60p c_Alpha.md`, true],
   ]) {
     silent(await stop(t, { rows: bash('b', command), message: cite(PAGE.alpha) }), command);
     asked(await stop(t, { rows: bash('b', command), message: cite(PAGE.gamma) }), PAGE.gamma);
-    asked(await stop(t, { rows: bash('b', command, { error: true }), message: cite(PAGE.alpha) }), PAGE.alpha);
+    const failed = await stop(t, { rows: bash('b', command, { error: true }), message: cite(PAGE.alpha) });
+    if (viewer) silent(failed, `${command}, failed: a viewer call that failed may have printed part of it`); else asked(failed, PAGE.alpha);
   }
   silent(await stop(t, { rows: bash('b', 'for f in c_Alpha.md c_Beta.md; do head -20 "$f"; done'), message: `${cite(PAGE.alpha)} ${cite(PAGE.beta)}` }), 'both named in the loop');
   // the name is a whole name and the call is a command that could show a page
@@ -334,45 +336,106 @@ withInstall('ARC-09-C267 lever 2 — what cannot be resolved counts every page w
   asked(await stop(t, { rows: [...bash('b1', 'cd "$CORPUS/markdown/it-service-management"'), ...bash('b2', `cd ${folder}`), ...bash('b3', 'sed -n 1,60p c_Beta.md')], message: cite(PAGE.alpha) }), PAGE.alpha);
 });
 
-// ---- what stays open after the ask: the citations recomputed on the final answer ---------------------------------------------------------
-withInstall('ARC-09-C267 lever 2 — the notice recomputes the citations on the final answer after the continuation: one withdrawn is resolved, one still cited and unread stays open', async (t, i) => {
+// ---- what stays open after the ask: the first answer's citations and the continuation's (the architect's ruling a of 2026-11-16) ----------------
+withInstall('ARC-09-C267 lever 2 — the notice keeps the first answer\'s citations as a second input: a read, or a Correction line that names a page as a pointer or withdrawn, closes one; silence does not', async (t, i) => {
   const message = `${cite(PAGE.alpha)} ${cite(PAGE.beta)}`;
   const d = await stop(t, { rows: [], message });
   const feedback = U(`Stop hook feedback:\n${d.reason}`, { isMeta: true });
   const after = (text, extra = [], input = {}) => stop(t, { rows: [A([{ type: 'text', text: message }]), feedback, ...extra, A([{ type: 'text', text }])], message: text, input: { stop_hook_active: true, ...input } });
   const re = (page) => new RegExp(page.replaceAll('.', '\\.'));
-  // it withdrew the first and kept the second
-  const kept = await after(`Correction: the matrix rests on ${PAGE.beta} alone.`);
-  assert.match(kept.systemMessage, re(PAGE.beta));
-  assert.doesNotMatch(kept.systemMessage, re(PAGE.alpha), 'the withdrawn citation is not in the notice');
-  // it withdrew both, without writing either path again, as the ask says
-  silent(await after('Correction: both citations are withdrawn; the answer rests on the skill text.'), 'both withdrawn');
-  // a Correction line that names a page and says it is withdrawn, removed or dropped
-  silent(await after(`Correction: ${PAGE.alpha} withdrawn.\nCorrection: ${PAGE.beta} removed from the answer.`), 'withdrawn and removed, on Correction lines');
-  // a page the continuation marks a pointer, one it withdrew, and a page that first appears now and was not read
-  const mixed = await after(`Correction: ${PAGE.alpha} is a pointer.\nCorrection: ${PAGE.beta} withdrawn.\nThe rest is in ${PAGE.gamma}.`);
-  assert.match(mixed.systemMessage, re(PAGE.gamma));
-  assert.doesNotMatch(mixed.systemMessage, new RegExp(`${PAGE.alpha.replaceAll('.', '\\.')}|${PAGE.beta.replaceAll('.', '\\.')}`));
-  // the answer restated with both citations: both stay open; one of them read after the ask: one
-  const restated = await after(message);
-  assert.match(restated.systemMessage, re(PAGE.alpha));
-  assert.match(restated.systemMessage, re(PAGE.beta));
-  const oneRead = await after(message, readPage('r1', i.abs(PAGE.alpha)));
-  assert.doesNotMatch(oneRead.systemMessage, re(PAGE.alpha), 'read after the ask');
-  assert.match(oneRead.systemMessage, re(PAGE.beta));
-  // By the ruling, a continuation that does not cite a page has withdrawn it: "Understood." and nothing else leaves the notice empty.
-  silent(await after('Understood.'), 'nothing cited in the final answer');
-  // A file the turn wrote follows the same rule: the citations of what the continuation wrote are the ones that count.
+  const open = (n, pages, why) => {
+    assert.ok(n && n.systemMessage, `${why}: no notice`);
+    for (const p of [PAGE.alpha, PAGE.beta, PAGE.gamma]) {
+      if (pages.includes(p)) assert.match(n.systemMessage, re(p), `${why}: ${p} should be open`); else assert.doesNotMatch(n.systemMessage, re(p), `${why}: ${p} should be closed`);
+    }
+  };
+  // The user still sees the first answer: "Understood." leaves every unread citation of it in the notice.
+  open(await after('Understood.'), [PAGE.alpha, PAGE.beta], 'nothing cited, nothing closed');
+  // A restated answer that silently drops a citation does not close it.
+  open(await after(`Correction: the matrix rests on ${PAGE.beta} alone.`), [PAGE.alpha, PAGE.beta], 'a citation dropped without a word');
+  open(await after(message), [PAGE.alpha, PAGE.beta], 'the answer restated');
+  // The registered tail says not to write a withdrawn path again: a withdrawal that names no page closes nothing, and the notice says so.
+  open(await after('Correction: both citations are withdrawn; the answer rests on the skill text.'), [PAGE.alpha, PAGE.beta], 'a withdrawal that names no page');
+  // A line that names the pages and says something else closes nothing either.
+  open(await after(`Correction: ${PAGE.alpha} and ${PAGE.beta} say what I cited, I believe.`), [PAGE.alpha, PAGE.beta], 'a claim about unread pages');
+  // A Correction line that names a page and says it is a pointer, withdrawn, retracted, removed or dropped closes it.
+  for (const word of ['is a pointer', 'withdrawn', 'was withdrawn', 'retracted', 'removed from the answer', 'dropped']) {
+    silent(await after(`Correction: ${PAGE.alpha} ${word}.\nCorrection: ${PAGE.beta} ${word}.`), word);
+  }
+  open(await after(`Correction: ${PAGE.alpha} is a pointer.`), [PAGE.beta], 'one of two named');
+  // A page that first appears in the continuation is open until a page is read or a line marks it; the first answer's closed ones stay closed.
+  open(await after(`Correction: ${PAGE.alpha} is a pointer.\nCorrection: ${PAGE.beta} withdrawn.\nThe rest is in ${PAGE.gamma}.`), [PAGE.gamma], 'a new citation');
+  silent(await after(`Correction: ${PAGE.alpha} is a pointer.\nCorrection: ${PAGE.beta} withdrawn.\nCorrection: ${PAGE.gamma} is a pointer.`), 'a new citation marked a pointer');
+  // A page read after the ask is closed.
+  open(await after(message, readPage('r1', i.abs(PAGE.alpha))), [PAGE.beta], 'one read after the ask');
+  silent(await after('Correction: both pages say what I cited.', [...readPage('r1', i.abs(PAGE.alpha)), ...readPage('r2', i.abs(PAGE.beta))]), 'both read');
+  // A file the turn wrote follows the same rule: its citations are the first answer's.
   const file = join(i.root, 'clients', 'acme', 'envelopes', 'e2.md');
   const write = (id, content) => [use(id, 'Write', { file_path: file, content }), res(id, 'ok')];
-  const saved = await stop(t, { rows: write('w', `The matrix (citation: ${PAGE.alpha}) and ${PAGE.beta}.\n`), message: 'Saved.' });
+  const original = `The matrix (citation: ${PAGE.alpha}) and ${PAGE.beta}.\n`;
+  const saved = await stop(t, { rows: write('w', original), message: 'Saved.' });
   asked(saved, PAGE.alpha, PAGE.beta);
   const fb = U(`Stop hook feedback:\n${saved.reason}`, { isMeta: true });
-  const rewrite = async (content, text) => stop(t, { rows: [...write('w', `The matrix (citation: ${PAGE.alpha}) and ${PAGE.beta}.\n`), A([{ type: 'text', text: 'Saved.' }]), fb, ...write('w2', content), A([{ type: 'text', text }])], message: text, input: { stop_hook_active: true } });
-  silent(await rewrite('The matrix, with no citation.\n', 'Correction: the citations are removed from the file.'), 'the file rewritten without them');
-  const still = await rewrite(`The matrix (citation: ${PAGE.alpha}).\n`, 'Saved again.');
-  assert.match(still.systemMessage, re(PAGE.alpha));
-  assert.doesNotMatch(still.systemMessage, re(PAGE.beta));
+  const next = async (content, text, extra = []) => stop(t, { rows: [...write('w', original), A([{ type: 'text', text: 'Saved.' }]), fb, ...(content === null ? [] : write('w2', content)), ...extra, A([{ type: 'text', text }])], message: text, input: { stop_hook_active: true } });
+  open(await next(null, 'Understood.'), [PAGE.alpha, PAGE.beta], 'the file left alone');
+  open(await next('The matrix, with no citation.\n', 'Correction: the citations are removed from the file.'), [PAGE.alpha, PAGE.beta], 'the file rewritten, no page named');
+  open(await next(`The matrix (citation: ${PAGE.alpha}).\n`, 'Saved again.'), [PAGE.alpha, PAGE.beta], 'the file rewritten with one citation');
+  silent(await next('The matrix, with no citation.\n', `Correction: ${PAGE.alpha} removed from the file.\nCorrection: ${PAGE.beta} removed from the file.`), 'the file rewritten and the removal said');
+  open(await next(null, 'Correction: read.', readPage('r', i.abs(PAGE.beta))), [PAGE.alpha], 'one page of the file read');
+});
+
+// ---- a failed viewer call may have printed part of what it was asked for (ruling d) ----------------------------------------------------------
+withInstall('ARC-09-C267 lever 2 — a failed viewer call shows the pages it names that are on disk; a failed call that is no viewer shows nothing', async (t, i) => {
+  const folder = i.folder(PAGE.alpha);
+  const page = i.abs(PAGE.alpha);
+  const gone = `${folder}/missing.md`;
+  // cat a.md missing.md: the shell prints a.md and says the other is not there, and the call fails
+  silent(await stop(t, { rows: bash('b', `cat ${page} ${gone}`, { error: true }), message: cite(PAGE.alpha) }), 'cat a.md missing.md clears a.md');
+  asked(await stop(t, { rows: bash('b', `cat ${page} ${gone}`, { error: true }), message: cite(PAGE.beta) }), PAGE.beta);
+  // the same for the other viewers, a folder set in the call, a pattern, a search, PowerShell, a loop
+  for (const [command, pages] of [
+    [`sed -n 1,40p ${page}; false`, [PAGE.alpha]],
+    [`cd ${folder} && head -5 c_Alpha.md && exit 3`, [PAGE.alpha]],
+    [`cat ${folder}/*.md; false`, [PAGE.alpha, PAGE.beta]],
+    [`cat ${folder}/c_{Alpha,Beta}.md ${gone}`, [PAGE.alpha, PAGE.beta]],
+    [`grep -n table ${page}; false`, [PAGE.alpha]],
+    [`for f in c_Alpha.md c_Beta.md; do head -3 "$f"; done; false`, [PAGE.alpha, PAGE.beta]],
+  ]) {
+    silent(await stop(t, { rows: bash('b', command, { error: true }), message: pages.map(cite).join(' ') }), command);
+    asked(await stop(t, { rows: bash('b', command, { error: true }), message: cite(PAGE.gamma) }), PAGE.gamma);
+  }
+  silent(await stop(t, { rows: powershell('p', `Get-Content "${page.replaceAll('/', '\\')}" -TotalCount 5; exit 1`, {}, { error: true }), message: cite(PAGE.alpha) }), 'a failed PowerShell Get-Content');
+  // a call that is no viewer shows nothing, failed or not for what it printed
+  asked(await stop(t, { rows: bash('b', `python3 -c "open('${page}')"`, { error: true }), message: cite(PAGE.alpha) }), PAGE.alpha);
+  asked(await stop(t, { rows: bash('b', `ls ${page}`, { error: true }), message: cite(PAGE.alpha) }), PAGE.alpha);
+  asked(await stop(t, { rows: bash('b', `cp ${page} /tmp/x`, { error: true }), message: cite(PAGE.alpha) }), PAGE.alpha);
+  // a sub-agent's failed viewer call, too
+  const agent = [use('a1', 'Agent', { subagent_type: 'general-purpose', prompt: 'read it' }), res('a1', 'It says X.')];
+  silent(await stop(t, { rows: agent, side: { a1: bash('s', `cat ${page} ${gone}`, { error: true }) }, message: cite(PAGE.alpha) }), 'a sub-agent\'s cat a.md missing.md');
+});
+
+// ---- an unresolved call with a viewer shows the pages its output names (ruling e) ---------------------------------------------------------------
+withInstall('ARC-09-C267 lever 2 — an unresolved call that has a viewer verb shows the pages named in its output; one that has none does not', async (t, i) => {
+  const folder = i.folder(PAGE.alpha);
+  const page = i.abs(PAGE.alpha);
+  const out = (id, command, text, { error = false } = {}) => [use(id, 'Bash', { command, description: 'x' }), res(id, text, { is_error: error })];
+  const both = `${cite(PAGE.alpha)} ${cite(PAGE.beta)}`;
+  const listing = '== c_Alpha.md\n1\tThe sn_example table.\n== c_Beta.md\n1\tThe sn_example table.\n';
+  const loop = `for f in $(ls ${folder}); do echo "== $f"; head -3 ${folder}/$f; done`;
+  silent(await stop(t, { rows: out('b', loop, listing), message: both }), 'the loop over $(ls dir) with head names both in its output');
+  asked(await stop(t, { rows: out('b', loop, listing), message: cite(PAGE.gamma) }), PAGE.gamma);
+  asked(await stop(t, { rows: out('b', loop, '== xc_Alpha.md\n== c_Alpha.md.bak\n'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  // head over several files prints a header for each
+  silent(await stop(t, { rows: out('b', `ls ${folder} | sed 's|^|${folder}/|' | xargs head -2`, `==> ${page} <==\n1\tx\n\n==> ${i.abs(PAGE.beta)} <==\n1\tx\n`), message: both }), 'xargs head: the headers name the pages');
+  silent(await stop(t, { rows: out('b', `find ${folder} -name '*.md' -exec head -1 {} +`, `==> ${page} <==\n1\tx\n`), message: cite(PAGE.alpha) }), 'find -exec head');
+  silent(await stop(t, { rows: out('b', loop, listing, { error: true }), message: both }), 'a failed loop: its output counts as well');
+  // no viewer verb: what an interpreter or a listing printed shows no page
+  asked(await stop(t, { rows: out('b', `python3 -c "import os; print(os.listdir('${folder}'))"`, "['c_Alpha.md', 'c_Beta.md']"), message: cite(PAGE.alpha) }), PAGE.alpha);
+  asked(await stop(t, { rows: out('b', `for f in $(ls ${folder}); do echo "$f"; done`, 'c_Alpha.md\nc_Beta.md\n'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  asked(await stop(t, { rows: out('b', `ls ${folder} | xargs echo`, 'c_Alpha.md c_Beta.md'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  // a sub-agent's call
+  const agent = [use('a1', 'Agent', { subagent_type: 'general-purpose', prompt: 'read them' }), res('a1', 'It says X.')];
+  silent(await stop(t, { rows: agent, side: { a1: out('s', loop, listing) }, message: both }), 'a sub-agent\'s loop');
 });
 
 // ---- C254 does not read the classes file --------------------------------------------------------------------------------------------------
