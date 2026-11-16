@@ -8,7 +8,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { PAGE, asked, cite, res, silent, stop, use, withInstall } from '../helpers/lever2.mjs';
+import { PAGE, asked, cite, readPage, res, silent, stop, use, withInstall } from '../helpers/lever2.mjs';
 
 // ---- B1 -----------------------------------------------------------------------------------------------------------------------------------------
 withInstall('ARC-09-C267 replay B1 — a Grep whose lines are relative to the session\'s folder shows that page, not a doubled one that is not on disk', async (t, i) => {
@@ -123,4 +123,52 @@ withInstall('ARC-09-C267 replay B4 (c) — a pattern with no folder that names m
   asked(await stop(t, { rows: ran('cd "$HOME/x" && cat c_Alp*.md'), message: cite(PAGE.beta), seams: { options: { ubiquity: 2 } } }), PAGE.beta);
   // a pattern with a folder counts however many pages it names
   silent(await stop(t, { rows: ran(`for f in ${i.folder(PAGE.alpha)}/c_*.md; do head -3 "$f"; done`), message: cite(PAGE.alpha), seams: { options: { ubiquity: 1 } } }), 'a pattern with a folder');
+});
+
+// ---- B5: a Grep of one page that found nothing shows nothing -----------------------------------------------------------------------------------------
+withInstall('ARC-09-C267 replay B5 — a Grep whose path is one page shows it only when its result has a match line', async (t, i) => {
+  const grepOne = (body) => [use('g', 'Grep', { pattern: 'Priority 1|P1 ', path: i.abs(PAGE.alpha), output_mode: 'content' }), res('g', body)];
+  asked(await stop(t, { rows: grepOne('No matches found'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  asked(await stop(t, { rows: grepOne('[Omitted long matching line]'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  silent(await stop(t, { rows: grepOne('40:The sn\\_example table.'), message: cite(PAGE.alpha) }), 'a match line');
+  silent(await stop(t, { rows: grepOne('[Omitted long matching line]\n--\n41:another line'), message: cite(PAGE.alpha) }), 'an omitted line beside a match');
+  // another page is asked about either way
+  asked(await stop(t, { rows: grepOne('40:The sn\\_example table.'), message: cite(PAGE.beta) }), PAGE.beta);
+});
+
+// ---- B6: a failed call counts a page only if the result holds a line of that page --------------------------------------------------------------------
+withInstall('ARC-09-C267 replay B6 — zsh stops a list at an expansion error: the sed after it never ran, and its page is asked about; an ls shows no page', async (t, i) => {
+  writeFileSync(join(i.corpus, PAGE.alpha), 'Alpha holds the escalation rule of a case.\n');
+  writeFileSync(join(i.corpus, PAGE.beta), 'Beta says something quite different here.\n');
+  const area = i.folder(PAGE.alpha);
+  const list = `cd ${area}; sed -n 15,60p c_Alpha.md; echo ======; sed -n 15,70p c_Beta.md`;
+  const abort = 'Exit code 1\nAlpha holds the escalation rule of a case.\n(eval):1: ====== not found';
+  silent(await stop(t, { rows: failedCall('b', list, abort), message: cite(PAGE.alpha) }), 'the first sed printed');
+  asked(await stop(t, { rows: failedCall('b', list, abort), message: cite(PAGE.beta) }), PAGE.beta);
+  silent(await stop(t, { rows: failedCall('b', list, `${abort}\nBeta says something quite different here.`), message: `${cite(PAGE.alpha)} ${cite(PAGE.beta)}` }), 'both printed');
+  asked(await stop(t, { rows: failedCall('b', list, 'Exit code 1\n(eval):1: ====== not found'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  // cat a.md missing.md still counts a.md: its lines are there
+  silent(await stop(t, { rows: failedCall('b', `cat ${i.abs(PAGE.alpha)} missing.md`, 'Exit code 1\nAlpha holds the escalation rule of a case.\ncat: missing.md: No such file or directory'), message: cite(PAGE.alpha) }), 'a.md of cat a.md missing.md');
+  // a page that only an ls named is no page that was read, whether the call ran or not
+  const ls = `cd ${area}; ls c_Alpha.md c_Beta.md 2>&1; sed -n 15,45p c_Alpha.md`;
+  const ran = [use('b', 'Bash', { command: ls, description: 'x' }), res('b', 'c_Alpha.md\nc_Beta.md\nAlpha holds the escalation rule of a case.')];
+  silent(await stop(t, { rows: ran, message: cite(PAGE.alpha) }), 'the page sed printed');
+  asked(await stop(t, { rows: ran, message: cite(PAGE.beta) }), PAGE.beta);
+});
+
+// ---- B7: the file name of a partial path is a bare-name citation -------------------------------------------------------------------------------------
+withInstall('ARC-09-C267 replay B7 — a partial path to a corpus page (`.../x.md`, `folder/x.md`) is asked about unless the page was opened; a path outside the corpus is not', async (t, i) => {
+  const remote = 'markdown/servicenow-platform/domain-separation/domain-separation-remote-tables.md';
+  const incident = 'markdown/it-service-management/incident.md';
+  for (const rel of [remote, incident]) { mkdirSync(dirname(join(i.corpus, rel)), { recursive: true }); writeFileSync(join(i.corpus, rel), 'The sn\\_example table.\n'); }
+  const ellipsis = 'Domain separation is unsupported (`.../domain-separation-remote-tables.md`).';
+  asked(await stop(t, { rows: [], message: ellipsis }), 'domain-separation-remote-tables.md');
+  asked(await stop(t, { rows: [], message: 'See domain-separation/domain-separation-remote-tables.md for it.' }), 'domain-separation-remote-tables.md');
+  silent(await stop(t, { rows: readPage('r', i.abs(remote)), message: ellipsis }), 'the page was opened');
+  // a path outside the corpus is that file\'s, even when a corpus page has the same name
+  silent(await stop(t, { rows: [], message: 'The RACI is in clients/acme/incident.md.' }), 'a client file named like a page');
+  silent(await stop(t, { rows: [], message: 'Updated .claude/skills/csm-specialist/SKILL.md.' }), 'SKILL.md');
+  // a file the turn wrote cites it too
+  const file = join(i.root, 'clients', 'acme', 'hld.md');
+  asked(await stop(t, { rows: [use('w', 'Write', { file_path: file, content: `The limit is in ${ellipsis}\n` }), res('w', 'ok')], message: 'Saved.' }), 'domain-separation-remote-tables.md');
 });

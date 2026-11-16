@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { commandReads, pagesInLines, pagesOfGrep, walkThread, wordNamesPage } from '../tools/snowarch/lib/docs/read-routes.mjs';
-import { makeShown } from '../tools/snowarch/lib/docs/grounding-check.mjs';
+import { groundingFindings, makeShown } from '../tools/snowarch/lib/docs/grounding-check.mjs';
 import { A, U, res, use } from './helpers/lever2.mjs';
 
 const CORPUS = '/arms/N/clone/vendor/ServiceNowDocs';
@@ -322,4 +322,72 @@ test('ARC-09-C267 replay B4 (c) — a pattern with no folder that names more tha
   // exactly the ubiquity is not over it
   assert.equal(shownBy(folderless('cd "$HOME/x" && cat c_Esc*.md'), 'markdown/hr-service-delivery/c_Esc1.md', { allPages: () => pages, ubiquity: 4 }), true, '4 pages are not more than 4');
   assert.equal(shownBy(folderless('cd "$HOME/x" && cat c_Esc*.md'), 'markdown/hr-service-delivery/c_Esc1.md', { allPages: () => pages, ubiquity: 3 }), false, '4 pages are more than 3');
+});
+
+// ---- B5: the page a Grep names as its path counts only when the result has a match line --------------------------------------------------------------
+// The architect's check of 88f22769 against his reader (v5): "No matches found" is a non-empty result, and pagesOfGrep added the one file named by `path` whenever the body
+// was non-empty (C268 O 31be2a4e, a3b90ed9: the page was cited for a claim and never opened; in one the answer says the grep found nothing).
+test('ARC-09-C267 replay B5 — a Grep of one page shows it only when its result has a match line: "No matches found" and an omitted line are none', () => {
+  const one = { path: ESC };
+  const pages = (body) => grep(one, body);
+  for (const body of ['No matches found', 'No matches found\n', '  No matches found.  ', '[Omitted long matching line]', '[Omitted long matching line]\n--\n[Omitted long matching line]', '\n\n', '--']) {
+    assert.deepEqual(pages(body), [], JSON.stringify(body));
+  }
+  for (const body of ['12:the escalation text', '12-context line', 'the text with no line number', '[Omitted long matching line]\n12:a line', '--\n12:a line', 'No matches found\n12:a line']) {
+    assert.deepEqual(pages(body), [PAGE], JSON.stringify(body));
+  }
+  // a folder searched, no match: no page either
+  assert.deepEqual(grep({ path: `${CORPUS}/markdown/csm` }, 'No matches found'), []);
+  // and through the walk
+  const rows = (body) => [U('how?'), use('g', 'Grep', { pattern: 'P1', path: ESC, output_mode: 'content' }, { cwd: '/home/dev/install' }), res('g', body)];
+  assert.deepEqual([...walkThread(rows('No matches found'), {}).reached.keys()], []);
+  assert.deepEqual([...walkThread(rows('40:Priority 1'), {}).reached.keys()], [PAGE]);
+});
+
+// ---- B6: a failed call counts a page only if the result holds a line of THAT page ---------------------------------------------------------------------
+test('ARC-09-C267 replay B6 — a failed call that ran counts the pages whose lines its result holds: zsh stops a list at an expansion error, and the seds after it never ran', () => {
+  const other = 'markdown/csm/c_Other.md';
+  const text = { [PAGE]: 'The escalation rule of a case.\nA second line of the page.\n', [other]: 'The other page has its own words.\n' };
+  const pageText = (page) => text[page] ?? null;
+  const run = (command, said) => reached(failed('b', command, said), { pageText });
+  const list = `cd ${CORPUS}/markdown/csm && sed -n 15,60p c_Esc.md; echo ======; sed -n 15,70p c_Other.md`;
+  // the architect's N 2a8d2ca1: the first sed printed, "====== not found" stopped the list
+  assert.deepEqual(run(list, 'Exit code 1\nThe escalation rule of a case.\n(eval):1: ====== not found'), [PAGE]);
+  assert.deepEqual(run(list, 'Exit code 1\n(eval):1: ====== not found'), [], 'neither printed');
+  assert.deepEqual(run(list, 'Exit code 1\nThe escalation rule of a case.\nThe other page has its own words.\n'), [PAGE, other], 'both printed');
+  // cat a.md missing.md still counts a.md: its lines are there
+  assert.deepEqual(run(`cat ${ESC} ${CORPUS}/markdown/csm/c_Other.md missing.md`, 'Exit code 1\nThe escalation rule of a case.\ncat: missing.md: No such file or directory'), [PAGE]);
+  // a page with no line long enough to be evidence, or with no seam at all: the prefix decides, as before
+  assert.deepEqual(reached(failed('b', list, 'Exit code 1\n(eval):1: ====== not found'), { pageText: () => '# T\n\nShort.\n' }), [PAGE, other]);
+  assert.deepEqual(reached(failed('b', list, 'Exit code 1\n(eval):1: ====== not found')), [PAGE, other]);
+  // a page that cannot be read has no evidence either
+  assert.deepEqual(run(list, 'cd: failed'), [], 'a refusal is still none');
+});
+
+// ---- B7: the file name of a partial path is a bare-name citation -------------------------------------------------------------------------------------
+test('ARC-09-C267 replay B7 — a partial path to a corpus page (`.../x.md`, `folder/x.md`) cites the pages of that name below it; a path outside the corpus and SKILL.md do not', () => {
+  const REMOTE = 'markdown/servicenow-platform/domain-separation/domain-separation-remote-tables.md';
+  const STATE = 'markdown/it-service-management/incident-management/c_IncidentManagementStateModel.md';
+  const named = (name) => ({ 'domain-separation-remote-tables.md': [REMOTE], 'c_IncidentManagementStateModel.md': [STATE], 'incident.md': ['markdown/it-service-management/incident.md'] }[name] ?? []);
+  const rows = (...parts) => [U('how?'), ...parts.flat()];
+  const find = (reply, rowList = rows(), options = {}) => groundingFindings({ rows: rowList, reply, options: { blocking: ['citedUnread'], pagesNamed: named, ...options } }).items.map((i) => i.path);
+  // the architect's O d0085f47, and the same with the other spellings of a partial path
+  assert.deepEqual(find('Domain separation is unsupported (`.../domain-separation-remote-tables.md`).'), ['domain-separation-remote-tables.md']);
+  assert.deepEqual(find('Domain separation is unsupported (`…/domain-separation-remote-tables.md`).'), ['domain-separation-remote-tables.md']);
+  assert.deepEqual(find('See incident-management/c_IncidentManagementStateModel.md for the states.'), ['c_IncidentManagementStateModel.md']);
+  assert.deepEqual(find('The states are in it-service-management/incident-management/c_IncidentManagementStateModel.md.'), ['c_IncidentManagementStateModel.md']);
+  assert.deepEqual(find('The states are in `.../incident-management/c_IncidentManagementStateModel.md`.'), ['c_IncidentManagementStateModel.md']);
+  // a path outside the corpus is that file's, and so is SKILL.md
+  assert.deepEqual(find('The RACI is in clients/acme/incident.md.'), []);
+  assert.deepEqual(find('Updated .claude/skills/csm-specialist/SKILL.md and docs/README.md.'), []);
+  assert.deepEqual(find('The folder is elsewhere: other-folder/c_IncidentManagementStateModel.md.'), [], 'a folder no page of that name is under');
+  // the page was opened: no ask
+  const opened = rows([use('r', 'Read', { file_path: `${CORPUS}/${REMOTE}` }, { cwd: '/home/dev/install' }), res('r', '1\tx')]);
+  assert.deepEqual(find('Domain separation is unsupported (`.../domain-separation-remote-tables.md`).', opened), []);
+  // the skips of a path: a pointer, a declaration, the user\'s own words
+  assert.deepEqual(find('See also .../domain-separation-remote-tables.md for the rest.'), []);
+  assert.deepEqual(find('.../domain-separation-remote-tables.md was not read.'), []);
+  assert.deepEqual(find('Domain separation (`.../domain-separation-remote-tables.md`).', [U('what about .../domain-separation-remote-tables.md?')]), []);
+  // the answer also gives the full path: one citation, under the path
+  assert.deepEqual(find(`Domain separation (\`.../domain-separation-remote-tables.md\`, ${REMOTE}).`), [REMOTE]);
 });
