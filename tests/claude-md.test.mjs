@@ -250,8 +250,22 @@ test('ARC-09-C250 — a rewritten sentence is named: C217c variant B\'s line 13'
   assert.deepEqual(named(removedFrom(doc.replace(old, rewrite))), [`rule: ${old}`]);
 });
 
+// ARC-09-C268 — THE ABSENCE RULE, the architect's text of 2026-11-16 and the owner's confirmation the same day. A construct is
+// called "not documented" only once `docs lookup` has printed ABSENT for it, and a page the lookup lists is opened first. It is
+// the grounding rule's first sentence, in §1, which every session reads: not in the six gateways, which the false absences that were
+// diagnosed mostly did not pass through.
+const ABSENCE_RULE = 'If the corpus does not cover it, say so rather than recalling it, but only once '
+  + '`./snowarch docs lookup <names or words>` shows ABSENT; open any page it lists first.';
+
+test('ARC-09-C268 — the grounding rule says "not documented" only once docs lookup shows ABSENT, and a page it lists is opened first', () => {
+  const bullet = doc.split('\n').find((l) => l.startsWith('- **Ground every factual claim'));
+  assert.ok(bullet, 'the grounding rule is not the first bullet of §1 any more');
+  assert.ok(bullet.includes(ABSENCE_RULE), 'the grounding rule does not carry the absence rule');
+  assert.equal(doc.split('docs lookup').length - 1, 1, 'the lookup is named in CLAUDE.md once: the rule goes in once, for every absence claim');
+});
+
 test('ARC-09-C250 — a sentence one word shorter is named', () => {
-  const sentence = 'If the corpus does not cover it, say so rather than recalling it.';
+  const sentence = ABSENCE_RULE;
   assert.ok(doc.includes(sentence), 'the sentence the case shortens is not in CLAUDE.md');
   assert.deepEqual(named(removedFrom(doc.replace(sentence, sentence.replace(' rather', '')))), [`sentence: ${sentence}`]);
 });

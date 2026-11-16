@@ -209,14 +209,18 @@ test('ARC-09-C140 — 2.0.13 to 2.1.0-rc.1: B01 fetches the manifest the old U4 
   assert.match(status(), VERIFIED_RC1);
 
   // (b) Down to 2.0.13 and back, with the licences repository gone: the cache survives both moves and is this
-  // release's, so B01 stays cached, nothing is fetched, and E-32 reads verified straight away.
+  // release's, so nothing is fetched, and E-32 reads verified straight away. B01 may run or be cached on the way back up
+  // (ARC-09-C268: the generator's permission entries move its inputs, and a run is not a fetch); what this step is about is
+  // that a held manifest is never fetched again, so B01 reads ok and never warns that a repository could not be reached.
   const down = snowarch(w.user, ['upgrade', '--to', 'v2.0.13', '--yes'], { bin: w.bin });
   assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.0.13', down.text);
   assert.ok(existsSync(cache), 'the cache did not survive the move to 2.0.13');
   renameSync(w.licences.bare, gone);
   const back = snowarch(w.user, ['upgrade', '--to', 'v2.1.0-rc.1', '--yes'], { bin: w.bin });
   assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v2.1.0-rc.1', back.text);
-  assert.match(between(back.text, '[U6/7]', '[U7/7]'), /\[B01\/09\][^\n]*ok \(cached\)/, back.text);
+  const u6back = between(back.text, '[U6/7]', '[U7/7]');
+  assert.match(u6back, /\[B01\/09\][^\n]*… ok/, back.text);
+  assert.doesNotMatch(u6back, /\[B01\/09\][^\n]*warn/, back.text);
   assert.doesNotMatch(back.text, /release manifest:/, 'a held manifest was fetched again');
   assert.equal(e32(w.user)?.status, 'ok', JSON.stringify(e32(w.user)));
   assert.match(status(), VERIFIED_RC1);
