@@ -158,3 +158,56 @@ withInstall('ARC-09-C267 review 2, item 6 — the notice names no dead path the 
   for (const p of pages.slice(12)) assert.ok(!n2?.systemMessage || !re(p).test(n2.systemMessage), `the notice names a page the ask did not: ${p}`);
   assert.match(n2?.systemMessage ?? '', /\b3 more\b/, 'it counts what the ask counted');
 });
+
+// ---- guards ----------------------------------------------------------------------------------------------------------------------------------
+withInstall('ARC-09-C267 review 2, item 4 — the pages a script that ran names are pages it showed, and those of a script that did not run are not', async (t, i) => {
+  const script = `base = "${i.folder(PAGE.alpha)}"\nfor name in ["c_Alpha.md", "c_Beta.md"]:\n    print(open(base + "/" + name).read()[:2000])\n`;
+  const ran = [...write('w', '/tmp/readpages.py', script), ...bash('b', 'python3 /tmp/readpages.py')];
+  silent(await stop(t, { rows: ran, message: `${cite(PAGE.alpha)} ${cite(PAGE.beta)}` }), 'the script printed both pages, and the answer cites them');
+  asked(await stop(t, { rows: ran, message: cite(PAGE.gamma) }), PAGE.gamma);
+  asked(await stop(t, { rows: write('w', '/tmp/readpages.py', script), message: cite(PAGE.alpha) }), PAGE.alpha);
+  // run by another name: the base name decides, a different file is not it
+  asked(await stop(t, { rows: [...write('w', '/tmp/readpages.py', script), ...bash('b', 'python3 /tmp/other.py')], message: cite(PAGE.alpha) }), PAGE.alpha);
+});
+
+withInstall('ARC-09-C267 review 2, items 1 to 3 — a listing that is not fed to a viewer shows nothing, with the filters and folders of the review in the same call', async (t, i) => {
+  const root = `${i.corpus}/markdown`;
+  const area = i.folder(PAGE.alpha);
+  for (const command of [
+    `rg -l -g 'c_Alp*.md' table ${root}`, `find ${area} -iname 'c_alp*' -type f`, `fd -g 'c_Alp*.md' ${root}`, `find ${area} -type f | xargs wc -l`,
+    `for f in $(ls ${area}); do echo "$f"; done`, `grep -rl --include='c_Alp*.md' table ${root} | sort | uniq -c | tail -3`,
+  ]) {
+    asked(await stop(t, { rows: bash('b', command), message: cite(PAGE.alpha) }), PAGE.alpha);
+  }
+  // and the same filters, fed to a viewer, show
+  for (const command of [`rg -l -g 'c_Alp*.md' table ${root} | xargs head -3`, `find ${area} -iname 'c_alp*' -type f | xargs sed -n 1,3p`, `for f in $(ls ${area}); do head -2 "${area}/$f"; done`]) {
+    silent(await stop(t, { rows: bash('b', command), message: cite(PAGE.alpha) }), command);
+  }
+});
+
+withInstall('ARC-09-C267 review 2, item 6 — a dead path in a file the turn wrote is asked about, in the ask and in the notice alike, whatever the answer holds', async (t, i) => {
+  const dead = 'markdown/it-service-management/c_GoneRule.md';
+  const file = join(i.root, 'clients', 'acme', 'hld.md');
+  const rows = write('w', file, `Escalation follows the rule in ${dead}.\n`);
+  const d = await stop(t, { rows, message: 'Saved.' });
+  asked(d, dead);
+  const feedback = U(`Stop hook feedback:\n${d.reason}`, { isMeta: true });
+  const after = await stop(t, { rows: [...rows, text('Saved.'), feedback, text('Understood.')], message: 'Understood.', input: { stop_hook_active: true } });
+  assert.ok(after?.systemMessage?.includes(dead), `the notice names what the ask named: ${JSON.stringify(after)}`);
+  // the same path in a fence of the answer (C254's set holds it): the ask names it all the same
+  asked(await stop(t, { rows, message: `Saved.\n\`\`\`markdown\nEscalation follows the rule in ${dead}.\n\`\`\`` }), dead);
+  // and a dead path only in the answer is C254's, not this ask's
+  silent(await stop(t, { rows: [], message: cite(dead) }), 'a dead path in the answer is not asked about here');
+});
+
+withInstall('ARC-09-C267 review 2, item 6 — when the continuation opens every page, the ones past the twelve too, the notice says nothing', async (t, i) => {
+  const pages = Array.from({ length: 15 }, (_, k) => `markdown/it-service-management/q${String(k + 1).padStart(2, '0')}.md`);
+  for (const p of pages) addPage(i, p);
+  const wrote = write('w3', join(i.root, 'clients', 'acme', 'hld3.md'), `References:\n${pages.map((p) => `- ${p}`).join('\n')}\n`);
+  const d = await stop(t, { rows: wrote, message: 'Saved.' });
+  assert.match(d.reason, /And 3 more of these/);
+  const feedback = U(`Stop hook feedback:\n${d.reason}`, { isMeta: true });
+  const reads = pages.flatMap((p, k) => readPage(`z${k}`, i.abs(p)));
+  const fixed = pages.map((p) => `Correction: ${p} says what the file cites.`).join('\n');
+  silent(await stop(t, { rows: [...wrote, text('Saved.'), feedback, ...reads, text(fixed)], message: fixed, input: { stop_hook_active: true } }), 'every page read');
+});

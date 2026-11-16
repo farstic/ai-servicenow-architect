@@ -13,7 +13,9 @@
 //   unsourced         a name in no source, where the index is sparse or missing: no corpus claim is made
 //   citedUnread       a corpus page cited, in the answer or in a file this turn wrote, that reached the session by no read route (read-routes.mjs: a Read,
 //                     a shell command or an MCP call that showed it, a Grep in content mode, a sub-agent's read, a read before a compaction); not one the line
-//                     itself says, right after the path, was not read, not a pointer sentence ("see also", "start with", "read … first"), and not a path the user typed
+//                     itself says, right after the path, was not read, not a pointer sentence ("see also", "start with", "read … first"), and not a path the user typed;
+//                     nor what a file the turn wrote AND ran names (a script), nor a bare name of a file outside the corpus that the session read, wrote or edited, or that the
+//                     answer gives a path to (`clients/acme/incident.md`)
 //   resting           "unverified" / "not opened" / a spent budget in the final reply
 //   overclaim         `Pages read: <n>` greater than the pages Read
 //
@@ -144,6 +146,8 @@ const MAX_PAGES_OF_A_NAME = 5;
 /** A bare corpus file name in a line: not a part of a longer name or of a path (`markdown/a/c_X.md` is the citation of its path). */
 const BARE_NAME = /(?<![A-Za-z0-9_.\-/\\])[A-Za-z0-9][A-Za-z0-9_.\-]*\.md(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/g;
 const HAS_BARE_NAME = new RegExp(BARE_NAME.source);
+/** A `.md` name with a folder in front of it (`clients/acme/incident.md`): the name is that file's. */
+const PATH_TO_NAME = /(?<=[A-Za-z0-9_.\-~]\/)([A-Za-z0-9][A-Za-z0-9_.\-]*\.md)(?![A-Za-z0-9_-]|\.[A-Za-z0-9])/g;
 
 /**
  * Which corpus pages the session SHOWED, by the one set of rules the ask uses and the notice that follows it must use as well (the architect's review of
@@ -175,7 +179,7 @@ export function makeShown(turn, options = {}) {
   };
   const onDisk = (path) => typeof options.pageExists === 'function' && options.pageExists(path);
   const mentioned = (list, path) => { const name = path.slice(path.lastIndexOf('/') + 1); return list.some((text) => mentionsPage(text, name)); };
-  const patterned = (list, path) => list.some((q) => wordNamesPage(q.w, path, { ci: q.ci }));
+  const patterned = (list, path) => list.some((q) => (q.dir !== undefined ? path.startsWith(`${q.dir}/`) : wordNamesPage(q.w, path, { ci: q.ci })));
   const viaMain = (path) => turn.reached.has(path) || turn.pagesRead.has(path) || turn.savedCitations.has(path)
     || mentioned(turn.opaque ?? [], path) || patterned(turn.patterns ?? [], path)
     || (onDisk(path) && (mentioned(turn.opaqueFailed ?? [], path) || patterned(turn.patternsFailed ?? [], path)));
@@ -226,11 +230,13 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
   const fullText = live.map(([l]) => l).join('\n');
 
   const absenceAt = live.some(([l]) => ABSENCE_ANYWHERE.test(l));
-  const cites = live.some(([l]) => l.includes('markdown/')) || (turn?.written ?? []).some((w) => w.text.includes('markdown/'));
+  // A file the turn wrote and then ran is a script, and what it names is not a citation of the answer or of a document (the architect's second review of #600, item 4).
+  const docs = (turn?.written ?? []).filter((w) => !w.script);
+  const cites = live.some(([l]) => l.includes('markdown/')) || docs.some((w) => w.text.includes('markdown/'));
   const names0 = wantNames && live.some(([l]) => /`[^`\n]*[_.][^`\n]*`|\[[A-Za-z0-9_.\\]*[_.][A-Za-z0-9_.\\]*\]/.test(l));
   const restingAt = live.some(([l]) => RESTING.test(l));
   const countsAt = /Pages read:/i.test(fullText);
-  const bareAt = typeof options.pagesNamed === 'function' && (live.some(([l]) => HAS_BARE_NAME.test(posix(l).replace(CITATION, ''))) || (turn?.written ?? []).some((w) => HAS_BARE_NAME.test(posix(w.text).replace(CITATION, ''))));
+  const bareAt = typeof options.pagesNamed === 'function' && (live.some(([l]) => HAS_BARE_NAME.test(posix(l).replace(CITATION, ''))) || docs.some((w) => HAS_BARE_NAME.test(posix(w.text).replace(CITATION, ''))));
   if (!(names0 || cites || absenceAt || restingAt || countsAt || bareAt)) return result('nothing-to-check');
 
   const declared = new Set([...fullText.matchAll(DECLARED)].map((m) => m[1].toLowerCase()));
@@ -323,7 +329,7 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
     const dead = options.deadPaths ?? new Set();
     const typed = turn.typed ?? '';
     const places = live.map(([l, i]) => [l, i, false]);
-    for (const w of turn.written ?? []) {
+    for (const w of docs) {
       let fenced = false;
       for (const l of w.text.split(/\r?\n/)) {
         if (FENCE.test(l)) { fenced = !fenced; continue; }
@@ -332,6 +338,7 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
     }
     const cited = new Map();
     const bareCited = new Map();
+    const tails = new Set();                                       // names the answer or a document gives a path for (`clients/acme/incident.md`, a corpus page's)
     for (const [l, i, inFile] of places) {
       const line = posix(l);
       for (const m of line.matchAll(CITATION)) {
@@ -341,6 +348,7 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
         if (!cited.has(m[0])) cited.set(m[0], { line: i, inFile });
       }
       if (typeof options.pagesNamed !== 'function') continue;
+      for (const m of line.matchAll(PATH_TO_NAME)) tails.add(m[1].toLowerCase());
       for (const m of line.matchAll(BARE_NAME)) {
         const name = m[0];
         if (NOT_PAGES.has(name.toLowerCase())) continue;
@@ -358,8 +366,9 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
     const { shownPage, unsure, incomplete } = made;
     const onDisk = (path) => typeof options.pageExists === 'function' && options.pageExists(path);
     // A page the answer cites that is not on disk cannot be opened, and is C254's (it reads the answer's paths; this reads the same disk, so the first
-    // ask and the notice after it agree); in a file the turn wrote it is asked about like any other.
-    const deadHere = (path, at) => dead.has(path) || (!at.inFile && typeof options.pageExists === 'function' && !options.pageExists(path));
+    // ask and the notice after it agree); in a file the turn wrote it is asked about like any other, in the ask and in the notice alike: C254's set holds the
+    // answer's paths, and a path that stands in the answer's fence and in the file is the file's too (the architect's second review of #600, item 6).
+    const deadHere = (path, at) => !at.inFile && (dead.has(path) || (typeof options.pageExists === 'function' && !options.pageExists(path)));
     const cutShort = Array.isArray(options.incomplete) ? options.incomplete : [];
     if (cutShort.length) notes.push(`citedUnread: nothing asked, an input was cut short: ${cutShort.join('; ')}`);
     else {
@@ -369,9 +378,11 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
         if (unsure()) { unsureAt = true; continue; }
         findings.citedUnread.push({ kind: 'citedUnread', path, line: at.line, inFile: at.inFile });
       }
-      const haveNames = new Set([...cited.keys()].map((c) => c.slice(c.lastIndexOf('/') + 1)));
+      const own = turn.ownFiles ?? new Set();
       for (const [name, at] of bareCited) {
-        if (haveNames.has(name)) continue;
+        // A name the answer also gives a path to (a corpus page's: its path is the citation; any other: that file's), and a file outside the corpus that the session read,
+        // wrote or edited, are not a second citation of a corpus page of the same name (the first review's D, and the second review's item 5).
+        if (own.has(name.toLowerCase()) || tails.has(name.toLowerCase())) continue;
         let pages = options.pagesNamed(name) ?? [];
         if (pages.length === 0 || pages.length > MAX_PAGES_OF_A_NAME) continue;
         if (typeof options.pageExists === 'function') pages = pages.filter(onDisk);
@@ -484,8 +495,10 @@ const DESCRIBE = Object.freeze({
  *
  * The notice agrees with the ask (the architect's review of #600, B1 and B2): a page is closed by the rules the ask used (`makeShown`: any read route, a
  * name or a pattern in a call that could not be resolved, a sub-agent's rows), over ALL the rows, so a folder set before the answer, or a loop that
- * opened the pages after it, close them; a page the answer cites that is not on disk is C254's and is in neither pass (the disk is the same on both); and
- * a citation the continuation adds is not listed when the ask itself named the page (C254 gives the right path of a dead one, and asks for it).
+ * opened the pages after it, close them; a page the answer cites that is not on disk is C254's and is in neither pass (the disk is the same on both; a path in a
+ * file the turn wrote is asked about in both); and a citation the continuation adds is not listed when the ask itself named the page (C254 gives the right path of
+ * a dead one, and asks for it). It lists what the ask LISTED (second review, item 6): the first `maxItems` (12) of the ask's items that stayed open by name, and
+ * counts the rest that stayed open (`unnamed`), as the ask counted them.
  */
 export function residualFindings({ rows = null, reply = null, index = null, coverage = null, options = {} } = {}) {
   const none = { ours: false, open: [], text: null };
@@ -533,7 +546,11 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
       default: return true;
     }
   };
-  const open = was.items.filter((i) => !resolved(i));
+  // The notice lists what the ask listed (the architect's second review of #600, item 6): the ask names the first `max` items and counts the rest, so the
+  // notice names those of the first `max` that stayed open and counts the rest that did. Every item of the ask is a key, so none returns as new.
+  const max = options.maxItems ?? MAX_ITEMS;
+  const open = was.items.slice(0, max).filter((i) => !resolved(i));
+  const unnamed = was.items.slice(max).filter((i) => !resolved(i)).length;
   const wasKeys = new Set(was.items.map(keyOf));
   const asked = norm(rowText(whole.live[first.index]));
   for (const i of now.items) {
@@ -542,8 +559,9 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
     open.push(i);
   }
   const notes = [...was.notes, ...now.notes];
-  if (open.length === 0) return withNotes({ ours: true, open: [], text: null }, notes);
+  if (open.length === 0 && unnamed === 0) return withNotes({ ours: true, open: [], text: null }, notes);
   const shown = open.slice(0, 6).map((i) => DESCRIBE[i.kind](i));
-  const more = open.length > shown.length ? `; and ${open.length - shown.length} more` : '';
-  return { ours: true, open, ...(notes.length ? { notes } : {}), text: `Grounding check: ${open.length} item(s) in this answer were not corrected after one request — ${shown.join('; ')}${more}. Check them before relying on this answer.` };
+  const rest = open.length - shown.length + unnamed;
+  const more = rest > 0 ? (shown.length ? `; and ${rest} more` : `${rest} more, past the ${max} the request listed`) : '';
+  return { ours: true, open, unnamed, ...(notes.length ? { notes } : {}), text: `Grounding check: ${open.length + unnamed} item(s) in this answer were not corrected after one request — ${shown.join('; ')}${more}. Check them before relying on this answer.` };
 }

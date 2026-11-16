@@ -26,6 +26,19 @@
 //   - a thread whose folder Claude Code resets before every Bash call (a sub-agent's, and the main thread's when it is told to) starts each call at the
 //     folder its row records (`carryFolder: false`); a `cd` of one call is then not the next call's (A2).
 //
+// The architect's second review of #600 (2026-11-16, eight agents), items 1 to 7, in the order of the code below:
+//   - a name filter of a search is taken as WRITTEN, with the case its tool gives it, and matches below the search root, wherever the shell stands: `find -name`,
+//     `-path`, `-iname`, `-ipath`, `rg -g`, `--glob`, `--iglob`, `grep --include`, `fd -g`, PowerShell `-Filter` and `-Include` (`nameFiltersOf`); a regex filter of find is no
+//     glob and covers what the search covers, the folder it names or every page; a negated glob and `--exclude` narrow nothing of what is read (items 1 and 2);
+//   - a folder a call names under the corpus, in a call that has a content viewer, is every page below it (`{ dir }`, `corpusFolder`): `rg -l X DIR | xargs cat`,
+//     `find DIR -type f | xargs cat`, `for f in $(ls DIR); do head "DIR/$f"`, a viewer word with an expansion segment by its static folder (item 3);
+//   - a pattern or a folder is kept only for a call that can show lines: it has a content viewer (`cat`, `head`, `sed`, `grep` that prints lines, `Get-Content`, also given
+//     to `xargs`, `find -exec` or a shell), or a command that may read a page with no viewer verb (an interpreter, `eval`, `source`, a shell, `git show`, a verb the shell
+//     builds). `find … | xargs grep -l`, `… | xargs wc -l | sort | tail`, a loop that only echoes show no page; a filter given no file and fed by a pipe is no viewer (item 7);
+//   - a file the session wrote and then ran (an interpreter or shell given its path, `source`, `./file`) is a SCRIPT, not a document: what it names is not a citation, and
+//     the pages it names are pages it may have shown (`ranFiles`, `walkThread`'s `script`); the files outside the corpus that the session read, wrote or edited are
+//     its own, and a bare mention of one is not a citation of a page of the same name (`ownFiles`) (items 4 and 5).
+//
 // PURE: every function reads its arguments and nothing else (no file, no clock, no global); the file system is the caller's `glob`.
 import { corpusRelative } from './resolve.mjs';
 import { globToRegExp } from './glob-fs.mjs';
@@ -129,6 +142,12 @@ export function patternsInText(text) {
   return [...out];
 }
 
+/**
+ * A word with a character no path or glob holds (a space, a quote, a parenthesis, `=`, `;`, `<`, `>`, `|`, `&`): it is text, a script or a message, and not a path.
+ * The characters are the ones `patternsInText` reads a token from; a word with one is read for the tokens in it and not as a pattern or a folder.
+ */
+const NOT_A_PATH = /[^A-Za-z0-9_.\-/\\~$@%+:{}[\]*?,!^]/;
+
 // ---- the shell: words, operators, depth, expansions, and the here-documents that are text and not commands --------------------------------
 
 /** Does a `$` before this character begin an expansion the shell would make (`$F`, `${F}`, `$(…)`, `$1`, `$@`)? */
@@ -177,6 +196,15 @@ export function shellSegments(command, { powershell = false } = {}) {
     words = []; segX = false; seps += sep;
   };
   const redirects = (ws) => ws.some((w) => /^(?:1|&)?>>?(?![&|])/.test(w)) || ws.some((w) => /(?:^|[\\/])tee$/.test(w));
+  /** The file a command line writes by a redirect (`> f`, `>> f`, `>f`) or `tee [-a] f`, else null. */
+  const targetOf = (ws) => {
+    for (let k = 0; k < ws.length; k += 1) {
+      const m = /^(?:1|&)?>>?(?![&|])(.*)$/.exec(ws[k]);
+      if (m) return m[1] || ws[k + 1] || null;
+      if (/(?:^|[\\/])tee$/.test(ws[k])) return ws.slice(k + 1).find((x) => !x.startsWith('-')) ?? null;
+    }
+    return null;
+  };
   for (let i = 0; i < s.length; i += 1) {
     const c = s[i];
     const next = s[i + 1];
@@ -207,7 +235,7 @@ export function shellSegments(command, { powershell = false } = {}) {
         body.push(line);
         if (e >= s.length) break;
       }
-      heredocs.push({ body: body.join('\n'), writes: /Set-Content|Add-Content|Out-File|\bsc\b|>>?\s*\S/i.test(s), owner: words.slice() });
+      heredocs.push({ body: body.join('\n'), writes: /Set-Content|Add-Content|Out-File|\bsc\b|>>?\s*\S/i.test(s), owner: words.slice(), file: null });
       cuts.push([from, Math.min(at, s.length)]);
       word = '@'; started = true;                                 // the here-string stands for one word
       i = Math.max(at - 2, i);
@@ -239,7 +267,7 @@ export function shellSegments(command, { powershell = false } = {}) {
           body.push(text);
           if (e >= s.length) break;
         }
-        heredocs.push({ body: body.join('\n'), writes, owner: h.owner });
+        heredocs.push({ body: body.join('\n'), writes, owner: h.owner, file: writes ? targetOf(line) : null });
       }
       cuts.push([from, Math.min(pos, s.length)]);
       pending = [];
@@ -427,8 +455,88 @@ const POWERSHELL_OPAQUE = new Set(['foreach-object', '%', 'foreach', 'where-obje
 const KEYWORDS = new Set(['do', 'then', 'else', 'elif', '!', '{', 'time', 'coproc']);
 const WRAPPERS = new Set(['command', 'builtin', 'exec', 'env', 'nice', 'nohup', 'sudo', 'doas', 'timeout', 'stdbuf', 'ionice', 'caffeinate', 'unbuffer']);
 const ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/;
-/** The tests of `find` that take a pattern for a file's base name or whole path: it matches the same wherever the shell stands. */
-const FIND_NAME_FLAGS = new Set(['-name', '-iname', '-path', '-ipath', '-wholename', '-iwholename', '-regex', '-iregex', '-lname', '-ilname']);
+// ---- name filters: a pattern for the names of the files a search finds (the architect's second review of #600, items 1 and 2) ----------------------------
+/**
+ * A name filter matches the files below the search ROOT, wherever the shell stands, so its pattern is kept as written (never joined to the shell's folder) and with
+ * the case the TOOL gives it: `find -name`, `-path` and `-wholename` are case-sensitive, `-iname`, `-ipath` and `-iwholename` are not, `rg -g`/`--glob` are
+ * (`--iglob` is not), `grep --include` is, `fd -g` is smart-case (taken as blind: the side chosen), PowerShell's `-Filter` and `-Include` are not. A regex of find
+ * (`-regex`, `-iregex`) is not a glob and its dialect is not JavaScript's: it is read as `any`, covering whatever the search covers. A negated glob (`!*.txt`) and the
+ * `--exclude` family narrow nothing of what is read.
+ */
+const FIND_NAME_CS = new Set(['-name', '-path', '-wholename', '-lname']);
+const FIND_NAME_CI = new Set(['-iname', '-ipath', '-iwholename', '-ilname']);
+const GREP_VERBS = new Set(['grep', 'egrep', 'fgrep', 'rgrep']);
+const FD_VERBS = new Set(['fd', 'fdfind']);
+/** The flags of fd that take a value, so that the value is not taken for the pattern or a folder. */
+const FD_VALUE_FLAGS = new Set(['-e', '--extension', '-t', '--type', '-d', '--max-depth', '--min-depth', '-E', '--exclude', '-S', '--size', '-c', '--color', '-j', '--threads', '-x', '--exec',
+  '-X', '--exec-batch', '--max-results', '--changed-within', '--changed-before', '-o', '--owner', '--base-directory', '--search-path', '--path-separator']);
+
+/**
+ * `{ filters, used, any }` for the words of one command: `filters` are `{ value, ci }` (a glob as written), `used` the indexes of the words that are flags or values of a
+ * filter, `any` is `{ ci }` when the command filters by a regex (find). Pure.
+ */
+function nameFiltersOf(key, words, powershell) {
+  const filters = [];
+  const used = new Set();
+  let any = null;
+  const take = (value, ci, ...indexes) => {
+    for (const k of indexes) used.add(k);
+    if (typeof value === 'string' && value !== '' && !value.startsWith('!')) filters.push({ value, ci });
+  };
+  if (powershell) {
+    for (let k = 0; k < words.length; k += 1) {
+      const flag = words[k].toLowerCase();
+      if (flag === '-filter' && words[k + 1] !== undefined) { take(words[k + 1], true, k, k + 1); k += 1; }
+      else if (flag === '-include') {
+        used.add(k);
+        let j = k + 1;
+        for (; j < words.length && !words[j].startsWith('-'); j += 1) take(words[j], true, j);
+        k = j - 1;
+      }
+    }
+    return { filters, used, any };
+  }
+  if (key === 'find') {
+    for (let k = 0; k < words.length; k += 1) {
+      const flag = words[k];
+      if (FIND_NAME_CS.has(flag)) { take(words[k + 1], false, k, k + 1); k += 1; }
+      else if (FIND_NAME_CI.has(flag)) { take(words[k + 1], true, k, k + 1); k += 1; }
+      else if (flag === '-regex' || flag === '-iregex') { any = { ci: flag === '-iregex' }; used.add(k); used.add(k + 1); k += 1; }
+    }
+  } else if (key === 'rg' || key === 'ripgrep') {
+    for (let k = 0; k < words.length; k += 1) {
+      const w = words[k];
+      if (w === '-g' || w === '--glob') { take(words[k + 1], false, k, k + 1); k += 1; }
+      else if (w === '--iglob') { take(words[k + 1], true, k, k + 1); k += 1; }
+      else if (w.startsWith('--glob=')) take(w.slice('--glob='.length), false, k);
+      else if (w.startsWith('--iglob=')) take(w.slice('--iglob='.length), true, k);
+      else if (/^-g[^-]/.test(w)) take(w.slice(2), false, k);
+    }
+  } else if (GREP_VERBS.has(key)) {
+    for (let k = 0; k < words.length; k += 1) {
+      const w = words[k];
+      if (w === '--include') { take(words[k + 1], false, k, k + 1); k += 1; }
+      else if (w.startsWith('--include=')) take(w.slice('--include='.length), false, k);
+    }
+  } else if (FD_VERBS.has(key) && words.some((w) => w === '-g' || w === '--glob')) {
+    // fd -g PATTERN [PATH…]: the glob is the first word that is not a flag or a flag's value
+    for (let k = 0; k < words.length; k += 1) {
+      const w = words[k];
+      if (w.startsWith('-')) { if (FD_VALUE_FLAGS.has(w)) k += 1; continue; }
+      take(w, true, k);
+      break;
+    }
+  }
+  return { filters, used, any };
+}
+
+/** The corpus folder a path names (`markdown`, `markdown/<area>`, …), or null: a page, a folder of the corpus that is not `markdown/`, and a path outside it name none. */
+function corpusFolder(path) {
+  const m = /(?:^|\/)ServiceNowDocs(?:\/(markdown(?:\/.+)?))?$/.exec(posix(path).replace(/\/+$/, ''));
+  if (!m) return null;
+  const rel = m[1] ?? 'markdown';
+  return /\.md$/i.test(rel) ? null : rel;
+}
 
 /** The words of a command from its verb on: the reserved words, assignments and wrappers (`nice -n 10`, `timeout 5`, `env A=b`) in front are left out. */
 function unwrap(words, powershell) {
@@ -444,13 +552,112 @@ function unwrap(words, powershell) {
 
 /** Does a word of this command hold a viewer or a search verb (`xargs head -2`, `bash -c "cat x.md"`, `find . -exec cat {} \;`)? A runner that is given one reads with it. */
 function givesViewer(rest, showing, searching, powershell) {
-  for (const w of rest.slice(1)) {
-    for (const token of w.split(/[\s;|&()]+/)) {
-      const key = powershell ? token.toLowerCase() : token;
-      if (showing.has(key) || searching.has(key)) return true;
-    }
+  const tokens = [];
+  for (const w of rest.slice(1)) for (const token of w.split(/[\s;|&()]+/)) if (token) tokens.push(token);
+  for (let k = 0; k < tokens.length; k += 1) {
+    const key = powershell ? tokens[k].toLowerCase() : tokens[k];
+    if (showing.has(key)) return true;
+    // a search that only lists, counts or is quiet (`xargs grep -l`) prints no line of any page: its flags come right after it
+    if (searching.has(key) && !silentSearch(tokens.slice(k + 1, k + 8), powershell)) return true;
   }
   return false;
+}
+
+/** The commands that take their first word for a script (`sed 1,5p f`, `awk 'NR<3' f`), so that it is not a file. */
+const SCRIPTED = new Set(['sed', 'awk', 'gawk', 'mawk', 'nawk']);
+
+/** The words that run another command, which a runner (xargs, find -exec) given only known commands (`wc`, `echo`, `ls`) does not. */
+const runsAnything = (w) => w.split(/[\s;|&()]+/).some((t) => INTERPRETER.test(t) || (INDIRECT.has(t) && t !== 'xargs' && t !== 'parallel'));
+
+/**
+ * Is this opaque command one that can show nothing of its own? A loop (what it runs is the commands in its body, judged each by itself), and `xargs`, `parallel`
+ * and `find -exec` given no shell and no interpreter: they run the commands they are given, and those that are known are judged by `givesViewer`. Everything else
+ * (an interpreter, `eval`, `source`, a shell, `git show`, a verb the shell builds) may read a page without a viewer verb, and keeps its patterns.
+ */
+function benignRunner(key, rest, powershell) {
+  if (powershell) return false;
+  if (LOOPS.has(key)) return true;
+  if (key === 'xargs' || key === 'parallel') return !rest.slice(1).some(runsAnything);
+  if (key === 'find') return !rest.slice(1).some(runsAnything);
+  return false;
+}
+
+/**
+ * The words of a showing or searching command that name files: not a flag, not the value of `-e` or `-f`, and not the pattern of a search or the script of `sed`
+ * and `awk` (their first word, unless a flag gave it). PowerShell has no such first word: every word that is not a flag is taken, as it may be a path.
+ */
+function fileWords(key, words, searchesFiles, powershell) {
+  const out = [];
+  let first = !powershell && (searchesFiles || SCRIPTED.has(key))
+    && !words.some((w) => w === '-e' || w === '-f' || w.startsWith('--regexp') || w.startsWith('--expression') || w.startsWith('--file'));
+  let value = false;
+  for (const w of words) {
+    if (w.startsWith('-')) { value = !powershell && (w === '-e' || w === '-f'); continue; }
+    if (value) { value = false; continue; }
+    if (first) { first = false; continue; }
+    out.push(w);
+  }
+  return out;
+}
+
+/** The shells and the commands that run a file in this one: a file they are given is run. */
+const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'csh', 'tcsh', 'source', '.']);
+/**
+ * Is `w` a flag after which this interpreter or shell takes CODE and not a file: `python3 -c`, `python -m`, `bash -c` (`-lc`, `-ec`), `node -e`, `perl -ne`, `php -r`,
+ * `pwsh -Command`? Not `bash -e`, which is errexit and is followed by the script.
+ */
+function isCodeFlag(key, w) {
+  if (/^(?:pwsh|powershell)/i.test(key)) return /^-(?:c|command|encodedcommand|ec)$/i.test(w);
+  if (SHELLS.has(key)) return /^-[A-Za-z]*c$/.test(w);
+  return /^-(?:[A-Za-z]*[cemr]|p)$/.test(w) || /^--(?:eval|print|command)$/.test(w);
+}
+
+/**
+ * The base names of the files a command line runs (the architect's second review of #600, item 4): the words an interpreter or a shell is given before any
+ * `-c` code (`python3 -u x.py`, `bash x.sh`, `source x`, `. x`, `pwsh -File x.ps1`), and a file invoked by its path (`./x.sh`, `/tmp/x.py`). A `.md` word is
+ * data. They are matched by base name to the files the session wrote, to tell a script it wrote and ran from a document it wrote. Pure.
+ */
+function ranFiles(key, rest, powershell) {
+  const out = [];
+  const take = (w) => { const name = basename(w); if (name && !/\.md$/i.test(name)) out.push(name); };
+  if (INTERPRETER.test(key) || (!powershell && SHELLS.has(key))) {
+    const words = rest.slice(1);
+    for (let k = 0; k < words.length; k += 1) {
+      const w = words[k];
+      if (/^-(?:file|f)$/i.test(w) && /^(?:pwsh|powershell)/i.test(key) && words[k + 1] !== undefined) { take(words[k + 1]); break; }
+      if (isCodeFlag(key, w)) break;
+      if (!w.startsWith('-')) take(w);
+    }
+  } else if (/[\\/]/.test(rest[0])) take(rest[0]);
+  return out;
+}
+
+/**
+ * The part of a word before its first segment that is an expansion (`$f`, `${D}`, a back-tick, `~`, a `{}`): `DIR/$f` is under `DIR`, `$D/x` under no known
+ * folder (the empty string). A word with none is returned whole. Pure.
+ */
+function staticFolder(word) {
+  const out = [];
+  for (const seg of posix(word).split('/')) {
+    if (/[$`{}]/.test(seg) || seg.startsWith('~')) break;
+    out.push(seg);
+  }
+  return out.join('/');
+}
+
+/** A redirect as a word of its own (`>`, `>>`, `2>`, `<`, `&>`): the word after it is a file. */
+const REDIRECT = /^(?:\d|&)?[<>]{1,2}&?$/;
+
+/**
+ * The words of a segment that may name a folder to search or list: not the variable of a `for` (the words after its `in` are), nothing of a `while`, `until`,
+ * `done`, `fi` or `esac` (what a loop runs is its own segments), not the pattern of a search or the script of `sed` and `awk`, and not a redirect or the file it names. Pure.
+ */
+function rootWords(info, showing, searching, powershell) {
+  let words = info.words;
+  if (info.key === 'for' || info.key === 'select') { const at = words.indexOf('in'); words = at < 0 ? [] : words.slice(at + 1); }
+  else if (['while', 'until', 'done', 'fi', 'esac'].includes(info.key)) words = [];
+  else if (!powershell && (searching.has(info.key) || SCRIPTED.has(info.key))) words = fileWords(info.key, words, searching.has(info.key), false);
+  return words.filter((w, k) => !REDIRECT.test(w) && !(k > 0 && REDIRECT.test(words[k - 1])));
 }
 
 /** Is this command one whose reading cannot be told from its words? `rest` are its words from the verb on, `x` whether the segment has an expansion. */
@@ -474,8 +681,10 @@ function opaqueVerb(key, rest, powershell, x) {
  * `{ reads, cwd, lost, moved, heredocs, searched, unresolved, viewer }`: `viewer` says that the call has a viewer or a search that prints lines, or a
  * runner that is given one (`xargs head`, `bash -c "cat x.md"`), so that what it printed may name pages; `moved` is true when the line changed the folder for the calls that follow, and `cwd`
  * (`null` when not known) and `lost` are where it stands then. `patterns` are the glob and brace words of a call that cannot be resolved (`{ w, ci }`: the
- * word as the folder it stood in makes it, or as written when that folder is not known, or for a `find -name` pattern, which matches base names), and a
- * viewer's pattern that `glob` did not answer: `wordNamesPage` says which pages one could name. `searched` is the folder each search that prints lines (`grep`, `rg`, `Select-String`,
+ * word as the folder it stood in makes it, or as written when that folder is not known), the name filters of its searches as written (`{ w, ci }`, the case the tool
+ * gives them), a viewer's pattern that `glob` did not answer (`wordNamesPage` says which pages one could name), and the corpus folders it names (`{ dir }`: every
+ * page below `markdown/<area>…`); they are kept only when the call has a viewer or a command that may read a page without one. `runs` are the base names of the
+ * files the call runs (`ranFiles`). `searched` is the folder each search that prints lines (`grep`, `rg`, `Select-String`,
  * without `-c`, `-l`, `-L` or `-q`) ran in: the lines such a search prints over a folder or several files begin with the path of their page
  * (`pagesInLines`). `unresolved` is a list of texts, each of which may show a page the call does not name: a relative `.md` name when the folder is not
  * known, a pattern nothing answered, and the whole call (without the here-documents that are text a command writes) when a loop, `xargs`, an
@@ -492,10 +701,12 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
   let folderLost = Boolean(lost);
   let moved = false;
   let opaque = false;                                              // the call has a command whose reading cannot be told
+  let unknown = false;                                             // ... one that may read a page with no viewer verb: an interpreter, `eval`, `source`, a shell, `git show`
   let viewer = false;                                              // the call has a viewer or a search that prints lines, or a runner that is given one
   let flagged = false;                                             // a viewer or a search of the call has an expansion in its words
   const saved = [];
-  const patterns = new Map();                                      // { w, ci } by spelling: what a glob or a brace word of the call could name
+  const patterns = new Map();                                      // { w, ci } by spelling, or { dir }: what a glob, a brace word or a folder of the call could name
+  const runs = new Set();                                          // the base names of the files the call runs (read-routes.mjs, `ranFiles`)
   const segInfo = [];                                              // the words of each segment and the folder it ran in, for the patterns of a call left unresolved
   const add = (page, verb) => { if (!reads.has(page)) reads.set(page, verb); };
   /** A pattern word as the shell would have seen it: joined to the folder it ran in (those it knows), or as written when no folder is known or it is lost. */
@@ -507,6 +718,26 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
     if (rowCwd !== null && rowCwd !== folder) bases.push(rowCwd);
     const spellings = asWritten || folderGone || ABSOLUTE.test(w) || bases.length === 0 ? [w] : bases.map((b) => joinPath(b, w));
     for (const spelling of spellings) patterns.set(`${powershell ? 'i' : 's'}\0${spelling}`, { w: spelling, ci: powershell });
+  };
+  /** A name filter's pattern as written, with the case its tool gives it: it matches the files below the search root, wherever the shell stands. */
+  const addFilter = (value, ci) => {
+    if (patterns.size >= 64 || value.length > MAX_WORD) return;
+    const w = posix(value);
+    patterns.set(`${ci ? 'i' : 's'}\0${w}`, { w, ci });
+  };
+  /** Every page under a corpus folder (`markdown/<area>`, or `markdown` for the whole corpus). */
+  const addFolder = (dir) => { if (patterns.size < 64) patterns.set(`d\0${dir}`, { dir }); };
+  /** The corpus folders a word of a command that ran in `folder` names, as the folders the call could have been run from make them (those it knows). */
+  const foldersOf = (word, folder, folderGone) => {
+    const stem = staticFolder(word);
+    if (stem === '' || stem.length > MAX_WORD) return [];
+    const full = [];
+    if (ABSOLUTE.test(stem)) full.push(stem);
+    else {
+      if (folder !== null && !folderGone) full.push(joinPath(folder, stem));
+      if (rowCwd !== null && rowCwd !== folder) full.push(joinPath(rowCwd, stem));
+    }
+    return full.map(corpusFolder).filter((dir) => dir !== null);
   };
   const consider = (raw, key) => {
     for (const arg of powershell ? [raw] : expandBraces(raw)) {
@@ -555,24 +786,26 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
     }
     const key = powershell ? basename(rest[0]).toLowerCase() : basename(rest[0]);
     segInfo.push({ words: rest.slice(1), key, folder: at, gone: folderLost });
-    if (opaqueVerb(key, rest, powershell, seg.x)) { opaque = true; if (givesViewer(rest, showing, searching, powershell)) viewer = true; return; }
+    for (const name of ranFiles(key, rest, powershell)) runs.add(name);
+    if (opaqueVerb(key, rest, powershell, seg.x)) {
+      opaque = true;
+      if (!benignRunner(key, rest, powershell)) unknown = true;
+      if (givesViewer(rest, showing, searching, powershell)) viewer = true;
+      return;
+    }
     const showsLines = showing.has(key);
     const searchesFiles = searching.has(key);
     if (!showsLines && !searchesFiles) return;
     if (searchesFiles && silentSearch(rest.slice(1), powershell)) return;
+    const files = fileWords(key, rest.slice(1), searchesFiles, powershell);
+    // A filter that is given no file and is fed by a pipe (`ls | sort`, `xargs wc -l | tail -3`) prints the lines it was given, which are no page's. A search given
+    // no file and not fed by a pipe searches the folder it is in. A command with an expansion (`cat `find …``) may be given its files by it.
+    if (!powershell && !seg.x && !files.some((w) => !/^\d+$/.test(w)) && !(searchesFiles && seg.op !== '|')) return;
     viewer = true;
     if (seg.x) flagged = true;
     if (searchesFiles) searched.push(at);
-    const operands = rest.slice(1).filter((w) => !w.startsWith('-'));
-    if (powershell && showsLines && operands.length === 0 && seg.op === '|') { opaque = true; return; }    // Get-Content reads what the pipe gives it
-    let skipPattern = searchesFiles && !powershell && !rest.slice(1).some((w) => w === '-e' || w === '-f' || w.startsWith('--regexp'));
-    let afterE = false;
-    for (const w of rest.slice(1)) {
-      if (w.startsWith('-')) { afterE = !powershell && (w === '-e' || w === '-f'); continue; }
-      if (afterE) { afterE = false; continue; }                                                              // the value of -e: a pattern, not a file
-      if (skipPattern) { skipPattern = false; continue; }                                                    // grep PATTERN FILE: the first word is the pattern
-      consider(powershell ? w : w.replace(/^<+/, ''), key);                                                 // cat <page.md
-    }
+    if (powershell && showsLines && files.length === 0 && seg.op === '|') { opaque = true; return; }       // Get-Content reads what the pipe gives it
+    for (const w of files) consider(powershell ? w : w.replace(/^<+/, ''), key);                          // cat <page.md
   });
   while (saved.length) [at, folderLost] = saved.pop();                // the line ended inside a subshell: its folder goes with it
   if (opaque || flagged) {
@@ -582,18 +815,40 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       if (owner.length && opaqueVerb(powershell ? basename(owner[0]).toLowerCase() : basename(owner[0]), owner, powershell, false)) scripts.push(h.body);
     }
     unresolved.push([bare, ...scripts].join('\n'));
-    // The glob and brace words of every command of the call, each as the folder it ran in makes it; the scripts a word cannot be read inside (a quoted
-    // `python3 -c "…"`, a here-document that feeds an interpreter) by the tokens in them, as written.
-    for (const info of segInfo) {
-      info.words.forEach((w, n) => {
-        if (w.startsWith('-')) return;
-        if (/\s/.test(w)) { for (const token of patternsInText(w)) addPattern(token, null, true, true); return; }
-        if (PATTERN_WORD.test(w)) addPattern(w, info.folder, info.gone, info.key === 'find' && FIND_NAME_FLAGS.has(info.words[n - 1]));
-      });
+    // What the call could have shown by a pattern or a folder is kept only when it can show lines at all (the architect's second review of #600, item 7): it has a
+    // viewer (`cat`, `head`, `grep` that prints lines…), or a command that may read a page with no viewer verb. A call that only lists, counts or echoes
+    // (`find … | xargs grep -l`, `… | xargs wc -l`, a loop that echoes) shows no page, whatever it names.
+    if (viewer || unknown) {
+      for (const info of segInfo) {
+        // A name filter is taken as written, with the case its tool gives it, and matches below the search root (items 1 and 2).
+        // A case-sensitive value with no wildcard is a name the call prints, which the names rule already counts (`mentionsPage`); a case-blind one may differ in case.
+        const named = nameFiltersOf(info.key, info.words, powershell);
+        for (const f of named.filters) if (f.ci || PATTERN_WORD.test(f.value)) addFilter(f.value, f.ci);
+        // The glob and brace words of the call, each as the folder it ran in makes it; the scripts a word cannot be read inside (a quoted `python3 -c "…"`)
+        // by the tokens in them, as written. The plain words of a segment that name a folder under the corpus are its roots (item 3).
+        const roots = new Set();
+        info.words.forEach((w, n) => {
+          if (named.used.has(n) || w.startsWith('-')) return;
+          if (NOT_A_PATH.test(w)) { for (const token of patternsInText(w)) addPattern(token, null, true, true); return; }
+          if (PATTERN_WORD.test(w)) addPattern(w, info.folder, info.gone);
+        });
+        // Folders count when the call has a viewer to feed them to: `git -C <corpus> show HEAD:<page>` names the corpus and reads one page.
+        for (const w of viewer ? rootWords(info, showing, searching, powershell) : []) {
+          if (w.startsWith('-') || NOT_A_PATH.test(w) || PATTERN_WORD.test(w)) continue;
+          if (showing.has(powershell ? w.toLowerCase() : w) || searching.has(powershell ? w.toLowerCase() : w) || INTERPRETER.test(w) || (INDIRECT.has(w) && w !== '.')) continue;      // a runner's command
+          for (const dir of foldersOf(w, info.folder, info.gone)) roots.add(dir);
+        }
+        // A regex filter of find (`-regex`, `-iregex`) is not a glob: it covers what the search covers, which is the folder it names, or every page when none.
+        // A name filter narrows a folder's pages (its pattern is the match), so the folder is added only for a segment that has none.
+        if (named.any) {
+          if (roots.size === 0) addFilter('*', named.any.ci);
+          else for (const dir of roots) addFolder(dir);
+        } else if (named.filters.length === 0) for (const dir of roots) addFolder(dir);
+      }
+      for (const script of scripts) for (const token of patternsInText(script)) addPattern(token, null, true, true);
     }
-    for (const script of scripts) for (const token of patternsInText(script)) addPattern(token, null, true, true);
   }
-  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer, patterns: [...patterns.values()] };
+  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer, runs: [...runs], patterns: [...patterns.values()] };
 }
 
 /**
@@ -676,8 +931,9 @@ const WRITERS = Object.freeze({
 
 /**
  * Walks the rows of ONE thread (the session's own, or one sub-agent's) in order and returns what reached it and what it wrote:
- * `{ reached: Map(page → { route, at }), writes: [{ tool, text, at }], calls: Map(tool_use id → Map(page → route)), opaque: [{ text, at }] }`, `at`
- * being the row of the call; `calls` says which pages each shell call showed, by the verb that showed it (`search` for the lines a search printed);
+ * `{ reached: Map(page → { route, at }), writes: [{ tool, text, at, file, script }], calls: Map(tool_use id → Map(page → route)), opaque: [{ text, at }], ownFiles }`, `at`
+ * being the row of the call, `file` the path a write names (or the target of a heredoc that writes), `script` whether a later call ran the file (its text is then also
+ * one of `opaque`, and its glob tokens `patterns`), `ownFiles` the lower-case base names of the files outside the corpus that the thread read, wrote or edited; `calls` says which pages each shell call showed, by the verb that showed it (`search` for the lines a search printed);
  * `opaque` is the text of each call that may have shown a page without naming it (`commandReads`' `unresolved`, and the code of another language in an
  * MCP call), for the names rule, and, for a call of those that has a viewer verb, the first 500,000 characters of its output. A call counts only when its
  * result came back without `is_error`; except that a Bash or PowerShell call with a viewer verb that FAILED may have printed part of what it was asked
@@ -699,13 +955,28 @@ export function walkThread(rows, { glob = null, pageExists = null, carryFolder =
   const failedOpaque = [];
   const patterns = new Map();
   const failedPatterns = new Map();
+  const ownFiles = new Set();                                      // lower-case base names of the files outside the corpus that the session read, wrote or edited
+  const ranScripts = new Set();                                    // the writes that a later call ran
   let aborted = false;
   let cwd = null;
   let lost = false;
   const onDisk = typeof pageExists === 'function' ? pageExists : () => false;
   const output = (b) => posix(textOfResult(b)).slice(0, OUTPUT_CAP);
   const reach = (page, route, at) => { if (!reached.has(page)) reached.set(page, { route, at }); };
-  const keep = (into, list) => { for (const q of list) into.set(`${q.ci}\0${q.w}`, q); };
+  const keep = (into, list) => { for (const q of list) into.set(q.dir !== undefined ? `d\0${q.dir}` : `${q.ci}\0${q.w}`, q); };
+  /** A file the session touched that is not a page of the corpus: a bare mention of its name is no citation of a page that has the same name (item 5). */
+  const own = (file) => { if (typeof file === 'string' && file && !pageAt(file)) { const name = basename(file).toLowerCase(); if (name) ownFiles.add(name); } };
+  /** A call ran the file with this base name: every write of it so far is a script, and the pages it names are pages it may have shown (item 4). */
+  const ran = (name, at) => {
+    for (const w of writes) {
+      if (!w.file || basename(w.file) !== name) continue;
+      w.script = true;
+      if (ranScripts.has(w)) continue;
+      ranScripts.add(w);
+      opaque.push({ text: posix(w.text).slice(0, OUTPUT_CAP), at });
+      keep(patterns, patternsInText(w.text).map((token) => ({ w: posix(token), ci: false })));
+    }
+  };
   const all = Array.isArray(rows) ? rows : [];
   for (let at = 0; at < all.length; at += 1) {
     if (shouldStop && at % 64 === 0 && shouldStop()) { aborted = true; break; }
@@ -733,7 +1004,7 @@ export function walkThread(rows, { glob = null, pageExists = null, carryFolder =
         keep(failedPatterns, done.patterns);
         continue;
       }
-      if (name === 'Read') { const page = pageAt(input.file_path); if (page) reach(page, 'Read', use.at); continue; }
+      if (name === 'Read') { const page = pageAt(input.file_path); if (page) reach(page, 'Read', use.at); else own(input.file_path); continue; }
       if (name === 'Bash' || name === 'PowerShell') {
         if (!carryFolder) { cwd = null; lost = false; }
         const done = commandReads(input.command, { powershell: name === 'PowerShell', cwd, rowCwd: use.rowCwd, lost, glob });
@@ -745,7 +1016,12 @@ export function walkThread(rows, { glob = null, pageExists = null, carryFolder =
         for (const text of done.unresolved) opaque.push({ text: posix(text), at: use.at });
         if (done.viewer && done.unresolved.length) opaque.push({ text: output(b), at: use.at });
         keep(patterns, done.patterns);
-        for (const h of done.heredocs) if (h.writes && h.body) writes.push({ tool: name, text: h.body, at: use.at });
+        for (const h of done.heredocs) {
+          if (!h.writes) continue;
+          own(h.file);
+          if (h.body) writes.push({ tool: name, text: h.body, at: use.at, file: h.file ?? null, script: false });
+        }
+        for (const file of done.runs) ran(file, use.at);
         continue;
       }
       if (name === 'Grep') { for (const page of pagesOfGrep(input, textOfResult(b), use.rowCwd)) reach(page, 'Grep', use.at); continue; }
@@ -757,8 +1033,12 @@ export function walkThread(rows, { glob = null, pageExists = null, carryFolder =
         keep(patterns, done.patterns);
         continue;
       }
-      if (Object.hasOwn(WRITERS, name)) for (const text of WRITERS[name](input)) writes.push({ tool: name, text, at: use.at });
+      if (Object.hasOwn(WRITERS, name)) {
+        const file = typeof input.file_path === 'string' ? input.file_path : (typeof input.notebook_path === 'string' ? input.notebook_path : null);
+        own(file);
+        for (const text of WRITERS[name](input)) writes.push({ tool: name, text, at: use.at, file, script: false });
+      }
     }
   }
-  return { reached, writes, calls, opaque, failedOpaque, patterns: [...patterns.values()], failedPatterns: [...failedPatterns.values()], aborted };
+  return { reached, writes, calls, opaque, failedOpaque, ownFiles, patterns: [...patterns.values()], failedPatterns: [...failedPatterns.values()], aborted };
 }

@@ -184,7 +184,8 @@ export function turnSources(rows, options = {}) {
     names: { read: new Set(), skill: new Set(), named: new Set(), builder: new Set() },
     savedCitations: new Set(),   // pages cited by saved Envelopes this session read
     reached: new Map(),          // every corpus page that reached the session, by any route (read-routes.mjs), whenever it did: a compaction does not undo it
-    written: [],                 // [{ tool, text }] the text of the files the current turn wrote (Write, Edit, MultiEdit, NotebookEdit, a heredoc that writes)
+    written: [],                 // [{ tool, text, file, script }] the text of the files the current turn wrote (Write, Edit, MultiEdit, NotebookEdit, a heredoc that writes); `script` says that a later call ran the file
+    ownFiles: new Set(),         // the lower-case base names of the files outside the corpus that the session read, wrote or edited: a bare mention of one is not a citation of a page of the same name
     typed: '',                   // what the user typed, in every prompt of the session, as lower-case text with forward slashes
     opaque: [],                  // the text of each call (any row) that may have shown a page without naming it: a loop, xargs, code of another language (read-routes.mjs)
     opaqueFailed: [],            // the same for a call with a viewer verb that failed; the caller uses it only for a page that is on disk
@@ -335,7 +336,8 @@ export function turnSources(rows, options = {}) {
   out.patternsFailed = walked.failedPatterns;
   const offset = boundary + 1;
   const from = out.turnStart < 0 ? 0 : out.turnStart;
-  for (const w of walked.writes) if (w.at - offset >= from) out.written.push({ tool: w.tool, text: w.text });
+  for (const w of walked.writes) if (w.at - offset >= from) out.written.push({ tool: w.tool, text: w.text, file: w.file, script: w.script });
+  out.ownFiles = walked.ownFiles;
   const typed = [];
   for (const r of main) {
     if (r.type !== 'user') continue;

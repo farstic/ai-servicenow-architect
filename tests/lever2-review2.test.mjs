@@ -192,3 +192,113 @@ test('ARC-09-C267 review 2, item 4 — what a script the turn ran cites is not a
   const withPaths = rowsOf(writeCall('w', '/tmp/r.py', `open("${BETA}")\n`), bashCall('b', 'python3 /tmp/r.py'));
   assert.deepEqual(find(withPaths, 'Done.').items, [], 'a full path in a script that ran');
 });
+
+// ---- guards: what the fixes must keep, and the edges they were built on ---------------------------------------------------------------------------
+test('ARC-09-C267 review 2 — a command is a viewer when it is given a file: sed, awk and grep keep their script or pattern apart, a bare number is no file', () => {
+  const PAGE_FILE = `${CSM}/c_Alpha.md`;
+  for (const command of [
+    `sed -n 1,5p ${PAGE_FILE}`, `sed -n -e 1p ${PAGE_FILE}`, `sed --expression=1p ${PAGE_FILE}`, `sed -ne 1p ${PAGE_FILE}`, `awk '{print}' ${PAGE_FILE}`, `awk -F: '{print $1}' ${PAGE_FILE}`,
+    `grep -n pat ${PAGE_FILE}`, `grep -e pat ${PAGE_FILE}`, `grep -f pats ${PAGE_FILE}`, `rg -n pat ${PAGE_FILE}`, `head -n 5 ${PAGE_FILE}`, `tail -n +3 ${PAGE_FILE}`, `cat < ${PAGE_FILE}`,
+    `cat ${PAGE_FILE} | sort | tail -3`, 'cat `find . -name x`', 'cat "$F"', 'grep -rn pat', 'rg pat',
+  ]) assert.equal(viewerOf(command), true, `${command} reads a file`);
+  for (const command of ['sort -n', 'tail -3', 'head -n 5', 'uniq -c', 'cat <<EOF\nx\nEOF', 'sed -n 1,5p', 'awk \'NR<3\'', 'ls | grep pat', 'ls | grep -i pat', 'echo x | sed s/x/y/', 'cut -d, -f1']) {
+    assert.equal(viewerOf(command), false, `${command} reads none`);
+  }
+  // a page the viewer names is still a read, with the same words
+  assert.deepEqual([...commandReads(`sed -n 1,5p ${PAGE_FILE}`).reads.keys()], ['markdown/customer-service-management/c_Alpha.md']);
+  assert.deepEqual([...commandReads(`sed --expression=1p ${PAGE_FILE}`).reads.keys()], ['markdown/customer-service-management/c_Alpha.md']);
+  assert.deepEqual([...commandReads(`awk -F: '{print}' ${PAGE_FILE}`).reads.keys()], ['markdown/customer-service-management/c_Alpha.md']);
+  assert.deepEqual([...commandReads(`grep -n pat ${PAGE_FILE}`).reads.keys()], ['markdown/customer-service-management/c_Alpha.md']);
+});
+
+test('ARC-09-C267 review 2, item 7 — a search piped into the next, or a name filter on a plain value, keeps what it should', () => {
+  // a name filter on a plain case-sensitive value is a name the call prints, which the names rule counts; a case-blind one may differ in case
+  assert.deepEqual(pats(`find ${ROOT} -name c_Alpha.md | xargs cat`), []);
+  assert.deepEqual(pats(`find ${ROOT} -iname c_alpha.md | xargs cat`), ['i:c_alpha.md']);
+  assert.deepEqual(pats(`rg --files --iglob c_alpha.md ${ROOT} | xargs cat`), ['i:c_alpha.md']);
+  // a code word with no space in it is text, read for its tokens, and not a pattern joined to the folder
+  assert.deepEqual(pats(`python3 -c "print(open(glob.glob('${CSM}/c_A*.md')[0]).read())"`), [`s:${CSM}/c_A*.md`]);
+  assert.deepEqual(pats(`node -e "require('fs').readFileSync('${CSM}/c_A*.md')"`), [`s:${CSM}/c_A*.md`]);
+});
+
+test('ARC-09-C267 review 2, item 3 — a folder counts only with a viewer, and a loop\'s variable or a runner\'s command is no folder', () => {
+  const inFolder = { cwd: CSM, rowCwd: '/home/dev/install' };
+  // git -C <corpus> show names the corpus and reads one page
+  assert.deepEqual(pats(`git -C ${ROOT.replace('/markdown', '')} show HEAD:markdown/it-service-management/c_Alpha.md`), []);
+  assert.deepEqual(pats(`python3 -c "x" ${CSM}`), [], 'an interpreter\'s word that is a folder is not a folder it lists to a viewer');
+  // with the shell standing in the corpus, the words of a loop, a runner and a search that are not folders name none
+  assert.deepEqual(pats('for f in a b; do cat "$f"; done', inFolder), ['dir:markdown/customer-service-management/a', 'dir:markdown/customer-service-management/b'], 'the words after `in` may be folders, `f` and `in` are not');
+  assert.deepEqual(pats('rg -l escal . | xargs cat', inFolder), ['dir:markdown/customer-service-management']);
+  assert.deepEqual(pats('find . -type f | xargs head -3', inFolder), ['dir:markdown/customer-service-management', 'dir:markdown/customer-service-management/f']);
+  assert.deepEqual(pats('while read f; do head -3 "$f"; done < list.txt', inFolder), []);
+  // a word with an expansion in its first segment names no folder; one in a later segment, the folder before it
+  assert.deepEqual(pats('for f in $(cat list.txt); do head -3 "$D/$f"; done'), []);
+  assert.deepEqual(pats(`for f in $(cat list.txt); do head -3 "${CSM}/$f"; done`), ['dir:markdown/customer-service-management']);
+  assert.deepEqual(pats(`for f in $(cat list.txt); do head -3 "${CSM}/sub/c_$f.md"; done`), ['dir:markdown/customer-service-management/sub']);
+  // PowerShell: a folder with its separators the Windows way
+  const ps = { powershell: true, cwd: 'C:/home/dev/install', rowCwd: 'C:/home/dev/install' };
+  assert.deepEqual(pats('Get-ChildItem C:\\home\\dev\\install\\vendor\\ServiceNowDocs\\markdown\\customer-service-management | Get-Content', ps), ['dir:markdown/customer-service-management']);
+});
+
+test('ARC-09-C267 review 2, item 4 — what a script says is run is the file an interpreter or a shell is given, not its code; bash -e is errexit', () => {
+  const runs = (command, opts) => commandReads(command, opts).runs.sort();
+  assert.deepEqual(runs('python3 -u /tmp/a.py --all'), ['a.py']);
+  assert.deepEqual(runs('bash -e /tmp/r.sh'), ['r.sh']);
+  assert.deepEqual(runs('bash -eu /tmp/r.sh'), ['r.sh']);
+  assert.deepEqual(runs('sh r.sh && python3 b.py'), ['b.py', 'r.sh']);
+  assert.deepEqual(runs('source /tmp/r.sh'), ['r.sh']);
+  assert.deepEqual(runs('. /tmp/r.sh'), ['r.sh']);
+  assert.deepEqual(runs('./r.sh'), ['r.sh']);
+  assert.deepEqual(runs('/tmp/r.sh arg'), ['r.sh']);
+  assert.deepEqual(runs('nohup python3 /tmp/a.py'), ['a.py']);
+  for (const code of ['bash -c "cat x"', 'bash -lc "cat x"', 'node -e "1"', 'perl -ne "print" f.txt', 'python3 -m pytest tests', 'python3 -c "print(1)"', 'cat /tmp/r.sh', 'ls /tmp', 'node /tmp/notes.md']) {
+    assert.deepEqual(runs(code), [], code);
+  }
+  assert.deepEqual(runs('pwsh -File /tmp/x.ps1', { powershell: true }), ['x.ps1']);
+  assert.deepEqual(runs('pwsh -Command x.ps1', { powershell: true }), []);
+  assert.deepEqual(runs('.\\x.ps1', { powershell: true }), ['x.ps1']);
+  assert.deepEqual(runs('python -c "1" ; python y.py', { powershell: true }), ['y.py']);
+});
+
+test('ARC-09-C267 review 2, item 4 — the pages a script that ran names are pages it may have shown; one that did not run shows none', () => {
+  const script = 'for name in ["c_Beta.md"]:\n    print(open(base + name).read())\nimport glob\nglob.glob("/x/ServiceNowDocs/markdown/csm/c_Esc*.md")\n';
+  const ran = walkThread(rowsOf(writeCall('w', '/tmp/readpages.py', script), bashCall('b', 'python3 /tmp/readpages.py')), {});
+  assert.ok(ran.opaque.some((o) => o.text.includes('c_Beta.md')), 'the script\'s text is a call text for the names rule');
+  assert.deepEqual(ran.patterns.map((p) => p.w), ['/x/ServiceNowDocs/markdown/csm/c_Esc*.md'], 'and its glob tokens are the call\'s patterns');
+  const never = walkThread(rowsOf(writeCall('w', '/tmp/readpages.py', script)), {});
+  assert.deepEqual(never.opaque, []);
+  assert.deepEqual(never.patterns, []);
+  const twice = walkThread(rowsOf(writeCall('w', '/tmp/readpages.py', script), bashCall('b', 'python3 /tmp/readpages.py'), bashCall('c', 'python3 /tmp/readpages.py')), {});
+  assert.equal(twice.opaque.filter((o) => o.text.includes('c_Beta.md')).length, 1, 'once, however often it ran');
+  // a run that failed shows nothing of the script
+  const failed = walkThread(rowsOf(writeCall('w', '/tmp/readpages.py', script), [A([{ type: 'tool_use', id: 'f', name: 'Bash', input: { command: 'python3 /tmp/readpages.py' } }], { cwd: '/home/dev/install' }), res('f', 'Exit code 1', { is_error: true })]), {});
+  assert.deepEqual(failed.opaque, []);
+  assert.deepEqual(failed.writes.map((w) => w.script), [false]);
+});
+
+test('ARC-09-C267 review 2, item 7 — find -exec follows the same rule: a listing in it shows no page, a viewer in it shows', () => {
+  for (const command of [`find ${ROOT} -name '*.md' -exec grep -l major_incident {} +`, `find ${CSM} -type f -exec wc -l {} +`, `find ${CSM} -type f -exec ls -la {} \;`]) {
+    assert.equal(viewerOf(command), false, `${command} lists`);
+    assert.deepEqual(pats(command), [], `${command} shows no page`);
+  }
+  for (const command of [`find ${ROOT} -name '*.md' -exec grep -n major_incident {} +`, `find ${CSM} -type f -exec head -3 {} +`]) {
+    assert.equal(viewerOf(command), true, `${command} shows lines`);
+    assert.ok(pats(command).length > 0, `${command} covers pages`);
+  }
+  // find given a shell keeps its patterns: the shell may read a page with no viewer verb
+  assert.ok(pats(`find ${ROOT} -name 'c_A*.md' -exec sh -c 'cat "$1"' _ {} \;`).length > 0);
+});
+
+test('ARC-09-C267 review 2, item 5 — a write to a page of the corpus does not make its name the session\'s own', () => {
+  const corpusPage = '/home/dev/install/vendor/ServiceNowDocs/markdown/it-service-management/c_Alpha.md';
+  const walked = walkThread(rowsOf(writeCall('w1', corpusPage, 'x'), bashCall('b', `cat > ${corpusPage} <<'EOF'\nx\nEOF`), writeCall('w2', '/home/dev/install/clients/acme/Notes.md', 'x')), {});
+  assert.deepEqual([...walked.ownFiles], ['notes.md']);
+});
+
+test('ARC-09-C267 review 2, item 5 — a name that stands right after a slash is part of a path, even a path from the root, and a name its own page\'s path was given for is not cited twice', () => {
+  assert.deepEqual(find(rowsOf(), 'The file is at /c_Beta.md.').items, [], 'a path from the root');
+  assert.deepEqual(find(rowsOf(), 'The file is at docs/c_Beta.md.').items, [], 'a path in the project');
+  assert.deepEqual(find(rowsOf(), `The rule is in ${BETA}; c_Beta.md says it.`).items.map((i) => i.path), [BETA], 'a page cited by its path and by its name is one citation');
+  assert.deepEqual(find(rowsOf(), `${BETA} was not read. c_Beta.md is only a pointer.`).items, [], 'a path the answer says it did not read, and its name: one page, declared');
+  assert.deepEqual(find(rowsOf(), 'See c_Beta.md.').items.map((i) => i.path), ['c_Beta.md'], 'a name alone is a citation');
+});

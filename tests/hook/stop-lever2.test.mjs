@@ -359,7 +359,8 @@ withInstall('ARC-09-C267 lever 2 — an unresolved call that has a viewer verb s
   const loop = `for f in $(ls ${folder}); do echo "== $f"; head -3 ${folder}/$f; done`;
   silent(await stop(t, { rows: out('b', loop, listing), message: both }), 'the loop over $(ls dir) with head names both in its output');
   asked(await stop(t, { rows: out('b', loop, listing), message: cite(PAGE.gamma) }), PAGE.gamma);
-  asked(await stop(t, { rows: out('b', loop, '== xc_Alpha.md\n== c_Alpha.md.bak\n'), message: cite(PAGE.alpha) }), PAGE.alpha);
+  // a part of a longer name in the output is no page (a loop that names no corpus folder: one that does covers the folder, review 2 item 3)
+  asked(await stop(t, { rows: out('b', 'for f in $(cat list.txt); do echo "== $f"; head -3 "$f"; done', '== xc_Alpha.md\n== c_Alpha.md.bak\n'), message: cite(PAGE.alpha) }), PAGE.alpha);
   // head over several files prints a header for each
   silent(await stop(t, { rows: out('b', `ls ${folder} | sed 's|^|${folder}/|' | xargs head -2`, `==> ${page} <==\n1\tx\n\n==> ${i.abs(PAGE.beta)} <==\n1\tx\n`), message: both }), 'xargs head: the headers name the pages');
   silent(await stop(t, { rows: out('b', `find ${folder} -name '*.md' -exec head -1 {} +`, `==> ${page} <==\n1\tx\n`), message: cite(PAGE.alpha) }), 'find -exec head');
