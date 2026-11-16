@@ -66,8 +66,8 @@
 
 /* Contrast: the design's small grey labels were 3.8:1 on the page colour and its links 3.1:1 on a dark callout. These three tokens
    are the only colour change; every pair the page uses is checked at 4.5:1 in both themes by tests/install-windows-guide-html.test.mjs. */
-:root, [data-theme="light"] { --ink-3: #5F5B51; --on-ok: #FBFAF5; --link: var(--accent); }
-[data-theme="dark"] { --ink-3: #A29E90; --on-ok: #0B0B0A; --link: #A5A3FF; }
+:root, [data-theme="light"] { --ink-3: #5F5B51; --on-ok: #FBFAF5; --on-warn: #FBFAF5; --link: var(--accent); }
+[data-theme="dark"] { --ink-3: #A29E90; --on-ok: #0B0B0A; --on-warn: #0C0C0B; --link: #A5A3FF; }
 
 /* ── Reset and base (MONOLITH base.css, without its fixed heights) ───────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -138,6 +138,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
 .btn.pri:hover { color: var(--paper); }
 .flag.on { color: var(--ink); }
 .timer .btn { margin-left: auto; }
+/* The reset button: armed by the first click (amber, and a symbol in its words), and the two seconds after the clear. The id wins over the hover. */
+#btn-reset.armed, #btn-reset.armed:hover { background: var(--warn); color: var(--on-warn); }
+#btn-reset.cleared, #btn-reset.cleared:hover { background: var(--ok); color: var(--on-ok); }
 .sec h3 span#need-count, .sec h3 span#need-missing-count { font: inherit; }
 .tw table { min-width: 100%; }
 .need-row label { color: var(--ink); }
@@ -404,6 +407,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <button type="button" class="btn" id="btn-theme">☾ Dark</button>
           <button type="button" class="btn" id="btn-reset">Reset checkmarks</button>
         </div>
+        <span class="sr-only" id="reset-live" role="status" aria-live="polite"></span>
         <p class="keys">Keys: <span class="key">N</span> next command · <span class="key">C</span> copy it · <span class="key">/</span> find a problem</p>
       </div>
     </nav>
@@ -2011,10 +2015,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   var CMD = {};
   D.commands.forEach(function (c) { CMD[c.id] = c; });
   var STEPS = D.steps;
-  var STEP_BY_ID = {};
-  STEPS.forEach(function (s) { STEP_BY_ID[s.id] = s; });
-  var ALL_CMDS = [];
-  STEPS.forEach(function (s) { s.cmds.forEach(function (c) { ALL_CMDS.push({ cid: c[0], t: c[1], min: c[2], step: s.id }); }); });
   var TROUBLE_BY_ID = {};
   D.trouble.forEach(function (r) { TROUBLE_BY_ID[r.id] = r; });
   var SAMPLE_LIC = 'LIC-2026-0000.json';
@@ -2189,6 +2189,50 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     return { items: items, sum: ocSum(items) };
   }
 
+  // ── Progress, as the Contents and the Next button read it, and the reset: functions of the state and nothing else, so a test runs them ──
+  var STEP_BY_ID = {};
+  D.steps.forEach(function (s) { STEP_BY_ID[s.id] = s; });
+  var ALL_CMDS = [];
+  D.steps.forEach(function (s) { s.cmds.forEach(function (c) { ALL_CMDS.push({ cid: c[0], t: c[1], min: c[2], step: s.id }); }); });
+  function navModel(st, live) {
+    var links = D.nav.filter(function (x) { return x.id && (!x.live || live); });
+    var ids = links.map(function (x) { return x.id; });
+    var ai = Math.max(0, ids.indexOf(st.active));
+    var ri = Math.max(ai, ids.indexOf(st.reached));
+    var needL = D.need.filter(function (x) { return !x.live || live; });
+    var needDone = needL.filter(function (x) { return st.need[x.id]; }).length;
+    var items = links.map(function (x, idx) {
+      var on = idx === ai, count = '', complete = false, sp = STEP_BY_ID[x.id];
+      if (sp) { var n = sp.cmds.filter(function (c) { return st.done[c[0]]; }).length; complete = n === sp.cmds.length || st.chk[x.id] === 'yes'; count = n + '/' + sp.cmds.length; }
+      else if (x.id === 'need') { complete = needDone === needL.length; count = needDone + '/' + needL.length; }
+      var passed = idx < ri || complete;
+      return { id: x.id, on: on, passed: passed, complete: complete, count: complete ? '' : count, cls: on ? 'on' : (passed ? 'past' : ''),
+        mark: st.chk[x.id] === 'no' && !on ? '!' : (passed && !on ? '✓' : x.n) };
+    });
+    return { ids: ids, items: items, ai: ai, ri: ri, needDone: needDone, needTotal: needL.length, pct: Math.round((ri + 1) / links.length * 100) + '%' };
+  }
+  function nextModel(st, live) {
+    var done = 0, left = 0, next = null;
+    ALL_CMDS.forEach(function (c) {
+      if (st.done[c.cid]) done++;
+      else { left += (c.cid === 's6' && !live) ? D.designMinutes.s6 : c.min; if (!next) next = c; }
+    });
+    return { done: done, total: ALL_CMDS.length, left: left, next: next,
+      text: next ? 'Next command · ' + done + '/' + ALL_CMDS.length + ' done · ~' + Math.max(1, Math.round(left)) + ' min left' : 'Install complete' };
+  }
+  // The reset: what it leaves (the first section is the one reached and the one the reader is in), and which stored keys it drops. What the reader
+  // typed or chose (Your details, the URL, the mode, the view, the theme) is not among them, and the furthest section is written back, not removed.
+  function resetState(first) { return { done: {}, need: {}, chk: {}, timers: {}, reached: first, active: first, focus: first, resume: false }; }
+  function resetKeys(keys) { return keys.filter(function (k) { return k.indexOf('aiarch.cmd.') === 0 || k === 'aiarch.need' || k === 'aiarch.chk'; }); }
+  // The button takes two clicks: the first arms it and clears nothing; a second inside four seconds clears. Esc, focus moving away and a click
+  // elsewhere take the first back, and so does the time (the page's timer). `act`: 'arm', 'clear', 'cancel', or null for nothing to do.
+  function resetFlow(armedAt, event, now) {
+    if (event === 'click') return armedAt && now - armedAt <= 4000 ? { armedAt: 0, act: 'clear' } : { armedAt: now, act: 'arm' };
+    if (event === 'esc' || event === 'blur' || event === 'away') return { armedAt: 0, act: armedAt ? 'cancel' : null };
+    return { armedAt: armedAt, act: null };
+  }
+  function resetLabel(state) { return state === 'cleared' ? 'Cleared ✓' : (state === 'armed' ? '⚠ Click again to clear' : 'Reset checkmarks'); }
+  function resetWords(state) { return state === 'cleared' ? 'Cleared ✓' : (state === 'armed' ? 'Click again to clear' : ''); }
   /* @pure-end */
 
   /* ── State ───────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -2196,7 +2240,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     lic: SAMPLE_LIC, label: 'pdi', url: '', mode: 'live', done: {}, need: {}, chk: {}, timers: {}, now: Date.now(),
     out: { v: '', pre: '', lic: '' }, q: '', helpText: '', copiedUrl: false, helpCopied: false,
     active: 'need', reached: 'need', focus: 'need', view: 'all', theme: 'light', open: false,
-    resume: false, resumeHidden: false,
+    resume: false, resumeHidden: false, noReach: false, cleared: false, armedAt: 0,
     pb: { env: 'pdi', flags: presetFlags('full') },
     sim: { step: 1, label: 'pdi', url: '', env: 'pdi', auth: 'basic', user: 'admin', flags: presetFlags('full'), applied: false }
   };
@@ -2707,15 +2751,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   function derive() {
     var live = S.mode === 'live';
     var navL = navList(), ls = navL.filter(function (x) { return x.id; });
-    var ids = ls.map(function (x) { return x.id; });
-    var ai = Math.max(0, ids.indexOf(S.active));
-    var ri = Math.max(ai, ids.indexOf(S.reached));
+    var nav = navModel(S, live), nxt = nextModel(S, live);
     var needL = D.need.filter(function (x) { return !x.live || live; });
-    var needDone = needL.filter(function (x) { return S.need[x.id]; }).length;
-    var doneC = ALL_CMDS.filter(function (c) { return S.done[c.cid]; }).length;
-    var left = 0;
-    ALL_CMDS.forEach(function (c) { if (!S.done[c.cid]) left += (c.cid === 's6' && !live) ? D.designMinutes.s6 : c.min; });
-    return { live: live, navL: navL, links: ls, ids: ids, ai: ai, ri: ri, needL: needL, needDone: needDone, doneC: doneC, left: left, nx: nextCmd() };
+    return { live: live, navL: navL, links: ls, ids: nav.ids, ai: nav.ai, ri: nav.ri, nav: nav, needL: needL, needDone: nav.needDone, doneC: nxt.done, left: nxt.left, nx: nxt.next };
   }
   var NAVEL = {};
   var NEEDEL = {};
@@ -2731,21 +2769,17 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   }
   function renderNav(d) {
     var stepSet = {};
-    d.ids.forEach(function (id, idx) {
-      var e = NAVEL[id], x = e.item, on = idx === d.ai;
-      var count = '', complete = false, sp = STEP_BY_ID[id];
-      if (sp) { var n = sp.cmds.filter(function (c) { return S.done[c[0]]; }).length; complete = n === sp.cmds.length || S.chk[id] === 'yes'; count = n + '/' + sp.cmds.length; }
-      else if (id === 'need') { complete = d.needDone === d.needL.length; count = d.needDone + '/' + d.needL.length; }
-      var passed = idx < d.ri || complete;
-      e.a.className = on ? 'on' : (passed ? 'past' : '');
-      if (on) e.a.setAttribute('aria-current', 'location'); else e.a.removeAttribute('aria-current');
-      setText(e.span, S.chk[id] === 'no' && !on ? '!' : (passed && !on ? '✓' : x.n));
-      setText(e.em, complete ? '' : count);
-      stepSet[id] = true;
+    d.nav.items.forEach(function (it) {
+      var e = NAVEL[it.id];
+      e.a.className = it.cls;
+      if (it.on) e.a.setAttribute('aria-current', 'location'); else e.a.removeAttribute('aria-current');
+      setText(e.span, it.mark);
+      setText(e.em, it.count);
+      stepSet[it.id] = true;
     });
     Object.keys(NAVEL).forEach(function (id) { NAVEL[id].a.hidden = !stepSet[id]; });
     var cur = d.links[d.ai] || d.links[0];
-    var pct = Math.round((d.ri + 1) / d.links.length * 100) + '%';
+    var pct = d.nav.pct;
     setText($('#nav-head'), 'Contents · ' + pct + ' passed · ' + (d.live ? 'live' : 'design-only'));
     setText($('#nav-cur'), (cur.n !== '—' ? cur.n + ' · ' : '') + cur.t);
     $('#nav-bar').style.width = pct;
@@ -2754,6 +2788,11 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     setText($('#nav-caret'), S.open ? '▲ Close' : '▼ Open');
     setText($('#btn-view'), S.view === 'step' ? '☰ Show all steps' : '▤ One step at a time');
     setText($('#btn-theme'), S.theme === 'dark' ? '☀ Light' : '☾ Dark');
+    var rb = $('#btn-reset'), rs = S.cleared ? 'cleared' : (S.armedAt ? 'armed' : '');
+    setText(rb, resetLabel(rs));
+    rb.classList.toggle('armed', rs === 'armed');
+    rb.classList.toggle('cleared', rs === 'cleared');
+    setText($('#reset-live'), resetWords(rs));
   }
   function buildNeed() {
     var box = $('#need-list');
@@ -2866,7 +2905,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     if (doc && doc.scrollHeight - doc.scrollTop - doc.clientHeight < 4) active = ids[ids.length - 1];
     var ch = false;
     if (active !== S.active) { S.active = active; ch = true; }
-    if (ids.indexOf(active) > ids.indexOf(S.reached)) { S.reached = active; save('aiarch.reached', active); ch = true; }
+    if (!S.noReach && ids.indexOf(active) > ids.indexOf(S.reached)) { S.reached = active; save('aiarch.reached', active); ch = true; }
     if (ch) render();
   }
   function setFocus(id, target) {
@@ -2903,11 +2942,45 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     };
     if (S.view === 'step' && S.focus !== 'trouble') { setFocus('trouble', 't-search'); setTimeout(go, 160); } else go();
   }
+  var armTimer = 0, clearedTimer = 0;
   function resetMarks() {
-    storedKeys().filter(function (k) { return k.indexOf('aiarch.cmd.') === 0; }).forEach(drop);
-    drop('aiarch.need'); drop('aiarch.reached'); drop('aiarch.chk');
-    S.done = {}; S.need = {}; S.chk = {}; S.timers = {}; S.reached = S.active;
+    var first = links()[0].id;
+    resetKeys(storedKeys()).forEach(drop);
+    var r = resetState(first);
+    S.done = r.done; S.need = r.need; S.chk = r.chk; S.timers = r.timers; S.reached = r.reached; S.active = r.active; S.focus = r.focus;
+    S.resume = r.resume; S.noReach = true;
+    save('aiarch.reached', first);
+    S.cleared = true;
+    clearTimeout(clearedTimer);
+    clearedTimer = setTimeout(function () { S.cleared = false; render(); }, 2000);
     render();
+    // Back to the top, at once under reduced motion. The scroll up passes every section, and the spy would raise the furthest one reached
+    // again to the one it starts in, so it may not until the scroll has ended.
+    if (S.view === 'step') setFocus(first);
+    else { try { window.scrollTo({ top: 0, behavior: rm() ? 'auto' : 'smooth' }); } catch (e) { window.scrollTo(0, 0); } }
+    var free = function () { S.noReach = false; };
+    setTimeout(free, 1600);
+    document.addEventListener('scrollend', function once() { document.removeEventListener('scrollend', once); free(); });
+  }
+  /** The first click arms the button and clears nothing; a second inside four seconds clears. */
+  function onResetClick() {
+    var f = resetFlow(S.armedAt, 'click', Date.now());
+    clearTimeout(armTimer);
+    S.armedAt = f.armedAt;
+    if (f.act === 'clear') return resetMarks();
+    S.cleared = false;
+    clearTimeout(clearedTimer);
+    armTimer = setTimeout(function () { S.armedAt = 0; render(); }, 4000);
+    render();
+  }
+  /** Esc, focus moving away or a click elsewhere take the first click back; true when there was one to take back. */
+  function disarm(event) {
+    var f = resetFlow(S.armedAt, event, Date.now());
+    if (f.act !== 'cancel') return false;
+    clearTimeout(armTimer);
+    S.armedAt = f.armedAt;
+    render();
+    return true;
   }
 
   /* ── Wiring ──────────────────────────────────────────────────────────────────────────────────────────────────── */
@@ -2919,7 +2992,8 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       setTimeout(function () { var el = document.getElementById(f); if (el) el.scrollIntoView({ block: 'start' }); }, 80);
     });
     $('#btn-theme').addEventListener('click', function () { S.theme = S.theme === 'dark' ? 'light' : 'dark'; save('aiarch.theme', S.theme); render(); });
-    $('#btn-reset').addEventListener('click', resetMarks);
+    $('#btn-reset').addEventListener('click', onResetClick);
+    $('#btn-reset').addEventListener('blur', function () { disarm('blur'); });
     $('#mode-live').addEventListener('click', function () { S.mode = 'live'; save('aiarch.mode', 'live'); render(); });
     $('#mode-design').addEventListener('click', function () { S.mode = 'design'; save('aiarch.mode', 'design'); render(); });
     $('#f-lic').addEventListener('input', function (e) { S.lic = e.target.value; save('aiarch.lic', S.lic); render(); });
@@ -2942,6 +3016,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     });
     document.addEventListener('keydown', function (e) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Escape' && S.armedAt) { disarm('esc'); return; }
       var t = e.target, tag = ((t && t.tagName) || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) { if (e.key === 'Escape' && t.blur) t.blur(); return; }
       var k = e.key;
@@ -2952,6 +3027,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       } else if (k === '/') { e.preventDefault(); goSearch(); }
       else if (k === 'Escape' && S.open) { S.open = false; render(); }
     });
+    document.addEventListener('click', function (e) {
+      if (S.armedAt && !(e.target && e.target.closest && e.target.closest('#btn-reset'))) disarm('away');
+    }, true);
     document.addEventListener('click', function (e) {
       if (S.view !== 'step') return;
       var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
