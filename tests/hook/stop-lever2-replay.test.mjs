@@ -53,6 +53,12 @@ withInstall('ARC-09-C267 replay B2 — a refused call shows nothing, and one tha
   asked(await stop(t, { rows: failedCall('b', `cat ${page} missing.md`, 'cat: missing.md: No such file or directory'), message: cite(PAGE.alpha) }), PAGE.alpha);
   // and the page it did not name is asked about as before
   asked(await stop(t, { rows: failedCall('b', `cat ${page} missing.md`, 'Exit code 1'), message: cite(PAGE.beta) }), PAGE.beta);
+  // a sub-agent's calls follow the same rule: its rows are walked with the same seams
+  const agent = [use('a1', 'Agent', { subagent_type: 'general-purpose', prompt: 'read it' }), res('a1', 'It says X.')];
+  const held = '1\tThe sn\\_example table.\ncat: missing.md: No such file or directory';
+  silent(await stop(t, { rows: agent, side: { a1: failedCall('s', `cat ${page} missing.md`, held) }, message: cite(PAGE.alpha) }), 'a sub-agent\'s failed cat whose result holds the page\'s line');
+  silent(await stop(t, { rows: agent, side: { a1: failedCall('s', `cat ${page} missing.md`, 'Exit code 1') }, message: cite(PAGE.alpha) }), 'a sub-agent\'s failed cat that ran');
+  asked(await stop(t, { rows: agent, side: { a1: failedCall('s', `cat ${page} missing.md`, 'This command requires approval') }, message: cite(PAGE.alpha) }), PAGE.alpha);
 });
 
 // ---- B3 -----------------------------------------------------------------------------------------------------------------------------------------

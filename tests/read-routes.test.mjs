@@ -28,7 +28,9 @@ const use = (id, name, input, extra = {}) => A([{ type: 'tool_use', id, name, in
 const res = (id, content, extra = {}) => U([{ type: 'tool_result', tool_use_id: id, content, ...extra }]);
 // Built, not spelled whole: engine lint L02 holds every literal `mcp__<server>__` under tests/ to the product's own server key.
 const MCP_FILE = ['mcp', 'srv', 'file_tool'].join('__');
-const call = (id, name, input, body = 'ok', { error = false, row = {} } = {}) => [use(id, name, input, row), res(id, body, error ? { is_error: true } : {})];
+// A shell call that ran and failed says so, as Claude Code's text does (`Exit code N`); a refused one does not (tests/lever2-replay.test.mjs).
+const ranAndFailed = (name, body) => ((name === 'Bash' || name === 'PowerShell') && !/^Exit code/.test(body) ? `Exit code 1\n${body}` : body);
+const call = (id, name, input, body = 'ok', { error = false, row = {} } = {}) => [use(id, name, input, row), res(id, error ? ranAndFailed(name, body) : body, error ? { is_error: true } : {})];
 
 // ---- the page a path names ----------------------------------------------------------------------------------------------------
 test('ARC-09-C267 read-routes — pageAt: one page, in any spelling a call may carry; a folder, a glob, a list and another file are none', () => {
@@ -424,7 +426,7 @@ test('ARC-09-C267 read-routes — walkThread: a failed viewer call shows the pag
   assert.deepEqual([...walked.reached.keys()], [PAGE, 'markdown/csm/c_Eighth.md'], 'a.md of a failed cat, and the page of a failed head; not the one that is not on disk, not the python call, not what a failed cd would have set');
   assert.deepEqual(walked.opaque.map((o) => o.text), ['c_Third.md', 'x', 'for f in $(ls d); do echo "== $f"; head -3 d/$f; done', '== c_Fifth.md\n1\tx', 'python3 -c "print(1)"'],
     'the cat after the failed cd had no folder, so its name and its output; the loop and its output; the python call, whose output is not read, for it has no viewer');
-  assert.deepEqual(walked.failedOpaque.map((o) => o.text), ['for f in $(ls d); do head -3 d/$f; done', '== c_Seventh.md'], 'what a failed call with a viewer leaves, apart');
+  assert.deepEqual(walked.failedOpaque.map((o) => o.text), ['for f in $(ls d); do head -3 d/$f; done', 'Exit code 1\n== c_Seventh.md'], 'what a failed call with a viewer leaves, apart');
   assert.deepEqual([...walkThread(rows).reached.keys()], [], 'with no way to ask whether a page is on disk a failed call shows nothing');
   const long = walkThread([U('q'), ...call('l', 'Bash', { command: 'for f in $(ls d); do head -3 d/$f; done' }, `${'x'.repeat(600_000)} c_Late.md`)]);
   assert.ok(long.opaque[1].text.length <= 500_000, 'an output is kept to its first 500,000 characters');
@@ -521,7 +523,7 @@ test('ARC-09-C267 read-routes — turnSources carries the texts of the failed an
   const t = turnSources(rows, { pageExists: (p) => !p.endsWith('c_Gone.md') });
   assert.deepEqual([...t.reached.keys()], [PAGE], 'the failed cat shows the page that is on disk, from the folder the row records');
   assert.deepEqual(t.opaque, ['ls d | xargs head -2', '==> d/c_Other.md <==']);
-  assert.deepEqual(t.opaqueFailed, ['for f in c_Third.md; do head -3 "$f"; done', 'out']);
+  assert.deepEqual(t.opaqueFailed, ['for f in c_Third.md; do head -3 "$f"; done', 'Exit code 1\nout']);
 });
 
 test('ARC-09-C267 read-routes — walkThread and turnSources take the file system the caller gives: a pattern in a call shows the pages it expands to', () => {

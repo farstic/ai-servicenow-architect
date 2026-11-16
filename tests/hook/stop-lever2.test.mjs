@@ -364,7 +364,7 @@ withInstall('ARC-09-C267 lever 2 — an unresolved call that has a viewer verb s
   // head over several files prints a header for each
   silent(await stop(t, { rows: out('b', `ls ${folder} | sed 's|^|${folder}/|' | xargs head -2`, `==> ${page} <==\n1\tx\n\n==> ${i.abs(PAGE.beta)} <==\n1\tx\n`), message: both }), 'xargs head: the headers name the pages');
   silent(await stop(t, { rows: out('b', `find ${folder} -name '*.md' -exec head -1 {} +`, `==> ${page} <==\n1\tx\n`), message: cite(PAGE.alpha) }), 'find -exec head');
-  silent(await stop(t, { rows: out('b', loop, listing, { error: true }), message: both }), 'a failed loop: its output counts as well');
+  silent(await stop(t, { rows: out('b', loop, `Exit code 1\n${listing}`, { error: true }), message: both }), 'a failed loop that ran: its output counts as well');
   // no viewer verb: what an interpreter or a listing printed shows no page
   asked(await stop(t, { rows: out('b', `python3 -c "import os; print(os.listdir('${folder}'))"`, "['c_Alpha.md', 'c_Beta.md']"), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: out('b', `for f in $(ls ${folder}); do echo "$f"; done`, 'c_Alpha.md\nc_Beta.md\n'), message: cite(PAGE.alpha) }), PAGE.alpha);

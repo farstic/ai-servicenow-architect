@@ -167,7 +167,7 @@ export function makeShown(turn, options = {}) {
     if (!Array.isArray(got) && Array.isArray(got?.incomplete)) side.incomplete = got.incomplete.slice();
     for (const rows of threads) {
       // A sub-agent's folder is reset before every Bash call (carryFolder: false).
-      const walked = walkThread(rows, { glob: options.glob, pageExists: options.pageExists, carryFolder: false, shouldStop: options.shouldStop });
+      const walked = walkThread(rows, { glob: options.glob, pageExists: options.pageExists, pageText: options.pageText, carryFolder: false, shouldStop: options.shouldStop });
       for (const page of walked.reached.keys()) side.pages.add(page);
       for (const o of walked.opaque) side.opaque.push(o.text);
       for (const o of walked.failedOpaque) side.opaqueFailed.push(o.text);

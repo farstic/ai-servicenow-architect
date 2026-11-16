@@ -209,7 +209,10 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
       isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD, askedOnly: true, incomplete, pagesNamed,
       carryFolder: keepsFolder(seams.env ?? process.env),
       sideRows,
-      glob: makeGlob({ shouldStop: stop }), pageExists: (page) => existsSync(join(root, CORPUS_DIR, ...page.split('/'))), ...(seams.options ?? {}) };
+      glob: makeGlob({ shouldStop: stop }), pageExists: (page) => existsSync(join(root, CORPUS_DIR, ...page.split('/'))),
+      // The text of a page, for the one question whether the result of a call that failed holds a line of it (read-routes.mjs, B2); the first 200,000 characters.
+      pageText: (page) => { try { return readFileSync(join(root, CORPUS_DIR, ...page.split('/')), 'utf8').slice(0, 200_000); } catch { return null; } },
+      ...(seams.options ?? {}) };
     if (input.stop_hook_active) {
       const r = residualFindings({ rows: transcript?.rows ?? null, reply: message, index, coverage: index?.coverage ?? null, options });
       for (const n of r.notes ?? []) debug(n);

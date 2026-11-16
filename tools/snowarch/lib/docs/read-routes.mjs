@@ -743,6 +743,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
   let flagged = false;                                             // a viewer or a search of the call has an expansion in its words
   const saved = [];
   const patterns = new Map();                                      // { w, ci } by spelling, or { dir }: what a glob, a brace word or a folder of the call could name
+  const printing = new Map();                                      // the name filters of a search under the corpus that prints lines: `searchPatterns` (B3)
   const runs = new Set();                                          // the base names of the files the call runs (read-routes.mjs, `ranFiles`)
   const segInfo = [];                                              // the words of each segment and the folder it ran in, for the patterns of a call left unresolved
   const add = (page, verb) => { if (!reads.has(page)) reads.set(page, verb); };
@@ -775,6 +776,17 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       if (rowCwd !== null && rowCwd !== folder) full.push(joinPath(rowCwd, stem));
     }
     return full.map(corpusFolder).filter((dir) => dir !== null);
+  };
+  /** The corpus folders a segment names or runs on: its folder words, and the shell's own when it is given none. */
+  const rootsOf = (info, named) => {
+    const roots = new Set();
+    const takesFolders = showing.has(info.key) || searching.has(info.key) || LISTERS.has(info.key) || ['xargs', 'parallel', 'for', 'select'].includes(info.key);       // not `echo x`
+    for (const w of takesFolders ? rootWords(info, showing, searching, powershell) : []) {
+      if (w.startsWith('-') || NOT_A_PATH.test(w) || PATTERN_WORD.test(w) || /^\d+$/.test(w)) continue;
+      for (const dir of foldersOf(w, info.folder, info.gone)) roots.add(dir);
+    }
+    if (searchesCwd(info, named, searching, powershell)) for (const dir of foldersOf('.', info.folder, info.gone)) roots.add(dir);
+    return roots;
   };
   const consider = (raw, key) => {
     for (const arg of powershell ? [raw] : expandBraces(raw)) {
@@ -841,6 +853,12 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
     viewer = true;
     if (seg.x) flagged = true;
     if (searchesFiles) searched.push(at);
+    if (searchesFiles && !powershell) {
+      const named = nameFiltersOf(key, rest.slice(1), false);
+      if (named.filters.length && rootsOf({ key, words: rest.slice(1), op: seg.op, folder: at, gone: folderLost }, named).size > 0) {
+        for (const f of named.filters) if (printing.size < 16 && f.value.length <= MAX_WORD) printing.set(`${f.ci ? 'i' : 's'}\0${f.value}`, { w: posix(f.value), ci: f.ci });
+      }
+    }
     if (powershell && showsLines && files.length === 0 && seg.op === '|') { opaque = true; return; }       // Get-Content reads what the pipe gives it
     for (const w of files) consider(powershell ? w : w.replace(/^<+/, ''), key);                          // cat <page.md
   });
@@ -863,20 +881,14 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
         for (const f of named.filters) if (f.ci || PATTERN_WORD.test(f.value)) addFilter(f.value, f.ci);
         // The glob and brace words of the call, each as the folder it ran in makes it; the scripts a word cannot be read inside (a quoted `python3 -c "…"`)
         // by the tokens in them, as written. The plain words of a segment that name a folder under the corpus are its roots (item 3).
-        const roots = new Set();
         info.words.forEach((w, n) => {
           if (named.used.has(n) || w.startsWith('-')) return;
           if (NOT_A_PATH.test(w)) { for (const token of patternsInText(w)) addPattern(token, null, true, true); return; }
           if (PATTERN_WORD.test(w)) addPattern(w, info.folder, info.gone);
         });
-        // Folders count when the call has a viewer to feed them to: `git -C <corpus> show HEAD:<page>` names the corpus and reads one page.
-        const takesFolders = showing.has(info.key) || searching.has(info.key) || LISTERS.has(info.key) || ['xargs', 'parallel', 'for', 'select'].includes(info.key);       // not `echo x`
-        for (const w of viewer && takesFolders ? rootWords(info, showing, searching, powershell) : []) {
-          if (w.startsWith('-') || NOT_A_PATH.test(w) || PATTERN_WORD.test(w) || /^\d+$/.test(w)) continue;
-          for (const dir of foldersOf(w, info.folder, info.gone)) roots.add(dir);
-        }
-        // A lister or searcher given no folder runs on the one the shell stands in (`cd <area> && ls | xargs head`).
-        if (viewer && searchesCwd(info, named, searching, powershell)) for (const dir of foldersOf('.', info.folder, info.gone)) roots.add(dir);
+        // Folders count when the call has a viewer to feed them to: `git -C <corpus> show HEAD:<page>` names the corpus and reads one page. A lister or searcher
+        // given no folder runs on the one the shell stands in (`cd <area> && ls | xargs head`).
+        const roots = viewer ? rootsOf(info, named) : new Set();
         // A regex filter of find (`-regex`, `-iregex`) is not a glob: it covers what the search covers, which is the folder it names, or every page when none.
         // A name filter narrows a folder's pages (its pattern is the match), so the folder is added only for a segment that has none.
         if (named.any) {
@@ -887,7 +899,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       for (const script of scripts) for (const token of patternsInText(script)) addPattern(token, null, true, true);
     }
   }
-  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer, runs: [...runs], patterns: [...patterns.values()] };
+  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer, runs: [...runs], patterns: [...patterns.values()], searchPatterns: [...printing.values()] };
 }
 
 /**
@@ -927,17 +939,24 @@ export const pagesOfInput = (input, opts) => inputReads(input, opts).pages;
 /**
  * The corpus pages whose lines a search printed: the lines that begin with a page's path and then `:` or `-` (`path:12:text`, `path-12-context`,
  * `path:text`; a drive letter may come first). A path that is relative to a folder (`c_Esc.md:12:text`, from a search run inside it) is joined to
- * each of `bases`. A line that is only a path (a listing) or a count (`path:3` is read the same way, so the caller does not pass one) names a page
- * no more than the search it came from showed. Pure.
+ * the `bases` in order, and names the first page that exists: with `pageExists` (the disk) the first base under which the page is there, and never a page that
+ * is not (the replay over the C268 sessions, B1: a doubled page, `markdown/a/markdown/a/x.md`, is a path of the right shape that no disk holds); without it
+ * the first base that makes a page. A line that is only a path (a listing) or a count (`path:3` is read the same way, so the caller does not pass one) names a
+ * page no more than the search it came from showed. Pure.
  */
-export function pagesInLines(body, bases = []) {
+export function pagesInLines(body, bases = [], { pageExists = null } = {}) {
   const pages = new Set();
   if (typeof body !== 'string' || !body.includes('.md')) return pages;
   for (const line of body.split(/\r?\n/)) {
     const m = /^((?:[A-Za-z]:)?[^:]*?\.md)(?::|-)/.exec(line);
     if (!m) continue;
-    let page = pageAt(m[1]);
-    for (const base of bases) if (!page && typeof base === 'string' && base) page = pageAt(joinPath(base, m[1]));
+    let page = pageAt(m[1]);                                    // a path that is absolute names its page: the tool printed it
+    for (const base of bases) {
+      if (page) break;
+      if (typeof base !== 'string' || !base) continue;
+      const found = pageAt(joinPath(base, m[1]));
+      if (found && (typeof pageExists !== 'function' || pageExists(found))) page = found;
+    }
     if (page) pages.add(page);
   }
   return pages;
@@ -945,19 +964,24 @@ export function pagesInLines(body, bases = []) {
 
 /**
  * The corpus pages a Grep in content mode showed: the pages on the lines it returned, and the one page it searched when `path` names a file (its
- * lines carry no path). A Grep that only lists files or counts shows no line.
+ * lines carry no path). A Grep that only lists files or counts shows no line. A relative line is below the SESSION's folder (`rowCwd`), which is tried before
+ * the search path (B1); `seams` is `{ pageExists }`.
  */
-export function pagesOfGrep(input, body, rowCwd = null) {
+export function pagesOfGrep(input, body, rowCwd = null, seams = {}) {
   const pages = new Set();
   if (input?.output_mode !== 'content' || typeof body !== 'string' || !body.trim()) return pages;
   const one = pageAt(input.path);
   if (one) pages.add(one);
-  for (const page of pagesInLines(body, [input.path, rowCwd])) pages.add(page);
+  for (const page of pagesInLines(body, [rowCwd, input.path], seams)) pages.add(page);
   return pages;
 }
 
 /** The most of an output kept as text for the names rule. */
 const OUTPUT_CAP = 500_000;
+/** The result of a call that RAN and failed starts so (Claude Code's text); a refusal's does not. */
+const RAN = /^\s*Exit code\b/i;
+/** A line of a page shorter than this is no evidence that a result holds the page (a heading, a rule). */
+const MIN_EVIDENCE = 16;
 
 // ---- one thread of rows -----------------------------------------------------------------------------------------------------------------
 /** Tools that write a file, and the input fields that hold the text written. */
@@ -985,7 +1009,7 @@ const WRITERS = Object.freeze({
  * failed viewer call apart in `failedPatterns`. `shouldStop()` is the run's deadline: the walk stops at the next row, `aborted` says so. Nothing is
  * cut at a compaction boundary: a page read before it was read. Pure.
  */
-export function walkThread(rows, { glob = null, pageExists = null, carryFolder = true, shouldStop = null } = {}) {
+export function walkThread(rows, { glob = null, pageExists = null, pageText = null, carryFolder = true, shouldStop = null } = {}) {
   const uses = new Map();
   const reached = new Map();
   const writes = [];
@@ -1000,6 +1024,16 @@ export function walkThread(rows, { glob = null, pageExists = null, carryFolder =
   let cwd = null;
   let lost = false;
   const onDisk = typeof pageExists === 'function' ? pageExists : () => false;
+  const seams = typeof pageExists === 'function' ? { pageExists } : {};
+  const evidence = new Map();                                       // page → its lines long enough to be evidence that a result holds them
+  /** Does the text of a result hold a line of this page (B2)? Needs the page's text (`pageText`), which the hook reads from the corpus folder. */
+  const holdsLineOf = (said, page) => {
+    if (!evidence.has(page)) {
+      const text = typeof pageText === 'function' ? pageText(page) : null;
+      evidence.set(page, typeof text === 'string' ? text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= MIN_EVIDENCE).slice(0, 300) : []);
+    }
+    return evidence.get(page).some((line) => said.includes(line));
+  };
   const output = (b) => posix(textOfResult(b)).slice(0, OUTPUT_CAP);
   const reach = (page, route, at) => { if (!reached.has(page)) reached.set(page, { route, at }); };
   const keep = (into, list) => { for (const q of list) into.set(q.dir !== undefined ? `d\0${q.dir}` : `${q.ci}\0${q.w}`, q); };
@@ -1037,6 +1071,10 @@ export function walkThread(rows, { glob = null, pageExists = null, carryFolder =
         if (!carryFolder) { cwd = null; lost = false; }
         const done = commandReads(input.command, { powershell: name === 'PowerShell', cwd, rowCwd: use.rowCwd, lost, glob });
         if (!done.viewer) continue;
+        // A REFUSED call (permission, parse) never ran and shows nothing (the replay over the C268 sessions, B2). One that ran and failed says "Exit code N", or its
+        // result holds a line of a page it names: the prefix is not relied on alone, since a wording that changes would show every failed call as a refusal.
+        const said = textOfResult(b);
+        if (!RAN.test(said) && ![...done.reads.keys()].some((page) => holdsLineOf(said, page))) continue;
         for (const [page, verb] of done.reads) if (onDisk(page)) reach(page, verb, use.at);
         for (const text of done.unresolved) failedOpaque.push({ text: posix(text), at: use.at });
         if (done.unresolved.length) failedOpaque.push({ text: output(b), at: use.at });
@@ -1048,8 +1086,11 @@ export function walkThread(rows, { glob = null, pageExists = null, carryFolder =
         if (!carryFolder) { cwd = null; lost = false; }
         const done = commandReads(input.command, { powershell: name === 'PowerShell', cwd, rowCwd: use.rowCwd, lost, glob });
         const shown = new Map(done.reads);
-        if (done.searched.length) for (const page of pagesInLines(textOfResult(b), [...done.searched, use.rowCwd])) if (!shown.has(page)) shown.set(page, 'search');
+        const printed = done.searched.length ? pagesInLines(textOfResult(b), [...done.searched, use.rowCwd], seams) : new Set();
+        for (const page of printed) if (!shown.has(page)) shown.set(page, 'search');
         for (const [page, verb] of shown) reach(page, verb, use.at);
+        // A search that printed lines with no file name (`grep -rh`, `rg -I`) names no page: its name filter does (B3).
+        if (done.searchPatterns.length && printed.size === 0 && textOfResult(b).trim() !== '') keep(patterns, done.searchPatterns);
         if (shown.size) calls.set(b.tool_use_id, shown);
         if (done.moved) { cwd = done.cwd; lost = done.lost; }
         for (const text of done.unresolved) opaque.push({ text: posix(text), at: use.at });
@@ -1063,7 +1104,7 @@ export function walkThread(rows, { glob = null, pageExists = null, carryFolder =
         for (const file of done.runs) ran(file, use.at);
         continue;
       }
-      if (name === 'Grep') { for (const page of pagesOfGrep(input, textOfResult(b), use.rowCwd)) reach(page, 'Grep', use.at); continue; }
+      if (name === 'Grep') { for (const page of pagesOfGrep(input, textOfResult(b), use.rowCwd, seams)) reach(page, 'Grep', use.at); continue; }
       if (typeof name === 'string' && name.startsWith('mcp__')) {
         const done = inputReads(input, { rowCwd: use.rowCwd, glob });
         for (const page of done.pages) reach(page, 'mcp', use.at);

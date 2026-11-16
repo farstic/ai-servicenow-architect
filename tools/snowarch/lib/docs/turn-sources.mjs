@@ -213,7 +213,7 @@ export function turnSources(rows, options = {}) {
   };
 
   // The shell's folder and every route by which a page reached the main thread are one walk of its rows (read-routes.mjs).
-  const walked = walkThread(main, { glob: options.glob, pageExists: options.pageExists, carryFolder: options.carryFolder !== false, shouldStop: options.shouldStop });
+  const walked = walkThread(main, { glob: options.glob, pageExists: options.pageExists, pageText: options.pageText, carryFolder: options.carryFolder !== false, shouldStop: options.shouldStop });
   if (walked.aborted) out.aborted = true;
 
   // Pass 1 — the tool calls, by id; and where the current turn begins.

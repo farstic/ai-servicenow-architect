@@ -71,6 +71,9 @@ test('ARC-09-C267 replay B1 — walkThread: a Grep after a cd into the corpus re
   assert.deepEqual([...walkThread(shell, { pageExists: exists(CMDB_PAGE) }).reached.keys()], [CMDB_PAGE]);
   // a line that no base makes a page on disk reaches none
   assert.deepEqual([...walkThread(shell, { pageExists: exists('markdown/elsewhere/x.md') }).reached.keys()], []);
+  assert.deepEqual([...walkThread(rows, { pageExists: exists('markdown/elsewhere/x.md') }).reached.keys()], [], 'a Grep line the same');
+  // with no disk, the folder the shell stood in when it searched comes before the row's: the lines are relative to it
+  assert.deepEqual([...walkThread(shell, {}).reached.keys()], [CMDB_PAGE]);
 });
 
 // ---- B2: a refused call never ran ------------------------------------------------------------------------------------------------------------------
@@ -96,6 +99,9 @@ test('ARC-09-C267 replay B2 — a refused call reaches no page; a call that ran 
   assert.deepEqual(reached(failed('p', `Get-Content ${ESC}, missing.md`, 'Exit code 1\nGet-Content : Cannot find path', 'PowerShell')), [PAGE]);
   // a page that is not on disk is not named even then
   assert.deepEqual(reached(failed('b', `cat ${ESC} missing.md`, 'Exit code 1'), { pageExists: exists() }), []);
+  // the prefix is the START of the result: a refusal that says the words later is still a refusal
+  assert.deepEqual(reached(failed('b', `cat ${ESC} missing.md`, 'This command requires approval. A command that fails prints Exit code 1 first.')), []);
+  assert.deepEqual(reached(failed('b', `cat ${ESC} missing.md`, '  Exit code 2\nout')), [PAGE], 'white space before it is not the start of anything else');
 });
 
 test('ARC-09-C267 replay B2 — a refused call that cannot be resolved (a loop, xargs, a pattern) shows nothing either: not its text, not its output, not its patterns', () => {
@@ -155,4 +161,17 @@ test('ARC-09-C267 replay B3 — a resolved search that prints lines without a fi
   // a negated glob and --exclude filter nothing
   assert.equal(showsPage(`rg -I -g '!*.txt' assign ${AREA}`, MODULE), false);
   assert.equal(showsPage(`grep -rh --exclude='*.txt' assign ${AREA}`, MODULE), false);
+  // a search outside the corpus, or of a folder nobody can place, names no page by its filter (`*.md` would be every page)
+  assert.equal(showsPage("grep -rh --include='*.md' assign /home/dev/install/clients/acme", MODULE), false, 'a folder outside the corpus');
+  assert.equal(showsPage("grep -rh --include='*.md' assign clients/acme", MODULE), false, 'a folder in the project');
+  // lines that carry a file name name their pages, and the filter adds none of the others it matches
+  const HELPER = 'markdown/platform-administration/table-administration-and-data-management/c_AssignmentRulesHelper.md';
+  const named = `${AREA}/c_AssignmentRulesModule.md:3:assign the incident`;
+  assert.equal(showsPage(`grep -rn --include='c_AssignmentRules*' assign ${AREA}`, HELPER, named), false, 'a page the lines do not name');
+  assert.equal(showsPage(`grep -rn --include='c_AssignmentRules*' assign ${AREA}`, MODULE, named), false, 'its own lines are the search route\'s, not a pattern');
+  // the shell\'s own folder is the root of a search that is given none
+  const inArea = (command, body = '1\tassign the incident') => walkThread([U('how?'), use('b', 'Bash', { command }, { cwd: AREA }), res('b', body)], {}).patterns.some((q) => wordNamesPage(q.w, MODULE, { ci: q.ci }));
+  assert.equal(inArea("grep -rh --include='c_AssignmentRules*' assign"), true, 'no folder named: the one the shell stands in');
+  assert.equal(inArea("rg -I -g 'c_AssignmentRules*' assign"), true);
+  assert.equal(inArea("echo x | grep -h --include='c_AssignmentRules*' assign"), false, 'a pipe is its input');
 });
