@@ -74,6 +74,9 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
     write(root, page, `# Fixture page\n\n\`\`\`sh\ngit clone --branch v${version} `
       + `https://github.com/farstic/ai-servicenow-architect.git\n\`\`\`\n`);
   }
+  // ARC-09-C285 — the interactive Windows guide: the same clone line, and the release field of its data block.
+  write(root, 'docs/AI-Architect-Windows-Install-Guide.html', `<!DOCTYPE html>\n<script type="application/json" id="guide-data">\n{\n "release": "v${version}",\n `
+    + `"clone": "git clone --branch v${version} https://github.com/farstic/ai-servicenow-architect.git"\n}\n</script>\n`);
   write(root, 'docs/CHANGELOG.md', '# Changelog\n\n## Unreleased\n\n- something\n');
   write(root, 'engine.config.json', `${JSON.stringify(CONFIG, null, 2)}\n`);
   write(root, 'packages/snowarch/dist/contract.json', contract);
@@ -376,12 +379,14 @@ test('AC 1/2 — a green run commits once, tags once, and the tag carries the tw
   // `(?![-\d.])` and NOT `\b`, for the reason ARC-09-C12a spells it that way: the fixture seeds
   // these pages at `v2.0.0-dev`, and `\b` matches after the `0` in `v2.0.0-dev` too — so the first
   // cut of this assertion passed with the writer neutralised. Caught by running that control.
-  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'docs/INSTALL-WINDOWS.md']) {
+  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html']) {
     assert.match(read(root, page), /--branch v2\.0\.0(?![-\d.])/,
       `${page} does not name the version just cut`);
     assert.equal(/--branch v2\.0\.0-dev/.test(read(root, page)), false,
       `${page} still carries the pre-release tag — the writer did not rewrite it`);
   }
+  // ARC-09-C285 — and the release the interactive guide names moved with its clone line, not only the line.
+  assert.match(read(root, 'docs/AI-Architect-Windows-Install-Guide.html'), /"release": "v2\.0\.0"/);
   assert.match(read(root, 'docs/README-head.md'), /\*\*v2\.0\.0\*\* · /);
   assert.match(read(root, 'docs/CHANGELOG.md'), /## 2\.0\.0 — 2026-09-11/);
   assert.equal(git(root, ['status', '--porcelain']).trim(), '', 'the release left the tree dirty');
@@ -956,7 +961,7 @@ test('ARC-09-C61 — the install-page guard passes at the shape a release commit
   assert.deepEqual(allowed, ['v1.9.0', 'v2.0.0'],
     'the release commit\'s own version is not allowed on its pages — this is the refusal');
 
-  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'docs/INSTALL-WINDOWS.md']) {
+  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html']) {
     const named = cloneTagsIn(read(root, page));
     assert.ok(named.length > 0, `${page} names no clone tag after the release wrote it`);
     for (const tag of named) {

@@ -171,7 +171,7 @@ test('ARC-07-W8 — every clone command on a user page quiets the detached-HEAD 
   // A release tag is a TAG, so a correct clone earns fourteen lines of git advice about being in a
   // state the reader did not choose and cannot act on. The option is on every clone line, and the
   // page says once what the note means for anyone who clones another way.
-  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md']) {
+  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html']) {
     const clones = [...read(rel).matchAll(/git\b[^\n]*?\bclone --branch v\d/g)].map((m) => m[0]);
     assert.ok(clones.length > 0, `${rel} names no pinned clone`);
     for (const line of clones) {
@@ -460,7 +460,7 @@ test('ARC-06-C17 — Uninstall states BOTH halves: the default writes nothing, l
 // form to primary AND gives it a writer, because a version in a page that no writer owns is a
 // version that goes stale — this page is the evidence.
 
-const USER_PAGES = ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md'];
+const USER_PAGES = ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html'];
 
 test('ARC-09-C60 — no user page tells a reader to clone without pinning a release', () => {
   const offenders = [];
@@ -520,7 +520,7 @@ test('ARC-09-C61 — the pinned clone names the newest release that exists', asy
     return;
   }
 
-  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md']) {
+  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html']) {
     const named = cloneTagsIn(read(rel));
     assert.ok(named.length > 0, `${rel} names no release tag in a clone command`);
     for (const tag of named) {

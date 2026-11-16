@@ -1,0 +1,3001 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Architect — install guide for Windows</title>
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&amp;family=IBM+Plex+Mono:wght@400;500;600;700&amp;display=swap">
+<style>
+:root, [data-theme="light"] {
+  --paper:   #EFEDE4;   
+  --paper-2: #FBFAF5;   
+  --paper-3: #E3E0D4;   
+  --ink:     #0B0B0A;   
+  --ink-2:   #45433C;
+  --ink-3:   #7C786C;
+  --line:    #0B0B0A;   
+  --line-soft: rgba(11,11,10,0.16);
+
+  --accent:      #2B27E0;   
+  --accent-ink:  #FBFAF5;
+  --accent-soft: #DEDDFB;
+
+  --ok:   #0C7A33;  --ok-soft:   #CDE8D5;
+  --warn: #A85A00;  --warn-soft: #F2E2C8;
+  --bad:  #C81E1E;  --bad-soft:  #F2D2D2;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper:   #0C0C0B;
+  --paper-2: #15140F;
+  --paper-3: #201E18;
+  --ink:     #F2F0E6;
+  --ink-2:   #B6B2A4;
+  --ink-3:   #7E7A6C;
+  --line:    #F2F0E6;
+  --line-soft: rgba(242,240,230,0.18);
+
+  --accent:      #6E6BFF;
+  --accent-ink:  #0C0C0B;
+  --accent-soft: #211F4A;
+
+  --ok:   #4FC97A;  --ok-soft:   #173A24;
+  --warn: #E2A03C;  --warn-soft: #3A2D14;
+  --bad:  #F26464;  --bad-soft:  #3A1A1A;
+  color-scheme: dark;
+}
+
+/* ── MONOLITH tokens that are not colours: fonts, borders, shadows, the terminal palette ─────────────────────────── */
+:root {
+  --disp: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', 'Cascadia Mono', 'SF Mono', ui-monospace, Consolas, monospace;
+  --bw: 1.5px;
+  --bw-2: 2px;
+  --shadow-hard: 4px 4px 0 var(--ink);
+  --shadow-hard-sm: 3px 3px 0 var(--ink);
+  --shadow-accent: 4px 4px 0 var(--accent);
+  --term-bg: #0B0B0A;
+  --term-fg: #F2F0E6;
+  --term-dim: #8C887A;
+  --term-line: #2E2C26;
+  --term-bar: #1A1915;
+  --term-typed: #8F8CFF;
+}
+
+/* Contrast: the design's small grey labels were 3.8:1 on the page colour and its links 3.1:1 on a dark callout. These three tokens
+   are the only colour change; every pair the page uses is checked at 4.5:1 in both themes by tests/install-windows-guide-html.test.mjs. */
+:root, [data-theme="light"] { --ink-3: #5F5B51; --on-ok: #FBFAF5; --link: var(--accent); }
+[data-theme="dark"] { --ink-3: #A29E90; --on-ok: #0B0B0A; --link: #A5A3FF; }
+
+/* ── Reset and base (MONOLITH base.css, without its fixed heights) ───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+body { background: var(--paper); color: var(--ink); font-family: var(--disp); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+input, textarea, select { font: inherit; color: inherit; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+code, pre { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+::selection { background: var(--accent); color: var(--accent-ink); }
+::placeholder { color: var(--ink-3); opacity: 1; }
+:focus-visible { outline: var(--bw-2) solid var(--accent); outline-offset: 2px; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-soft); border: 3px solid var(--paper); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
+html { scroll-padding-top: 16px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+button:disabled { cursor: not-allowed; }
+
+/* ── What live and design-only show ──────────────────────────────────────────────────────────────────────────── */
+body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { display: none !important; }
+
+/* ── Command box ─────────────────────────────────────────────────────────────────────────────────────────────── */
+.cbox { display: flex; align-items: stretch; background: var(--term-bg); color: var(--term-fg); border: 2px solid var(--line); min-width: 0; transition: box-shadow .15s linear; }
+.cbox.flash { box-shadow: 0 0 0 4px var(--accent); }
+.cbox-mark { flex: 0 0 44px; display: grid; place-items: center; border: 0; border-right: 1px solid var(--term-line); background: transparent; cursor: pointer; padding: 0; }
+.cbox-mark span { width: 14px; height: 14px; border: 1.5px solid var(--term-dim); background: transparent; display: grid; place-items: center; color: var(--term-bg); font: 700 11px/1 var(--mono); }
+.cbox-mark.on span { border-color: var(--ok); background: var(--ok); }
+.cbox-mark.on span::before { content: '✓'; }
+.cbox-mark:hover span { border-color: var(--term-fg); }
+.cbox-code { flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: pre; padding: 12px 14px; font: 13.5px/1.5 var(--mono); background: transparent; color: inherit; }
+.cbox-ps { color: var(--term-dim); }
+.cbox-copy { flex: 0 0 auto; min-width: 100px; font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--term-fg); background: transparent; border: 0; border-left: 1px solid var(--term-line); padding: 0 14px; cursor: pointer; }
+.cbox-copy:hover { background: var(--accent); color: var(--accent-ink); }
+.cbox-copy.flash { background: var(--ok); color: var(--on-ok); }
+.cbox :focus-visible { outline-offset: -4px; }
+
+.cbox-code, .term-body { scrollbar-width: thin; scrollbar-color: #6B685C var(--term-bg); }
+
+/* ── Terminal box ────────────────────────────────────────────────────────────────────────────────────────────── */
+@keyframes aiblink { 50% { opacity: 0; } }
+.term { display: grid; min-width: 0; border: 2px solid var(--line); }
+.term-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--term-bar); color: var(--term-dim); padding-left: 12px; border-bottom: 1px solid var(--term-line); }
+.term-lab { display: flex; align-items: center; gap: 8px; font: 600 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; }
+.term-lab i { width: 8px; height: 8px; background: var(--term-dim); display: inline-block; }
+.term-play { font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--term-fg); background: transparent; border: 0; border-left: 1px solid var(--term-line); padding: 8px 14px; cursor: pointer; }
+.term-play:hover { background: var(--accent); color: var(--accent-ink); }
+.term-body { background: var(--term-bg); color: var(--term-fg); padding: 14px 16px; font: 13px/1.6 var(--mono); overflow-x: auto; min-height: 3.4em; }
+.tl { white-space: pre; min-height: 1.6em; }
+.tl.dim { color: var(--term-dim); }
+.typed { color: var(--term-typed); font-weight: 600; }
+.caret { color: var(--term-typed); animation: aiblink 1s steps(1) infinite; }
+
+/* ── A grid cell may shrink below its content, so a long command scrolls inside its own box ─────────────────────── */
+.stack, .tool-b, .q-body, .okq, .res, .oclist { grid-template-columns: minmax(0, 1fr); }
+[data-cmd], [data-term], [data-chk], [data-timer] { min-width: 0; max-width: 100%; }
+
+/* ── Parts the design drew with inline styles ────────────────────────────────────────────────────────────────── */
+.done { color: var(--on-ok); }
+.done h3 { color: var(--on-ok); }
+.done .ic { color: #0B0B0A; }
+.next.all { color: var(--on-ok); }
+.gl:focus-visible + .tip { display: block; }
+.mode button { color: var(--ink); }
+.mode button.on { color: var(--accent-ink); }
+.tool textarea[readonly] { background: var(--paper-3); }
+.pbtn, .flag, .btn { color: var(--ink); }
+.pbtn.on { color: var(--paper); }
+.btn.pri { color: var(--accent-ink); }
+.btn.pri:hover { color: var(--paper); }
+.flag.on { color: var(--ink); }
+.timer .btn { margin-left: auto; }
+.sec h3 span#need-count, .sec h3 span#need-missing-count { font: inherit; }
+.tw table { min-width: 100%; }
+.need-row label { color: var(--ink); }
+.cbox-code, .copyline code, .term-body, .tw { max-width: 100%; }
+.g-main { overflow-wrap: anywhere; }
+.g-main code, .g-main .ic { overflow-wrap: normal; }
+.g-main .tw, .g-main .cbox, .g-main .term { overflow-wrap: normal; }
+
+@media (max-width: 700px) {
+  .ic, .g-main .ic { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (max-width: 520px) {
+  .g-wrap { padding-left: 16px; padding-right: 16px; }
+  .g-nav { margin-left: -16px; margin-right: -16px; }
+  .cbox { flex-wrap: wrap; }
+  .cbox-code { flex: 1 1 calc(100% - 44px); }
+  .cbox-copy { flex: 1 1 100%; min-height: 40px; border-left: 0; border-top: 1px solid var(--term-line); }
+  .hero { padding-top: 32px; }
+  .details { padding: 14px; }
+  .oci { grid-template-columns: 1fr; gap: 2px; }
+  .grow { grid-template-columns: 1fr; gap: 2px; }
+  .dl { grid-template-columns: 1fr; }
+  .dl > div:nth-child(odd) { border-bottom: 0; padding-bottom: 0; }
+  .next { right: 8px; bottom: 8px; max-width: calc(100vw - 16px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+  .caret { animation: none; }
+}
+@media print {
+  .g-nav, .next, .resume, .pager, .term-play { display: none !important; }
+  body { background: #fff; color: #000; }
+}
+
+  body { background: var(--paper); color: var(--ink); }
+  .g-root { font: 15px/1.6 var(--disp); color: var(--ink); background: var(--paper); }
+  .g-wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px 64px; }
+  .g-row { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; }
+  .g-nav { flex: 1 1 240px; max-width: 280px; border: 2px solid var(--line); background: var(--paper-2); position: sticky; top: 16px; z-index: 5; max-height: calc(100vh - 32px); display: flex; flex-direction: column; box-shadow: var(--shadow-hard); }
+  .g-main { flex: 999 1 560px; min-width: 0; }
+  .nav-top { display: flex; flex-direction: column; width: 100%; text-align: left; background: var(--ink); color: var(--paper); padding: 10px 14px; gap: 4px; border: 0; cursor: default; }
+  .nav-top .h { font: 600 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; display: flex; justify-content: space-between; gap: 8px; }
+  .nav-top .cur { font: 600 13px var(--mono); color: var(--paper); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-top .caret { display: none; }
+  .bar { height: 6px; background: var(--paper-3); border-bottom: 2px solid var(--line); }
+  .bar i { display: block; height: 100%; background: var(--accent); transition: width .15s linear; }
+  .g-nav .list { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+  .g-nav .grp { font: 600 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--ink-3); padding: 14px 14px 6px; }
+  .g-nav a { display: block; font: 500 13px/1.3 var(--mono); color: var(--ink); padding: 7px 14px; border-top: 1px solid var(--line-soft); }
+  .g-nav a:hover { background: var(--ink); color: var(--paper); text-decoration: none; }
+  .g-nav a span { color: var(--ink-3); display: inline-block; min-width: 2.4em; }
+  .g-nav a:hover span { color: var(--paper); }
+  .g-nav a.past { color: var(--ink-2); }
+  .g-nav a.past span { color: var(--ok); font-weight: 700; }
+  .g-nav a.on { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .g-nav a.on span { color: var(--accent-ink); }
+  .g-nav .foot { padding: 12px 14px; border-top: 2px solid var(--line); }
+  @media (max-width: 860px) {
+    .g-nav { flex-basis: 100%; max-width: none; top: 0; max-height: 70vh; margin: 0 -24px; border-left: 0; border-right: 0; box-shadow: none; }
+    .nav-top { cursor: pointer; }
+    .nav-top .caret { display: inline; }
+    .g-nav .list, .g-nav .foot { display: none; }
+    .g-nav.open .list, .g-nav.open .foot { display: block; }
+  }
+  .btn { font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink); background: var(--paper-2); border: 2px solid var(--line); padding: 8px 12px; box-shadow: var(--shadow-hard-sm); cursor: pointer; }
+  .btn:hover { background: var(--ink); color: var(--paper); }
+  .btn:active { transform: translate(3px,3px); box-shadow: none; }
+
+  .hero { border-bottom: 2px solid var(--line); padding: 48px 0 32px; margin-bottom: 40px; }
+  .kick { font: 600 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--ink-2); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sq { width: 10px; height: 10px; background: var(--accent); display: inline-block; flex: 0 0 auto; }
+  .hero h1 { font: 900 clamp(40px, 7vw, 84px)/0.95 var(--disp); letter-spacing: -0.03em; text-transform: uppercase; margin: 18px 0 20px; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .lead { font-size: 18px; line-height: 1.55; max-width: 62ch; color: var(--ink-2); }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+  .chip { font: 600 12px var(--mono); letter-spacing: .06em; border: 2px solid var(--line); padding: 6px 10px; display: inline-flex; gap: 8px; align-items: center; background: var(--paper-2); }
+  .chip i { width: 8px; height: 8px; background: var(--ok); display: inline-block; }
+
+  .sec { border-top: 2px solid var(--line); padding: 36px 0 12px; scroll-margin-top: 16px; }
+  .sec-head { display: flex; gap: 18px; align-items: stretch; margin-bottom: 18px; }
+  .num { flex: 0 0 auto; min-width: 64px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 900 34px/1 var(--disp); padding: 8px 10px; }
+  .num.ink { background: var(--ink); color: var(--paper); font: 600 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  .sec-head .t { display: flex; flex-direction: column; justify-content: center; }
+  .sec-head .t small { font: 600 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--ink-3); }
+  .sec h2 { font: 900 clamp(24px, 3.4vw, 36px)/1.02 var(--disp); letter-spacing: -0.02em; text-transform: uppercase; }
+  .sec h3 { font: 700 14px var(--mono); letter-spacing: .08em; text-transform: uppercase; margin: 28px 0 10px; display: flex; gap: 10px; align-items: baseline; }
+  .sec h3 b { color: var(--accent); }
+  .sec p { margin: 10px 0; max-width: 72ch; }
+  .sec ul, .sec ol { margin: 10px 0 10px 22px; max-width: 72ch; }
+  .sec li { margin: 6px 0; }
+  .sec ol li::marker { font: 700 13px var(--mono); color: var(--accent); }
+  .stack { display: grid; gap: 10px; margin: 12px 0; }
+  .muted { color: var(--ink-2); font-size: 14px; }
+
+  .ic { font: 500 0.88em var(--mono); background: var(--paper-3); border: 1px solid var(--line-soft); padding: 1px 5px; white-space: nowrap; }
+  .key { font: 600 12px var(--mono); border: 1.5px solid var(--line); border-bottom-width: 3px; padding: 0 6px; background: var(--paper-2); white-space: nowrap; }
+  .ui { font-weight: 700; }
+
+  .call { border: 2px solid var(--line); border-left-width: 8px; padding: 14px 16px; margin: 16px 0; background: var(--paper-2); max-width: 78ch; }
+  .call strong { display: block; font: 700 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 4px; }
+  .call p { margin: 4px 0; }
+  .call.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .call.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .call.ok   { border-left-color: var(--ok);   background: var(--ok-soft); }
+  .call.acc  { border-left-color: var(--accent); background: var(--accent-soft); }
+
+  .tw { overflow-x: auto; margin: 14px 0; border: 2px solid var(--line); max-width: 100%; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--paper-2); }
+  th { text-align: left; font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; background: var(--ink); color: var(--paper); padding: 9px 12px; white-space: nowrap; }
+  td { padding: 9px 12px; border-top: 1px solid var(--line-soft); vertical-align: top; }
+  td:first-child { white-space: nowrap; font-weight: 600; }
+
+  .details { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; border: 2px solid var(--line); padding: 18px; background: var(--paper-2); box-shadow: var(--shadow-hard); margin: 18px 0; }
+  .details label { display: block; font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; margin-bottom: 6px; }
+  .details input { width: 100%; font: 500 14px var(--mono); padding: 9px 10px; border: 2px solid var(--line); background: var(--paper); }
+  .details small { display: block; margin-top: 6px; font-size: 13px; color: var(--ink-2); }
+
+  .q { border: 2px solid var(--line); margin: 22px 0; background: var(--paper-2); }
+  .q-head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid var(--line); }
+  .q-head .n { background: var(--ink); color: var(--paper); font: 700 13px var(--mono); padding: 10px 12px; letter-spacing: .08em; }
+  .q-head h3 { margin: 0; }
+  .q-body { padding: 14px; display: grid; gap: 12px; }
+  .dl { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr); border-top: 1px solid var(--line-soft); }
+  .dl > div { padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+  .dl > div:nth-child(odd) { font: 600 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); padding-top: 11px; padding-right: 12px; }
+
+  .done { border: 2px solid var(--line); background: var(--ok); color: #0B0B0A; padding: 20px; margin: 26px 0; box-shadow: var(--shadow-hard); }
+  .done h3 { margin: 0 0 6px; font: 900 26px/1 var(--disp); letter-spacing: -0.02em; }
+  .done .ic { background: rgba(255,255,255,.4); }
+  .foot { border-top: 2px solid var(--line); margin-top: 40px; padding-top: 18px; font: 13px/1.6 var(--mono); color: var(--ink-2); }
+  .g-wrap { padding-bottom: 140px; }
+  .g-nav a em { float: right; font: 600 11px var(--mono); font-style: normal; color: var(--ink-3); margin-left: 6px; }
+  .g-nav a.on em { color: var(--accent-ink); }
+  .g-nav a.past em { color: var(--warn); }
+
+  .mode { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 6px 0 22px; }
+  .mode button { text-align: left; border: 2px solid var(--line); background: var(--paper-2); padding: 14px 16px; box-shadow: var(--shadow-hard-sm); display: flex; flex-direction: column; gap: 4px; }
+  .mode button b { font: 900 22px/1 var(--disp); text-transform: uppercase; letter-spacing: -0.02em; }
+  .mode button span { font-size: 14px; color: var(--ink-2); }
+  .mode button small { font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); }
+  .mode button.on { background: var(--accent); color: var(--accent-ink); }
+  .mode button.on span, .mode button.on small { color: var(--accent-ink); }
+  .mode button:active { transform: translate(3px,3px); box-shadow: none; }
+
+  .need { border: 2px solid var(--line); background: var(--paper-2); margin: 12px 0; }
+  .need-row { display: flex; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--line-soft); align-items: flex-start; }
+  .need-row:first-child { border-top: 0; }
+  .need-row input { width: 18px; height: 18px; margin-top: 3px; flex: 0 0 auto; accent-color: var(--ok); }
+  .need-row label { font-weight: 600; cursor: pointer; }
+  .need-row small { display: block; color: var(--ink-2); font-weight: 400; font-size: 13.5px; }
+  .need-row.ok { background: var(--ok-soft); }
+
+  .next { position: fixed; right: 16px; bottom: 16px; z-index: 30; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--ink); color: var(--paper); border: 2px solid var(--line); box-shadow: 4px 4px 0 var(--accent); padding: 10px 14px; max-width: min(380px, calc(100vw - 32px)); text-align: left; cursor: pointer; }
+  .next:hover { background: var(--accent); color: var(--accent-ink); }
+  .next:active { transform: translate(4px,4px); box-shadow: none; }
+  .next small { font: 600 10px var(--mono); letter-spacing: .16em; text-transform: uppercase; opacity: .85; }
+  .next b { font: 700 13px var(--mono); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .next.all { background: var(--ok); color: #0B0B0A; box-shadow: var(--shadow-hard); }
+
+  .tool { border: 2px solid var(--line); background: var(--paper-2); box-shadow: var(--shadow-hard); margin: 18px 0; }
+  .tool-h { background: var(--ink); color: var(--paper); font: 600 11px var(--mono); letter-spacing: .18em; text-transform: uppercase; padding: 9px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .tool-b { padding: 14px; display: grid; gap: 12px; }
+  .tool input[type=text], .tool input[type=search] { width: 100%; font: 500 14px var(--mono); padding: 9px 10px; border: 2px solid var(--line); background: var(--paper); }
+  .tool .l { font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .tool p { margin: 0; }
+  .res { border: 2px solid var(--line); padding: 10px 12px; display: grid; gap: 6px; }
+  .res.ok { background: var(--ok-soft); } .res.warn { background: var(--warn-soft); } .res.bad { background: var(--bad-soft); }
+  .res .big { font: 600 15px var(--mono); word-break: break-all; }
+  .res ul { margin: 0 0 0 18px; font-size: 14px; }
+  .flags { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+  .flag { display: flex; gap: 10px; align-items: flex-start; text-align: left; border: 2px solid var(--line); background: var(--paper); padding: 10px 12px; }
+  .flag .bx { font: 700 13px var(--mono); flex: 0 0 auto; }
+  .flag b { font: 700 13px var(--mono); display: block; }
+  .flag .d { font-size: 13px; color: var(--ink-2); }
+  .flag.on { background: var(--accent-soft); }
+  .flag:disabled { background: var(--paper-3); border-style: dashed; cursor: not-allowed; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pills .lab { font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); margin-right: 4px; }
+  .pbtn { font: 600 12px var(--mono); border: 2px solid var(--line); background: var(--paper); padding: 7px 10px; }
+  .pbtn:hover { background: var(--paper-3); }
+  .pbtn.on { background: var(--ink); color: var(--paper); }
+  .pbtn:disabled { background: var(--paper-3); border-style: dashed; cursor: not-allowed; color: var(--ink-2); }
+  .dots { display: flex; gap: 4px; }
+  .dots i { width: 18px; height: 6px; background: #45433C; display: inline-block; }
+  .dots i.on { background: #8F8CFF; }
+  .err { color: var(--bad); font: 600 13px var(--mono); }
+  .simnav { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line-soft); padding-top: 12px; }
+  .btn.pri { background: var(--accent); color: var(--accent-ink); }
+  .btn.pri:hover { background: var(--ink); color: var(--paper); }
+  .btn:disabled { background: var(--paper-3); color: var(--ink-2); box-shadow: none; border-style: dashed; cursor: not-allowed; }
+  .copyline { display: flex; align-items: stretch; border: 2px solid var(--line); background: var(--term-bg, #0B0B0A); color: var(--term-fg, #F2F0E6); }
+  .copyline code { flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: pre; padding: 10px 12px; font: 13.5px/1.5 var(--mono); }
+  .copyline button { flex: 0 0 auto; font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--term-fg, #F2F0E6); border-left: 1px solid #2E2C26; padding: 0 14px; }
+  .copyline button:hover { background: var(--accent); color: var(--accent-ink); }
+  .ans { width: 100%; border-collapse: collapse; }
+  .trouble td:first-child { white-space: normal; min-width: 200px; }
+  .trouble .ic { white-space: normal; }
+  .trouble tr.hit td { background: var(--accent-soft); }
+  .trouble tr.hit td:first-child { box-shadow: inset 6px 0 0 var(--accent); }
+
+  .g-nav .foot { margin-top: 0; font: inherit; color: inherit; }
+  .g-nav .foot .pills { gap: 6px; }
+  .keys { margin: 10px 0 0; font: 12px/1.9 var(--mono); color: var(--ink-2); }
+  .resume { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; border: 2px solid var(--line); background: var(--accent-soft); padding: 12px 16px; margin: -16px 0 28px; box-shadow: var(--shadow-hard); }
+  .pager { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; border: 2px solid var(--line); background: var(--paper-2); padding: 10px 12px; margin: 0 0 20px; }
+  .pager .btn { white-space: normal; text-align: left; max-width: 100%; }
+  .pager .pos { font: 600 12px var(--mono); letter-spacing: .14em; color: var(--ink-2); }
+  .okq { border: 2px solid var(--line); background: var(--paper-2); padding: 12px 14px; margin: 26px 0 8px; display: grid; gap: 10px; }
+  .okq.yes { background: var(--ok-soft); }
+  .okq.no { background: var(--warn-soft); }
+  .okq p { margin: 0; }
+  .okq .tw { margin: 0; }
+  .oclist { display: grid; gap: 6px; }
+  .oci { display: grid; grid-template-columns: minmax(96px, 140px) minmax(0, 1fr); gap: 10px; border: 2px solid var(--line); padding: 8px 10px; font-size: 14px; }
+  .oci b { font: 700 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; padding-top: 2px; }
+  .oci.ok { background: var(--ok-soft); } .oci.warn { background: var(--warn-soft); } .oci.bad { background: var(--bad-soft); }
+  .tool textarea { width: 100%; font: 500 13px/1.5 var(--mono); padding: 9px 10px; border: 2px solid var(--line); background: var(--paper); color: var(--ink); resize: vertical; }
+  .timer { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-top: 8px; background: var(--paper-2); }
+  .timer .big { font: 700 14px var(--mono); }
+  .timer span { font-size: 14px; }
+  .glw { position: relative; display: inline; }
+  .gl { font: inherit; color: inherit; background: none; border: 0; border-bottom: 2px dotted var(--accent); padding: 0; cursor: help; }
+  .gl:hover, .gl:focus-visible { color: var(--accent); }
+  .tip { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 40; width: min(300px, 78vw); background: var(--ink); color: var(--paper); font: 400 13px/1.5 var(--disp); text-transform: none; letter-spacing: 0; white-space: normal; padding: 10px 12px; border: 2px solid var(--line); box-shadow: 4px 4px 0 var(--accent); }
+  .glw:hover .tip, .gl:focus + .tip { display: block; }
+  .grow { display: grid; grid-template-columns: minmax(120px, 210px) minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+  .grow .dt { font: 700 13px var(--mono); }
+</style>
+</head>
+<body data-mode="live">
+<noscript><p style="margin:0;padding:12px 16px;background:#F2E2C8;color:#0B0B0A;font:14px/1.5 system-ui,sans-serif">This guide needs JavaScript to show its commands. The same steps are in <b>docs/INSTALL-WINDOWS.md</b> in the AI Architect folder, and on github.com/farstic/snowarch.</p></noscript>
+<div class="g-root">
+<div class="g-wrap">
+
+  <header class="hero">
+    <div class="kick"><span class="sq"></span>AI ServiceNow Architect · Windows · release <span data-bind="release"></span></div>
+    <h1>Install the <em>AI Architect</em> on Windows</h1>
+    <p class="lead">This guide takes you from a Windows computer with nothing installed to a working AI Architect connected to your ServiceNow instance. Follow it from top to bottom. Every command has a Copy button. Plan about 30 minutes; most of it is waiting.</p>
+    <div class="chips">
+      <span class="chip"><i></i>Windows 10 (1809+) or Windows 11</span>
+      <span class="chip"><i></i>No administrator rights needed</span>
+      <span class="chip"><i></i>Tested end to end · 12 Nov 2026</span>
+    </div>
+  </header>
+
+  <div class="resume" id="resume" role="status" hidden>
+    <span><b>Welcome back.</b> <span id="resume-text"></span></span>
+    <span class="pills"><button type="button" class="btn pri" id="resume-go">Continue →</button><button type="button" class="btn" id="resume-hide">Dismiss</button></span>
+  </div>
+
+  <div class="g-row">
+    <nav class="g-nav" id="nav" aria-label="Contents">
+      <button type="button" class="nav-top" id="nav-top" aria-expanded="false">
+        <span class="h"><span id="nav-head">Contents</span><span class="caret" id="nav-caret">▼ Open</span></span>
+        <span class="cur" id="nav-cur"></span>
+      </button>
+      <div class="bar" aria-hidden="true"><i id="nav-bar" style="width:0%"></i></div>
+      <div class="list" id="nav-list"></div>
+      <div class="foot">
+        <div class="pills">
+          <button type="button" class="btn" id="btn-view">▤ One step at a time</button>
+          <button type="button" class="btn" id="btn-theme">☾ Dark</button>
+          <button type="button" class="btn" id="btn-reset">Reset checkmarks</button>
+        </div>
+        <p class="keys">Keys: <span class="key">N</span> next command · <span class="key">C</span> copy it · <span class="key">/</span> find a problem</p>
+      </div>
+    </nav>
+
+    <main class="g-main">
+
+      <nav class="pager" aria-label="Step by step" data-pager hidden>
+        <button type="button" class="btn" data-pg="prev">◀ Start</button>
+        <span class="pos"></span>
+        <button type="button" class="btn pri" data-pg="next">End ▶</button>
+      </nav>
+
+      <!-- WHAT YOU NEED -->
+      <section class="sec" id="need" style="border-top:0;padding-top:0">
+        <div class="sec-head"><div class="num ink">Prep</div><div class="t"><small>Before you begin</small><h2>What you need</h2></div></div>
+        <h3><b>■</b>How will you use it?</h3>
+        <p class="muted">Pick one. The guide hides what you do not need, and the time and progress follow your choice. You can switch later.</p>
+        <div class="mode" role="group" aria-label="Install mode">
+          <button type="button" id="mode-live" aria-pressed="true"><small>Recommended</small><b>Live</b><span>Connect my ServiceNow instance. The Architect reads from it and, with your approval, changes it.</span></button>
+          <button type="button" id="mode-design" aria-pressed="false"><small>No instance yet</small><b>Design-only</b><span>Work from the ServiceNow documentation and the specialist skills. Add an instance later.</span></button>
+        </div>
+
+        <h3><b>■</b><span id="need-count">Check what you need</span></h3>
+        <div class="need" id="need-list"></div>
+        <div class="call ok" id="need-ready" hidden><strong>Ready to install</strong><p>You have everything. Start with <a href="#step-1">Step 1</a>, or press the button at the bottom right: it always takes you to your next command.</p></div>
+        <div class="call warn" id="need-missing"><strong id="need-missing-count">Still missing</strong><p>Tick each line when you have it. The grey line under each one says how to get it. You can read on in the meantime, but do not start Step 1 before everything is ticked.</p></div>
+        <p class="muted">No administrator rights are needed. Every program in this guide installs into your own user folder. If your company blocks downloads of programs altogether, ask your IT team.</p>
+
+        <h3><b>■</b>Your details (optional)</h3>
+        <p class="muted">Type them once and every command on this page will use them. They stay in this page; nothing is sent anywhere.</p>
+        <div class="details">
+          <div>
+            <label for="f-lic">Your licence file name</label>
+            <input id="f-lic" type="text" value="LIC-2026-0000.json" spellcheck="false" autocomplete="off">
+            <small>Exactly as it appears in Downloads, for example <code class="ic">LIC-2026-0000.json</code>.</small>
+          </div>
+          <div>
+            <label for="f-label">Your instance label</label>
+            <input id="f-label" type="text" value="pdi" spellcheck="false" autocomplete="off">
+            <small>The short name you will give your instance in the wizard (question 1), for example <code class="ic">pdi</code>.</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- HOW TO USE -->
+      <section class="sec" id="how">
+        <div class="sec-head"><div class="num ink">Read</div><div class="t"><small>Before you begin</small><h2>How to use this guide</h2></div></div>
+        <ul>
+          <li>Each dark box with a <span class="ui">Copy</span> button holds one command. The square on its left ticks itself when you copy, so you can see where you are.</li>
+          <li>Click Copy, click inside the PowerShell window, paste with a right-click (or <span class="key">Ctrl</span>+<span class="key">V</span>) and press <span class="key">Enter</span>.</li>
+          <li>Wait until the line that starts with <code class="ic">PS</code> comes back before you run the next command.</li>
+          <li>Dark boxes labelled <span class="ui">On screen</span> show what you will see. You do not type those. Press <span class="ui">▶ Play</span> to watch them typed out.</li>
+          <li>The screens in this guide are examples. Your version numbers, file counts, times, folders and free disk space differ.</li>
+        </ul>
+        <div class="call bad"><strong>Never paste several commands at once</strong><p>Paste one command, press Enter, wait, then the next. In our own test a pasted block of three lines arrived broken and PowerShell asked a question nobody expected.</p></div>
+        <div class="call warn"><strong>Something unexpected on the screen?</strong><p>Do not press Enter. Press <span class="key">Ctrl</span>+<span class="key">C</span> to cancel, then look it up in <a href="#trouble">If something goes wrong</a>.</p></div>
+      </section>
+
+      <!-- STEP 1 -->
+      <section class="sec" id="step-1">
+        <div class="sec-head"><div class="num">1</div><div class="t"><small>Step 1</small><h2>Open PowerShell the normal way</h2></div></div>
+        <p>PowerShell is the window where you type the commands in this guide.</p>
+        <ol>
+          <li>Press <span class="key">Win</span>+<span class="key">R</span> (the Windows logo key and R together). A small Run box opens.</li>
+          <li>Type <code class="ic">powershell</code> and press <span class="key">Enter</span>. Do not press Ctrl+Shift+Enter, and do not choose <span class="ui">Run as administrator</span>.</li>
+          <li>Look at the line where you type. It must start with <code class="ic">PS C:\Users\</code> followed by your user name.</li>
+        </ol>
+        <div data-term="ps" data-label="On screen"></div>
+        <div class="call bad">
+          <strong>If it shows PS C:\WINDOWS\system32&gt;</strong>
+          <p>That is an administrator window. Close it and start again from 1. Files made from an administrator window may not be changeable later from a normal one, and everything the AI Architect runs from that window would run with full rights over the computer.</p>
+        </div>
+        <p>To be completely sure, run this check. It only reads.</p>
+        <div class="stack"><div data-cmd="s1-whoami"></div></div>
+        <p><code class="ic">Medium Mandatory Level</code> means a normal window, which is what you want. <code class="ic">High Mandatory Level</code> means an administrator window: close it.</p>
+        <p class="muted">A line saying <i>Cannot load PSReadline module</i> at the top of the window is harmless.</p>
+
+        <div data-chk="step-1"></div>
+      </section>
+
+      <!-- STEP 2 -->
+      <section class="sec" id="step-2">
+        <div class="sec-head"><div class="num">2</div><div class="t"><small>Step 2</small><h2>Install the programs</h2></div></div>
+        <p>You need three programs (Git, Node.js and Claude Code), plus draw.io Desktop for the diagrams in your Word documents (2f). You install them once per computer. Each download command fetches one file from that program's official site.</p>
+        <div class="call ok"><strong>No administrator rights needed</strong><p>Every program goes into your own user folder (<code class="ic">%LOCALAPPDATA%\Programs</code>), so Windows never asks for an administrator password. Do not use <code class="ic">winget</code> for this guide: on many company computers it is broken or blocked, and its installers ask for administrator rights.</p></div>
+
+        <h3><b>2a</b>Git for Windows</h3>
+        <p>Downloads the AI Architect and keeps it up to date. First download the installer (67 MB):</p>
+        <div class="stack"><div data-cmd="s2a-dl"></div></div>
+        <p>Then install it for your user only. It shows nothing and takes about a minute; wait until the <code class="ic">PS</code> line comes back.</p>
+        <div class="stack"><div data-cmd="s2a-inst"></div></div>
+        <div data-timer="s2a-inst"></div>
+        <p class="muted">It installs into <code class="ic">%LOCALAPPDATA%\Programs\Git</code> and adds Git to your PATH.</p>
+
+        <h3><b>2b</b>Node.js</h3>
+        <p>Runs the part of the AI Architect that talks to your ServiceNow instance. This is the zip version (41 MB), which needs no installer. Download it:</p>
+        <div class="stack"><div data-cmd="s2b-dl"></div></div>
+        <p>Unpack it into your user folder:</p>
+        <div class="stack"><div data-cmd="s2b-unz"></div></div>
+        <p>Tell Windows where Node.js is, and where <span class="glw"><button type="button" class="gl" aria-describedby="tip-npm">npm</button><span class="tip" id="tip-npm" role="tooltip" data-gl="npm"></span></span> keeps the tools it installs (your account only). It prints nothing when it works.</p>
+        <div class="stack"><div data-cmd="s2b-path"></div></div>
+        <p class="muted">If your company blocks files in the Temp folder, use <code class="ic">$HOME\Downloads</code> in place of <code class="ic">$env:TEMP\snowarch-dl</code> in these commands.</p>
+
+        <h3><b>2c</b>Claude Code</h3>
+        <p>The AI assistant that the Architect runs in.</p>
+        <div class="stack"><div data-cmd="s2c"></div></div>
+        <div data-timer="s2c"></div>
+        <p>It shows no progress while it downloads. Wait until the <code class="ic">PS</code> line comes back, and read the <span class="ui">Setup notes</span> it prints at the end.</p>
+
+        <h3><b>2d</b>Tell Windows where Claude Code is</h3>
+        <p>Windows looks for commands in a list of folders called <span class="glw"><button type="button" class="gl" aria-describedby="tip-path">PATH</button><span class="tip" id="tip-path" role="tooltip" data-gl="path"></span></span>. The Claude Code installer may not add its folder to that list, and then Windows answers <code class="ic">'claude' is not recognized</code>, even in a new window. This command adds the folder for your account only. It prints nothing when it works. The installer prints this same command if it ever finds Claude Code installed but its folder not on PATH.</p>
+        <div class="stack"><div data-cmd="s2d"></div></div>
+
+        <h3><b>2e</b>Open a fresh window and check</h3>
+        <p>Close PowerShell and open a new one exactly as in Step 1, so it sees the new programs. Then run these four commands, one at a time.</p>
+        <div class="stack">
+          <div data-cmd="s2e-claude"></div>
+          <div data-cmd="s2e-git"></div>
+          <div data-cmd="s2e-node"></div>
+          <div data-cmd="s2e-npm"></div>
+        </div>
+        <div data-term="versions" data-label="On screen (the numbers on your computer may be higher)"></div>
+        <div class="tw"><table>
+          <thead><tr><th>Program</th><th>You need at least</th></tr></thead>
+          <tbody>
+            <tr><td>Claude Code</td><td>2.1.214</td></tr>
+            <tr><td>Git</td><td>2.34.1</td></tr>
+            <tr><td>Node.js</td><td>v20. Step 2b installs v26.13.0, the version this guide was tested with. The AI Architect is tested with Node.js 20, 22 and 24 on Windows, macOS and Linux, and with 26 on Windows and Linux.</td></tr>
+            <tr><td>npm</td><td>Any version. It comes with Node.js.</td></tr>
+          </tbody>
+        </table></div>
+
+        <div class="tool" style="box-shadow:none">
+          <div class="tool-h"><span>Check your versions</span><span id="oc-v-sum">paste to check</span></div>
+          <div class="tool-b">
+            <div><label class="l" for="oc-v">Paste what PowerShell printed</label>
+            <textarea id="oc-v" rows="4" spellcheck="false" placeholder="Paste the output of the four commands, e.g. 2.1.322 (Claude Code) …"></textarea></div>
+            <div class="oclist" id="oc-v-list" hidden></div>
+          </div>
+        </div>
+        <p class="muted">If one of them answers <i>is not recognized</i>, see <a href="#trouble">If something goes wrong</a>.</p>
+
+        <h3><b>2f</b>draw.io Desktop (for the diagrams)</h3>
+        <p>The AI Architect draws its diagrams in draw.io and turns them into pictures for your Word documents. Without draw.io Desktop on this computer it stops with <code class="ic">ERROR: draw.io Desktop not found</code> and cannot make the Word file. This is the zip version (180 MB): no installer, no administrator rights. Download it:</p>
+        <div class="stack"><div data-cmd="s2f-dl"></div></div>
+        <p>Unpack it into your user folder:</p>
+        <div class="stack"><div data-cmd="s2f-unz"></div></div>
+        <p>The AI Architect looks for draw.io in that folder by itself, so there is no PATH command to run and no window to reopen. Check that the program is in place:</p>
+        <div class="stack"><div data-cmd="s2f-test"></div></div>
+        <p>It must answer <code class="ic">True</code>. draw.io renders on your own computer; nothing about your diagrams is sent anywhere.</p>
+
+        <div data-chk="step-2"></div>
+      </section>
+
+      <!-- STEP 3 -->
+      <section class="sec" id="step-3">
+        <div class="sec-head"><div class="num">3</div><div class="t"><small>Step 3</small><h2>Sign in to Claude Code</h2></div></div>
+        <p>You do this once per computer.</p>
+        <div class="stack"><div data-cmd="s3"></div></div>
+        <ol>
+          <li>Claude Code opens a short first-time setup in the window. Choose any colour theme, then choose to sign in with your Claude account.</li>
+          <li>Your browser opens. Sign in with your Claude account and allow access.</li>
+          <li>Go back to PowerShell. If Claude Code asks whether you trust this folder, answer <span class="ui">Yes</span>.</li>
+          <li>Type <code class="ic">/exit</code> and press <span class="key">Enter</span>. You are back at the <code class="ic">PS</code> line.</li>
+        </ol>
+
+        <div data-chk="step-3"></div>
+      </section>
+
+      <!-- STEP 4 -->
+      <section class="sec" id="step-4">
+        <div class="sec-head"><div class="num">4</div><div class="t"><small>Step 4</small><h2>Download the AI Architect</h2></div></div>
+        <p>This puts the AI Architect in a folder named <code class="ic">AI-Arch</code> inside your own user folder: <code class="ic">C:\Users\&lt;you&gt;\AI-Arch</code>. Run the three commands one at a time.</p>
+        <div class="stack">
+          <div data-cmd="s4-cd"></div>
+          <div data-cmd="s4-clone"></div>
+          <div data-cmd="s4-cd2"></div>
+        </div>
+        <div data-timer="s4-clone"></div>
+        <div data-term="clone" data-label="On screen"></div>
+        <p>The <code class="ic">warning: … is not a commit!</code> line is harmless. Your line should now end in <code class="ic">\AI-Arch&gt;</code>.</p>
+        <div class="call acc"><strong>Why this folder</strong><p>The installer keeps your ServiceNow password in a file inside this folder (<code class="ic">.local\instances.json</code>) and locks that file, and the folder <code class="ic">.local</code> around it, so that only your account and the system can read them. It does this in whatever folder you choose, and the wizard says so when it saves; if that folder had let other accounts read the file, the wizard adds a line saying who could, and that the permissions were changed just now. Your user folder is private to you anyway, so it is the one this guide uses. If you prefer another folder, use its name in these commands and in <a href="#daily">Every day</a>. A folder name with a space in it has not been tested.</p></div>
+        <p class="muted">If git says the folder already exists, you already have a copy. Either continue with Step 5 in that folder, or pick another name and use it in both of the last two commands.</p>
+
+        <div data-chk="step-4"></div>
+      </section>
+
+      <!-- STEP 5 -->
+      <section class="sec" id="step-5">
+        <div class="sec-head"><div class="num">5</div><div class="t"><small>Step 5</small><h2>Add your licence</h2></div></div>
+        <p>Put the licence in place before you run the installer, so the install checks it together with everything else. All commands run in the <code class="ic">AI-Arch</code> folder.</p>
+        <h3><b>5a</b>Make the folder for it</h3>
+        <div class="stack"><div data-cmd="s5a"></div></div>
+        <p class="muted">It prints a small table with the new folder <code class="ic">.local</code>. That is normal.</p>
+        <h3><b>5b</b>Find the exact name of your licence file</h3>
+        <div class="stack"><div data-cmd="s5b"></div></div>
+        <p>Look at the <span class="ui">Name</span> column, for example <code class="ic">LIC-2026-0000.json</code>, and type that name into <a href="#need">Your details</a> at the top of this page. The next command changes to match.</p>
+        <h3><b>5c</b>Copy it into place</h3>
+        <div class="stack"><div data-cmd="s5c"></div></div>
+        <p class="muted" data-sample-note hidden>This is the sample name. Type your file's name in <a href="#need">Your details</a> at the top, or replace <code class="ic">LIC-2026-0000.json</code> with it.</p>
+        <p class="muted">It prints nothing when it works.</p>
+        <div class="call warn"><strong>The name must be exactly licence.json</strong><p>Spelled with a <b>c</b>, the British way. A file called <code class="ic">license.json</code>, or one that keeps its original name, is not read.</p></div>
+
+        <div data-chk="step-5"></div>
+      </section>
+
+      <!-- STEP 6 -->
+      <section class="sec" id="step-6">
+        <div class="sec-head"><div class="num">6</div><div class="t"><small>Step 6</small><h2>Run the installer</h2></div></div>
+        <div class="stack"><div data-cmd="s6"></div></div>
+        <div data-timer="s6"></div>
+        <p>The installer works in four parts: it checks the computer, shows a plan, downloads what it needs, and asks seven questions about your ServiceNow instance. Each part is explained below, in the order you will see it.</p>
+
+        <h3><b>6a</b>It checks your computer</h3>
+        <div data-term="preflight" data-label="On screen"></div>
+        <div class="tw"><table>
+          <thead><tr><th>Line</th><th>What it checks</th></tr></thead>
+          <tbody>
+            <tr><td><code class="ic">root</code></td><td>You started the installer from inside the AI Architect folder.</td></tr>
+            <tr><td><code class="ic">git</code></td><td>Git is installed and new enough.</td></tr>
+            <tr><td><code class="ic">claudeCode</code></td><td>Claude Code is installed and new enough, and <code class="ic">login: ok</code> means you are signed in (Step 3).</td></tr>
+            <tr><td><code class="ic">disk</code></td><td>There is enough free space.</td></tr>
+            <tr><td><code class="ic">network</code></td><td>The computer can reach github.com, where the AI Architect comes from.</td></tr>
+            <tr><td><code class="ic">node</code></td><td>Node.js and its helper npm are installed.</td></tr>
+            <tr><td><code class="ic">platform</code></td><td>Your Windows version. Shown for information.</td></tr>
+          </tbody>
+        </table></div>
+        <p>Every line must start with <code class="ic">ok</code>. If one does not, that line says what to do. Do it, then run <code class="ic">.\bootstrap.cmd</code> again; it continues from where it stopped.</p>
+
+
+        <div class="tool" style="box-shadow:none">
+          <div class="tool-h"><span>Check the installer check</span><span id="oc-pre-sum">paste to check</span></div>
+          <div class="tool-b">
+            <div><label class="l" for="oc-pre">Paste what PowerShell printed</label>
+            <textarea id="oc-pre" rows="4" spellcheck="false" placeholder="Paste the lines that start with ok B00 …"></textarea></div>
+            <div class="oclist" id="oc-pre-list" hidden></div>
+          </div>
+        </div>
+
+        <h3><b>6b</b>The plan screen: choose live mode</h3>
+        <div data-term="plan" data-label="On screen"></div>
+        <div class="tw"><table>
+          <thead><tr><th>Line</th><th>Choices</th><th>What to pick</th></tr></thead>
+          <tbody>
+            <tr><td>1 Mode</td><td><code class="ic">design-only</code> works from the ServiceNow documentation and the specialist skills, with no instance.<br><code class="ic">live</code> also connects one ServiceNow instance.</td><td><b>live</b>, to work with your instance. Pick design-only only if you have no instance yet; you can add one later.</td></tr>
+            <tr><td>2 Docs</td><td><code class="ic">full</code> downloads all of the ServiceNow documentation.<br><code class="ic">skip</code> downloads none, and the health check then fails.</td><td>Leave it on <b>full</b>.</td></tr>
+          </tbody>
+        </table></div>
+        <div class="call acc design-only"><strong>You chose design-only</strong><p>The plan already shows <code class="ic">design-only</code>. Press <span class="key">Enter</span> to run it as shown and go on to 6c. The instance wizard (6d) is skipped.</p></div>
+        <div class="live-only">
+        <p>To switch to live mode, press these keys:</p>
+        <ol>
+          <li>Type <code class="ic">1</code> and press <span class="key">Enter</span>. The mode menu opens:
+            <div class="stack"><div data-term="modeMenu" data-label="On screen"></div></div>
+          </li>
+          <li>Type <code class="ic">2</code> and press <span class="key">Enter</span>. The plan comes back with <code class="ic">Mode live</code> and more steps in the Steps line.</li>
+          <li>Press <span class="key">Enter</span> once more. The install starts.
+            <div class="stack"><div data-term="planLive" data-label="On screen"></div></div>
+          </li>
+        </ol>
+        <p class="muted">Changed your mind before the last Enter? Type <code class="ic">1</code> again. <code class="ic">?</code> explains each line, and <code class="ic">q</code> quits without changing anything.</p>
+        </div>
+
+        <h3><b>6c</b>It downloads the documentation (2 to 3 minutes)</h3>
+        <div data-term="docs" data-label="On screen"></div>
+        <p>This downloads all 51,665 pages of ServiceNow documentation that the Architect reads before it answers. The screen can sit still for a minute or two. Let it run. In our test it took two and a half minutes.</p>
+      </section>
+
+      <!-- STEP 6d WIZARD -->
+      <section class="sec live-only" id="step-6d">
+        <div class="sec-head"><div class="num">6d</div><div class="t"><small>Step 6d</small><h2>The instance wizard: seven questions</h2></div></div>
+        <div data-term="wizard" data-label="On screen"></div>
+
+        <div class="tool" id="sim">
+          <div class="tool-h"><span>Try it first · wizard practice · <span id="sim-head">question 1 of 7</span></span><span class="dots" id="sim-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+          <div class="tool-b" id="sim-body"></div>
+        </div>
+        <div class="call acc"><strong>Made a mistake?</strong><p>Nothing is saved until the very end. Press <span class="key">Ctrl</span>+<span class="key">C</span>, then run <code class="ic">.\bootstrap.cmd</code> again. It skips what is already done and brings you back to this wizard. After the wizard has finished, you change things with one command each; see <a href="#settings">Change settings later</a>.</p></div>
+
+        <div class="q">
+          <div class="q-head"><span class="n">1/7</span><h3>Label</h3></div>
+          <div class="q-body">
+            <div data-term="q1" data-label="On screen"></div>
+            <div class="dl">
+              <div>What it is</div><div>A nickname for this instance. You will use it later in commands, for example to change the password.</div>
+              <div>What to type</div><div>A short name without spaces, such as <code class="ic">pdi</code> or <code class="ic">acme-dev</code>. The name in brackets is a suggestion: press Enter to take it.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="q">
+          <div class="q-head"><span class="n">2/7</span><h3>Instance URL</h3></div>
+          <div class="q-body">
+            <div data-term="q2" data-label="On screen"></div>
+            <div class="dl">
+              <div>What it is</div><div>The address you open in your browser to reach ServiceNow.</div>
+              <div>What to type</div><div>Only the beginning, up to and including <code class="ic">.service-now.com</code>. Leave out everything after it.</div>
+              <div>Example</div><div>If your browser shows <code class="ic">https://&lt;your-instance&gt;.service-now.com/now/nav/ui/home</code>, type <code class="ic">https://&lt;your-instance&gt;.service-now.com</code>. A slash at the very end does no harm: the wizard removes it and says <code class="ic">trailing slash removed</code>.</div>
+            </div>
+            <div class="tool" style="margin:0;box-shadow:none">
+              <div class="tool-h"><span>Check your address</span></div>
+              <div class="tool-b">
+                <div><label class="l" for="url-check">Paste the address from your browser</label>
+                <input id="url-check" type="text" placeholder="https://dev123456.service-now.com/now/nav/ui/home" spellcheck="false" autocomplete="off"></div>
+                <div class="res" id="url-res" hidden></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="q">
+          <div class="q-head"><span class="n">3/7</span><h3>Environment</h3></div>
+          <div class="q-body">
+            <div data-term="q3" data-label="On screen"></div>
+            <div class="dl">
+              <div>What it is</div><div>What kind of instance this is. It decides which permissions the wizard proposes at question 7.</div>
+              <div>What to type</div><div>The number of the matching line, then Enter. Choose honestly:</div>
+            </div>
+            <div class="tw" style="margin:0"><table>
+              <thead><tr><th>Type</th><th>Choose it when</th></tr></thead>
+              <tbody>
+                <tr><td><code class="ic">1</code> pdi</td><td>It is your own free personal developer instance, usually <code class="ic">devNNNNNN.service-now.com</code>.</td></tr>
+                <tr><td><code class="ic">2</code> dev</td><td>It is a development instance you share with your team.</td></tr>
+                <tr><td><code class="ic">3</code> test</td><td>It is a test or UAT instance.</td></tr>
+                <tr><td><code class="ic">4</code> prod</td><td>It has real users. The wizard saves it read-only: the Architect can read but cannot change anything there.</td></tr>
+              </tbody>
+            </table></div>
+            <p class="muted" style="margin:0">Right after this question the screen shows a line like the one below. It only reports your proxy settings; you type nothing. <code class="ic">unset</code> is normal. Behind a company <span class="glw"><button type="button" class="gl" aria-describedby="tip-proxy">proxy</button><span class="tip" id="tip-proxy" role="tooltip" data-gl="proxy"></span></span>, see <a href="#trouble">If something goes wrong</a>.</p>
+            <div data-term="proxy" data-label="On screen"></div>
+          </div>
+        </div>
+
+        <div class="q">
+          <div class="q-head"><span class="n">4/7</span><h3>Authentication</h3></div>
+          <div class="q-body">
+            <div data-term="q4" data-label="On screen"></div>
+            <div class="dl">
+              <div>What it is</div><div>How the AI Architect signs in to ServiceNow.</div>
+              <div>What to type</div><div><code class="ic">1</code> (basic), or just press Enter. Choose <code class="ic">2</code> only if your ServiceNow administrator gave you an <span class="glw"><button type="button" class="gl" aria-describedby="tip-oauth">OAuth</button><span class="tip" id="tip-oauth" role="tooltip" data-gl="oauth"></span></span> client ID and secret and asked you to use them.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="q">
+          <div class="q-head"><span class="n">5/7</span><h3>Credentials</h3></div>
+          <div class="q-body">
+            <div data-term="q5" data-label="On screen"></div>
+            <div class="dl">
+              <div>What to type</div><div>The user name and password you use to log in to this instance in the browser. On a PDI the user name is <code class="ic">admin</code>.</div>
+              <div>The password</div><div>Nothing appears while you type it, not even dots. That is on purpose. Type it, or paste it with a right-click, and press Enter.</div>
+              <div>Where it goes</div><div>It stays on this computer, in your AI Architect folder. It is never sent into the chat with Claude.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="q">
+          <div class="q-head"><span class="n">6/7</span><h3>Login check</h3></div>
+          <div class="q-body">
+            <div data-term="q6" data-label="On screen"></div>
+            <div class="dl">
+              <div>What happens</div><div>The installer signs in and reads a few tables to learn what your account may do. It changes nothing on the instance.</div>
+              <div>What to type</div><div>Nothing. The <code class="ic">[INFO]</code> lines are normal.</div>
+              <div>If it fails</div><div>The message says why. Most often the address, user name or password has a typo. Nothing has been saved: press Ctrl+C and run <code class="ic">.\bootstrap.cmd</code> again.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="q">
+          <div class="q-head"><span class="n">7/7</span><h3>Permissions</h3></div>
+          <div class="q-body">
+            <div data-term="q7" data-label="On screen"></div>
+            <div class="dl">
+              <div>What it is</div><div>Which kinds of changes the AI Architect may make on this instance. <code class="ic">[x]</code> means allowed and <code class="ic">[ ]</code> means not allowed. <code class="ic">probe: ok</code> means your ServiceNow account is able to do it.</div>
+            </div>
+            <div class="tw" style="margin:0"><table>
+              <thead><tr><th>Permission</th><th>What it allows</th></tr></thead>
+              <tbody>
+                <tr><td>WRITE</td><td>Create, update and delete records: incidents, catalog items, users, update sets. Without it, everything is read-only.</td></tr>
+                <tr><td>CMDB_WRITE</td><td>Also write configuration items and their relationships in the CMDB. Needs WRITE.</td></tr>
+                <tr><td>SCRIPTING</td><td>Write Script Includes, Business Rules, Client Scripts, ACLs and UI Actions. Reading them is always allowed. Needs WRITE.</td></tr>
+                <tr><td>ATF</td><td>Run Automated Test Framework tests. Reading tests and results is always allowed.</td></tr>
+                <tr><td>NOW_ASSIST</td><td>The Now Assist (generative AI) tools. Needs a Now Assist licence on the instance.</td></tr>
+                <tr><td>FLUENT</td><td>The ServiceNow SDK (Fluent) build and deploy tools. Needs the ServiceNow SDK installed on this computer. If you do not use it, switch it off.</td></tr>
+              </tbody>
+            </table></div>
+            <p style="margin:0">Not sure which to allow? Try the choices in the <a href="#sim">wizard practice</a> above, or later with the <a href="#perm-builder">permissions builder</a>.</p>
+            <p style="margin:0">To accept the list as it is, press <span class="key">Enter</span>.</p>
+            <p style="margin:0">To change one permission, for example to switch FLUENT off:</p>
+            <ol style="margin:0 0 0 22px">
+              <li>Type its number, <code class="ic">6</code>, and press Enter.</li>
+              <li>The screen shows <code class="ic">FLUENT:  [1] on (current)  [2] off</code>. Type <code class="ic">2</code> and press Enter.</li>
+              <li>The list comes back with <code class="ic">[ ] FLUENT</code>. Change others the same way, then press Enter to apply.</li>
+            </ol>
+            <p style="margin:0">To choose a ready-made set, type <code class="ic">preset</code>, a space and its name, then press Enter:</p>
+            <div class="tw" style="margin:0"><table>
+              <thead><tr><th>Preset</th><th>What is on</th><th>When</th></tr></thead>
+              <tbody>
+                <tr><td><code class="ic">full</code></td><td>Everything</td><td>Proposed for pdi, dev and test instances.</td></tr>
+                <tr><td><code class="ic">pdi-developer</code></td><td>Everything except NOW_ASSIST and FLUENT</td><td>Building on a PDI, dev or test instance without the AI and SDK tools.</td></tr>
+                <tr><td><code class="ic">read-only</code></td><td>Nothing</td><td>Reviewing and designing against a real instance. The only choice for a prod instance.</td></tr>
+                <tr><td><code class="ic">custom</code></td><td>What you set by hand</td><td>Shown automatically after you change single permissions.</td></tr>
+              </tbody>
+            </table></div>
+            <div class="call ok" style="margin:0"><strong>The AI Architect always asks before it changes anything</strong><p>Even with every permission on, before each change on your instance the AI Architect asks you a question of this form, and waits for your answer:</p><p><code class="ic">About to &lt;action&gt; on instance "pdi" — write approved?</code></p><p>Permissions only say what it may ask for. Changing them here is not an approval.</p></div>
+            <div data-term="saved" data-label="On screen when it is saved"></div>
+          </div>
+        </div>
+
+      </section>
+      <section class="sec" id="step-6e" style="border-top:0;padding-top:0">
+        <h3><b>6e</b>The end of the install</h3>
+        <div data-term="end" data-label="On screen"></div>
+        <ul>
+          <li><span class="ui">Health check:</span> <code class="ic">0 fail</code> is what matters. A <code class="ic">warn</code> or a <code class="ic">fail</code> names the check it comes from. <code class="ic">E-31 the licence</code> warns in the last days before the licence ends. With a licence that runs for longer, this line shows no warning.</li>
+          <li><span class="ui">Mode:</span> says live, with your instance label.</li>
+          <li><span class="ui">Next:</span> names your folder. That is where you start Claude.</li>
+        </ul>
+        <p>Press any key. You are back at the <code class="ic">PS</code> line.</p>
+
+        <div data-chk="step-6"></div>
+      </section>
+
+      <!-- STEP 7 -->
+      <section class="sec" id="step-7">
+        <div class="sec-head"><div class="num">7</div><div class="t"><small>Step 7</small><h2>Check your licence</h2></div></div>
+        <div class="stack"><div data-cmd="s7"></div></div>
+        <div data-term="lic" data-label="On screen (example)"></div>
+        <div class="tw"><table>
+          <thead><tr><th>First word</th><th>Meaning</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr><td><code class="ic">ok</code></td><td>Everything works.</td><td>Nothing.</td></tr>
+            <tr><td><code class="ic">ok · … · design-only</code></td><td>Your licence covers design-only mode.</td><td>Live mode needs a live licence: ask for one, or switch with <code class="ic">.\snowarch.cmd mode design</code>.</td></tr>
+            <tr><td><code class="ic">expiring</code></td><td>The last days before the end date. Everything still works.</td><td>Ask for a renewal; see <a href="#renewal">Licence renewal</a>.</td></tr>
+            <tr><td><code class="ic">expired</code></td><td>The end date has passed. ServiceNow tools stop working.</td><td>Ask for a renewal.</td></tr>
+            <tr><td><code class="ic">missing</code></td><td>There is no <code class="ic">.local\licence.json</code>.</td><td>Repeat <a href="#step-5">Step 5</a>.</td></tr>
+            <tr><td><code class="ic">invalid</code></td><td>The file is damaged or is not a licence.</td><td>Ask for a new copy of the file.</td></tr>
+            <tr><td><code class="ic">revoked</code></td><td>The licence was withdrawn.</td><td>Contact whoever gave it to you.</td></tr>
+          </tbody>
+        </table></div>
+
+        <div class="tool" style="box-shadow:none">
+          <div class="tool-h"><span>Check your licence</span><span id="oc-lic-sum">paste to check</span></div>
+          <div class="tool-b">
+            <div><label class="l" for="oc-lic">Paste what PowerShell printed</label>
+            <textarea id="oc-lic" rows="4" spellcheck="false" placeholder="Licence: ok · LIC-2026-0000 · until 2026-12-31"></textarea></div>
+            <div class="oclist" id="oc-lic-list" hidden></div>
+          </div>
+        </div>
+        <p class="muted">A licence works through its end date, counted in <span class="glw"><button type="button" class="gl" aria-describedby="tip-utc">UTC</button><span class="tip" id="tip-utc" role="tooltip" data-gl="utc"></span></span> time.</p>
+
+        <div data-chk="step-7"></div>
+      </section>
+
+      <!-- STEP 8 -->
+      <section class="sec" id="step-8">
+        <div class="sec-head"><div class="num">8</div><div class="t"><small>Step 8</small><h2>Start the AI Architect</h2></div></div>
+        <p>Always start it from inside your <code class="ic">AI-Arch</code> folder.</p>
+        <div class="stack"><div data-cmd="s8"></div></div>
+        <ol>
+          <li>Claude asks whether you trust this folder. Answer <span class="ui">Yes</span>. It asks only the first time.</li>
+          <li>Type <code class="ic">/mcp</code> and press Enter. Under <span class="glw"><button type="button" class="gl" aria-describedby="tip-mcp">Project MCPs</button><span class="tip" id="tip-mcp" role="tooltip" data-gl="mcp"></span></span> you should see <code class="ic">servicenow</code> with a tick. Other lines come from your own Claude account and do not matter here. Press <span class="key">Esc</span>.
+            <div class="stack"><div data-term="mcp" data-label="On screen"></div></div>
+          </li>
+          <li>Type <code class="ic">/snowarch status</code> and press Enter. The first lines should match the end of the install:
+            <div class="stack"><div data-term="status" data-label="On screen"></div></div>
+          </li>
+          <li class="live-only">Ask a first question that only reads, for example <i>How many open incidents are there?</i> The AI Architect reads the answer from your instance and tells you what it read.</li>
+          <li class="design-only">Ask a first question, for example <i>How do assignment rules work for incidents?</i> In design-only mode the AI Architect answers from the ServiceNow documentation.</li>
+        </ol>
+        <div class="done">
+          <h3>YOU ARE DONE</h3>
+          <p style="margin:0">The AI Architect is installed, licensed and connected. The User Guide in your folder, <code class="ic">docs\USER-GUIDE.md</code>, shows how to work with it, with examples for analysts, architects and developers.</p>
+        </div>
+
+        <div data-chk="step-8"></div>
+      </section>
+
+      <!-- OPTIONAL -->
+      <section class="sec" id="optional">
+        <div class="sec-head"><div class="num ink">+</div><div class="t"><small>After the install</small><h2>Optional tools</h2></div></div>
+        <p>The AI Architect works without them. Each one adds a feature, and each installs without administrator rights. Programs installed this way do not appear in Apps &amp; features and do not update themselves: to update one, download the new zip and unpack it again.</p>
+        <div class="tw"><table>
+          <thead><tr><th>Tool</th><th>What it adds</th></tr></thead>
+          <tbody>
+            <tr><td>ServiceNow SDK</td><td>The Fluent build and deploy tools, the FLUENT permission (wizard question 7).</td></tr>
+            <tr><td>Microsoft Word</td><td>Opens and checks the Word documents the Architect writes. Usually installed by your company.</td></tr>
+            <tr><td>PowerShell 7</td><td>Not needed for the Word documents: the built-in Windows PowerShell 5.1 makes them (tested on 12 November). Only for other tools that call <code class="ic">pwsh</code>.</td></tr>
+          </tbody>
+        </table></div>
+        <h3><b>■</b>ServiceNow SDK</h3>
+        <div class="stack">
+          <div data-cmd="o-sdk"></div>
+          <div data-cmd="o-sdkv"></div>
+        </div>
+        <p>Then switch the FLUENT permission on, in your AI-Arch folder, and restart Claude:</p>
+        <div class="stack"><div data-cmd="o-fluent"></div></div>
+        <p class="muted">Tested: now-sdk 4.14.0 with Node.js 26 from the zip. npm may suggest a newer npm at the end; you can ignore it.</p>
+        <h3><b>■</b>PowerShell 7</h3>
+        <p>Download <code class="ic">PowerShell-&lt;version&gt;-win-x64.zip</code> from github.com/PowerShell/PowerShell/releases into Downloads, then:</p>
+        <div class="stack">
+          <div data-cmd="o-pwsh"></div>
+          <div data-cmd="o-pwshp"></div>
+        </div>
+        <p class="muted">Open a new PowerShell window after these, so it sees the new PATH.</p>
+      </section>
+
+      <!-- DAILY -->
+      <section class="sec" id="daily">
+        <div class="sec-head"><div class="num ink">Day</div><div class="t"><small>After the install</small><h2>Every day</h2></div></div>
+        <ol>
+          <li>Open PowerShell: <span class="key">Win</span>+<span class="key">R</span>, type <code class="ic">powershell</code>, press <span class="key">Enter</span>.</li>
+          <li>Go to your folder:<div class="stack"><div data-cmd="d-cd"></div></div></li>
+          <li>Start the AI Architect:<div class="stack"><div data-cmd="d-claude"></div></div></li>
+        </ol>
+        <div class="call warn"><strong>Only from this folder</strong><p>Started anywhere else, the AI Architect is not loaded and <code class="ic">/mcp</code> shows no servicenow line.</p></div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="sec" id="settings">
+        <div class="sec-head"><div class="num ink">Set</div><div class="t"><small>After the install</small><h2>Change settings later</h2></div></div>
+        <p>You never need to reinstall to change a setting. Run these in PowerShell inside your <code class="ic">AI-Arch</code> folder, outside Claude. Afterwards, restart Claude: type <code class="ic">/exit</code>, then <code class="ic">claude</code>. The commands use the instance label from <a href="#need">Your details</a>.</p>
+        <h3><b>■</b>Change the password</h3>
+        <div class="stack"><div data-cmd="c-pw"></div></div>
+        <h3><b>■</b>Switch to a ready-made permission set</h3>
+        <p>The last word is the set: <code class="ic">full</code>, <code class="ic">pdi-developer</code> or <code class="ic">read-only</code>.</p>
+        <div class="stack"><div data-cmd="c-preset"></div></div>
+        <h3><b>■</b>Switch single permissions on or off</h3>
+        <p>Write each permission as <code class="ic">NAME=on</code> or <code class="ic">NAME=off</code>. This example allows record changes and blocks CMDB changes.</p>
+        <div class="stack"><div data-cmd="c-flags"></div></div>
+        <div class="tool" id="perm-builder">
+          <div class="tool-h"><span id="pb-label">Permissions builder</span><span id="pb-preset">preset full</span></div>
+          <div class="tool-b" id="pb-body"></div>
+        </div>
+        <h3><b>■</b>Test the connection</h3>
+        <div class="stack"><div data-cmd="c-test"></div></div>
+        <h3><b>■</b>See your instances</h3>
+        <div class="stack"><div data-cmd="c-list"></div></div>
+        <h3><b>■</b>Fix a wrong address</h3>
+        <p>Remove the instance, then add it again with the guided setup below.</p>
+        <div class="stack"><div data-cmd="c-rm"></div></div>
+        <h3><b>■</b>Add another instance</h3>
+        <p>Inside Claude, type <code class="ic">/snowarch setup-instance</code>. It asks for a label and an address in the chat, then gives you one command to run in PowerShell, where you type the password. Your password never passes through the chat. When PowerShell says <span class="ui">Saved instance</span>, go back to Claude and type <code class="ic">/snowarch setup-instance --resume</code>.</p>
+        <h3><b>■</b>Work without the instance for a while</h3>
+        <p>Design-only mode keeps your saved instance but stops using it.</p>
+        <div class="stack"><div data-cmd="c-design"></div></div>
+        <p>Back to live mode:</p>
+        <div class="stack"><div data-cmd="c-live"></div></div>
+        <h3><b>■</b>Run the full health check</h3>
+        <div class="stack"><div data-cmd="c-doctor"></div></div>
+      </section>
+
+      <!-- RENEWAL -->
+      <section class="sec" id="renewal">
+        <div class="sec-head"><div class="num ink">Lic</div><div class="t"><small>After the install</small><h2>Licence renewal</h2></div></div>
+        <p>When <code class="ic">licence check</code> says <code class="ic">expiring</code>, ask whoever gave you the licence for a renewal. You receive a new file. Save it in Downloads, type its name in <a href="#need">Your details</a>, and copy it over the old one:</p>
+        <div class="stack"><div data-cmd="r-copy"></div></div>
+        <p class="muted" data-sample-note hidden>This is the sample name. Type your file's name in <a href="#need">Your details</a> at the top, or replace <code class="ic">LIC-2026-0000.json</code> with it.</p>
+        <p>Then restart Claude (<code class="ic">/exit</code>, then <code class="ic">claude</code>). The licence is read when Claude starts, so a window that was already open keeps the old state until you restart it.</p>
+        <div class="call bad"><strong>After the end date</strong><p>ServiceNow tools stop working. These commands still work, so you can see what is wrong and fix it: <code class="ic">licence</code>, <code class="ic">doctor</code>, <code class="ic">status</code>, <code class="ic">version</code>, <code class="ic">upgrade</code>, <code class="ic">bootstrap</code> and <code class="ic">mode design</code>.</p></div>
+      </section>
+
+      <!-- RELEASES -->
+      <section class="sec" id="releases">
+        <div class="sec-head"><div class="num ink">New</div><div class="t"><small>After the install</small><h2>New releases</h2></div></div>
+        <p>Check whether a newer release is out. This changes nothing.</p>
+        <div class="stack"><div data-cmd="u-check"></div></div>
+        <p>Move to the newest release:</p>
+        <div class="stack"><div data-cmd="u-up"></div></div>
+        <p>It shows a plan first and changes nothing until you accept it. Your instances and passwords are not touched. Restart Claude afterwards.</p>
+      </section>
+
+      <!-- TROUBLE -->
+      <section class="sec" id="trouble">
+        <div class="sec-head"><div class="num" style="background:var(--bad)">!</div><div class="t"><small>Help</small><h2>If something goes wrong</h2></div></div>
+        <div class="tool" style="box-shadow:none">
+          <div class="tool-h"><span>Find your problem</span><span id="t-count">known problems</span></div>
+          <div class="tool-b">
+            <div><label class="l" for="t-search">Paste or type what you see on the screen</label>
+            <input id="t-search" type="search" placeholder="e.g. is not recognized, proxy, licence expired" spellcheck="false" autocomplete="off"></div>
+          </div>
+        </div>
+        <div class="call warn" id="t-none" hidden><strong>Nothing matches</strong><p>Try fewer words, or one distinctive word from the message. If it is still not here, see <a href="#help">Asking for help</a> below.</p></div>
+        <div class="tw trouble"><table>
+          <thead><tr><th>What you see</th><th>What to do</th></tr></thead>
+          <tbody id="t-body"></tbody>
+        </table></div>
+        <p>Setting a company proxy for the current window (replace the address with the one from your IT team):</p>
+        <div class="stack"><div data-cmd="t-proxy"></div></div>
+        <p>Reloading PATH in the current window instead of opening a new one:</p>
+        <div class="stack"><div data-cmd="t-path"></div></div>
+        <h3 id="help"><b>■</b>Asking for help</h3>
+        <p>Run these two commands in your folder and copy their full output into your message. Neither shows your password or your instance address.</p>
+        <div class="stack">
+          <div data-cmd="t-ver"></div>
+          <div data-cmd="t-doc"></div>
+        </div>
+        <div class="tool">
+          <div class="tool-h"><span>Your help message</span><span>no password, no instance address</span></div>
+          <div class="tool-b">
+            <p class="muted">It collects where you are, what you skipped, the steps you marked as not working, and the output you pasted into the checks. Add a line about what you see, copy it, and paste it into an email or Teams. Then add the output of the two commands above.</p>
+            <div><label class="l" for="help-desc">What do you see?</label>
+            <textarea id="help-desc" rows="3" placeholder="e.g. After 2c, claude --version says 'claude' is not recognized"></textarea></div>
+            <div><label class="l" for="help-msg">The message</label>
+            <textarea id="help-msg" rows="12" readonly spellcheck="false"></textarea></div>
+            <div class="pills"><button type="button" class="btn pri" id="help-copy">Copy message</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- UNINSTALL -->
+      <section class="sec" id="uninstall">
+        <div class="sec-head"><div class="num ink">Del</div><div class="t"><small>After the install</small><h2>Uninstall</h2></div></div>
+        <ol>
+          <li>In your folder, switch the AI Architect off. This is always safe.<div class="stack"><div data-cmd="x-design"></div></div></li>
+          <li>Close Claude and PowerShell, then delete the folder <code class="ic">C:\Users\&lt;you&gt;\AI-Arch</code> in File Explorer. This also deletes your saved password.</li>
+          <li>If the folder <code class="ic">%APPDATA%\snowarch</code> exists, delete it too.</li>
+        </ol>
+      </section>
+
+      <!-- SAFETY -->
+      <section class="sec" id="safety">
+        <div class="sec-head"><div class="num" style="background:var(--ok);color:#0B0B0A">✓</div><div class="t"><small>Read once</small><h2>Your data and safety</h2></div></div>
+        <ul>
+          <li>Your ServiceNow password is stored only in <code class="ic">.local\instances.json</code> inside your AI Architect folder. It never goes into the chat. Nobody helping you needs it, so never send that file.</li>
+          <li>The installer locks that file, and the folder <code class="ic">.local</code> around it, so that only your account and the system can read them (the computer's administrators can always take a file over). <code class="ic">.\snowarch.cmd doctor</code> checks it (check SV-02) and names anyone else who could read the file; <code class="ic">.\snowarch.cmd doctor --fix</code> repairs it after showing what it will change.</li>
+          <li>The AI Architect asks <i>write approved?</i> before every change on your instance, and a prod instance is saved read-only.</li>
+          <li>Your licence file is issued to you. Do not share it.</li>
+        </ul>
+      </section>
+
+      <!-- NOT TESTED -->
+      <section class="sec" id="untested">
+        <div class="sec-head"><div class="num ink">?</div><div class="t"><small>Read once</small><h2>What has not been tested</h2></div></div>
+        <p>This guide was written from one end-to-end install. Four things in it rest on something other than a run:</p>
+        <ul>
+          <li><b>Windows 10.</b> The test machine ran Windows 11. Windows 10 (version 1809 or later) has the same PowerShell 5.1 and takes the same commands.</li>
+          <li><b>Claude Code's first-run screens on Windows</b> (Step 3). They are described in general terms because they change with Claude Code's releases.</li>
+          <li><b>A folder name with a space in it, a folder on a network drive, and a folder that OneDrive or another sync tool manages</b> (Step 4).</li>
+          <li><b>What the screens say after the licence has ended</b> (Step 7). The table is the product's own list of states, not a transcript of each one.</li>
+        </ul>
+        <p>If you meet a difference, <code class="ic">.\snowarch.cmd version</code> and <code class="ic">.\snowarch.cmd doctor</code> (see <a href="#help">Asking for help</a>) are what to send.</p>
+      </section>
+
+      <!-- GLOSSARY -->
+      <section class="sec" id="glossary">
+        <div class="sec-head"><div class="num ink">A–Z</div><div class="t"><small>Reference</small><h2>Glossary</h2></div></div>
+        <p class="muted">Words with a dotted line in the guide show these explanations when you point at them or tab to them.</p>
+        <div id="gl-list"></div>
+      </section>
+
+
+      <nav class="pager" aria-label="Step by step" data-pager hidden>
+        <button type="button" class="btn" data-pg="prev">◀ Start</button>
+        <span class="pos"></span>
+        <button type="button" class="btn pri" data-pg="next">End ▶</button>
+      </nav>
+
+      <div class="foot">Tested end to end on 12 November 2026 on a company laptop: Windows 11 Enterprise (build 26200), a standard user without administrator rights. Git 2.56.1 (per user), Node.js 26.13.0 and npm 11.20.0 (zip), Claude Code 2.1.322, ServiceNow SDK 4.14.0, PowerShell 7.7.0 (zip; present on the test machine, not needed by this guide), draw.io 32.6.10 (zip), Word 16.0.20527; the AI Architect release of that day, in live mode, on a ServiceNow instance.</div>
+
+    </main>
+  </div>
+</div>
+<button type="button" class="next" id="next" aria-label="Go to the next command">
+  <small>Next command</small>
+  <b>…</b>
+</button>
+</div>
+<script type="application/json" id="guide-data">
+{
+ "release": "v2.2.6",
+ "floors": {
+  "claudeCode": "2.1.214",
+  "node": "20.0.0",
+  "git": "2.34.1"
+ },
+ "designMinutes": {
+  "s6": 4
+ },
+ "commands": [
+  {
+   "id": "s1-whoami",
+   "code": "whoami /groups | findstr Level"
+  },
+  {
+   "id": "s2a-dl",
+   "code": "mkdir \"$env:TEMP\\snowarch-dl\" -Force | Out-Null; $ProgressPreference = 'SilentlyContinue'; iwr -UseBasicParsing https://github.com/git-for-windows/git/releases/download/v2.56.1.windows.1/Git-2.56.1-64-bit.exe -OutFile \"$env:TEMP\\snowarch-dl\\git.exe\""
+  },
+  {
+   "id": "s2a-inst",
+   "code": "Start-Process \"$env:TEMP\\snowarch-dl\\git.exe\" -ArgumentList '/VERYSILENT','/NORESTART','/SUPPRESSMSGBOXES' -Wait"
+  },
+  {
+   "id": "s2b-dl",
+   "code": "$ProgressPreference = 'SilentlyContinue'; iwr -UseBasicParsing https://nodejs.org/dist/v26.13.0/node-v26.13.0-win-x64.zip -OutFile \"$env:TEMP\\snowarch-dl\\node.zip\""
+  },
+  {
+   "id": "s2b-unz",
+   "code": "Expand-Archive \"$env:TEMP\\snowarch-dl\\node.zip\" \"$env:LOCALAPPDATA\\Programs\" -Force"
+  },
+  {
+   "id": "s2b-path",
+   "code": "[Environment]::SetEnvironmentVariable(\"Path\", [Environment]::GetEnvironmentVariable(\"Path\", \"User\") + \";$env:LOCALAPPDATA\\Programs\\node-v26.13.0-win-x64;$env:APPDATA\\npm\", \"User\")"
+  },
+  {
+   "id": "s2c",
+   "code": "irm https://claude.ai/install.ps1 | iex"
+  },
+  {
+   "id": "s2d",
+   "code": "[Environment]::SetEnvironmentVariable(\"Path\", [Environment]::GetEnvironmentVariable(\"Path\", \"User\") + \";$env:USERPROFILE\\.local\\bin\", \"User\")"
+  },
+  {
+   "id": "s2e-claude",
+   "code": "claude --version"
+  },
+  {
+   "id": "s2e-git",
+   "code": "git --version"
+  },
+  {
+   "id": "s2e-node",
+   "code": "node --version"
+  },
+  {
+   "id": "s2e-npm",
+   "code": "npm --version"
+  },
+  {
+   "id": "s2f-dl",
+   "code": "$ProgressPreference = 'SilentlyContinue'; iwr -UseBasicParsing https://github.com/jgraph/drawio-desktop/releases/download/v32.6.10/draw.io-32.6.10-windows.zip -OutFile \"$env:TEMP\\snowarch-dl\\drawio.zip\""
+  },
+  {
+   "id": "s2f-unz",
+   "code": "Expand-Archive \"$env:TEMP\\snowarch-dl\\drawio.zip\" \"$env:LOCALAPPDATA\\Programs\\drawio\" -Force"
+  },
+  {
+   "id": "s2f-test",
+   "code": "Test-Path \"$env:LOCALAPPDATA\\Programs\\drawio\\draw.io.exe\""
+  },
+  {
+   "id": "s3",
+   "code": "claude"
+  },
+  {
+   "id": "s4-cd",
+   "code": "cd $HOME"
+  },
+  {
+   "id": "s4-clone",
+   "code": "git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git AI-Arch"
+  },
+  {
+   "id": "s4-cd2",
+   "code": "cd AI-Arch"
+  },
+  {
+   "id": "s5a",
+   "code": "mkdir .local -Force"
+  },
+  {
+   "id": "s5b",
+   "code": "Get-ChildItem $HOME\\Downloads\\LIC-*.json"
+  },
+  {
+   "id": "s5c",
+   "code": "Copy-Item \"$HOME\\Downloads\\{lic}\" .local\\licence.json"
+  },
+  {
+   "id": "s6",
+   "code": ".\\bootstrap.cmd"
+  },
+  {
+   "id": "s7",
+   "code": ".\\snowarch.cmd licence check"
+  },
+  {
+   "id": "s8",
+   "code": "claude"
+  },
+  {
+   "id": "o-sdk",
+   "code": "npm install -g @servicenow/sdk"
+  },
+  {
+   "id": "o-sdkv",
+   "code": "now-sdk --version"
+  },
+  {
+   "id": "o-fluent",
+   "code": ".\\snowarch.cmd instance set-flags {label} FLUENT=on"
+  },
+  {
+   "id": "o-pwsh",
+   "code": "Expand-Archive -Path (Get-ChildItem \"$HOME\\Downloads\\PowerShell-*-win-x64.zip\" | Select-Object -First 1).FullName -DestinationPath \"$env:LOCALAPPDATA\\Programs\\PowerShell7\" -Force"
+  },
+  {
+   "id": "o-pwshp",
+   "code": "[Environment]::SetEnvironmentVariable(\"Path\", [Environment]::GetEnvironmentVariable(\"Path\", \"User\") + \";$env:LOCALAPPDATA\\Programs\\PowerShell7\", \"User\")"
+  },
+  {
+   "id": "d-cd",
+   "code": "cd $HOME\\AI-Arch"
+  },
+  {
+   "id": "d-claude",
+   "code": "claude"
+  },
+  {
+   "id": "c-pw",
+   "code": ".\\snowarch.cmd instance set-credentials {label}"
+  },
+  {
+   "id": "c-preset",
+   "code": ".\\snowarch.cmd instance set-preset {label} pdi-developer"
+  },
+  {
+   "id": "c-flags",
+   "code": ".\\snowarch.cmd instance set-flags {label} WRITE=on CMDB_WRITE=off"
+  },
+  {
+   "id": "c-builder",
+   "code": ".\\snowarch.cmd instance set-preset {label} full",
+   "pageOnly": true
+  },
+  {
+   "id": "c-test",
+   "code": ".\\snowarch.cmd instance test {label}"
+  },
+  {
+   "id": "c-list",
+   "code": ".\\snowarch.cmd instance list"
+  },
+  {
+   "id": "c-rm",
+   "code": ".\\snowarch.cmd instance remove {label}"
+  },
+  {
+   "id": "c-design",
+   "code": ".\\snowarch.cmd mode design"
+  },
+  {
+   "id": "c-live",
+   "code": ".\\snowarch.cmd mode live"
+  },
+  {
+   "id": "c-doctor",
+   "code": ".\\snowarch.cmd doctor"
+  },
+  {
+   "id": "r-copy",
+   "code": "Copy-Item \"$HOME\\Downloads\\{lic}\" .local\\licence.json"
+  },
+  {
+   "id": "u-check",
+   "code": ".\\snowarch.cmd upgrade --check"
+  },
+  {
+   "id": "u-up",
+   "code": ".\\snowarch.cmd upgrade"
+  },
+  {
+   "id": "t-proxy",
+   "code": "$env:HTTPS_PROXY = \"http://proxy.example.com:8080\""
+  },
+  {
+   "id": "t-path",
+   "code": "$env:Path = [Environment]::GetEnvironmentVariable(\"Path\", \"User\") + \";\" + [Environment]::GetEnvironmentVariable(\"Path\", \"Machine\")"
+  },
+  {
+   "id": "t-ver",
+   "code": ".\\snowarch.cmd version"
+  },
+  {
+   "id": "t-doc",
+   "code": ".\\snowarch.cmd doctor"
+  },
+  {
+   "id": "x-design",
+   "code": ".\\snowarch.cmd mode design"
+  }
+ ],
+ "terminals": {
+  "ps": "~ Windows PowerShell\n~ Copyright (C) Microsoft Corporation. All rights reserved.\n\nPS C:\\Users\\you>",
+  "versions": "PS C:\\Users\\you> [[claude --version]]\n2.1.322 (Claude Code)\nPS C:\\Users\\you> [[git --version]]\ngit version 2.56.1.windows.1\nPS C:\\Users\\you> [[node --version]]\nv26.13.0",
+  "clone": "Cloning into 'AI-Arch'...\nremote: Enumerating objects: 814, done.\n~ …\nResolving deltas: 100% (255/255), done.\n~ warning: refs/tags/… is not a commit!\nPS C:\\Users\\you> [[cd AI-Arch]]\nPS C:\\Users\\you\\AI-Arch>",
+  "preflight": "ok B00 root: C:\\Users\\you\\AI-Arch\nok B00 git: 2.56.1\nok B00 claudeCode: 2.1.322 · login: ok\nok B00 disk: 830.0 GB free\nok B00 network: github.com reachable (HTTP 200)\nok B00 node: 26.13.0 · npm present\nok B00 platform: win32 x64 10.0.26200\n[B00/09] preflight … ok (2 s)",
+  "plan": "Installing the AI ServiceNow Architect into this folder only — nothing else on the machine changes.\nTwo choices below, then it runs on its own (a few minutes; live adds a short wizard).\n~ Plan — Enter runs it as shown · type a number to choose that line's value · \"?\" explains · q quits\n1  Mode   design-only    live needs a ServiceNow instance (wizard runs in this terminal); Node 26.13.0 found\n2  Docs   full           full = whole corpus · skip = none (the doctor will report FAIL)\nSteps  B01 workspace · B02 docs · B05 tool list · B07 Claude settings · B09 summary\n>",
+  "modeMenu": "> [[1]]\nMode:\n[1] design-only — works from the ServiceNow docs and the specialist skills; no instance (current)\n[2] live — also connects one ServiceNow instance (the wizard asks for URL and login)",
+  "planLive": "1  Mode   live           live needs a ServiceNow instance (wizard runs in this terminal); Node 26.13.0 found\n2  Docs   full           full = whole corpus · skip = none (the doctor will report FAIL)\nSteps  B01 workspace · B02 docs · B04 deps · B05 tool list · B06 instance · B07 Claude settings · B08 verify · B09 summary\n~ Mode → live · Enter runs it · 1 changes it again · q quits\n>",
+  "docs": "release manifest: v2.2.5 fetched (473 files)\n[B01/09] workspace … ok (4 s)\n[docs] checkout --detach c10276e … 89.9 s\n[docs] 51,665 files · 299 MB working tree\ncitations: checked: 588 | dead: 0\n[B02/09] docs … ok (147 s)\n[B03/09] mode … ok (0.0 s)\n[B04/09] deps … installing (npm ci)\n[B04/09] deps … ok (7 s)\n[B05/09] tool list … ok (0.0 s)",
+  "wizard": "Instance wizard — seven steps (six questions and a login check).\n~ Have ready: the instance URL and a username + password for it. Nothing is saved until the end.",
+  "q1": "[1/7] Label — a short name you will type in commands, e.g. pdi, acme-dev\nLabel [pdi] [[{label}]]",
+  "q2": "[2/7] Instance URL\nInstance URL (https://\u003chost>, no path) [[{base}]]",
+  "q3": "[3/7] Environment\nWhat is this instance?\n[1] pdi — your personal developer instance (devNNNNNN.service-now.com)\n[2] dev — a shared development instance\n[3] test — a test / UAT instance\n[4] prod — real users; the wizard saves it read-only\n[[1]]\nEnvironment → pdi",
+  "proxy": "~ network: HTTPS_PROXY=unset · NO_PROXY=unset · NODE_EXTRA_CA_CERTS=unset",
+  "q4": "[4/7] Authentication\nAuthentication?\n[1] basic — username + password (recommended for PDI; no instance-side setup) · Enter picks this\n[2] oauth_ropc — OAuth password grant (legacy; needs client id + secret AND a user password;\n    instances can disable it)\n[[1]]\nAuthentication → basic",
+  "q5": "[5/7] Credentials\nUsername (a ServiceNow user on this instance — admin on a PDI) [[admin]]\nPassword (nothing is shown while you type):",
+  "q6": "[6/7] Checking the login and what this account may do (read-only, a few seconds) …\n~ [INFO] Querying ServiceNow table: sys_user\n~ [INFO] Querying ServiceNow table: sys_user_has_role\n~ [INFO] Querying ServiceNow table: sys_update_set\n~ … four more lines like these",
+  "q7": "[7/7] Permissions\nPermissions for instance \"{label}\" (environment pdi) — what Claude's tools may do there.\nProposed: full (everything on)\n1  [x] WRITE        probe: ok\n2  [x] CMDB_WRITE   probe: ok\n3  [x] SCRIPTING    probe: ok\n4  [x] ATF          probe: ok\n5  [x] NOW_ASSIST   probe: ok\n6  [x] FLUENT       probe: ok\n~ Enter = apply as shown · a number opens that flag · \"preset \u003cname>\" switches · \"?\" explains",
+  "saved": "Applying: preset custom — WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off\nSaved instance \"{label}\" (pdi · basic · preset custom · default).\nProbes: auth: ok · write: ok · cmdb_write: ok · scripting: ok · atf: ok · now_assist: ok\nSaved to .local\\instances.json in this folder — readable only by you.\n[B06/09] instance … ok (92 s)",
+  "end": "[B07/09] Claude settings … ok (0.3 s)\n[B08/09] verify … ok (12 s)\n[B09/09] summary … ok (4 s)\nHealth check (quick): 16 ok · 1 warn (E-31 the licence) · 0 fail · 26 more run with .\\snowarch.cmd doctor\nMode: live — instance={label} (pdi) preset=custom\nNext: run `claude` in this folder: C:\\Users\\you\\AI-Arch\nYou will see one workspace-trust dialog — answer Yes.\n~ … a short list of commands for changing settings later …\nPress any key to continue . . .",
+  "lic": "Licence: ok · {licId} · until 2026-12-31",
+  "mcp": "Project MCPs (C:\\Users\\you\\AI-Arch\\.mcp.json)\n√   servicenow                  399 tools",
+  "status": "Mode: live — {label} (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v2.2.5 · 473 files\nDocs: vendor/ServiceNowDocs @ c10276e95345 (australia) · full"
+ },
+ "steps": [
+  {
+   "id": "step-1",
+   "cmds": [
+    [
+     "s1-whoami",
+     "1 · Check it is not an admin window",
+     0.2
+    ]
+   ]
+  },
+  {
+   "id": "step-2",
+   "cmds": [
+    [
+     "s2a-dl",
+     "2a · Download Git",
+     1
+    ],
+    [
+     "s2a-inst",
+     "2a · Install Git",
+     1.5
+    ],
+    [
+     "s2b-dl",
+     "2b · Download Node.js",
+     0.7
+    ],
+    [
+     "s2b-unz",
+     "2b · Unpack Node.js",
+     0.5
+    ],
+    [
+     "s2b-path",
+     "2b · Add Node.js to PATH",
+     0.2
+    ],
+    [
+     "s2c",
+     "2c · Install Claude Code",
+     2
+    ],
+    [
+     "s2d",
+     "2d · Add Claude Code to PATH",
+     0.2
+    ],
+    [
+     "s2e-claude",
+     "2e · Check claude",
+     0.2
+    ],
+    [
+     "s2e-git",
+     "2e · Check git",
+     0.1
+    ],
+    [
+     "s2e-node",
+     "2e · Check node",
+     0.1
+    ],
+    [
+     "s2e-npm",
+     "2e · Check npm",
+     0.1
+    ],
+    [
+     "s2f-dl",
+     "2f · Download draw.io",
+     1.5
+    ],
+    [
+     "s2f-unz",
+     "2f · Unpack draw.io",
+     1
+    ],
+    [
+     "s2f-test",
+     "2f · Check draw.io",
+     0.2
+    ]
+   ]
+  },
+  {
+   "id": "step-3",
+   "cmds": [
+    [
+     "s3",
+     "3 · Sign in to Claude Code",
+     2
+    ]
+   ]
+  },
+  {
+   "id": "step-4",
+   "cmds": [
+    [
+     "s4-cd",
+     "4 · Go to your user folder",
+     0.1
+    ],
+    [
+     "s4-clone",
+     "4 · Download the AI Architect",
+     1
+    ],
+    [
+     "s4-cd2",
+     "4 · Go into AI-Arch",
+     0.1
+    ]
+   ]
+  },
+  {
+   "id": "step-5",
+   "cmds": [
+    [
+     "s5a",
+     "5a · Make the .local folder",
+     0.1
+    ],
+    [
+     "s5b",
+     "5b · Find your licence file",
+     0.2
+    ],
+    [
+     "s5c",
+     "5c · Copy the licence into place",
+     0.2
+    ]
+   ]
+  },
+  {
+   "id": "step-6",
+   "cmds": [
+    [
+     "s6",
+     "6 · Run the installer",
+     8
+    ]
+   ]
+  },
+  {
+   "id": "step-7",
+   "cmds": [
+    [
+     "s7",
+     "7 · Check your licence",
+     0.3
+    ]
+   ]
+  },
+  {
+   "id": "step-8",
+   "cmds": [
+    [
+     "s8",
+     "8 · Start the AI Architect",
+     1
+    ]
+   ]
+  }
+ ],
+ "nav": [
+  {
+   "g": "Before you begin"
+  },
+  {
+   "id": "need",
+   "n": "—",
+   "t": "What you need"
+  },
+  {
+   "id": "how",
+   "n": "—",
+   "t": "How to use this guide"
+  },
+  {
+   "g": "Install"
+  },
+  {
+   "id": "step-1",
+   "n": "01",
+   "t": "Open PowerShell"
+  },
+  {
+   "id": "step-2",
+   "n": "02",
+   "t": "Install the programs"
+  },
+  {
+   "id": "step-3",
+   "n": "03",
+   "t": "Sign in to Claude Code"
+  },
+  {
+   "id": "step-4",
+   "n": "04",
+   "t": "Download the AI Architect"
+  },
+  {
+   "id": "step-5",
+   "n": "05",
+   "t": "Add your licence"
+  },
+  {
+   "id": "step-6",
+   "n": "06",
+   "t": "Run the installer"
+  },
+  {
+   "id": "step-6d",
+   "n": "6d",
+   "t": "The instance wizard",
+   "live": true
+  },
+  {
+   "id": "step-7",
+   "n": "07",
+   "t": "Check your licence"
+  },
+  {
+   "id": "step-8",
+   "n": "08",
+   "t": "Start the AI Architect"
+  },
+  {
+   "g": "After the install"
+  },
+  {
+   "id": "optional",
+   "n": "—",
+   "t": "Optional tools"
+  },
+  {
+   "id": "daily",
+   "n": "—",
+   "t": "Every day"
+  },
+  {
+   "id": "settings",
+   "n": "—",
+   "t": "Change settings later"
+  },
+  {
+   "id": "renewal",
+   "n": "—",
+   "t": "Licence renewal"
+  },
+  {
+   "id": "releases",
+   "n": "—",
+   "t": "New releases"
+  },
+  {
+   "id": "trouble",
+   "n": "—",
+   "t": "If something goes wrong"
+  },
+  {
+   "id": "uninstall",
+   "n": "—",
+   "t": "Uninstall"
+  },
+  {
+   "id": "safety",
+   "n": "—",
+   "t": "Your data and safety"
+  },
+  {
+   "id": "untested",
+   "n": "—",
+   "t": "What has not been tested"
+  },
+  {
+   "id": "glossary",
+   "n": "—",
+   "t": "Glossary"
+  }
+ ],
+ "need": [
+  {
+   "id": "n-win",
+   "t": "Windows 10 (1809 or later) or Windows 11, connected to the internet",
+   "hint": "Not sure? Press Win+R, type winver and press Enter: it shows your version."
+  },
+  {
+   "id": "n-disk",
+   "t": "About 2 GB of free disk space",
+   "hint": "The ServiceNow documentation takes about 490 MB and draw.io about 500 MB. File Explorer › This PC shows what is free."
+  },
+  {
+   "id": "n-plan",
+   "t": "A paid Claude plan: Pro, Max, Ultra, Team or Enterprise, or a Claude Console account",
+   "hint": "The free plan does not include Claude Code. Upgrade first, or ask whoever manages Claude at your company."
+  },
+  {
+   "id": "n-lic",
+   "t": "Your licence file, named like LIC-2026-0000.json, in your Downloads folder",
+   "hint": "Ask whoever issues your AI Architect licence. You need it in Step 5. Live mode needs a licence for live. Whoever gave you the licence knows which one you have."
+  },
+  {
+   "id": "n-inst",
+   "live": true,
+   "t": "Your instance address, and a user name and password for it",
+   "hint": "On a personal developer instance (PDI) the user is admin. No instance yet? Choose Design-only above."
+  }
+ ],
+ "trouble": [
+  {
+   "id": "claude-nr",
+   "see": "'claude' is not recognized",
+   "do": "Run the PATH command in Step 2d, close PowerShell and open a new one.",
+   "href": "#step-2",
+   "link": "Step 2d",
+   "k": "path command not found"
+  },
+  {
+   "id": "tools-nr",
+   "see": "'git', 'node', 'npm' or 'now-sdk' is not recognized",
+   "do": "Open a new PowerShell window: programs installed in Step 2 are seen only by new windows. If it persists, repeat that program's part of Step 2, including its PATH command.",
+   "href": "#step-2",
+   "link": "Step 2",
+   "k": "git node npm now-sdk path command not found"
+  },
+  {
+   "id": "admin-prompt",
+   "see": "An administrator password prompt, or: The operation was canceled by the user",
+   "do": "You started a normal installer, and it needs administrator rights. Use the silent command in 2a for Git and the zip in 2b for Node.js; neither needs administrator rights.",
+   "href": "#step-2",
+   "link": "Step 2",
+   "k": "admin uac canceled cancelled password elevation"
+  },
+  {
+   "id": "winget",
+   "see": "winget: 0x8a15000f : Data required by the source is missing",
+   "do": "winget's package list is broken, and only an administrator can repair it. This guide does not use winget: follow Step 2.",
+   "href": "#step-2",
+   "link": "Step 2",
+   "k": "winget 0x8a15000f source missing"
+  },
+  {
+   "id": "drawio",
+   "see": "ERROR: draw.io Desktop not found",
+   "do": "draw.io is not in %LOCALAPPDATA%\\Programs\\drawio. Repeat 2f and check that the last command answers True.",
+   "href": "#step-2",
+   "link": "Step 2f",
+   "k": "drawio diagram word"
+  },
+  {
+   "id": "irm",
+   "see": "'irm' is not recognized",
+   "do": "You are in Command Prompt, not PowerShell. Open PowerShell as in Step 1.",
+   "href": "#step-1",
+   "link": "Step 1",
+   "k": "cmd command prompt irm iex"
+  },
+  {
+   "id": "admin-window",
+   "see": "PS C:\\WINDOWS\\system32>",
+   "do": "An administrator window. Close it and open PowerShell as in Step 1.",
+   "href": "#step-1",
+   "link": "Step 1",
+   "k": "system32 admin administrator high mandatory level"
+  },
+  {
+   "id": "path0",
+   "see": "An unexpected question such as Path[0]:",
+   "do": "Press Ctrl+C, never Enter. Then paste one command at a time.",
+   "href": "#how",
+   "link": "How to use this guide",
+   "k": "path[0] question prompt pasted"
+  },
+  {
+   "id": "psreadline",
+   "see": "Cannot load PSReadline module",
+   "do": "Harmless. Continue.",
+   "k": "psreadline"
+  },
+  {
+   "id": "not-a-commit",
+   "see": "warning: refs/tags/… is not a commit!",
+   "do": "Harmless. Continue.",
+   "k": "refs tags commit warning clone"
+  },
+  {
+   "id": "preflight-line",
+   "see": "A line in the installer's check (6a) is not ok",
+   "do": "The line says what to do. Do it, then run .\\bootstrap.cmd again; it continues where it stopped.",
+   "href": "#step-6",
+   "link": "Step 6a",
+   "k": "b00 preflight bootstrap fail check"
+  },
+  {
+   "id": "proxy",
+   "see": "github.com is unreachable, or you are behind a company proxy",
+   "do": "Ask your IT team for the proxy address, set it in the window with the proxy command below, and run the installer again.",
+   "k": "proxy network https_proxy unreachable timeout github"
+  },
+  {
+   "id": "login-check",
+   "see": "The login check (question 6) fails",
+   "do": "Check the address, user name and password. Press Ctrl+C and run .\\bootstrap.cmd again.",
+   "href": "#step-6d",
+   "link": "Step 6d",
+   "k": "login 401 unauthorized password credentials wizard instance"
+  },
+  {
+   "id": "acl-restrict",
+   "see": "After the password is saved, the wizard says Its permissions could not be restricted",
+   "do": "Your password is saved, but Windows would not let the installer lock the file, so other accounts on this computer might be able to read it. Run .\\snowarch.cmd doctor --fix. It shows what it will change and changes it when you press Enter. If it cannot lock the file either, send the output of .\\snowarch.cmd doctor (see Asking for help).",
+   "href": "#help",
+   "link": "Asking for help",
+   "k": "permissions restricted lock file acl doctor fix sv-02 password instances.json"
+  },
+  {
+   "id": "mcp-missing",
+   "see": "/mcp shows no servicenow line",
+   "do": "Claude was started outside your folder. Type /exit, then follow Every day.",
+   "href": "#daily",
+   "link": "Every day",
+   "k": "mcp servicenow missing tools"
+  },
+  {
+   "id": "licence-bad",
+   "see": "The licence says expired or missing",
+   "do": "See Licence renewal, or repeat Step 5.",
+   "href": "#renewal",
+   "link": "Licence renewal",
+   "k": "licence license expired missing invalid revoked e-31"
+  }
+ ],
+ "stepTrouble": {
+  "step-1": [
+   "admin-window",
+   "irm",
+   "psreadline",
+   "path0"
+  ],
+  "step-2": [
+   "claude-nr",
+   "tools-nr",
+   "admin-prompt",
+   "winget",
+   "drawio",
+   "irm",
+   "proxy",
+   "path0"
+  ],
+  "step-3": [
+   "claude-nr",
+   "proxy",
+   "path0"
+  ],
+  "step-4": [
+   "tools-nr",
+   "not-a-commit",
+   "proxy",
+   "path0"
+  ],
+  "step-5": [
+   {
+    "see": "5b lists nothing, or: Cannot find path … LIC-*.json",
+    "do": "The licence file is not in your Downloads folder. Save it there, or ask for it, then run 5b again."
+   },
+   "licence-bad",
+   "path0"
+  ],
+  "step-6": [
+   "preflight-line",
+   "proxy",
+   "login-check",
+   "acl-restrict",
+   "path0"
+  ],
+  "step-7": [
+   "licence-bad"
+  ],
+  "step-8": [
+   "mcp-missing",
+   "claude-nr",
+   "licence-bad"
+  ]
+ },
+ "flags": [
+  {
+   "k": "WRITE",
+   "d": "Create, update and delete records. Off means read-only."
+  },
+  {
+   "k": "CMDB_WRITE",
+   "d": "Write configuration items and relationships. Needs WRITE.",
+   "dep": "WRITE"
+  },
+  {
+   "k": "SCRIPTING",
+   "d": "Write scripts, ACLs and UI Actions. Needs WRITE.",
+   "dep": "WRITE"
+  },
+  {
+   "k": "ATF",
+   "d": "Run Automated Test Framework tests."
+  },
+  {
+   "k": "NOW_ASSIST",
+   "d": "The Now Assist tools. Needs a Now Assist licence."
+  },
+  {
+   "k": "FLUENT",
+   "d": "ServiceNow SDK tools. Needs the SDK on this computer."
+  }
+ ],
+ "presets": {
+  "full": [
+   "WRITE",
+   "CMDB_WRITE",
+   "SCRIPTING",
+   "ATF",
+   "NOW_ASSIST",
+   "FLUENT"
+  ],
+  "pdi-developer": [
+   "WRITE",
+   "CMDB_WRITE",
+   "SCRIPTING",
+   "ATF"
+  ],
+  "read-only": []
+ },
+ "timed": {
+  "s2a-inst": {
+   "exp": 60,
+   "warn": 300,
+   "usual": "about 1 min",
+   "msg": "It shows nothing while it works: wait for the PS line.",
+   "over": "Longer than usual. If the PS line has not come back after 5 minutes, press Ctrl+C and run the command again."
+  },
+  "s2c": {
+   "exp": 120,
+   "warn": 480,
+   "usual": "1–2 min",
+   "msg": "It shows no progress while it downloads. Wait for the PS line and read the Setup notes.",
+   "over": "Longer than usual. Check the internet connection; behind a company proxy, see If something goes wrong."
+  },
+  "s4-clone": {
+   "exp": 40,
+   "warn": 240,
+   "usual": "under 1 min",
+   "msg": "The lines run past quickly; wait for the PS line.",
+   "over": "Longer than usual. Check the internet connection, or a company proxy (If something goes wrong)."
+  },
+  "s6": {
+   "exp": 180,
+   "warn": 600,
+   "usual": "2–3 min to the wizard",
+   "msg": "The documentation download (6c) can sit still for a minute or two. Then the wizard asks its questions.",
+   "over": "Over 10 minutes? If the screen shows a question, answer it (6d). If nothing has moved for minutes, see If something goes wrong."
+  }
+ },
+ "preflight": {
+  "keys": [
+   "root",
+   "git",
+   "claudeCode",
+   "disk",
+   "network",
+   "node",
+   "platform"
+  ],
+  "tips": {
+   "root": "Start the installer from inside the AI-Arch folder: cd $HOME\\AI-Arch, then .\\bootstrap.cmd.",
+   "git": "Install or update Git as in 2a, then open a new window.",
+   "claudeCode": "Install Claude Code (2c, 2d). If the problem is the login, sign in as in Step 3.",
+   "disk": "Free up disk space: about 2 GB is needed.",
+   "network": "The computer cannot reach github.com. Behind a company proxy, set it as in If something goes wrong.",
+   "node": "Install Node.js as in 2b, including its PATH command, then open a new window.",
+   "platform": "Shown for information."
+  }
+ },
+ "licence": {
+  "states": {
+   "ok": [
+    "ok",
+    "Everything works. Nothing to do."
+   ],
+   "expiring": [
+    "warn",
+    "The last days before the end date. Everything still works. Ask for a renewal."
+   ],
+   "expired": [
+    "bad",
+    "The end date has passed and ServiceNow tools stop working. Ask for a renewal."
+   ],
+   "missing": [
+    "bad",
+    "There is no .local\\licence.json. Repeat Step 5."
+   ],
+   "invalid": [
+    "bad",
+    "The file is damaged or is not a licence. Ask for a new copy of the file."
+   ],
+   "revoked": [
+    "bad",
+    "The licence was withdrawn. Contact whoever gave it to you."
+   ]
+  },
+  "designOnly": "Your licence covers design-only mode. Live mode needs a live licence: ask for one, or switch with .\\snowarch.cmd mode design."
+ },
+ "sim": {
+  "envNotes": {
+   "pdi": "Your own free personal developer instance. The wizard proposes full permissions.",
+   "dev": "A development instance you share with your team. The wizard proposes full permissions.",
+   "test": "A test or UAT instance. The wizard proposes full permissions.",
+   "prod": "Real users. The wizard saves it read-only: the Architect can read but cannot change anything there."
+  }
+ },
+ "gl": [
+  [
+   "PowerShell",
+   "The Windows window where you type commands. Every command in this guide runs there."
+  ],
+  [
+   "Administrator window",
+   "A PowerShell window with full rights over the computer. Its line starts with PS C:\\WINDOWS\\system32>. This guide never needs one."
+  ],
+  [
+   "PATH",
+   "The list of folders where Windows looks for programs. When a program’s folder is missing from it, Windows answers “is not recognized”."
+  ],
+  [
+   "Git",
+   "The program that downloads the AI Architect and keeps it up to date."
+  ],
+  [
+   "Node.js",
+   "Runs the part of the AI Architect that talks to your ServiceNow instance."
+  ],
+  [
+   "npm",
+   "A helper that comes with Node.js. It installs JavaScript tools, such as the ServiceNow SDK."
+  ],
+  [
+   "Claude Code",
+   "The AI assistant that the AI Architect runs in. You start it with the command claude."
+  ],
+  [
+   "Instance",
+   "One ServiceNow site with its own address, for example your company’s dev or test system."
+  ],
+  [
+   "PDI",
+   "Personal developer instance: a free ServiceNow instance of your own, usually devNNNNNN.service-now.com. Its user is admin."
+  ],
+  [
+   "Live / design-only",
+   "Live connects one instance. Design-only works from the ServiceNow documentation and the specialist skills, with no instance."
+  ],
+  [
+   "MCP",
+   "Model Context Protocol: the way Claude connects to tools. The servicenow MCP gives Claude its ServiceNow tools."
+  ],
+  [
+   "Preset",
+   "A ready-made set of permissions: full, pdi-developer or read-only. custom means you changed single permissions."
+  ],
+  [
+   "CMDB",
+   "Configuration Management Database: ServiceNow’s record of IT assets (configuration items) and how they connect."
+  ],
+  [
+   "ATF",
+   "Automated Test Framework: ServiceNow’s built-in tests."
+  ],
+  [
+   "OAuth",
+   "A sign-in method that uses a client ID and secret from your ServiceNow administrator, as well as a password."
+  ],
+  [
+   "Proxy",
+   "A company server that internet traffic goes through. Your IT team knows its address."
+  ],
+  [
+   "UTC",
+   "The world reference time. A licence works through its end date in UTC, which can differ by a few hours from your local time."
+  ]
+ ]
+}
+</script>
+<script>
+(function () {
+  'use strict';
+
+  /* ── Data: one JSON block, read once ─────────────────────────────────────────────────────────────────────────── */
+  var D = JSON.parse(document.getElementById('guide-data').textContent);
+  var FL = D.flags;
+  var CMD = {};
+  D.commands.forEach(function (c) { CMD[c.id] = c; });
+  var STEPS = D.steps;
+  var STEP_BY_ID = {};
+  STEPS.forEach(function (s) { STEP_BY_ID[s.id] = s; });
+  var ALL_CMDS = [];
+  STEPS.forEach(function (s) { s.cmds.forEach(function (c) { ALL_CMDS.push({ cid: c[0], t: c[1], min: c[2], step: s.id }); }); });
+  var TROUBLE_BY_ID = {};
+  D.trouble.forEach(function (r) { TROUBLE_BY_ID[r.id] = r; });
+  var SAMPLE_LIC = 'LIC-2026-0000.json';
+  var RM = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  /* ── Small helpers ───────────────────────────────────────────────────────────────────────────────────────────── */
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function h(tag, o, kids) {
+    var e = document.createElement(tag);
+    o = o || {};
+    if (o.cls) e.className = o.cls;
+    if (o.text !== undefined) e.textContent = o.text;
+    if (o.attrs) Object.keys(o.attrs).forEach(function (k) { e.setAttribute(k, o.attrs[k]); });
+    if (o.on) Object.keys(o.on).forEach(function (k) { e.addEventListener(k, o.on[k]); });
+    (kids || []).forEach(function (k) { e.appendChild(typeof k === 'string' ? document.createTextNode(k) : k); });
+    return e;
+  }
+  function setText(el, t) { if (el && el.textContent !== t) el.textContent = t; }
+  function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+  function toggle(el, show) { if (el) el.hidden = !show; }
+  function scrollTo(el, block) { if (el) el.scrollIntoView({ behavior: RM ? 'auto' : 'smooth', block: block || 'start' }); }
+
+  /* ── Storage: every access in try/catch; the page works without it ────────────────────────────────────────── */
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function save(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } }
+  function drop(k) { try { localStorage.removeItem(k); } catch (e) { /* storage blocked */ } }
+  function parseObj(s) { try { var v = JSON.parse(s); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (e) { return {}; } }
+  function storedKeys() { try { return Object.keys(localStorage); } catch (e) { return []; } }
+
+  /* ── Pure functions (the design's, with the floors, presets and licence words taken from the data) ──────────── */
+  /* @pure-begin: needs only D and FL; tests/install-windows-guide-html.test.mjs runs this block as it stands */
+  function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+  function presetFlags(name) {
+    var on = D.presets[name] || [];
+    var f = {};
+    FL.forEach(function (x) { f[x.k] = on.indexOf(x.k) >= 0; });
+    return f;
+  }
+  function norm(f, env) {
+    var r = {};
+    FL.forEach(function (x) { r[x.k] = !!f[x.k]; });
+    if (env === 'prod') FL.forEach(function (x) { r[x.k] = false; });
+    if (!r.WRITE) { r.CMDB_WRITE = false; r.SCRIPTING = false; }
+    return r;
+  }
+  function presetOf(f) {
+    var names = Object.keys(D.presets);
+    for (var i = 0; i < names.length; i++) {
+      var on = D.presets[names[i]];
+      if (FL.every(function (x) { return !!f[x.k] === (on.indexOf(x.k) >= 0); })) return names[i];
+    }
+    return 'custom';
+  }
+  function checkUrl(raw) {
+    raw = (raw || '').trim();
+    if (!raw) return { state: 'empty', base: '', msgs: [] };
+    var s = raw;
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = 'https://' + s;
+    var u;
+    var bad = { state: 'bad', base: '', msgs: ['That is not a web address. Copy it from the address bar of your browser.'] };
+    try { u = new URL(s); } catch (e) { return bad; }
+    if (!/^https?:$/.test(u.protocol) || !u.hostname || u.hostname.indexOf('.') < 0) return bad;
+    var msgs = [];
+    var host = u.hostname.toLowerCase() + (u.port ? ':' + u.port : '');
+    if (u.protocol === 'http:') msgs.push('Changed http to https: ServiceNow instances use https.');
+    var rest = (u.pathname === '/' ? '' : u.pathname) + u.search + u.hash;
+    if (rest) msgs.push('Left out ' + (rest.length > 48 ? rest.slice(0, 48) + '…' : rest) + ': the wizard needs only the address.');
+    var state = 'ok';
+    if (!/\.service-now\.com$/.test(u.hostname.toLowerCase())) {
+      state = 'warn';
+      msgs.push('This is not a .service-now.com address. That is fine if your company reaches ServiceNow through its own domain; otherwise check it.');
+    }
+    if (/^dev\d+\.service-now\.com$/i.test(u.hostname)) msgs.push('This looks like a personal developer instance: choose 1 pdi at question 3, user admin.');
+    return { state: state, base: 'https://' + host, msgs: msgs };
+  }
+  function cmpVer(a, b) {
+    a = a.split('.').map(Number); b = b.split('.').map(Number);
+    for (var i = 0; i < Math.max(a.length, b.length); i++) { var x = a[i] || 0, y = b[i] || 0; if (x !== y) return x - y; }
+    return 0;
+  }
+  function ocItem(k, s, t) { return { k: k, cls: 'oci ' + s, t: (s === 'ok' ? '✓ ' : (s === 'warn' ? '! ' : '✕ ')) + t }; }
+  function ocSum(items) {
+    var bad = items.filter(function (i) { return i.cls !== 'oci ok'; }).length;
+    return bad ? bad + ' to look at' : 'All good ✓';
+  }
+  function checkVersions(T) {
+    var F = D.floors;
+    var items = [];
+    var nr = function (n) { return new RegExp("'" + n + "'[^\\n]{0,40}is not recognized", 'i').test(T); };
+    if (/is not recognized as an internal or external command/i.test(T)) items.push(ocItem('Window', 'bad', 'This is Command Prompt, not PowerShell. Open PowerShell as in Step 1.'));
+    var m = T.match(/(\d+\.\d+\.\d+)\s*\(Claude Code\)/i);
+    if (m) items.push(cmpVer(m[1], F.claudeCode) >= 0 ? ocItem('Claude Code', 'ok', m[1] + ' — new enough.') : ocItem('Claude Code', 'bad', m[1] + ' is too old: you need ' + F.claudeCode + ' or later. Run 2c again.'));
+    else if (nr('claude')) items.push(ocItem('Claude Code', 'bad', 'Not found. Run the PATH command in 2d, close PowerShell and open a new one.'));
+    else items.push(ocItem('Claude Code', 'warn', 'Not in what you pasted. Run claude --version.'));
+    m = T.match(/git version (\d+\.\d+(?:\.\d+)?)/i);
+    if (m) items.push(cmpVer(m[1], F.git) >= 0 ? ocItem('Git', 'ok', m[1] + ' — new enough.') : ocItem('Git', 'bad', m[1] + ' is too old: you need ' + F.git + ' or later. Repeat 2a.'));
+    else if (nr('git')) items.push(ocItem('Git', 'bad', 'Not found. Open a new PowerShell window; if it persists, repeat 2a.'));
+    else items.push(ocItem('Git', 'warn', 'Not in what you pasted. Run git --version.'));
+    m = T.match(/(?:^|\s)v(\d+)\.(\d+)\.(\d+)\b/m);
+    var nodeMajor = parseInt(F.node, 10);
+    if (m) {
+      items.push(+m[1] >= nodeMajor ? ocItem('Node.js', 'ok', 'v' + m[1] + '.' + m[2] + '.' + m[3] + ' — new enough.') : ocItem('Node.js', 'bad', 'v' + m[1] + ' is too old: you need v' + nodeMajor + ' or later. Repeat 2b.'));
+    } else if (nr('node')) items.push(ocItem('Node.js', 'bad', 'Not found. Open a new window; if it persists, repeat 2b including its PATH command.'));
+    else items.push(ocItem('Node.js', 'warn', 'Not in what you pasted. Run node --version.'));
+    var lines = T.split(/\r?\n/).map(function (l) { return l.replace(/^PS [^>]*>\s*/, '').trim(); });
+    var npm = lines.filter(function (l) { return /^\d+\.\d+\.\d+$/.test(l); })[0];
+    if (npm) items.push(ocItem('npm', 'ok', npm + ' — any version works.'));
+    else if (nr('npm')) items.push(ocItem('npm', 'bad', 'Not found. It comes with Node.js: repeat 2b including its PATH command, then open a new window.'));
+    else items.push(ocItem('npm', 'warn', 'Not in what you pasted. Run npm --version.'));
+    return { items: items, sum: ocSum(items) };
+  }
+  // What the installer prints for a failing check has no key (checkLine in tools/snowarch/lib/steps/B00.mjs: "FAIL B00: <detail>"),
+  // so the key is read from the words of the detail, in the order a detail names them.
+  function guessKey(d) {
+    if (/repository root/i.test(d)) return 'root';
+    if (/^git\b/i.test(d)) return 'git';
+    if (/claude code|logged in|login/i.test(d)) return 'claudeCode';
+    if (/\bfree\b|disk/i.test(d)) return 'disk';
+    if (/node\.?js|\bnpm\b/i.test(d)) return 'node';
+    if (/github|network|unreachable|reach|proxy|HTTP|time ?out|dns/i.test(d)) return 'network';
+    if (/32-bit|platform/i.test(d)) return 'platform';
+    return '';
+  }
+  function checkPre(T) {
+    var tips = D.preflight.tips;
+    var items = [];
+    T.split(/\r?\n/).forEach(function (line) {
+      var m = /^\s*(\S+)\s+B00\s+(\w+):\s*(.*)$/.exec(line);
+      var s, key, rest;
+      if (m) { s = m[1].toLowerCase(); key = m[2]; rest = m[3].trim(); }
+      else {
+        m = /^\s*(WARN|FAIL)\s+B00:\s*(.*)$/i.exec(line);
+        if (!m) return;
+        s = m[1].toLowerCase(); rest = m[2].trim(); key = guessKey(rest) || 'check';
+      }
+      if (s === 'ok') {
+        // The installer's own ok line can say "login: not verified" (claude auth status unavailable): that is not a login problem.
+        if (key === 'claudeCode' && /login:\s*(?!ok\b|not verified\b)\S+/i.test(rest)) items.push(ocItem(key, 'bad', rest + ' — sign in as in Step 3, then run .\\bootstrap.cmd again.'));
+        else items.push(ocItem(key, 'ok', rest));
+      } else {
+        items.push(ocItem(key, s.indexOf('warn') === 0 ? 'warn' : 'bad', rest + ' — ' + (tips[key] || 'Do what the line says.') + ' Then run .\\bootstrap.cmd again.'));
+      }
+    });
+    if (!items.length) items.push(ocItem('Check', 'warn', 'No check lines found. Paste the lines that start with ok B00 (or with FAIL B00 or WARN B00).'));
+    return { items: items, sum: ocSum(items) };
+  }
+  function utcToday() { return new Date().toISOString().slice(0, 10); }
+  function checkLic(T, mode) {
+    var info = D.licence.states;
+    var items = [];
+    var m = T.match(/Licence:\s*(\w+)/i);
+    if (!m) { items.push(ocItem('Licence', 'warn', 'No Licence: line found. Paste what .\\snowarch.cmd licence check printed.')); return { items: items, sum: ocSum(items) }; }
+    var w = m[1].toLowerCase();
+    var i = info[w];
+    items.push(i ? ocItem('Status', i[0], w + ' — ' + i[1]) : ocItem('Status', 'warn', w + ' — not a word this guide knows. Ask whoever gave you the licence.'));
+    if (/·\s*design-only\b/i.test(T)) items.push(ocItem('Scope', mode === 'live' ? 'warn' : 'ok', D.licence.designOnly));
+    var d = T.match(/until\s+(\d{4}-\d{2}-\d{2})/i);
+    if (/·\s*perpetual\b/i.test(T)) {
+      items.push(ocItem('Until', 'ok', 'no end date'));
+    } else if (d) {
+      var end = Date.parse(d[1] + 'T00:00:00Z');
+      if (!isNaN(end)) {
+        var days = Math.round((end - Date.parse(utcToday() + 'T00:00:00Z')) / 86400000);
+        var state = w === 'expiring' ? 'warn' : (days < 0 ? 'bad' : 'ok');
+        var phrase = days < 0 ? 'ended ' + plural(-days, 'day') + ' ago.' : (days === 0 ? 'last day' : plural(days, 'day') + ' left');
+        items.push(ocItem('Until', state, d[1] + ' · ' + phrase + (state === 'warn' ? ' — ask for a renewal soon.' : '')));
+      }
+    }
+    return { items: items, sum: ocSum(items) };
+  }
+
+  /* @pure-end */
+
+  /* ── State ───────────────────────────────────────────────────────────────────────────────────────────────────── */
+  var S = {
+    lic: SAMPLE_LIC, label: 'pdi', url: '', mode: 'live', done: {}, need: {}, chk: {}, timers: {}, now: Date.now(),
+    out: { v: '', pre: '', lic: '' }, q: '', helpText: '', copiedUrl: false, helpCopied: false,
+    active: 'need', reached: 'need', focus: 'need', view: 'all', theme: 'light', open: false,
+    resume: false, resumeHidden: false,
+    pb: { env: 'pdi', flags: presetFlags('full') },
+    sim: { step: 1, label: 'pdi', url: '', env: 'pdi', auth: 'basic', user: 'admin', flags: presetFlags('full'), applied: false }
+  };
+  function loadState() {
+    var v = load('aiarch.lic'); if (v) S.lic = v;
+    v = load('aiarch.label'); if (v) { S.label = v; S.sim.label = v; }
+    v = load('aiarch.url'); if (v) S.url = v;
+    if (load('aiarch.mode') === 'design') S.mode = 'design';
+    v = load('aiarch.need'); if (v) S.need = parseObj(v);
+    v = load('aiarch.chk'); if (v) S.chk = parseObj(v);
+    v = load('aiarch.reached'); if (v) S.reached = v;
+    if (load('aiarch.view') === 'step') S.view = 'step';
+    var th = load('aiarch.theme');
+    S.theme = th === 'dark' || th === 'light' ? th : ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
+    readDone();
+    var had = storedKeys().some(function (k) { return k.indexOf('aiarch.cmd.') === 0; }) || (S.reached && S.reached !== 'need');
+    if (had) S.resume = true;
+    S.focus = S.reached || 'need';
+  }
+  function readDone() {
+    var d = {};
+    ALL_CMDS.forEach(function (c) { if (load('aiarch.cmd.' + c.cid) === '1') d[c.cid] = true; });
+    S.done = d;
+  }
+  function vars() {
+    var lic = (S.lic || '').trim() || SAMPLE_LIC;
+    return { lic: lic, licId: lic.replace(/\.json$/i, ''), label: (S.label || '').trim() || 'pdi' };
+  }
+  function fill(tpl, base) {
+    var v = vars();
+    return String(tpl).replace(/\{(lic|licId|label|base)\}/g, function (m, k) { return k === 'base' ? base : v[k]; });
+  }
+  function navList() { var live = S.mode === 'live'; return D.nav.filter(function (x) { return !x.live || live; }); }
+  function links() { return navList().filter(function (x) { return x.id; }); }
+  function nextCmd() {
+    for (var i = 0; i < ALL_CMDS.length; i++) if (!S.done[ALL_CMDS[i].cid]) return ALL_CMDS[i];
+    return null;
+  }
+  function groupOf(id) { return id === 'step-6e' ? 'step-6' : id; }
+
+  /* ── Command boxes ───────────────────────────────────────────────────────────────────────────────────────────── */
+  var boxes = {};
+  var builderCode = '';
+  function cmdText(id) {
+    if (id === 'c-builder') return builderCode;
+    return fill(CMD[id].code);
+  }
+  function flashCopy(b, msg) {
+    b.copy.textContent = msg;
+    b.copy.classList.add('flash');
+    clearTimeout(b.t);
+    b.t = setTimeout(function () { b.copy.textContent = 'Copy'; b.copy.classList.remove('flash'); }, 1800);
+  }
+  function setDone(cid, v) {
+    if (v) { S.done[cid] = true; save('aiarch.cmd.' + cid, '1'); } else { delete S.done[cid]; drop('aiarch.cmd.' + cid); }
+    if (v && D.timed[cid] && !S.timers[cid]) { S.timers[cid] = Date.now(); S.now = Date.now(); }
+    render();
+  }
+  function buildCmd(slot) {
+    var id = slot.getAttribute('data-cmd');
+    if (!CMD[id]) return;
+    var b = { id: id };
+    b.mark = h('button', { cls: 'cbox-mark', attrs: { type: 'button' } }, [h('span')]);
+    b.text = h('span', { cls: 'cbox-text' });
+    b.code = h('code', { cls: 'cbox-code' }, [h('span', { cls: 'cbox-ps', text: 'PS> ' }), b.text]);
+    b.copy = h('button', { cls: 'cbox-copy', text: 'Copy', attrs: { type: 'button' } });
+    b.box = h('div', { cls: 'cbox', attrs: { 'data-cid': id } }, [b.mark, b.code, b.copy]);
+    b.mark.addEventListener('click', function () { setDone(id, !S.done[id]); });
+    b.copy.addEventListener('click', function () {
+      var text = cmdText(id);
+      var select = function () {
+        try { var r = document.createRange(); r.selectNodeContents(b.code); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); } catch (e) { /* no selection API */ }
+        flashCopy(b, 'Ctrl+C now');
+      };
+      setDone(id, true);
+      try { navigator.clipboard.writeText(text).then(function () { flashCopy(b, 'Copied'); }, select); } catch (e) { select(); }
+    });
+    slot.appendChild(b.box);
+    boxes[id] = b;
+  }
+  function renderCmds() {
+    Object.keys(boxes).forEach(function (id) {
+      var b = boxes[id];
+      var done = !!S.done[id];
+      setText(b.text, cmdText(id));
+      b.mark.setAttribute('aria-pressed', done ? 'true' : 'false');
+      var label = done ? 'Ran it — click to unmark' : 'Mark as run';
+      b.mark.setAttribute('aria-label', label);
+      b.mark.title = label;
+      b.mark.classList.toggle('on', done);
+    });
+  }
+
+  /* ── Terminals ───────────────────────────────────────────────────────────────────────────────────────────────── */
+  var terms = [];
+  function termText(id) {
+    var base = checkUrl(S.url).base || 'https://<your-instance>.service-now.com';
+    var text = fill(D.terminals[id], base);
+    if (S.mode !== 'live' && (id === 'end' || id === 'status')) text = text.replace(/^Mode: live[^\n]*/m, 'Mode: design-only');
+    return text;
+  }
+  function parseTerm(text) {
+    return text.replace(/^\n+/, '').replace(/\s+$/, '').split('\n').map(function (l) {
+      if (l.indexOf('~ ') === 0) return { dim: true, segs: [{ t: l.slice(2) }] };
+      return { segs: l.split(/\[\[|\]\]/).map(function (t, i) { return { t: t, typed: i % 2 === 1 }; }).filter(function (s) { return s.t; }) };
+    });
+  }
+  function tlen(l) { return l ? l.segs.filter(function (s) { return s.typed; }).reduce(function (a, s) { return a + s.t.length; }, 0) : 0; }
+  function drawTerm(t) {
+    var L = parseTerm(t.text);
+    clear(t.body);
+    L.forEach(function (l, i) {
+      var typing = t.n >= 0;
+      if (typing && i > t.n) return;
+      var row = h('div', { cls: 'tl' + (l.dim ? ' dim' : '') });
+      var left = t.c;
+      var hereTyping = typing && i === t.n;
+      for (var k = 0; k < l.segs.length; k++) {
+        var s = l.segs[k];
+        if (s.typed && hereTyping) {
+          var part = s.t.slice(0, Math.max(0, left)); left -= s.t.length;
+          if (part) row.appendChild(h('span', { cls: 'typed', text: part }));
+          if (left < 0) break;
+        } else row.appendChild(h('span', { cls: s.typed ? 'typed' : '', text: s.t }));
+      }
+      if (hereTyping) row.appendChild(h('span', { cls: 'caret', text: '▌' }));
+      t.body.appendChild(row);
+    });
+    t.btn.textContent = t.n === -1 ? '▶ Play' : '■ Stop';
+  }
+  function stopTerm(t) { clearInterval(t.timer); t.timer = null; t.n = -1; t.c = 0; drawTerm(t); }
+  function playTerm(t) {
+    if (t.timer) return stopTerm(t);
+    t.L = parseTerm(t.text); t.w = 0; t.n = 0; t.c = 0;
+    t.timer = setInterval(function () {
+      var tl = tlen(t.L[t.n]);
+      if (t.c < tl) t.c++;
+      else {
+        t.w++; if (t.w < (tl ? 8 : 3)) return;
+        t.w = 0; t.n++; t.c = 0;
+        if (t.n >= t.L.length) return stopTerm(t);
+      }
+      drawTerm(t);
+    }, 32);
+    drawTerm(t);
+  }
+  function buildTerm(slot) {
+    var id = slot.getAttribute('data-term');
+    if (!D.terminals[id] && id !== 'sim-saved') return;
+    var t = { id: id, n: -1, c: 0, timer: null, text: '' };
+    t.btn = h('button', { cls: 'term-play', text: '▶ Play', attrs: { type: 'button' } });
+    t.body = h('div', { cls: 'term-body' });
+    t.btn.addEventListener('click', function () { playTerm(t); });
+    if (RM) t.btn.hidden = true;
+    var wrap = h('div', { cls: 'term' }, [
+      h('div', { cls: 'term-bar' }, [h('span', { cls: 'term-lab' }, [h('i'), slot.getAttribute('data-label') || 'On screen']), t.btn]),
+      t.body
+    ]);
+    slot.appendChild(wrap);
+    terms.push(t);
+  }
+  function renderTerms() {
+    terms.forEach(function (t) {
+      if (t.id === 'sim-saved') return;
+      var text = termText(t.id);
+      if (text !== t.text && !t.timer) { t.text = text; drawTerm(t); }
+    });
+  }
+
+  /* ── Timers ──────────────────────────────────────────────────────────────────────────────────────────────────── */
+  var timerEls = {};
+  function fmtSecs(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function buildTimer(slot) {
+    var cid = slot.getAttribute('data-timer');
+    var T = D.timed[cid];
+    if (!T) return;
+    var el = { big: h('span', { cls: 'big' }), msg: h('span'), stop: h('button', { cls: 'btn', text: 'It finished', attrs: { type: 'button' } }) };
+    el.box = h('div', { cls: 'res timer', attrs: { role: 'status' } }, [el.big, el.msg, el.stop]);
+    el.box.hidden = true;
+    el.stop.addEventListener('click', function () { delete S.timers[cid]; render(); });
+    slot.appendChild(el.box);
+    timerEls[cid] = el;
+  }
+  function renderTimers() {
+    Object.keys(timerEls).forEach(function (cid) {
+      var el = timerEls[cid], T = D.timed[cid], t0 = S.timers[cid];
+      el.box.hidden = !t0;
+      if (!t0) return;
+      var secs = Math.max(0, Math.floor((S.now - t0) / 1000));
+      var over = secs > T.warn;
+      setText(el.big, '⏱ ' + fmtSecs(secs) + ' · usually ' + T.usual);
+      setText(el.msg, over ? T.over : T.msg);
+      el.box.className = 'res timer' + (over ? ' warn' : '');
+    });
+  }
+
+  /* ── "Did step N work?" ──────────────────────────────────────────────────────────────────────────────────────── */
+  var chkEls = {};
+  function troubleRows(stepId) {
+    return (D.stepTrouble[stepId] || []).map(function (r) { return typeof r === 'string' ? TROUBLE_BY_ID[r] : r; }).filter(Boolean);
+  }
+  function buildChk(slot) {
+    var id = slot.getAttribute('data-chk');
+    var n = +id.replace('step-', '');
+    var c = {};
+    c.yes = h('button', { cls: 'pbtn', text: '✓ Yes, it worked', attrs: { type: 'button', 'aria-pressed': 'false' } });
+    c.no = h('button', { cls: 'pbtn', text: '✕ No', attrs: { type: 'button', 'aria-pressed': 'false' } });
+    c.yesMsg = h('p', { text: n < 8 ? 'Good. Go on to Step ' + (n + 1) + '.' : 'Good. The install is complete.' });
+    var tbody = h('tbody');
+    troubleRows(id).forEach(function (r) { tbody.appendChild(h('tr', {}, [h('td', {}, [h('code', { cls: 'ic', text: r.see })]), h('td', { text: r.do })])); });
+    c.no2 = h('div', {}, [
+      h('p', {}, [h('b', { text: 'The usual causes at this step:' })]),
+      h('div', { cls: 'tw trouble' }, [h('table', {}, [
+        h('thead', {}, [h('tr', {}, [h('th', { text: 'If you see' }), h('th', { text: 'Do this' })])]), tbody])]),
+      h('p', { cls: 'muted' }, ['Not listed? ', h('a', { text: 'Search all problems', attrs: { href: '#trouble' } }), ', or ',
+        h('a', { text: 'build a help message', attrs: { href: '#help' } }), '.'])
+    ]);
+    c.box = h('div', { cls: 'okq' }, [
+      h('div', { cls: 'pills' }, [h('span', { cls: 'lab', text: 'Did step ' + n + ' work?' }), c.yes, c.no]), c.yesMsg, c.no2]);
+    var setAns = function (val) {
+      if (S.chk[id] === val) delete S.chk[id]; else S.chk[id] = val;
+      save('aiarch.chk', JSON.stringify(S.chk));
+      render();
+    };
+    c.yes.addEventListener('click', function () { setAns('yes'); });
+    c.no.addEventListener('click', function () { setAns('no'); });
+    slot.appendChild(c.box);
+    chkEls[id] = c;
+  }
+  function renderChks() {
+    Object.keys(chkEls).forEach(function (id) {
+      var c = chkEls[id], v = S.chk[id] || '';
+      c.box.className = 'okq' + (v ? ' ' + v : '');
+      c.yes.className = 'pbtn' + (v === 'yes' ? ' on' : '');
+      c.no.className = 'pbtn' + (v === 'no' ? ' on' : '');
+      c.yes.setAttribute('aria-pressed', v === 'yes' ? 'true' : 'false');
+      c.no.setAttribute('aria-pressed', v === 'no' ? 'true' : 'false');
+      toggle(c.yesMsg, v === 'yes');
+      toggle(c.no2, v === 'no');
+    });
+  }
+
+  /* ── Output checks (2e, 6a, Step 7) ──────────────────────────────────────────────────────────────────────────── */
+  var OC = {
+    v: { fn: checkVersions, ta: $('#oc-v'), sum: $('#oc-v-sum'), list: $('#oc-v-list') },
+    pre: { fn: checkPre, ta: $('#oc-pre'), sum: $('#oc-pre-sum'), list: $('#oc-pre-list') },
+    lic: { fn: function (T) { return checkLic(T, S.mode); }, ta: $('#oc-lic'), sum: $('#oc-lic-sum'), list: $('#oc-lic-list') }
+  };
+  function renderOc() {
+    Object.keys(OC).forEach(function (k) {
+      var o = OC[k], text = S.out[k] || '';
+      var r = text.trim() ? o.fn(text) : { items: [], sum: 'paste to check' };
+      setText(o.sum, r.sum);
+      toggle(o.list, !!text.trim());
+      clear(o.list);
+      r.items.forEach(function (i) { o.list.appendChild(h('div', { cls: i.cls }, [h('b', { text: i.k }), h('span', { text: i.t })])); });
+    });
+  }
+
+  /* ── Flags, presets, environments (shared by the practice and the builder) ──────────────────────────────────── */
+  function flagButtons(flags, env, set) {
+    return FL.map(function (x) {
+      var forced = env === 'prod' || (!!x.dep && !flags[x.dep]);
+      var on = !!flags[x.k];
+      var b = h('button', { cls: 'flag' + (on ? ' on' : ''), attrs: { type: 'button', 'aria-pressed': on ? 'true' : 'false' } }, [
+        h('span', { cls: 'bx', text: on ? '[x]' : '[ ]' }), h('span', {}, [h('b', { text: x.k }), h('span', { cls: 'd', text: x.d })])]);
+      b.disabled = forced;
+      b.addEventListener('click', function () { if (forced) return; var f = Object.assign({}, flags); f[x.k] = !on; set(norm(f, env)); });
+      return b;
+    });
+  }
+  function presetButtons(flags, env, set) {
+    var cur = env === 'prod' ? 'read-only' : presetOf(flags);
+    return ['full', 'pdi-developer', 'read-only'].map(function (p) {
+      var b = h('button', { cls: 'pbtn' + (cur === p ? ' on' : ''), text: p, attrs: { type: 'button', 'aria-pressed': cur === p ? 'true' : 'false' } });
+      b.disabled = env === 'prod' && p !== 'read-only';
+      b.addEventListener('click', function () { set(norm(presetFlags(p), env)); });
+      return b;
+    });
+  }
+  function envButtons(env, pick) {
+    return [['pdi', '1 pdi'], ['dev', '2 dev'], ['test', '3 test'], ['prod', '4 prod']].map(function (e) {
+      var b = h('button', { cls: 'pbtn' + (env === e[0] ? ' on' : ''), text: e[1], attrs: { type: 'button', 'aria-pressed': env === e[0] ? 'true' : 'false' } });
+      b.addEventListener('click', function () { pick(e[0]); });
+      return b;
+    });
+  }
+  function fill1(parent, kids) { clear(parent); kids.forEach(function (k) { parent.appendChild(k); }); }
+
+  /* ── Permissions builder ─────────────────────────────────────────────────────────────────────────────────────── */
+  var PB = { root: $('#pb-body') };
+  function buildPb() {
+    PB.envs = h('div', { cls: 'pills' }); PB.presets = h('div', { cls: 'pills' }); PB.flags = h('div', { cls: 'flags' });
+    PB.cmd = h('div', { attrs: { 'data-cmd': 'c-builder' } });
+    PB.root.appendChild(h('p', { cls: 'muted', text: 'Click what the AI Architect may do. Rules from the wizard apply: CMDB_WRITE and SCRIPTING need WRITE, and a prod instance is always read-only. The command below changes to match.' }));
+    PB.root.appendChild(PB.envs); PB.root.appendChild(PB.presets); PB.root.appendChild(PB.flags);
+    PB.root.appendChild(h('span', { cls: 'l', text: 'Run this in your AI-Arch folder, then restart Claude', attrs: { style: 'margin:0' } }));
+    PB.root.appendChild(PB.cmd);
+    buildCmd(PB.cmd);
+  }
+  function renderPb() {
+    var P = S.pb, pf = norm(P.flags, P.env), pp = P.env === 'prod' ? 'read-only' : presetOf(pf);
+    var set = function (f) { S.pb = { env: S.pb.env, flags: f }; render(); };
+    var label = vars().label;
+    setText($('#pb-label'), 'Permissions builder · instance "' + label + '"');
+    setText($('#pb-preset'), 'preset ' + pp);
+    fill1(PB.envs, [h('span', { cls: 'lab', text: 'Environment' })].concat(envButtons(P.env, function (v) { S.pb = { env: v, flags: v === 'prod' ? presetFlags('read-only') : presetFlags('full') }; render(); })));
+    fill1(PB.presets, [h('span', { cls: 'lab', text: 'Preset' })].concat(presetButtons(pf, P.env, set)));
+    fill1(PB.flags, flagButtons(pf, P.env, set));
+    builderCode = pp !== 'custom'
+      ? '.\\snowarch.cmd instance set-preset ' + label + ' ' + pp
+      : '.\\snowarch.cmd instance set-flags ' + label + ' ' + FL.map(function (x) { return x.k + '=' + (pf[x.k] ? 'on' : 'off'); }).join(' ');
+  }
+
+  /* ── Wizard practice (6d) ────────────────────────────────────────────────────────────────────────────────────── */
+  var SIM = {};
+  var ENV_NOTE = D.sim.envNotes;
+  var ENV_NUM = { pdi: '1', dev: '2', test: '3', prod: '4' };
+  function simSet(p) { S.sim = Object.assign({}, S.sim, p); render(); }
+  function buildSim() {
+    var root = $('#sim-body');
+    if (!root) return;
+    SIM.panes = {};
+    var pane = function (n, kids) { var p = h('div', { cls: 'pane', attrs: { 'data-pane': String(n) } }, kids); SIM.panes[n] = p; root.appendChild(p); return p; };
+    root.appendChild(h('p', { cls: 'muted', text: 'Answer the seven questions here before the real wizard asks them. Nothing leaves this page, and nothing is saved on your instance. At the end you get the exact keys to press.' }));
+    SIM.label = h('input', { attrs: { id: 'sim-label', type: 'text', spellcheck: 'false', autocomplete: 'off' } });
+    SIM.labelErr = h('p', { cls: 'err' });
+    pane(1, [h('div', {}, [h('label', { cls: 'l', text: '[1/7] Label — a short name you will type in commands', attrs: { for: 'sim-label' } }), SIM.label]), SIM.labelErr]);
+    SIM.url = h('input', { attrs: { id: 'sim-url', type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: 'https://dev123456.service-now.com/now/nav/ui/home' } });
+    SIM.urlRes = h('div', { cls: 'res' }); SIM.urlRes.hidden = true;
+    pane(2, [h('div', {}, [h('label', { cls: 'l', text: '[2/7] Instance URL — paste it straight from your browser', attrs: { for: 'sim-url' } }), SIM.url]), SIM.urlRes]);
+    SIM.envs = h('div', { cls: 'pills' }); SIM.envNote = h('p', { cls: 'muted' });
+    pane(3, [h('span', { cls: 'l', text: '[3/7] Environment — what is this instance?' }), SIM.envs, SIM.envNote]);
+    SIM.auths = h('div', { cls: 'pills' });
+    pane(4, [h('span', { cls: 'l', text: '[4/7] Authentication' }), SIM.auths, h('p', { cls: 'muted', text: 'Choose 2 only if your ServiceNow administrator gave you an OAuth client ID and secret.' })]);
+    SIM.user = h('input', { attrs: { id: 'sim-user', type: 'text', spellcheck: 'false', autocomplete: 'off' } });
+    pane(5, [h('div', {}, [h('label', { cls: 'l', text: '[5/7] Username', attrs: { for: 'sim-user' } }), SIM.user]),
+      h('div', { cls: 'call acc', attrs: { style: 'margin:0' } }, [h('strong', { text: 'The password is not asked here' }),
+        h('p', { text: 'In the real wizard you type it next, and nothing appears while you type, not even dots. Never type it into this page.' })])]);
+    pane(6, [h('span', { cls: 'l', text: '[6/7] Login check' }),
+      h('div', { cls: 'res ok' }, [h('span', { cls: 'big', text: '✓ Simulated' }),
+        h('span', { attrs: { style: 'font-size:14px' }, text: 'The real wizard signs in and reads a few tables (sys_user, sys_user_has_role, sys_update_set …) to learn what your account may do. It changes nothing. You type nothing.' })])]);
+    SIM.q7 = h('span', { cls: 'l' }); SIM.presets = h('div', { cls: 'pills' }); SIM.flags = h('div', { cls: 'flags' });
+    pane(7, [SIM.q7, SIM.presets, SIM.flags]);
+    SIM.answers = h('tbody');
+    SIM.saved = h('div', { attrs: { 'data-term': 'sim-saved', 'data-label': 'On screen when it is saved' } });
+    SIM.applyMsg = h('span', { cls: 'muted' });
+    SIM.apply = h('button', { cls: 'btn pri', text: 'Use label and URL in this guide', attrs: { type: 'button' } });
+    pane(8, [h('span', { cls: 'l', text: 'Your answers — type exactly this in the real wizard' }),
+      h('div', { cls: 'tw', attrs: { style: 'margin:0' } }, [h('table', { cls: 'ans' }, [
+        h('thead', {}, [h('tr', {}, [h('th', { text: 'Question' }), h('th', { text: 'What you type' })])]), SIM.answers])]),
+      SIM.saved, h('div', { cls: 'pills' }, [SIM.apply, SIM.applyMsg])]);
+    SIM.back = h('button', { cls: 'btn', text: '◀ Back', attrs: { type: 'button' } });
+    SIM.next = h('button', { cls: 'btn pri', attrs: { type: 'button' } });
+    root.appendChild(h('div', { cls: 'simnav' }, [SIM.back, SIM.next]));
+    SIM.label.addEventListener('input', function () { simSet({ label: SIM.label.value }); });
+    SIM.url.addEventListener('input', function () { simSet({ url: SIM.url.value }); });
+    SIM.user.addEventListener('input', function () { simSet({ user: SIM.user.value }); });
+    SIM.back.addEventListener('click', function () { simSet({ step: Math.max(1, S.sim.step - 1), applied: false }); });
+    SIM.next.addEventListener('click', function () { if (S.sim.step === 8) simSet({ step: 1, applied: false }); else simSet({ step: S.sim.step + 1 }); });
+    SIM.apply.addEventListener('click', function () {
+      var A = S.sim, lbl = (A.label || '').trim(), u = checkUrl(A.url), f = norm(A.flags, A.env);
+      S.label = lbl; save('aiarch.label', lbl);
+      if (u.base) { S.url = u.base; save('aiarch.url', u.base); }
+      S.pb = { env: A.env, flags: f };
+      S.sim = Object.assign({}, A, { applied: true });
+      render();
+    });
+    buildTerm(SIM.saved);
+    SIM.saved = terms[terms.length - 1];
+  }
+  function renderSim() {
+    if (!SIM.panes) return;
+    var A = S.sim, sLabel = (A.label || '').trim();
+    var labelMsg = !sLabel ? 'Type a label.' : (/\s/.test(sLabel) ? 'No spaces: use a dash instead, for example acme-dev.' : '');
+    var su = checkUrl(A.url), sf = norm(A.flags, A.env), sp = A.env === 'prod' ? 'read-only' : presetOf(sf);
+    var canNext = { 1: !labelMsg, 2: su.state === 'ok' || su.state === 'warn', 3: true, 4: true, 5: !!(A.user || '').trim(), 6: true, 7: true };
+    setText($('#sim-head'), A.step <= 7 ? 'question ' + A.step + ' of 7' : 'your answers');
+    $$('#sim-dots i').forEach(function (d, i) { d.className = i + 1 <= Math.min(A.step, 7) ? 'on' : ''; });
+    Object.keys(SIM.panes).forEach(function (n) { SIM.panes[n].hidden = +n !== A.step; });
+    if (document.activeElement !== SIM.label && SIM.label.value !== A.label) SIM.label.value = A.label;
+    if (document.activeElement !== SIM.url && SIM.url.value !== A.url) SIM.url.value = A.url;
+    if (document.activeElement !== SIM.user && SIM.user.value !== A.user) SIM.user.value = A.user;
+    setText(SIM.labelErr, labelMsg); toggle(SIM.labelErr, !!labelMsg);
+    clear(SIM.urlRes);
+    if (su.state === 'empty') SIM.urlRes.hidden = true;
+    else {
+      SIM.urlRes.hidden = false;
+      SIM.urlRes.className = 'res ' + (su.state === 'ok' ? 'ok' : (su.state === 'warn' ? 'warn' : 'bad'));
+      SIM.urlRes.appendChild(h('span', { cls: 'l', text: 'The wizard needs', attrs: { style: 'margin:0' } }));
+      SIM.urlRes.appendChild(h('span', { cls: 'big', text: su.base || '—' }));
+      su.msgs.forEach(function (t) { SIM.urlRes.appendChild(h('span', { attrs: { style: 'font-size:14px' }, text: '· ' + t })); });
+    }
+    fill1(SIM.envs, envButtons(A.env, function (v) { simSet({ env: v, flags: v === 'prod' ? presetFlags('read-only') : presetFlags('full') }); }));
+    setText(SIM.envNote, ENV_NOTE[A.env]);
+    fill1(SIM.auths, [['basic', '1 basic — username + password'], ['oauth_ropc', '2 oauth_ropc — OAuth password grant']].map(function (a) {
+      var b = h('button', { cls: 'pbtn' + (A.auth === a[0] ? ' on' : ''), text: a[1], attrs: { type: 'button', 'aria-pressed': A.auth === a[0] ? 'true' : 'false' } });
+      b.addEventListener('click', function () { simSet({ auth: a[0] }); });
+      return b;
+    }));
+    setText(SIM.q7, '[7/7] Permissions for "' + (sLabel || '…') + '" · preset ' + sp);
+    var setF = function (f) { simSet({ flags: f }); };
+    fill1(SIM.presets, [h('span', { cls: 'lab', text: 'Preset' })].concat(presetButtons(sf, A.env, setF)));
+    fill1(SIM.flags, flagButtons(sf, A.env, setF));
+    var q7a, q7n;
+    if (A.env === 'prod') { q7a = 'Enter'; q7n = 'prod is saved read-only'; }
+    else if (sp === 'full') { q7a = 'Enter'; q7n = 'accepts full, as proposed'; }
+    else if (sp !== 'custom') { q7a = 'preset ' + sp; q7n = 'then Enter, then Enter again to apply'; }
+    else {
+      q7a = FL.map(function (x, i) { return { x: x, i: i }; }).filter(function (o) { return !sf[o.x.k]; }).map(function (o) { return (o.i + 1) + ' then 2'; }).join(' · ');
+      q7n = 'for each: the number, Enter, 2, Enter. Finally Enter to apply';
+    }
+    var rows = [
+      ['[1/7] Label', sLabel, 'then Enter'],
+      ['[2/7] Instance URL', su.base || '', 'then Enter'],
+      ['[3/7] Environment', ENV_NUM[A.env], A.env + ', then Enter'],
+      ['[4/7] Authentication', A.auth === 'basic' ? '1' : '2', A.auth === 'basic' ? 'or just Enter' : 'then the client ID and secret you were given'],
+      ['[5/7] Credentials', (A.user || '').trim(), 'Enter, then your password (nothing shows), Enter'],
+      ['[6/7] Login check', '—', 'nothing: wait a few seconds'],
+      ['[7/7] Permissions', q7a, q7n]
+    ];
+    clear(SIM.answers);
+    rows.forEach(function (r) {
+      SIM.answers.appendChild(h('tr', {}, [h('td', { text: r[0] }), h('td', {}, [h('code', { cls: 'ic', text: r[1] }), ' ', h('span', { cls: 'muted', text: r[2] })])]));
+    });
+    var flagStr = FL.map(function (x) { return x.k + '=' + (sf[x.k] ? 'on' : 'off'); }).join(' ');
+    SIM.savedText = 'Applying: preset ' + sp + ' — ' + flagStr + '\nSaved instance "' + sLabel + '" (' + A.env + ' · ' + A.auth + ' · preset ' + sp + ' · default).\n~ Practice only: nothing was saved.';
+    if (SIM.saved && SIM.saved.text !== SIM.savedText && !SIM.saved.timer) { SIM.saved.text = SIM.savedText; drawTerm(SIM.saved); }
+    setText(SIM.applyMsg, A.applied ? 'Done: the commands on this page now use "' + sLabel + '", and the permissions builder shows these choices.' : '');
+    SIM.back.disabled = A.step === 1;
+    SIM.next.disabled = A.step === 8 ? false : !canNext[A.step];
+    SIM.next.textContent = A.step === 7 ? 'See my answers ▶' : (A.step === 8 ? '↺ Start again' : 'Next ▶');
+  }
+
+  /* ── Your instance address (question 2) ──────────────────────────────────────────────────────────────────────── */
+  function renderUrl() {
+    var u = checkUrl(S.url), res = $('#url-res');
+    clear(res);
+    if (u.state === 'empty') { res.hidden = true; return; }
+    res.hidden = false;
+    res.className = 'res ' + (u.state === 'ok' ? 'ok' : (u.state === 'warn' ? 'warn' : 'bad'));
+    res.appendChild(h('span', { cls: 'l', text: u.state === 'ok' ? 'Type this at question 2' : (u.state === 'warn' ? 'Probably this — read the note below' : 'Not a web address'), attrs: { style: 'margin:0' } }));
+    if (u.base) {
+      var btn = h('button', { text: S.copiedUrl ? 'Copied' : 'Copy', attrs: { type: 'button' } });
+      btn.addEventListener('click', function () {
+        try { navigator.clipboard.writeText(u.base).then(function () { S.copiedUrl = true; render(); }, function () {}); } catch (e) { /* no clipboard */ }
+      });
+      res.appendChild(h('div', { cls: 'copyline' }, [h('code', { text: u.base }), btn]));
+    }
+    u.msgs.forEach(function (t) { res.appendChild(h('span', { attrs: { style: 'font-size:14px' }, text: '· ' + t })); });
+  }
+
+  /* ── Problem search ──────────────────────────────────────────────────────────────────────────────────────────── */
+  var STOP = { the: 1, is: 1, or: 1, and: 1, to: 1, of: 1, in: 1, it: 1, at: 1, on: 1, an: 1, ps: 1, my: 1, i: 1 };
+  function renderTrouble() {
+    var toks = (S.q || '').toLowerCase().split(/[^a-z0-9.:\[\]\-\/_']+/).map(function (t) { return t.replace(/^'+|'+$/g, ''); }).filter(function (t) { return t.length > 1 && !STOP[t]; });
+    var rows = D.trouble.map(function (r) {
+      var hay = (r.see + ' ' + r.do + ' ' + (r.k || '')).toLowerCase();
+      return { r: r, score: toks.filter(function (t) { return hay.indexOf(t) >= 0; }).length };
+    });
+    var top = 0;
+    if (toks.length) {
+      rows = rows.filter(function (x) { return x.score > 0; }).sort(function (a, b) { return b.score - a.score; });
+      top = rows.length ? rows[0].score : 0;
+    }
+    setText($('#t-count'), toks.length ? rows.length + ' of ' + D.trouble.length + ' match' : D.trouble.length + ' known problems');
+    toggle($('#t-none'), toks.length > 0 && rows.length === 0);
+    var tb = $('#t-body');
+    clear(tb);
+    rows.forEach(function (x) {
+      var r = x.r;
+      var last = [r.do];
+      if (r.href) { last.push(' '); last.push(h('a', { text: r.link + ' →', attrs: { href: r.href } })); }
+      tb.appendChild(h('tr', { cls: toks.length && x.score === top ? 'hit' : '' }, [h('td', {}, [h('code', { cls: 'ic', text: r.see })]), h('td', {}, last)]));
+    });
+  }
+
+  /* ── Help message ────────────────────────────────────────────────────────────────────────────────────────────── */
+  function helpMessage(d) {
+    var ls = d.links, reachedItem = ls[d.ri] || ls[0];
+    var lab = function (x) { return x ? ((x.n !== '—' ? x.n + ' · ' : '') + x.t) : ''; };
+    var skipped = [];
+    STEPS.forEach(function (s) {
+      var si = ls.map(function (x) { return x.id; }).indexOf(s.id);
+      if (si >= 0 && si < d.ri) s.cmds.forEach(function (cm) { if (!S.done[cm[0]]) skipped.push(cm[1]); });
+    });
+    var noSteps = Object.keys(S.chk).filter(function (k) { return S.chk[k] === 'no'; }).map(function (k) { return k.replace('step-', 'Step '); });
+    var L = [];
+    L.push('AI Architect install — help request');
+    L.push('Release ' + D.release + ' · Windows · mode: ' + (d.live ? 'live · instance label: ' + vars().label : 'design-only'));
+    L.push('Reached: ' + lab(reachedItem));
+    L.push('Commands run: ' + d.doneC + ' of ' + ALL_CMDS.length + (d.nx ? ' · next: ' + d.nx.t : ''));
+    if (skipped.length) L.push('Skipped on the way: ' + skipped.join(', '));
+    if (noSteps.length) L.push('Did not work: ' + noSteps.join(', '));
+    L.push('');
+    L.push('What I see:');
+    L.push((S.helpText || '').trim() || '(describe what happened, or paste the message)');
+    [['Versions (2e)', 'v'], ['Installer check (6a)', 'pre'], ['Licence check (Step 7)', 'lic']].forEach(function (p) {
+      var x = (S.out[p[1]] || '').trim();
+      if (x) { L.push(''); L.push('--- ' + p[0] + ' ---'); L.push(x); }
+    });
+    L.push('');
+    L.push('Below I add the output of .\\snowarch.cmd version and .\\snowarch.cmd doctor.');
+    return L.join('\n');
+  }
+
+  /* ── Derived values, then one render ─────────────────────────────────────────────────────────────────────────── */
+  function derive() {
+    var live = S.mode === 'live';
+    var navL = navList(), ls = navL.filter(function (x) { return x.id; });
+    var ids = ls.map(function (x) { return x.id; });
+    var ai = Math.max(0, ids.indexOf(S.active));
+    var ri = Math.max(ai, ids.indexOf(S.reached));
+    var needL = D.need.filter(function (x) { return !x.live || live; });
+    var needDone = needL.filter(function (x) { return S.need[x.id]; }).length;
+    var doneC = ALL_CMDS.filter(function (c) { return S.done[c.cid]; }).length;
+    var left = 0;
+    ALL_CMDS.forEach(function (c) { if (!S.done[c.cid]) left += (c.cid === 's6' && !live) ? D.designMinutes.s6 : c.min; });
+    return { live: live, navL: navL, links: ls, ids: ids, ai: ai, ri: ri, needL: needL, needDone: needDone, doneC: doneC, left: left, nx: nextCmd() };
+  }
+  var NAVEL = {};
+  var NEEDEL = {};
+  function buildNav() {
+    var list = $('#nav-list');
+    D.nav.forEach(function (x) {
+      if (!x.id) { var g = h('div', { cls: 'grp', text: x.g }); list.appendChild(g); return; }
+      var a = h('a', { attrs: { href: '#' + x.id } }, [h('em'), h('span'), document.createTextNode(x.t)]);
+      a.addEventListener('click', function () { S.active = x.id; S.open = false; render(); });
+      list.appendChild(a);
+      NAVEL[x.id] = { a: a, em: a.firstChild, span: a.childNodes[1], item: x };
+    });
+  }
+  function renderNav(d) {
+    var stepSet = {};
+    d.ids.forEach(function (id, idx) {
+      var e = NAVEL[id], x = e.item, on = idx === d.ai;
+      var count = '', complete = false, sp = STEP_BY_ID[id];
+      if (sp) { var n = sp.cmds.filter(function (c) { return S.done[c[0]]; }).length; complete = n === sp.cmds.length || S.chk[id] === 'yes'; count = n + '/' + sp.cmds.length; }
+      else if (id === 'need') { complete = d.needDone === d.needL.length; count = d.needDone + '/' + d.needL.length; }
+      var passed = idx < d.ri || complete;
+      e.a.className = on ? 'on' : (passed ? 'past' : '');
+      if (on) e.a.setAttribute('aria-current', 'location'); else e.a.removeAttribute('aria-current');
+      setText(e.span, S.chk[id] === 'no' && !on ? '!' : (passed && !on ? '✓' : x.n));
+      setText(e.em, complete ? '' : count);
+      stepSet[id] = true;
+    });
+    Object.keys(NAVEL).forEach(function (id) { NAVEL[id].a.hidden = !stepSet[id]; });
+    var cur = d.links[d.ai] || d.links[0];
+    var pct = Math.round((d.ri + 1) / d.links.length * 100) + '%';
+    setText($('#nav-head'), 'Contents · ' + pct + ' passed · ' + (d.live ? 'live' : 'design-only'));
+    setText($('#nav-cur'), (cur.n !== '—' ? cur.n + ' · ' : '') + cur.t);
+    $('#nav-bar').style.width = pct;
+    $('#nav').className = 'g-nav' + (S.open ? ' open' : '');
+    $('#nav-top').setAttribute('aria-expanded', S.open ? 'true' : 'false');
+    setText($('#nav-caret'), S.open ? '▲ Close' : '▼ Open');
+    setText($('#btn-view'), S.view === 'step' ? '☰ Show all steps' : '▤ One step at a time');
+    setText($('#btn-theme'), S.theme === 'dark' ? '☀ Light' : '☾ Dark');
+  }
+  function buildNeed() {
+    var box = $('#need-list');
+    D.need.forEach(function (x) {
+      var cb = h('input', { attrs: { type: 'checkbox', id: x.id } });
+      var row = h('div', { cls: 'need-row' }, [cb, h('label', { attrs: { for: x.id } }, [x.t, h('small', { text: x.hint })])]);
+      cb.addEventListener('change', function () { S.need[x.id] = cb.checked; save('aiarch.need', JSON.stringify(S.need)); render(); });
+      box.appendChild(row);
+      NEEDEL[x.id] = { row: row, cb: cb, item: x };
+    });
+  }
+  function renderNeed(d) {
+    var shown = {};
+    d.needL.forEach(function (x) { shown[x.id] = true; });
+    Object.keys(NEEDEL).forEach(function (id) {
+      var e = NEEDEL[id];
+      e.row.hidden = !shown[id];
+      e.cb.checked = !!S.need[id];
+      e.row.className = 'need-row' + (S.need[id] ? ' ok' : '');
+    });
+    setText($('#need-count'), 'Check what you need · ' + d.needDone + ' of ' + d.needL.length + ' ready');
+    var ready = d.needDone === d.needL.length;
+    toggle($('#need-ready'), ready);
+    toggle($('#need-missing'), !ready);
+    setText($('#need-missing-count'), 'Still missing: ' + (d.needL.length - d.needDone) + ' of ' + d.needL.length);
+  }
+  function renderPager(d) {
+    var isStep = S.view === 'step';
+    var fi = Math.max(0, d.ids.indexOf(S.focus));
+    var prev = d.links[fi - 1], nxt = d.links[fi + 1];
+    var lab = function (x) { return x ? ((x.n !== '—' ? x.n + ' · ' : '') + x.t) : ''; };
+    $$('[data-pager]').forEach(function (p) {
+      p.hidden = !isStep;
+      var pb = $('[data-pg="prev"]', p), nb = $('[data-pg="next"]', p);
+      pb.disabled = !prev; nb.disabled = !nxt;
+      setText(pb, prev ? '◀ ' + lab(prev) : '◀ Start');
+      setText(nb, nxt ? lab(nxt) + ' ▶' : 'End ▶');
+      setText($('.pos', p), (fi + 1) + ' / ' + d.links.length);
+    });
+  }
+  function renderNext(d) {
+    var nx = d.nx, b = $('#next');
+    b.className = nx ? 'next' : 'next all';
+    setText($('small', b), nx ? 'Next command · ' + d.doneC + '/' + ALL_CMDS.length + ' done · ~' + Math.max(1, Math.round(d.left)) + ' min left' : 'Install complete');
+    setText($('b', b), nx ? nx.t + ' ▸' : '✓ All commands run — see Step 8');
+    b.setAttribute('aria-label', nx ? 'Go to the next command: ' + nx.t : 'All commands run. Go to Step 8');
+  }
+  function renderResume(d) {
+    var show = !!S.resume && !S.resumeHidden;
+    toggle($('#resume'), show);
+    if (!show) return;
+    var lab = function (x) { return x ? ((x.n !== '—' ? x.n + ' · ' : '') + x.t) : ''; };
+    setText($('#resume-text'), d.nx ? 'Your next command is ' + d.nx.t + ' (' + d.doneC + ' of ' + ALL_CMDS.length + ' done).' : 'Every command is run. You last reached ' + lab(d.links[d.ri] || d.links[0]) + '.');
+  }
+  function renderMisc(d) {
+    document.body.setAttribute('data-mode', S.mode);
+    $('#mode-live').className = d.live ? 'on' : '';
+    $('#mode-design').className = d.live ? '' : 'on';
+    $('#mode-live').setAttribute('aria-pressed', d.live ? 'true' : 'false');
+    $('#mode-design').setAttribute('aria-pressed', d.live ? 'false' : 'true');
+    var v = vars();
+    [['#f-lic', S.lic], ['#f-label', S.label], ['#url-check', S.url], ['#t-search', S.q], ['#help-desc', S.helpText]].forEach(function (p) {
+      var el = $(p[0]);
+      if (el && document.activeElement !== el && el.value !== p[1]) el.value = p[1];
+    });
+    ['oc-v', 'oc-pre', 'oc-lic'].forEach(function (id) {
+      var el = $('#' + id), key = id.slice(3);
+      if (document.activeElement !== el && el.value !== S.out[key]) el.value = S.out[key];
+    });
+    $$('[data-sample-note]').forEach(function (el) { el.hidden = v.lic !== SAMPLE_LIC; });
+    $$('[data-bind="release"]').forEach(function (el) { setText(el, D.release); });
+    var hm = helpMessage(d);
+    var msg = $('#help-msg');
+    if (msg.value !== hm) msg.value = hm;
+    setText($('#help-copy'), S.helpCopied ? 'Copied ✓' : 'Copy message');
+  }
+  function applyView() {
+    var step = S.view === 'step', f = S.focus;
+    $$('section.sec').forEach(function (s) {
+      var v = (!step || groupOf(s.id) === f) ? '' : 'none';
+      if (s.style.display !== v) s.style.display = v;
+    });
+    var hero = $('header.hero');
+    if (hero) { var hv = (!step || f === 'need') ? '' : 'none'; if (hero.style.display !== hv) hero.style.display = hv; }
+  }
+  function applyTheme() {
+    var r = document.documentElement;
+    if (r.getAttribute('data-theme') !== S.theme) r.setAttribute('data-theme', S.theme);
+  }
+  var lastD = null;
+  function render() {
+    var d = derive();
+    lastD = d;
+    renderPb();
+    renderSim();
+    renderNav(d); renderNeed(d); renderPager(d); renderNext(d); renderResume(d); renderMisc(d);
+    renderCmds(); renderTerms(); renderTimers(); renderChks(); renderOc(); renderUrl(); renderTrouble();
+    applyView(); applyTheme();
+  }
+
+  /* ── Navigation: spy, focus, next command ────────────────────────────────────────────────────────────────────── */
+  function spy() {
+    if (S.view === 'step') return;
+    var ids = links().map(function (x) { return x.id; });
+    var navEl = $('#nav');
+    var offset = (navEl && window.innerWidth <= 860 ? navEl.getBoundingClientRect().height : 0) + 120;
+    var active = ids[0];
+    ids.forEach(function (id) { var el = document.getElementById(id); if (el && el.getBoundingClientRect().top <= offset) active = id; });
+    var doc = document.scrollingElement || document.documentElement;
+    if (doc && doc.scrollHeight - doc.scrollTop - doc.clientHeight < 4) active = ids[ids.length - 1];
+    var ch = false;
+    if (active !== S.active) { S.active = active; ch = true; }
+    if (ids.indexOf(active) > ids.indexOf(S.reached)) { S.reached = active; save('aiarch.reached', active); ch = true; }
+    if (ch) render();
+  }
+  function setFocus(id, target) {
+    var ids = links().map(function (x) { return x.id; });
+    if (ids.indexOf(id) < 0) return;
+    S.focus = id; S.active = id; S.open = false;
+    if (ids.indexOf(id) > ids.indexOf(S.reached)) { S.reached = id; save('aiarch.reached', id); }
+    render();
+    setTimeout(function () { var el = document.getElementById(target || id); scrollTo(el, target && target !== id ? 'center' : 'start'); }, 60);
+  }
+  function goTo(id) {
+    if (S.view === 'step') return setFocus(id);
+    scrollTo(document.getElementById(id), 'start');
+  }
+  var flashTimer = 0;
+  function goNext() {
+    var n = nextCmd();
+    var flash = function (cid, step) {
+      var b = boxes[cid];
+      if (b) {
+        scrollTo(b.box, 'center');
+        b.box.classList.add('flash');
+        clearTimeout(flashTimer);
+        flashTimer = setTimeout(function () { b.box.classList.remove('flash'); }, 2000);
+      } else scrollTo(document.getElementById(step), 'start');
+    };
+    if (!n) return goTo('step-8');
+    if (S.view === 'step' && S.focus !== n.step) { setFocus(n.step); setTimeout(function () { flash(n.cid, n.step); }, 160); } else flash(n.cid, n.step);
+  }
+  function goSearch() {
+    var go = function () {
+      var i = $('#t-search');
+      if (i) { scrollTo(i, 'center'); try { i.focus({ preventScroll: true }); } catch (e) { i.focus(); } }
+    };
+    if (S.view === 'step' && S.focus !== 'trouble') { setFocus('trouble', 't-search'); setTimeout(go, 160); } else go();
+  }
+  function resetMarks() {
+    storedKeys().filter(function (k) { return k.indexOf('aiarch.cmd.') === 0; }).forEach(drop);
+    drop('aiarch.need'); drop('aiarch.reached'); drop('aiarch.chk');
+    S.done = {}; S.need = {}; S.chk = {}; S.timers = {}; S.reached = S.active;
+    render();
+  }
+
+  /* ── Wiring ──────────────────────────────────────────────────────────────────────────────────────────────────── */
+  function wire() {
+    $('#nav-top').addEventListener('click', function () { S.open = !S.open; render(); });
+    $('#btn-view').addEventListener('click', function () {
+      var v = S.view === 'step' ? 'all' : 'step', f = S.view === 'step' ? S.focus : S.active;
+      S.view = v; S.focus = f; save('aiarch.view', v); render();
+      setTimeout(function () { var el = document.getElementById(f); if (el) el.scrollIntoView({ block: 'start' }); }, 80);
+    });
+    $('#btn-theme').addEventListener('click', function () { S.theme = S.theme === 'dark' ? 'light' : 'dark'; save('aiarch.theme', S.theme); render(); });
+    $('#btn-reset').addEventListener('click', resetMarks);
+    $('#mode-live').addEventListener('click', function () { S.mode = 'live'; save('aiarch.mode', 'live'); render(); });
+    $('#mode-design').addEventListener('click', function () { S.mode = 'design'; save('aiarch.mode', 'design'); render(); });
+    $('#f-lic').addEventListener('input', function (e) { S.lic = e.target.value; save('aiarch.lic', S.lic); render(); });
+    $('#f-label').addEventListener('input', function (e) { S.label = e.target.value; save('aiarch.label', S.label); render(); });
+    $('#url-check').addEventListener('input', function (e) { S.url = e.target.value; S.copiedUrl = false; save('aiarch.url', S.url); render(); });
+    $('#t-search').addEventListener('input', function (e) { S.q = e.target.value; render(); });
+    $('#help-desc').addEventListener('input', function (e) { S.helpText = e.target.value; render(); });
+    ['v', 'pre', 'lic'].forEach(function (k) { OC[k].ta.addEventListener('input', function (e) { S.out[k] = e.target.value; render(); }); });
+    $('#help-copy').addEventListener('click', function () {
+      var text = $('#help-msg').value;
+      var sel = function () { var m = $('#help-msg'); m.focus(); m.select(); };
+      try { navigator.clipboard.writeText(text).then(function () { S.helpCopied = true; render(); setTimeout(function () { S.helpCopied = false; render(); }, 1800); }, sel); } catch (e) { sel(); }
+    });
+    $('#next').addEventListener('click', goNext);
+    $('#resume-go').addEventListener('click', function () { S.resumeHidden = true; var d = lastD || derive(); if (d.nx) goNext(); else goTo((d.links[d.ri] || d.links[0]).id); render(); });
+    $('#resume-hide').addEventListener('click', function () { S.resumeHidden = true; render(); });
+    $$('[data-pager]').forEach(function (p) {
+      $('[data-pg="prev"]', p).addEventListener('click', function () { var d = derive(), fi = Math.max(0, d.ids.indexOf(S.focus)); if (d.links[fi - 1]) setFocus(d.links[fi - 1].id); });
+      $('[data-pg="next"]', p).addEventListener('click', function () { var d = derive(), fi = Math.max(0, d.ids.indexOf(S.focus)); if (d.links[fi + 1]) setFocus(d.links[fi + 1].id); });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      var t = e.target, tag = ((t && t.tagName) || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) { if (e.key === 'Escape' && t.blur) t.blur(); return; }
+      var k = e.key;
+      if (k === 'n' || k === 'N') { e.preventDefault(); goNext(); }
+      else if (k === 'c' || k === 'C') {
+        var n = nextCmd(); if (!n || !boxes[n.cid]) return;
+        e.preventDefault(); scrollTo(boxes[n.cid].box, 'center'); boxes[n.cid].copy.click();
+      } else if (k === '/') { e.preventDefault(); goSearch(); }
+      else if (k === 'Escape' && S.open) { S.open = false; render(); }
+    });
+    document.addEventListener('click', function (e) {
+      if (S.view !== 'step') return;
+      var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
+      if (!a) return;
+      var id = a.getAttribute('href').slice(1);
+      if (!id) return;
+      var el = document.getElementById(id);
+      if (!el) return;
+      var sec = el.closest('section.sec');
+      if (!sec) return;
+      e.preventDefault();
+      setFocus(groupOf(sec.id), id);
+    }, true);
+    var onScroll = (function () { var raf = 0; return function () { if (raf) return; raf = requestAnimationFrame(function () { raf = 0; spy(); }); }; })();
+    document.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    window.addEventListener('storage', function () { readDone(); render(); });
+    setInterval(function () { if (Object.keys(S.timers).length) { S.now = Date.now(); renderTimers(); } }, 1000);
+  }
+
+  /* ── Glossary: the section, and the words inside the text ────────────────────────────────────────────────────── */
+  function buildGlossary() {
+    var list = $('#gl-list');
+    D.gl.forEach(function (g) { list.appendChild(h('div', { cls: 'grow' }, [h('div', { cls: 'dt', text: g[0] }), h('div', { text: g[1] })])); });
+    $$('[data-gl]').forEach(function (el) {
+      var key = el.getAttribute('data-gl');
+      var hit = D.gl.filter(function (g) { return g[0].toLowerCase().replace(/[^a-z]/g, '') === key; })[0];
+      if (hit) el.textContent = hit[1];
+    });
+  }
+
+  /* ── Start ───────────────────────────────────────────────────────────────────────────────────────────────────── */
+  loadState();
+  $$('[data-cmd]').forEach(buildCmd);
+  $$('[data-term]').forEach(buildTerm);
+  $$('[data-timer]').forEach(buildTimer);
+  $$('[data-chk]').forEach(buildChk);
+  buildNav(); buildNeed(); buildPb(); buildSim(); buildGlossary();
+  wire();
+  render();
+  setTimeout(spy, 300);
+})();
+</script>
+</body>
+</html>
