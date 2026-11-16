@@ -34,6 +34,7 @@
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MB } from '../lib/size.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -58,7 +59,7 @@ function asking(pairs) {
 const NEEDS_CHECK = /`|markdown\/|not documented|not in the (?:bundled )?corpus|undocumented|citation unavailable|Pages read|un-?verified|not (?:yet )?(?:opened|read|checked|verified)|(?:did|could) not (?:open|read)|budget/i;
 
 /** A transcript over this is not read by the cheap gate below (the same limit as lib/docs/turn-sources.mjs). */
-const MAX_GATE_BYTES = 64 * 1024 * 1024;
+const MAX_GATE_BYTES = 64 * MB;
 
 /**
  * Could a file written in this turn carry a citation the answer does not? (ARC-09-C267, lever 2.) Only when the class `citedUnread` may ask
