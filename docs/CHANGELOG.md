@@ -35,16 +35,23 @@ Release carries it as an asset, so a reader with nothing installed can download 
 **The Stop hook asks once about a corpus page that an answer cites and the session never opened.** At the end of a turn it lists the
 pages that the final answer, or a file written in that turn, cites and that no read route of the session showed: a `Read`; a Bash or
 PowerShell command that shows the page (`cat`, `sed`, `head`, `tail`, `awk`, `nl`, `grep`, `rg`, `Get-Content`, `Select-String`, and the
-filters that print a file again), from the folder a `cd` set, which the next call keeps, with a brace list or a glob in its arguments expanded
-against the file system; a Grep that printed lines of it; an MCP file read; a sub-agent's read; a read before a compaction. A call that does not
-name its pages (a loop, `xargs`, `find -exec`, `$( )`, a variable, code of another language, `git show`) counts every page whose file name is in
-it as shown, and, if it has a viewer, in its output too; a failed viewer call counts the pages it names that are on disk. A sentence that only points ("see also", "start with", "read … first"), a path the user typed and a page the answer says it did not
-open are not claims. The hook asks the model once, in these words: "You cited pages that this session never opened: …. Open each one now. Where a
+filters that print a file again), from the folder a `cd` set, which the next call keeps (a sub-agent's folder, and the main thread's when
+`CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR` is set, is reset before every Bash call), with a brace list or a glob in its arguments expanded against
+the file system; a Grep that printed lines of it; an MCP file read; a sub-agent's read; a read before a compaction. A call that does not name its
+pages (a loop, `xargs`, `find -exec`, `$( )`, a variable, code of another language, `git show`) counts every page whose file name is in it as
+shown, and every page that a glob or brace word of it could name (`for f in dir/c_Esc*.md`, `find . -name 'c_Esc*.md' | xargs cat`, a folder lost by
+`cd ~`), and, if it has a viewer, every page named in its output; a failed viewer call counts the pages it names that are on disk. A bare file name that a
+corpus page has (`c_CaseRouting.md`, "(citation: `x.md`)") is a citation of every page of that name, shown if any was. A sentence that only points
+("see also", "start with", "read … first"), a path the user typed, a page the answer says it did not open and a page that is not on disk (C254's) are
+not claims. An input cut short (more than 200 sub-agent files or 64 MB of them, a line of the session file that does not parse) asks nothing and says
+why when `SNOWARCH_HOOK_DEBUG` is set; so does a run that passes its 3 s deadline. The hook asks the model once, in these words: "You cited pages that this session never opened: …. Open each one now. Where a
 page contradicts your answer, correct the answer. Where a citation only tells the reader where to look, mark it as a pointer on its Correction
 line." After the continuation it tells the user what stayed open, and never asks again in the turn: a citation of the first answer or of the
-continuation stays open until a page is read or a Correction line names it as a pointer or withdrawn, and silence closes nothing. `tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
-unreadable file, switches the grounding asks off. No `CLAUDE.md`, skill or agent changes. On a 5.3 MB transcript the hook takes the same time as
-before (about 210 to 310 ms in three interleaved runs of each, on a Mac).
+continuation stays open until a page is read, by any route the ask counted, or a Correction line names it as a pointer or withdrawn, and silence
+closes nothing; it lists no item that the ask did not name. `tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
+unreadable file, switches the grounding asks off. No `CLAUDE.md`, skill or agent changes. On a 63 MB session file the hook takes 0.5 to 1.1 s, and the
+continuation about 1.1 s; the first build took 2.4 to 3.9 s, and 10 s for the continuation. The names that a session's pages print, which were nearly all of
+that time, are now collected only for a class that asks for them.
 
 ### Added
 
@@ -63,7 +70,9 @@ before (about 210 to 310 ms in three interleaved runs of each, on a Mac).
   the data in `lib/docs/grounding-classes.json`). A sub-agent's reads, the reads before a compaction, a `cd` and a relative path, a brace list or
   a glob expanded against the file system, the lines of a recursive `grep` or Grep, and every page named in a call that cannot be resolved (a
   loop, `xargs`, code of another language) count as reads; a pointer sentence, a path the user typed and a page the answer says it did not open do
-  not need one. A page that is still cited and unread after the ask is told to the user, never to the model again (ARC-09-C267).
+  not need one. A page that is still cited and unread after the ask is told to the user, never to the model again (ARC-09-C267). The review of #600
+  adds the glob and brace words of an unresolved call, a folder reset before each call of a sub-agent, an input cut short that asks nothing, a glob
+  budget for each pattern, a notice that closes a page by the rules of the ask, and a bare file name as a citation.
 
 ### Changed
 
