@@ -2168,8 +2168,9 @@ the only failure mode and it changes nothing. A second writer would be a second 
 ## Editing the registration files
 
 **Never hand-edit `permissions` in `.claude/settings.json`.** It is generated: 236 allow entries and
-163 ask entries from the server contract, regenerated whenever a tool's gate changes, and two more allow
-entries, for `docs lookup`, from the launcher spelling (ARC-09-C268). A hand-edit is overwritten by the
+163 ask entries from the server contract, regenerated whenever a tool's gate changes, and four more allow
+entries, a Bash one and a PowerShell one for each of the two read-only commands a session is told to run,
+`docs lookup` and `status`, from the launcher spelling (ARC-09-C268, ARC-09-C288). A hand-edit is overwritten by the
 next `npm run gen`. **`env` and `hooks` are yours**: the generator rewrites only the key it owns and
 carries the rest through, which is asserted by test rather than trusted.
 

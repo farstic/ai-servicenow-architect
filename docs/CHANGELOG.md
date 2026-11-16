@@ -32,6 +32,11 @@ say what is wrong. A reader types a licence file name and an instance label once
 nothing leaves the page. The release writer moves its clone tag and its release with every final, the signed manifest covers it, and each GitHub
 Release carries it as an asset, so a reader with nothing installed can download it before cloning.
 
+**Typing Status no longer asks for permission.** `CLAUDE.md` §2 tells a session to run `./snowarch status` when the user types Status, and nothing allowed it: the
+`snowarch` skill's own `allowed-tools` apply only while the skill is active, so the plain word prompted, and in the C268 sitting it was refused 7 times in 39
+refused calls. The generated `.claude/settings.json` now allows it as it allows `docs lookup`, a Bash entry and a PowerShell entry in the same shape
+(`./snowarch status *` and `.\snowarch.cmd status *`), and nothing else of the launcher: not `doctor`, not `upgrade`, not `instance` (ARC-09-C288).
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -47,6 +52,8 @@ Release carries it as an asset, so a reader with nothing installed can download 
 
 ### Changed
 
+- The generated `.claude/settings.json` allows `./snowarch status` and `.\snowarch.cmd status` without a prompt, beside `docs lookup`: the generator's pair becomes
+  a list of the two read-only commands that the instructions tell a session to run. 240 allow entries (ARC-09-C288).
 - The release writes the interactive Windows guide (`writeGuideRelease`, beside `writeInstallTag`): its clone command, and the `release` field its
   hero and help message read. A release candidate leaves the page alone, as it leaves the other pages, and a page without the field is refused. The
   page is in the signed manifest's coverage (`packages/snowarch/src/licence/integrity.ts`), so a distribution carries it, and `release.yml` attaches
