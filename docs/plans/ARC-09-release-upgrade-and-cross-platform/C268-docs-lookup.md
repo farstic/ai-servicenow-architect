@@ -53,7 +53,7 @@ The two arms above, over a prompt class where the user's words differ from the c
 
 - **The primary was flat at its ceiling:** 52 of 54 in each arm, so the sentence is not shown to raise the share of answers that read and cite the key page. What it changes is the claim of absence: nine false "not documented" claims fell to two.
 - **How the claims were judged:** blind, in two passes of six readers each, over the 200 lines under test; the two passes agreed on 190 of the 200.
-- **The guards held:** no cited page was missing (0), no name was invented (0), the section 1.1 verdict letters were the same prompt by prompt (by hand), and the median time of an answer did not move (74.0 s and 73.8 s).
+- **The guards held:** no cited page was missing (0), no name was invented (0), the section 1.1 verdict letters were the same prompt by prompt (by hand), and the median time of an answer did not move (74.0 s with the sentence, 73.8 s without).
 - **Watched, and not ruled out:** refused shell calls rose from 0.15 to 0.33 an answer, and each one is a permission prompt for a user. Three were the lookup called as `cd … && ./../../snowarch docs lookup`, which the allow entry does not match; the rest were compound `sed` and `grep` reads. Nothing here changes it: a separate row will take it up.
 - **Still not measured:** Claude Code's own matching of the allow entries, and the PowerShell spelling in particular (see "The permission" above).
 
