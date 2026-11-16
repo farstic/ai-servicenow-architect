@@ -98,13 +98,10 @@ jobs:
           echo "dry run: opened nothing, pushed nothing"
           cat body.md
 
-      # ARC-09-C250 — the corpus map moves with the pin, in the same commit: the refresh checked the new pin out and
-      # staged engine.config.json, so the map is written from it and staged beside it.
-      - name: Write the corpus map at the new pin
-        if: ${{ !inputs.dry_run && steps.plan.outputs.moved == 'true' }}
-        run: |
-          node scripts/gen-docs-map.mjs --write
-          git add vendor/docs-map.md
+      # ARC-09-C280 — the corpus map and the files that quote the pin move with it, in the same commit, and the script
+      # above is what moves them: `scripts/docs-bump.mjs` regenerates the map (ARC-09-C250's step, which used to be a
+      # step here and ran only where this file did) and the five files in `scripts/lib/pin-followers.mjs`, stages them,
+      # and lists them in the report that becomes the pull request's body. Nothing here stages anything of its own.
 
       - name: Open or update the pull request
         if: ${{ !inputs.dry_run && steps.plan.outputs.moved == 'true' }}

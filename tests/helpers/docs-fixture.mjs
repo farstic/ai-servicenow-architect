@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 
 import { writeGitattributes } from './gitattributes.mjs';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CORPUS_DIR, ROOT_FILES } from '../../tools/snowarch/lib/docs/sync.mjs';
 import { trackTempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -179,4 +179,43 @@ function makeWorkspace({ scratch, pin, upstreamUrl }) {
 }
 
 
-export { AREAS, CITED_PAGE, LONG_NAME, UNCITED, git, buildUpstream, makeWorkspace, writeCitingSkill };
+/**
+ * ARC-09-C280 — the five files that quote the corpus pin without being generated from it by a recipe: the panel
+ * sample's `Docs:` line in the snowarch skill, the status snippet and VALIDATION-TESTS, and the pin and head in the two
+ * doctor status fixtures. Named by path here, as an oracle independent of the module that moves them.
+ */
+const SAMPLE_DOCS = ['.claude/skills/snowarch/SKILL.md', 'docs/snippets/status-template.md', 'tests/VALIDATION-TESTS.md'];
+const STATUS_FIXTURES = ['tests/fixtures/doctor/status-design.json', 'tests/fixtures/doctor/status-live.json'];
+const PIN_FOLLOWERS = [...SAMPLE_DOCS, ...STATUS_FIXTURES];
+
+const sampleLine = (pin) => `Docs: vendor/ServiceNowDocs @ ${pin.slice(0, 12)} (australia) · full`;
+const fixtureJson = (pin) => `${JSON.stringify({ docs: { present: true, pin, head: pin, family: 'australia' } }, null, 2)}\n`;
+
+/** Writes the five files at `pin` (not committed), except the named ones. */
+function writeFollowers(root, pin, { except = [] } = {}) {
+  for (const p of PIN_FOLLOWERS.filter((f) => !except.includes(f))) {
+    mkdirSync(join(root, dirname(p)), { recursive: true });
+    writeFileSync(join(root, p), SAMPLE_DOCS.includes(p)
+      ? `# fixture\n\n${sampleLine(pin)}\nRoster: 29 skills / 9 agents\n`
+      : fixtureJson(pin));
+  }
+}
+
+/**
+ * ARC-09-C283 — an install page with the paragraph the bump reads its figures from, as `docs/INSTALL.md` words it
+ * (the sentence wraps across lines there, and the reader has to follow it).
+ */
+function installPage({ areas, files, mb }) {
+  return [
+    '# Install', '', '### What the corpus costs', '',
+    '**The documentation costs about 490 MB on disk and about 30–45 seconds to fetch** — the whole corpus, all',
+    `${areas} areas and ${files.toLocaleString('en-US')} files, in a blobless checkout. Two measurements, because they count different things:`,
+    `the **working tree** is ${mb} MB on Linux and macOS and ${mb + 7} MB on Windows, and **tree plus \`.git\`** is 476`,
+    'MB Ubuntu / 484 MB macOS / 482 MB Windows. The first is what you read, the second is what the disk loses.', '',
+  ].join('\n');
+}
+
+export {
+  AREAS, CITED_PAGE, LONG_NAME, PIN_FOLLOWERS, SAMPLE_DOCS, STATUS_FIXTURES, UNCITED, git, buildUpstream, makeWorkspace,
+  installPage, writeCitingSkill, writeFollowers,
+};

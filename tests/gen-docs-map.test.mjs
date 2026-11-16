@@ -21,14 +21,18 @@ const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', st
 const URL_OF = (area) => `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/australia/markdown/${area}/index.md`;
 const page = (title, product) => `---\ntitle: ${title}\n${product ? `product: ${product}\n` : ''}---\n\n# ${title}\n`;
 
-/** A root with a three-area corpus at a pin, an engine.config.json naming that pin, and no map yet. */
-function fixture(t) {
+/**
+ * A root with a three-area corpus at a pin, an engine.config.json naming that pin, and no map yet. `areas` adds areas of
+ * its own — `{ area, llms, index }`, the title llms.txt gives it (or none) and the title of its index.md.
+ */
+function fixture(t, { areas = [] } = {}) {
   const root = tempDir('snowarch-c250-map-', t);
   const corpus = join(root, 'vendor/ServiceNowDocs');
   const put = (rel, text) => { mkdirSync(dirname(join(corpus, rel)), { recursive: true }); writeFileSync(join(corpus, rel), text); };
   mkdirSync(corpus, { recursive: true });
   initFixtureRepo((args) => git(args, corpus), corpus, ['-q', '-b', 'australia']);
-  put('llms.txt', `# ServiceNow docs\n\n- [Alpha publication](${URL_OF('alpha')})\n- [Beta, renamed](${URL_OF('beta')})\n`);
+  const more = areas.filter((a) => a.llms).map((a) => `- [${a.llms}](${URL_OF(a.area)})\n`).join('');
+  put('llms.txt', `# ServiceNow docs\n\n- [Alpha publication](${URL_OF('alpha')})\n- [Beta, renamed](${URL_OF('beta')})\n${more}`);
   // The family word an index title opens with is a release label: alpha's two titles are the same name.
   put('markdown/alpha/index.md', page('Australia Alpha publication'));
   put('markdown/alpha/a.md', page('A', 'Product One'));
@@ -37,6 +41,7 @@ function fixture(t) {
   put('markdown/beta/index.md', page('Beta Files'));
   put('markdown/beta/d.md', page('D', 'Piped|Name'));
   put('markdown/delta-x/index.md', page('x Combined Product Files'));
+  for (const a of areas) put(`markdown/${a.area}/index.md`, page(a.index ?? a.llms));
   git(['add', '-A'], corpus);
   git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'fixture'], corpus);
   const pin = git(['rev-parse', 'HEAD'], corpus).trim();
@@ -113,4 +118,76 @@ test('ARC-09-C250 — the shipped map has one row for every area of the pinned t
   if (!shape?.whole) { t.skip('not checked: this checkout\'s corpus is not the whole tree'); return; }
   const map = readFileSync(join(REPO, 'vendor/docs-map.md'), 'utf8');
   assert.deepEqual(rows(map).map((r) => cells(r)[0]), shape.inTree.map((a) => `\`markdown/${a}/\``));
+});
+
+// ARC-09-C277 — a release family opening a title is a label, not a name. The corpus is on the `australia` branch and its
+// index titles say "Brazil …" on 45 areas: a reader took the map to be about Brazil. The label is left out of each part of
+// a title, for any family, and only where it opens the title.
+
+/** The titles the map shows for the given areas, by area name. */
+function shown(t, areas, options) {
+  const { corpus, pin } = fixture(t, { areas });
+  const byArea = new Map(rows(buildMap({ corpus, pin, ...options })).map(cells).map((c) => [c[0].replace(/^`markdown\/|\/`$/g, ''), c[1]]));
+  return (area) => byArea.get(area);
+}
+
+test('ARC-09-C277 — a title shows no release family at its start, in either of its parts, whichever family it is', (t) => {
+  const title = shown(t, [
+    { area: 'it-service-management', llms: 'IT Service Management', index: 'Brazil IT Service Management' },
+    { area: 'cloud-governance-suite', index: 'Australia Cloud Governance Suite' },
+    { area: 'delta-z-australia', index: 'australia Combined Product Files' },
+    { area: 'release-notes', index: 'Brazil release notes' },
+    { area: 'both-parts', llms: 'Brazil Foo', index: 'Australia Foo' },
+    { area: 'renamed', llms: 'Account Lifecycle Events', index: 'Brazil Customer Success Management' },
+    { area: 'two-words', index: 'San Diego Platform Overview' },
+  ]);
+  assert.equal(title('it-service-management'), 'IT Service Management', 'the family the corpus is not on stays in the index title');
+  assert.equal(title('cloud-governance-suite'), 'Cloud Governance Suite', 'an index title with no llms.txt title keeps its family');
+  assert.equal(title('delta-z-australia'), 'Combined Product Files', 'a family written in lower case stays');
+  assert.equal(title('release-notes'), 'Release notes', 'what is left of a title does not open with a small letter');
+  assert.equal(title('both-parts'), 'Foo', 'two titles that are one name once the families are gone are shown once');
+  assert.equal(title('renamed'), 'Account Lifecycle Events / Customer Success Management', 'a renamed area shows both of its names, without the family');
+  assert.equal(title('two-words'), 'Platform Overview', 'a family of two words stays');
+});
+
+test('ARC-09-C277 — only a family at the start of a title goes: a name that merely begins with one, or sits in the middle, stays', (t) => {
+  const title = shown(t, [
+    { area: 'mid', llms: 'Moving from Zurich to Australia', index: 'Moving from Zurich to Australia' },
+    { area: 'longer-word', index: 'Fujitsu Integration' },
+    { area: 'only-family', index: 'Brazil' },
+    { area: 'vocabulary', index: 'vocabulary' },
+  ]);
+  assert.equal(title('mid'), 'Moving from Zurich to Australia');
+  assert.equal(title('longer-word'), 'Fujitsu Integration', 'Fuji is a family; Fujitsu is not');
+  assert.equal(title('only-family'), 'Brazil', 'a title that is a family and nothing else has nothing left to show');
+  assert.equal(title('vocabulary'), 'vocabulary', 'a title that opens with no family keeps its case');
+});
+
+test('ARC-09-C277 — the corpus\'s own family goes from a title even when no list names it', (t) => {
+  const own = (family) => shown(t, [{ area: 'zebra', index: 'Zebra Reports' }], family ? { family } : {})('zebra');
+  assert.equal(own('zebra'), 'Reports');
+  assert.equal(own(null), 'Zebra Reports', 'a word that is no family of this corpus lost its place at the start of a title');
+});
+
+test('ARC-09-C277 — every release family the engine config allows is one the map leaves out of a title', (t) => {
+  const schema = JSON.parse(readFileSync(join(REPO, 'engine.config.schema.json'), 'utf8'));
+  const allowed = schema.properties.docs.properties.family.enum;
+  assert.ok(allowed.length >= 4, 'the config names no families');
+  const title = shown(t, allowed.map((name) => ({ area: `family-${name}`, index: `${name[0].toUpperCase()}${name.slice(1)} Foo` })));
+  for (const name of allowed) assert.equal(title(`family-${name}`), 'Foo', `the config allows ${name}, and the map keeps it in a title`);
+});
+
+test('ARC-09-C277 — the shipped map names no release family at the start of a title', () => {
+  const map = readFileSync(join(REPO, 'vendor/docs-map.md'), 'utf8');
+  const parts = rows(map).flatMap((r) => cells(r)[1].split(' / '));
+  assert.ok(parts.length >= 50, `the map has ${parts.length} title parts`);
+  const schema = JSON.parse(readFileSync(join(REPO, 'engine.config.schema.json'), 'utf8'));
+  const families = [...schema.properties.docs.properties.family.enum, 'australia', 'brazil'];
+  assert.deepEqual(parts.filter((p) => families.includes(p.split(/\s+/)[0].toLowerCase())), []);
+  // Whatever a newer family is called, a label shows on most areas and a name on a few: the delta areas share "Combined"
+  // (4 of them today), the family label was on 50 of 54.
+  const opening = new Map();
+  for (const p of parts) opening.set(p.split(/\s+/)[0], (opening.get(p.split(/\s+/)[0]) ?? 0) + 1);
+  const [word, n] = [...opening].sort((a, b) => b[1] - a[1])[0];
+  assert.ok(n < 10, `"${word}" opens ${n} of the title parts of the map: a release label that is not in the generator's list of families`);
 });
