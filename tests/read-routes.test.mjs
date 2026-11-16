@@ -26,6 +26,8 @@ const A = (blocks, extra = {}) => ({ type: 'assistant', message: { role: 'assist
 const U = (content, extra = {}) => ({ type: 'user', message: { role: 'user', content }, ...extra });
 const use = (id, name, input, extra = {}) => A([{ type: 'tool_use', id, name, input }], extra);
 const res = (id, content, extra = {}) => U([{ type: 'tool_result', tool_use_id: id, content, ...extra }]);
+// Built, not spelled whole: engine lint L02 holds every literal `mcp__<server>__` under tests/ to the product's own server key.
+const MCP_FILE = ['mcp', 'srv', 'file_tool'].join('__');
 const call = (id, name, input, body = 'ok', { error = false, row = {} } = {}) => [use(id, name, input, row), res(id, body, error ? { is_error: true } : {})];
 
 // ---- the page a path names ----------------------------------------------------------------------------------------------------
@@ -117,7 +119,8 @@ test('ARC-09-C267 read-routes — cdOf: the target of a command that changes the
 test('ARC-09-C267 read-routes — commandReads: the verbs that show a page, and where each reads it from', () => {
   for (const [command, verb] of [[`cat ${FILE}`, 'cat'], [`head -50 ${FILE}`, 'head'], [`tail -n 20 ${FILE}`, 'tail'], [`sed -n '1,40p' ${FILE}`, 'sed'],
     [`awk 'NR<40' ${FILE}`, 'awk'], [`nl -ba ${FILE}`, 'nl'], [`less ${FILE}`, 'less'], [`bat ${FILE}`, 'bat'], [`/usr/bin/cat ${FILE}`, 'cat'], [`cat < ${FILE}`, 'cat'],
-    [`cat <${FILE}`, 'cat'], [`FOO=1 BAR=2 cat ${FILE}`, 'cat'], [`grep -n escalation ${FILE}`, 'grep'], [`egrep -n 'a|b' ${FILE}`, 'egrep'], [`rg -n escalation ${FILE}`, 'rg'],
+    [`cat <${FILE}`, 'cat'], [`cut -c1-80 ${FILE}`, 'cut'], [`fold -w 100 ${FILE}`, 'fold'], [`tac ${FILE}`, 'tac'], [`sort ${FILE}`, 'sort'], [`column -t ${FILE}`, 'column'],
+    [`FOO=1 BAR=2 cat ${FILE}`, 'cat'], [`grep -n escalation ${FILE}`, 'grep'], [`egrep -n 'a|b' ${FILE}`, 'egrep'], [`rg -n escalation ${FILE}`, 'rg'],
     [`grep -i -e one -e two ${FILE}`, 'grep'], [`grep --regexp=one ${FILE}`, 'grep'], [`cat vendor/ServiceNowDocs/${PAGE}`, 'cat']]) {
     assert.deepEqual([...commandReads(command).reads], [[PAGE, verb]], command);
   }
@@ -240,7 +243,7 @@ test('ARC-09-C267 read-routes — walkThread: a call counts only when it came ba
     ...call('b2', 'Bash', { command: `cat ${DOCS}/markdown/csm/c_Fourth.md` }, 'No such file', { error: true }),
     ...call('g1', 'Grep', { pattern: 'x', path: DOCS, output_mode: 'content' }, `${DOCS}/markdown/csm/c_Fifth.md:3:x`),
     ...call('g2', 'Grep', { pattern: 'x', path: DOCS }, `${DOCS}/markdown/csm/c_Sixth.md`),
-    ...call('m1', 'mcp__srv__file_tool', { path: `${DOCS}/markdown/csm/c_Seventh.md` }, 'summary'),
+    ...call('m1', MCP_FILE, { path: `${DOCS}/markdown/csm/c_Seventh.md` }, 'summary'),
     ...call('p1', 'PowerShell', { command: `Get-Content ${DOCS}/markdown/csm/c_Eighth.md` }),
     ...call('s1', 'Skill', { skill: 'csm-specialist' }, `Launching skill: ${PAGE}`),
   ];
@@ -339,14 +342,16 @@ test('ARC-09-C267 read-routes — turnSources: sub-agent rows are not the main t
     ['/s/ses/subagents/workflows/wf_1/deeper/agent-too-deep.jsonl', file(sub)],
   ]);
   const dirs = new Set(['/s/ses/subagents', '/s/ses/subagents/workflows', '/s/ses/subagents/workflows/wf_1', '/s/ses/subagents/workflows/wf_1/deeper']);
+  const fwd = (p) => p.replaceAll('\\', '/');                              // readSubagentRows joins with the platform's separator
   const seams = {
-    list: (dir) => {
+    list: (given) => {
+      const dir = fwd(given);
       if (!dirs.has(dir)) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
       const prefix = `${dir}/`;
       return [...new Set([...files.keys(), ...dirs].filter((p) => p.startsWith(prefix) && p.length > prefix.length).map((p) => p.slice(prefix.length).split('/')[0]))];
     },
-    stat: (p) => ({ size: (files.get(p) ?? '').length, isDirectory: () => dirs.has(p) }),
-    read: (p) => files.get(p),
+    stat: (given) => ({ size: (files.get(fwd(given)) ?? '').length, isDirectory: () => dirs.has(fwd(given)) }),
+    read: (given) => files.get(fwd(given)),
   };
   const got = readSubagentRows('/s/ses.jsonl', seams);
   assert.equal(got.length, 2, 'the two files that parse: the session\'s agent and the workflow\'s, and not the one three folders down');

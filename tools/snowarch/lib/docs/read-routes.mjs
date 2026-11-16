@@ -199,8 +199,8 @@ export function cdOf(words, { powershell = false } = {}) {
 }
 
 // ---- the commands that show a page ------------------------------------------------------------------------------------------------------
-/** The commands that print the lines of the files they are given. `ls`, `find`, `wc` and `stat` list or count: they show no page. */
-const SHOWING = new Set(['cat', 'head', 'tail', 'sed', 'nl', 'less', 'more', 'awk', 'bat']);
+/** The commands that print the lines of the files they are given (and the filters that print them again, cut or ordered). `ls`, `find`, `wc` and `stat` list or count: they show no page. */
+const SHOWING = new Set(['cat', 'head', 'tail', 'sed', 'nl', 'less', 'more', 'awk', 'bat', 'cut', 'fold', 'tac', 'rev', 'fmt', 'column', 'expand', 'sort', 'uniq', 'paste']);
 /** The commands that print the lines of a file that match: they show the page's lines that matter. */
 const SEARCHING = new Set(['grep', 'egrep', 'fgrep', 'rg']);
 const POWERSHELL_SHOWING = new Set([...SHOWING, 'get-content', 'gc', 'type']);

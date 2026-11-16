@@ -46,7 +46,9 @@ function install(t) {
     writeFileSync(join(root, 'vendor', 'ServiceNowDocs', rel), 'The sn\\_example table.\n');
   }
   const corpus = join(root, 'vendor', 'ServiceNowDocs');
-  return { root, corpus, abs: (rel) => join(corpus, rel), folder: (rel) => dirname(join(corpus, rel)) };
+  // Forward slashes on every platform: a Bash command reads a back-slash as an escape, and a Read or a PowerShell command takes either.
+  const fwd = (p) => p.replaceAll('\\', '/');
+  return { root, corpus, abs: (rel) => fwd(join(corpus, rel)), folder: (rel) => fwd(dirname(join(corpus, rel))) };
 }
 const A = (blocks, extra = {}) => ({ type: 'assistant', message: { role: 'assistant', content: blocks }, ...extra });
 const U = (content, extra = {}) => ({ type: 'user', message: { role: 'user', content }, ...extra });
@@ -250,6 +252,15 @@ withInstall('ARC-09-C267 lever 2 — one ask a turn: two pages, one block; the c
   const pointer = await stop(t, { rows: [A([{ type: 'text', text: message }]), feedback, A([{ type: 'text', text: `Correction: ${PAGE.alpha} is a pointer, not a claim.\nCorrection: ${PAGE.beta} is a pointer too.` }])],
     message: `Correction: ${PAGE.alpha} is a pointer, not a claim.\nCorrection: ${PAGE.beta} is a pointer too.`, input: { stop_hook_active: true } });
   silent(pointer, 'marked as pointers');
+  // a page read before a compaction is a page read: the first ask left it out, and the continuation does not report it as open
+  const early = [...readPage('r0', i.abs(PAGE.alpha)), ...compaction()];
+  const first = await stop(t, { rows: [...early, A([{ type: 'text', text: message }])], message });
+  asked(first, PAGE.beta);
+  assert.doesNotMatch(first.reason, new RegExp(PAGE.alpha.replaceAll('.', '\\.')), 'the page read before the compaction is not in the ask');
+  const feedback2 = U(`Stop hook feedback:\n${first.reason}`, { isMeta: true });
+  const still = await stop(t, { rows: [...early, A([{ type: 'text', text: message }]), feedback2, A([{ type: 'text', text: 'Understood.' }])], message: 'Understood.', input: { stop_hook_active: true } });
+  assert.match(still.systemMessage, new RegExp(PAGE.beta.replaceAll('.', '\\.')), 'the page nobody read stays open');
+  assert.doesNotMatch(still.systemMessage, new RegExp(PAGE.alpha.replaceAll('.', '\\.')), 'and the one read before the compaction is not reported');
 });
 
 // ---- the classes file --------------------------------------------------------------------------------------------------------------

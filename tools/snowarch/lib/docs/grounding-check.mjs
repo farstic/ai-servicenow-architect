@@ -394,8 +394,10 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
   const whole = turnSources(rows, options);
   const first = whole.feedback.find((f) => f.ours);
   if (!first) return none;
-  const before = whole.live.slice(0, first.index);
-  const after = whole.live.slice(first.index + 1);
+  // The original rows, cut at our feedback row, and not only the live ones: a page read before a compaction was read, and the first block did not ask about it.
+  const cut = rows.indexOf(whole.live[first.index]);
+  const before = cut >= 0 ? rows.slice(0, cut) : whole.live.slice(0, first.index);
+  const after = cut >= 0 ? rows.slice(cut + 1) : whole.live.slice(first.index + 1);
   const was = groundingFindings({ rows: before, reply: null, index, coverage, options });
   if (was.skipped || was.items.length === 0) return { ours: true, open: [], text: null };
 
