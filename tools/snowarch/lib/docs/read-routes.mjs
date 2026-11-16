@@ -471,6 +471,16 @@ const FD_VERBS = new Set(['fd', 'fdfind']);
 const FD_VALUE_FLAGS = new Set(['-e', '--extension', '-t', '--type', '-d', '--max-depth', '--min-depth', '-E', '--exclude', '-S', '--size', '-c', '--color', '-j', '--threads', '-x', '--exec',
   '-X', '--exec-batch', '--max-results', '--changed-within', '--changed-before', '-o', '--owner', '--base-directory', '--search-path', '--path-separator']);
 
+/** The words of an fd command that are neither a flag nor a flag's value: the pattern first, then the folders. */
+function fdPositional(words) {
+  const out = [];
+  for (let n = 0; n < words.length; n += 1) {
+    if (words[n].startsWith('-')) { if (FD_VALUE_FLAGS.has(words[n])) n += 1; continue; }
+    out.push(words[n]);
+  }
+  return out;
+}
+
 /**
  * `{ filters, used, any }` for the words of one command: `filters` are `{ value, ci }` (a glob as written), `used` the indexes of the words that are flags or values of a
  * filter, `any` is `{ ci }` when the command filters by a regex (find). Pure.
@@ -645,6 +655,28 @@ function staticFolder(word) {
   return out.join('/');
 }
 
+/**
+ * Does this lister or searcher run on the folder the shell stands in, being given none: `ls`, `find -type f`, `rg -l X`, `grep -rl X`, `fd x`, `tree`, PowerShell's
+ * `Get-ChildItem -Recurse`? A search that reads a pipe (`… | rg X`, `… | grep -l X`) reads its input and not a folder, and so does `grep X` without `-r`. Pure.
+ */
+function searchesCwd(info, named, searching, powershell) {
+  const k = info.key;
+  const operands = info.words.filter((w, n) => !w.startsWith('-') && !/^\d+$/.test(w) && !named.used.has(n));
+  if (powershell) return ['get-childitem', 'gci', 'dir', 'ls'].includes(k) && operands.length === 0;
+  if (k === 'ls' || k === 'dir' || k === 'tree' || k === 'du') return operands.length === 0;
+  if (k === 'find') { const at = info.words.findIndex((w) => w.startsWith('-') || w === '(' || w === '!'); return (at < 0 ? info.words.length : at) === 0; }
+  if (FD_VERBS.has(k)) return fdPositional(info.words).length < 2;                              // fd PATTERN [PATH…]
+  if (searching.has(k)) {
+    if (info.op === '|') return false;
+    const recursive = k === 'rg' || info.words.some((w) => w === '--recursive' || /^-[A-Za-z]*[rR][A-Za-z]*$/.test(w));
+    return recursive && fileWords(k, info.words, true, false).length === 0;
+  }
+  return false;
+}
+
+/** The commands that list the files of a folder. */
+const LISTERS = new Set(['ls', 'dir', 'tree', 'du', 'find', 'fd', 'fdfind', 'get-childitem', 'gci']);
+
 /** A redirect as a word of its own (`>`, `>>`, `2>`, `<`, `&>`): the word after it is a file. */
 const REDIRECT = /^(?:\d|&)?[<>]{1,2}&?$/;
 
@@ -657,6 +689,11 @@ function rootWords(info, showing, searching, powershell) {
   if (info.key === 'for' || info.key === 'select') { const at = words.indexOf('in'); words = at < 0 ? [] : words.slice(at + 1); }
   else if (['while', 'until', 'done', 'fi', 'esac'].includes(info.key)) words = [];
   else if (!powershell && (searching.has(info.key) || SCRIPTED.has(info.key))) words = fileWords(info.key, words, searching.has(info.key), false);
+  else if (!powershell && (info.key === 'xargs' || info.key === 'parallel')) {                                                        // the files the command it runs is given
+    const at = words.findIndex((w) => showing.has(w) || searching.has(w));
+    if (at >= 0) words = [...words.slice(0, at), ...fileWords(words[at], words.slice(at + 1), searching.has(words[at]), false)];
+  } else if (!powershell && FD_VERBS.has(info.key)) words = fdPositional(words).slice(1);                                             // its folders: the first is the pattern
+  else if (!powershell && info.key === 'find') { const at = words.findIndex((w) => w.startsWith('-') || w === '(' || w === '!'); if (at >= 0) words = words.slice(0, at); }     // its starting points
   return words.filter((w, k) => !REDIRECT.test(w) && !(k > 0 && REDIRECT.test(words[k - 1])));
 }
 
@@ -785,7 +822,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       return;
     }
     const key = powershell ? basename(rest[0]).toLowerCase() : basename(rest[0]);
-    segInfo.push({ words: rest.slice(1), key, folder: at, gone: folderLost });
+    segInfo.push({ words: rest.slice(1), key, op: seg.op, folder: at, gone: folderLost });
     for (const name of ranFiles(key, rest, powershell)) runs.add(name);
     if (opaqueVerb(key, rest, powershell, seg.x)) {
       opaque = true;
@@ -833,11 +870,13 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
           if (PATTERN_WORD.test(w)) addPattern(w, info.folder, info.gone);
         });
         // Folders count when the call has a viewer to feed them to: `git -C <corpus> show HEAD:<page>` names the corpus and reads one page.
-        for (const w of viewer ? rootWords(info, showing, searching, powershell) : []) {
-          if (w.startsWith('-') || NOT_A_PATH.test(w) || PATTERN_WORD.test(w)) continue;
-          if (showing.has(powershell ? w.toLowerCase() : w) || searching.has(powershell ? w.toLowerCase() : w) || INTERPRETER.test(w) || (INDIRECT.has(w) && w !== '.')) continue;      // a runner's command
+        const takesFolders = showing.has(info.key) || searching.has(info.key) || LISTERS.has(info.key) || ['xargs', 'parallel', 'for', 'select'].includes(info.key);       // not `echo x`
+        for (const w of viewer && takesFolders ? rootWords(info, showing, searching, powershell) : []) {
+          if (w.startsWith('-') || NOT_A_PATH.test(w) || PATTERN_WORD.test(w) || /^\d+$/.test(w)) continue;
           for (const dir of foldersOf(w, info.folder, info.gone)) roots.add(dir);
         }
+        // A lister or searcher given no folder runs on the one the shell stands in (`cd <area> && ls | xargs head`).
+        if (viewer && searchesCwd(info, named, searching, powershell)) for (const dir of foldersOf('.', info.folder, info.gone)) roots.add(dir);
         // A regex filter of find (`-regex`, `-iregex`) is not a glob: it covers what the search covers, which is the folder it names, or every page when none.
         // A name filter narrows a folder's pages (its pattern is the match), so the folder is added only for a segment that has none.
         if (named.any) {

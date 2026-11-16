@@ -226,10 +226,11 @@ test('ARC-09-C267 review 2, item 3 — a folder counts only with a viewer, and a
   // git -C <corpus> show names the corpus and reads one page
   assert.deepEqual(pats(`git -C ${ROOT.replace('/markdown', '')} show HEAD:markdown/it-service-management/c_Alpha.md`), []);
   assert.deepEqual(pats(`python3 -c "x" ${CSM}`), [], 'an interpreter\'s word that is a folder is not a folder it lists to a viewer');
+  assert.deepEqual(pats(`ls ${CSM}; python3 -c "print(1)"`), [], 'a listing and an interpreter that reads nothing: no viewer feeds the list');
   // with the shell standing in the corpus, the words of a loop, a runner and a search that are not folders name none
   assert.deepEqual(pats('for f in a b; do cat "$f"; done', inFolder), ['dir:markdown/customer-service-management/a', 'dir:markdown/customer-service-management/b'], 'the words after `in` may be folders, `f` and `in` are not');
   assert.deepEqual(pats('rg -l escal . | xargs cat', inFolder), ['dir:markdown/customer-service-management']);
-  assert.deepEqual(pats('find . -type f | xargs head -3', inFolder), ['dir:markdown/customer-service-management', 'dir:markdown/customer-service-management/f']);
+  assert.deepEqual(pats('find . -type f | xargs head -3', inFolder), ['dir:markdown/customer-service-management'], 'a flag\'s value and a script are not folders either');
   assert.deepEqual(pats('while read f; do head -3 "$f"; done < list.txt', inFolder), []);
   // a word with an expansion in its first segment names no folder; one in a later segment, the folder before it
   assert.deepEqual(pats('for f in $(cat list.txt); do head -3 "$D/$f"; done'), []);
