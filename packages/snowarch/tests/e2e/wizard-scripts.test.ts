@@ -1,9 +1,10 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, expect, it } from 'vitest';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { AUTH_EXHAUSTED, EXIT_FAILED, EXIT_OK, MAX_ATTEMPTS, runAdd, type AddIo } from '../../src/cli/instance.js';
 import { fakeRest } from '../helpers/fake-rest.js';
@@ -132,5 +133,20 @@ describe('ARC-09-C286 — the driver itself can fail', () => {
         scripted(stale), { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} }))
         .rejects.toThrow(/the live script stalled: the wizard asked "Password[^"]*" and no step was ready; the next step waits for \/A prompt the wizard never prints\//);
     } finally { w.cleanup(); }
+  });
+});
+
+describe('ARC-09-C286 — the live file takes its scripts from here', () => {
+  it('spells no prompt of its own, and gives every pseudo-terminal start the fixture licence', () => {
+    const live = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'instance-wizard.e2e.test.ts'), 'utf8');
+    // A pattern written in the live file is the second spelling this file exists to remove: it drifts at night, unseen.
+    expect(live).not.toMatch(/waitFor\s*:/);
+    expect(live).toContain('happyPathScript(');
+    expect(live).toContain('threeFailuresScript(');
+    // Every `runInPty` start in it takes the licensed environment (the spawn-class guard holds this too; this names the cause where it is read).
+    const starts = live.match(/runInPty\(/g) ?? [];
+    const licensedStarts = live.match(/env:\s*licensed\(\)/g) ?? [];
+    expect(starts.length).toBeGreaterThan(0);
+    expect(licensedStarts.length).toBe(starts.length);
   });
 });
