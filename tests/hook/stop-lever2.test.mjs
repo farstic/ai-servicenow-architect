@@ -280,7 +280,7 @@ withInstall('ARC-09-C267 lever 2 — a glob or a brace list in a viewer command 
   asked(await stop(t, { rows: bash('b', `cat ${folder}/*.md`), message: cite(PAGE.gamma) }), PAGE.gamma);
   asked(await stop(t, { rows: bash('b', 'cat /tmp/*.md'), message: cite(PAGE.alpha) }), PAGE.alpha);
   asked(await stop(t, { rows: bash('b', `grep -l table ${folder}/*.md`), message: both }), PAGE.alpha);
-  asked(await stop(t, { rows: bash('b', `cat ${folder}/*.md`, { error: true }), message: cite(PAGE.alpha) }), PAGE.alpha);
+  silent(await stop(t, { rows: bash('b', `cat ${folder}/*.md`, { error: true }), message: cite(PAGE.alpha) }), 'a pattern in a call that failed: the pages are on disk, and the call is a viewer');
   // PowerShell takes the same patterns, with back-slashes and any case
   const win = folder.replaceAll('/', '\\');
   silent(await stop(t, { rows: powershell('p', `Get-Content "${win}\\*.md" -TotalCount 40`), message: both }), 'Get-Content over a pattern');

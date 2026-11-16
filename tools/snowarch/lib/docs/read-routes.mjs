@@ -16,7 +16,10 @@
 //     folder the shell was in; `sed -n 1,40p {a,b}.md` is two pages whether or not either is there, since the shell would try both;
 //   - what cannot be resolved (a variable or a substitution in a viewer's words, a `for` or `while` loop, `xargs`, `find -exec`, `eval`, another
 //     shell, an interpreter of another language, `git show`, a PowerShell pipe into Get-Content, a folder lost by a `cd` the call cannot tell) is
-//     returned as TEXT, `unresolved`, and the caller counts every page whose bare file name is in it as shown (`mentionsPage`).
+//     returned as TEXT, `unresolved`, and the caller counts every page whose bare file name is in it as shown (`mentionsPage`); when the call has a
+//     viewer verb the pages named in its OUTPUT count too (a loop over `$(ls dir)` that heads every file);
+//   - a call that FAILED may still have printed part of what it was asked for (`cat a.md missing.md`): when it has a viewer verb, the pages it names
+//     that are on disk (`pageExists`, the caller's) count as shown, and so do its unresolved text and output; a failed call with no viewer shows nothing.
 //
 // PURE: every function reads its arguments and nothing else (no file, no clock, no global); the file system is the caller's `glob`.
 import { corpusRelative } from './resolve.mjs';
@@ -376,6 +379,17 @@ function unwrap(words, powershell) {
   return words.slice(i);
 }
 
+/** Does a word of this command hold a viewer or a search verb (`xargs head -2`, `bash -c "cat x.md"`, `find . -exec cat {} \;`)? A runner that is given one reads with it. */
+function givesViewer(rest, showing, searching, powershell) {
+  for (const w of rest.slice(1)) {
+    for (const token of w.split(/[\s;|&()]+/)) {
+      const key = powershell ? token.toLowerCase() : token;
+      if (showing.has(key) || searching.has(key)) return true;
+    }
+  }
+  return false;
+}
+
 /** Is this command one whose reading cannot be told from its words? `rest` are its words from the verb on, `x` whether the segment has an expansion. */
 function opaqueVerb(key, rest, powershell, x) {
   if (x && /[$`]/.test(rest[0])) return true;                                        // a verb the shell builds could be anything
@@ -394,7 +408,8 @@ function opaqueVerb(key, rest, powershell, x) {
  * the paths it expands to, or none). A relative file argument is read from each of those; a `cd` in the line moves the folder for what follows it, as the
  * shell does, but not inside `( … )` or on either side of a `|`, which run in a subshell. A brace list in a viewer's arguments is expanded (not in
  * PowerShell, which has none); a glob is asked of `glob`, only under the corpus and only when the pattern is absolute.
- * `{ reads, cwd, lost, moved, heredocs, searched, unresolved }`: `moved` is true when the line changed the folder for the calls that follow, and `cwd`
+ * `{ reads, cwd, lost, moved, heredocs, searched, unresolved, viewer }`: `viewer` says that the call has a viewer or a search that prints lines, or a
+ * runner that is given one (`xargs head`, `bash -c "cat x.md"`), so that what it printed may name pages; `moved` is true when the line changed the folder for the calls that follow, and `cwd`
  * (`null` when not known) and `lost` are where it stands then. `searched` is the folder each search that prints lines (`grep`, `rg`, `Select-String`,
  * without `-c`, `-l`, `-L` or `-q`) ran in: the lines such a search prints over a folder or several files begin with the path of their page
  * (`pagesInLines`). `unresolved` is a list of texts, each of which may show a page the call does not name: a relative `.md` name when the folder is not
@@ -412,6 +427,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
   let folderLost = Boolean(lost);
   let moved = false;
   let opaque = false;                                              // the call has a command whose reading cannot be told
+  let viewer = false;                                              // the call has a viewer or a search that prints lines, or a runner that is given one
   let flagged = false;                                             // a viewer or a search of the call has an expansion in its words
   const saved = [];
   const add = (page, verb) => { if (!reads.has(page)) reads.set(page, verb); };
@@ -460,11 +476,12 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       return;
     }
     const key = powershell ? basename(rest[0]).toLowerCase() : basename(rest[0]);
-    if (opaqueVerb(key, rest, powershell, seg.x)) { opaque = true; return; }
+    if (opaqueVerb(key, rest, powershell, seg.x)) { opaque = true; if (givesViewer(rest, showing, searching, powershell)) viewer = true; return; }
     const showsLines = showing.has(key);
     const searchesFiles = searching.has(key);
     if (!showsLines && !searchesFiles) return;
     if (searchesFiles && silentSearch(rest.slice(1), powershell)) return;
+    viewer = true;
     if (seg.x) flagged = true;
     if (searchesFiles) searched.push(at);
     const operands = rest.slice(1).filter((w) => !w.startsWith('-'));
@@ -487,16 +504,17 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
     }
     unresolved.push([bare, ...scripts].join('\n'));
   }
-  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved };
+  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer };
 }
 
 /**
  * The corpus pages an MCP call's input shows, and what it leaves unresolved: a file it names by `path`, `file_path` or `paths`, what the shell in it
- * shows (`command`, the `commands` of a batch, shell `code`), and the `code` of any other language as text, for the names rule. `{ pages, unresolved }`.
+ * shows (`command`, the `commands` of a batch, shell `code`), and the `code` of any other language as text, for the names rule. `{ pages, unresolved, viewer }`.
  */
 export function inputReads(input, { cwd = null, rowCwd = null, glob = null } = {}) {
   const pages = new Set();
   const unresolved = [];
+  let viewer = false;
   const files = [];
   for (const key of ['path', 'file_path']) if (typeof input?.[key] === 'string') files.push(input[key]);
   if (Array.isArray(input?.paths)) for (const f of input.paths) if (typeof f === 'string') files.push(f);
@@ -512,8 +530,9 @@ export function inputReads(input, { cwd = null, rowCwd = null, glob = null } = {
     const done = commandReads(line, { cwd, rowCwd, glob });
     for (const page of done.reads.keys()) pages.add(page);
     unresolved.push(...done.unresolved);
+    if (done.viewer) viewer = true;
   }
-  return { pages, unresolved };
+  return { pages, unresolved, viewer };
 }
 
 /** The corpus pages an MCP call's input shows: a file it names by `path`, `file_path` or `paths`, and what the shell in it shows. */
@@ -551,6 +570,9 @@ export function pagesOfGrep(input, body, rowCwd = null) {
   return pages;
 }
 
+/** The most of an output kept as text for the names rule. */
+const OUTPUT_CAP = 500_000;
+
 // ---- one thread of rows -----------------------------------------------------------------------------------------------------------------
 /** Tools that write a file, and the input fields that hold the text written. */
 const WRITERS = Object.freeze({
@@ -565,18 +587,24 @@ const WRITERS = Object.freeze({
  * `{ reached: Map(page → { route, at }), writes: [{ tool, text, at }], calls: Map(tool_use id → Map(page → route)), opaque: [{ text, at }] }`, `at`
  * being the row of the call; `calls` says which pages each shell call showed, by the verb that showed it (`search` for the lines a search printed);
  * `opaque` is the text of each call that may have shown a page without naming it (`commandReads`' `unresolved`, and the code of another language in an
- * MCP call), for the names rule. A call counts only when its result came back without `is_error`. The shell's folder is tracked across the calls of the
- * thread: a `cd` that succeeded moves it, and one the call cannot tell loses it until a `cd` it can. `glob` is the file system for patterns. Nothing is
- * cut at a compaction boundary: a page read before it was read. Pure.
+ * MCP call), for the names rule, and, for a call of those that has a viewer verb, the first 500,000 characters of its output. A call counts only when its
+ * result came back without `is_error`; except that a Bash or PowerShell call with a viewer verb that FAILED may have printed part of what it was asked
+ * for (`cat a.md missing.md`): the pages it names that `pageExists(page)` says are on disk are reached, and its unresolved text and its output are kept
+ * apart in `failedOpaque`, for the caller to use only for a page that is on disk. A failed call with no viewer shows nothing, and no failed call moves the
+ * shell's folder or writes a file. The folder is tracked across the calls of the thread: a `cd` that succeeded moves it, and one the call cannot tell
+ * loses it until a `cd` it can. `glob` is the file system for patterns. Nothing is cut at a compaction boundary: a page read before it was read. Pure.
  */
-export function walkThread(rows, { glob = null } = {}) {
+export function walkThread(rows, { glob = null, pageExists = null } = {}) {
   const uses = new Map();
   const reached = new Map();
   const writes = [];
   const calls = new Map();
   const opaque = [];
+  const failedOpaque = [];
   let cwd = null;
   let lost = false;
+  const onDisk = typeof pageExists === 'function' ? pageExists : () => false;
+  const output = (b) => posix(textOfResult(b)).slice(0, OUTPUT_CAP);
   const reach = (page, route, at) => { if (!reached.has(page)) reached.set(page, { route, at }); };
   (Array.isArray(rows) ? rows : []).forEach((r, at) => {
     if (!r || typeof r !== 'object') return;
@@ -586,10 +614,20 @@ export function walkThread(rows, { glob = null } = {}) {
     }
     if (r.type !== 'user') return;
     for (const b of blocksOf(r)) {
-      if (b.type !== 'tool_result' || b.is_error === true) continue;
+      if (b.type !== 'tool_result') continue;
+      const failed = b.is_error === true;
       const use = uses.get(b.tool_use_id);
       if (!use) continue;
       const { name, input } = use;
+      if (failed) {
+        if (name !== 'Bash' && name !== 'PowerShell') continue;
+        const done = commandReads(input.command, { powershell: name === 'PowerShell', cwd, rowCwd: use.rowCwd, lost, glob });
+        if (!done.viewer) continue;
+        for (const [page, verb] of done.reads) if (onDisk(page)) reach(page, verb, use.at);
+        for (const text of done.unresolved) failedOpaque.push({ text: posix(text), at: use.at });
+        if (done.unresolved.length) failedOpaque.push({ text: output(b), at: use.at });
+        continue;
+      }
       if (name === 'Read') { const page = pageAt(input.file_path); if (page) reach(page, 'Read', use.at); continue; }
       if (name === 'Bash' || name === 'PowerShell') {
         const done = commandReads(input.command, { powershell: name === 'PowerShell', cwd, rowCwd: use.rowCwd, lost, glob });
@@ -599,6 +637,7 @@ export function walkThread(rows, { glob = null } = {}) {
         if (shown.size) calls.set(b.tool_use_id, shown);
         if (done.moved) { cwd = done.cwd; lost = done.lost; }
         for (const text of done.unresolved) opaque.push({ text: posix(text), at: use.at });
+        if (done.viewer && done.unresolved.length) opaque.push({ text: output(b), at: use.at });
         for (const h of done.heredocs) if (h.writes && h.body) writes.push({ tool: name, text: h.body, at: use.at });
         continue;
       }
@@ -607,10 +646,11 @@ export function walkThread(rows, { glob = null } = {}) {
         const done = inputReads(input, { rowCwd: use.rowCwd, glob });
         for (const page of done.pages) reach(page, 'mcp', use.at);
         for (const text of done.unresolved) opaque.push({ text: posix(text), at: use.at });
+        if (done.viewer && done.unresolved.length) opaque.push({ text: output(b), at: use.at });
         continue;
       }
       if (Object.hasOwn(WRITERS, name)) for (const text of WRITERS[name](input)) writes.push({ tool: name, text, at: use.at });
     }
   });
-  return { reached, writes, calls, opaque };
+  return { reached, writes, calls, opaque, failedOpaque };
 }

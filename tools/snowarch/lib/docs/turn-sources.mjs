@@ -172,6 +172,7 @@ export function turnSources(rows, options = {}) {
     written: [],                 // [{ tool, text }] the text of the files the current turn wrote (Write, Edit, MultiEdit, NotebookEdit, a heredoc that writes)
     typed: '',                   // what the user typed, in every prompt of the session, as lower-case text with forward slashes
     opaque: [],                  // the text of each call (any row) that may have shown a page without naming it: a loop, xargs, code of another language (read-routes.mjs)
+    opaqueFailed: [],            // the same for a call with a viewer verb that failed; the caller uses it only for a page that is on disk
     envelopeNames: new Set(),    // names a saved Envelope prints (grounded only through the pages it cites)
     searches: [],                // [{ pattern, path, result }]
     feedback: [],                // [{ index, ours }] Stop-hook feedback rows of the current turn
@@ -180,7 +181,7 @@ export function turnSources(rows, options = {}) {
   };
 
   // The shell's folder and every route by which a page reached the main thread are one walk of its rows (read-routes.mjs).
-  const walked = walkThread(main, { glob: options.glob });
+  const walked = walkThread(main, { glob: options.glob, pageExists: options.pageExists });
 
   // Pass 1 — the tool calls, by id; and where the current turn begins.
   const uses = new Map();
@@ -295,6 +296,7 @@ export function turnSources(rows, options = {}) {
   // the current turn wrote, and the paths the user typed. A sub-agent's reads are another thread, walked by the caller.
   for (const [page, how] of walked.reached) out.reached.set(page, how.route);
   out.opaque = walked.opaque.map((o) => o.text);
+  out.opaqueFailed = walked.failedOpaque.map((o) => o.text);
   const offset = boundary + 1;
   const from = Math.max(out.turnStart < 0 ? 0 : out.turnStart, (options.replyAfter ?? -1) + 1);      // after the ask, on the continuation: only what the continuation wrote
   for (const w of walked.writes) if (w.at - offset >= from) out.written.push({ tool: w.tool, text: w.text });

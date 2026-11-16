@@ -279,18 +279,21 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
     let side = null;
     const sideThreads = () => {
       if (side) return side;
-      side = { pages: new Set(), opaque: [] };
+      side = { pages: new Set(), opaque: [], opaqueFailed: [] };
       const threads = typeof options.sideRows === 'function' ? options.sideRows() : options.sideRows;
       for (const rows of Array.isArray(threads) ? threads : []) {
-        const walked = walkThread(rows, { glob: options.glob });
+        const walked = walkThread(rows, { glob: options.glob, pageExists: options.pageExists });
         for (const page of walked.reached.keys()) side.pages.add(page);
         for (const o of walked.opaque) side.opaque.push(o.text);
+        for (const o of walked.failedOpaque) side.opaqueFailed.push(o.text);
       }
       return side;
     };
+    const onDisk = (path) => typeof options.pageExists === 'function' && options.pageExists(path);
     const named = (path) => {
       const name = path.slice(path.lastIndexOf('/') + 1);
-      return (turn.opaque ?? []).some((text) => mentionsPage(text, name)) || sideThreads().opaque.some((text) => mentionsPage(text, name));
+      const hit = (list) => list.some((text) => mentionsPage(text, name));
+      return hit(turn.opaque ?? []) || hit(sideThreads().opaque) || (onDisk(path) && (hit(turn.opaqueFailed ?? []) || hit(sideThreads().opaqueFailed)));
     };
     for (const [path, at] of cited) {
       if (turn.reached.has(path) || turn.pagesRead.has(path) || turn.savedCitations.has(path) || dead.has(path)) continue;
@@ -404,22 +407,25 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
   const whole = turnSources(rows, options);
   const first = whole.feedback.find((f) => f.ours);
   if (!first) return none;
-  const before = whole.live.slice(0, first.index);
-  const after = whole.live.slice(first.index + 1);
+  // The original rows, cut at our feedback row, and not only the live ones: a page read before a compaction was read, and the first block did not ask about it.
+  const cut = rows.indexOf(whole.live[first.index]);
+  const before = cut >= 0 ? rows.slice(0, cut) : whole.live.slice(0, first.index);
+  const after = cut >= 0 ? rows.slice(cut + 1) : whole.live.slice(first.index + 1);
   const was = groundingFindings({ rows: before, reply: null, index, coverage, options });
   if (was.skipped || was.items.length === 0) return { ours: true, open: [], text: null };
 
   const later = turnSources(after, options);
-  // The citations recomputed on the final answer after the continuation (the architect's ruling of 2026-11-16): a page is still open only if the
-  // answer as it now stands, the continuation's text and the files it wrote, still cites it and no read of the session showed it.
+  // What the continuation cites is a second input beside what the first answer cited (the architect's ruling of 2026-11-16): the user still sees the
+  // first answer, so a citation of either stays open until a page is read before the turn ends, or a Correction line names it as a pointer or withdrawn.
+  // A restated answer that silently drops a citation does not close it, and neither does "Understood.".
   const now = groundingFindings({ rows, reply, index, coverage, options: { ...options, replyAfter: first.index } });
-  const stillCited = new Set(now.findings.citedUnread.map((i) => i.path));
   const blocks = later.replyBlocks.slice();
   if (typeof reply === 'string' && reply && !(blocks.length && blocks[blocks.length - 1] === reply)) blocks.push(reply);
   const cont = blocks.flatMap((b) => b.split(/\r?\n/));
   const corrections = cont.filter((l) => /^\s*Correction:/i.test(l)).map(norm);
   const text = norm(blocks.join('\n'));
   const corrected = (name) => corrections.some((l) => l.includes(name));
+  const marked = (path) => corrections.some((l) => l.includes(norm(path)) && /pointer|withdr|retract|remov|dropp/.test(l));
   const printedBy = (name) => (index?.pathsOf(name) ?? []);
   const resolved = (i) => {
     switch (i.kind) {
@@ -429,14 +435,14 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
           || (corrected(i.name) && later.names.read.has(i.name));
       }
       case 'coined': case 'unsourced': return corrections.length > 0 && !text.includes(i.name);
-      case 'citedUnread': return !stillCited.has(i.path) || later.reached.has(i.path) || later.pagesRead.has(i.path) || corrections.some((l) => l.includes(norm(i.path)) && /pointer|withdr|retract|remov|dropp/.test(l));
+      case 'citedUnread': return later.reached.has(i.path) || later.pagesRead.has(i.path) || marked(i.path);
       case 'resting': case 'overclaim': return corrections.length > 0;
       default: return true;
     }
   };
   const open = was.items.filter((i) => !resolved(i));
   const wasKeys = new Set(was.items.map(keyOf));
-  for (const i of now.items) if (!wasKeys.has(keyOf(i))) open.push(i);
+  for (const i of now.items) if (!wasKeys.has(keyOf(i)) && !(i.kind === 'citedUnread' && marked(i.path))) open.push(i);
   if (open.length === 0) return { ours: true, open: [], text: null };
   const shown = open.slice(0, 6).map((i) => DESCRIBE[i.kind](i));
   const more = open.length > shown.length ? `; and ${open.length - shown.length} more` : '';

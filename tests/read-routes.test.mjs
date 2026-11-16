@@ -482,17 +482,18 @@ test('ARC-09-C267 read-routes — walkThread: a cd that succeeded carries to the
 test('ARC-09-C267 read-routes — walkThread: an unresolved call is kept as text with its row, an errored one is not, a lost folder carries and a later cd ends it', () => {
   const rows = [
     U('q'),
-    ...call('o1', 'Bash', { command: 'find . -name c_Esc.md | xargs cat' }),
+    ...call('o1', 'Bash', { command: 'find . -name c_Esc.md | xargs cat' }, 'out1'),
     ...call('o2', 'Bash', { command: 'python3 -c "open(\'c_Other.md\')"' }, 'Exit code 1', { error: true }),
     ...call('o3', 'Bash', { command: 'cd "$REPO/vendor/ServiceNowDocs/markdown/csm"' }),
-    ...call('o4', 'Bash', { command: 'sed -n 1,10p c_Third.md' }),
+    ...call('o4', 'Bash', { command: 'sed -n 1,10p c_Third.md' }, 'out4'),
     ...call('o5', 'Bash', { command: `cd ${FOLDER}` }),
     ...call('o6', 'Bash', { command: 'head -3 c_Fourth.md' }),
     ...call('o7', MCP_FILE, { language: 'python', code: "open('c_Fifth.md')" }),
   ];
   const { opaque, reached } = walkThread(rows);
-  assert.deepEqual(opaque.map((o) => o.text), ['find . -name c_Esc.md | xargs cat', 'c_Third.md', "open('c_Fifth.md')"], 'the call that failed is not there, the folder was lost for o4 only');
-  assert.deepEqual(opaque.map((o) => o.at), [1, 7, 13], 'and the row of each');
+  assert.deepEqual(opaque.map((o) => o.text), ['find . -name c_Esc.md | xargs cat', 'out1', 'c_Third.md', 'out4', "open('c_Fifth.md')"],
+    'the call that failed is not there (it has no viewer); the folder was lost for o4 only; a call with a viewer leaves its output beside its text; the code of another language leaves its code');
+  assert.deepEqual(opaque.map((o) => o.at), [1, 1, 7, 7, 13], 'and the row of each');
   assert.deepEqual([...reached.keys()], ['markdown/csm/c_Fourth.md'], 'what the second cd made resolvable is a definite read');
 });
 
