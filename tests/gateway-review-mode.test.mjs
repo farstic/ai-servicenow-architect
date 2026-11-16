@@ -39,7 +39,7 @@ function reviewSection(dir) {
 }
 
 /** The shared answer, with the gateway's own name taken out, so the six can be compared. */
-const ANSWER_START = '**What the review returns — exactly one of two (ARC-09-C160).**';
+const ANSWER_START = '**What the review returns — exactly one of two.**';
 
 test('ARC-09-C160 — every gateway\'s review mode says cleared or a §1.1 violation, never a Code Reviewer verdict', () => {
   const dirs = gatewayDirs(ROOT);

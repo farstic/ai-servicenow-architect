@@ -2,15 +2,17 @@
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CORPUS_DIR, EXIT, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
 import { syncUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { prBody } from '../scripts/docs-bump.mjs';
 import { RECIPE_TARGET, renderRecipeBlock } from '../tools/snowarch/lib/docs/recipe-block.mjs';
-import { AREAS, CITED_PAGE, buildUpstream, git, makeWorkspace, writeCitingSkill } from './helpers/docs-fixture.mjs';
+import {
+  AREAS, CITED_PAGE, PIN_FOLLOWERS, buildUpstream, git, installPage, makeWorkspace, writeCitingSkill, writeFollowers,
+} from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
@@ -295,6 +297,176 @@ test('a dry run restores the regenerated document too, not just the pin', () => 
   assert.equal(read(w.root, RECIPE_TARGET), before, 'the document was left modified');
   assert.equal(JSON.parse(read(w.root, 'engine.config.json')).docs.pin, pinBefore);
   assert.equal(git(['status', '--porcelain'], w.root).trim(), '');
+});
+
+/**
+ * ARC-09-C280 — the files that quote the pin, and the corpus map, are the bump's output too.
+ *
+ * The workflow runs this script and commits what it staged, so what the script stages is what the bot's pull request
+ * carries. #573, the bump to 96d3212, carried the config, the gitlink and the three recipe targets and went red on the
+ * panel sample, the two status fixtures and the map, which a person then moved by hand.
+ */
+const MAP_PATH = 'vendor/docs-map.md';
+const GEN_MAP = join(repoRoot, 'scripts', 'gen-docs-map.mjs');
+const mapTool = (w, ...args) => spawnSync(process.execPath, [GEN_MAP, ...args, '--root', w.root], { encoding: 'utf8' });
+const BUMP = join(repoRoot, 'scripts', 'docs-bump.mjs');
+const bump = (w, ...args) => spawnSync(process.execPath, [BUMP, ...args], {
+  cwd: w.root, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: '' },
+});
+
+/** The workspace gains the five followers and the map, at the current pin, committed. */
+function withFollowersAndMap(w) {
+  writeFollowers(w.root, upstream.pin);
+  const made = mapTool(w, '--write');
+  assert.equal(made.status, 0, `the fixture cannot make its first map: ${made.stdout}${made.stderr}`);
+  git(['add', '-A'], w.root);
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'followers and map'], w.root);
+  assert.equal(git(['status', '--porcelain'], w.root).trim(), '', 'precondition: the tree is clean');
+}
+
+test('ARC-09-C280 — a real run stages the files that follow the pin and the map, and names them in its report', () => {
+  const w = ready();
+  withFollowersAndMap(w);
+
+  const r = bump(w, '--json');
+
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  const staged = ['engine.config.json', CORPUS_DIR, ...PIN_FOLLOWERS, MAP_PATH];
+  assert.deepEqual(out.staged, staged, 'the report does not list what the bump staged');
+  assert.deepEqual(git(['diff', '--cached', '--name-only'], w.root).trim().split('\n').sort(), [...staged].sort());
+  for (const p of PIN_FOLLOWERS) {
+    assert.ok(read(w.root, p).includes(upstream.tip.slice(0, 12)), `${p}: does not carry the new pin`);
+    assert.ok(!read(w.root, p).includes(upstream.pin.slice(0, 12)), `${p}: still carries the old pin`);
+  }
+  assert.ok(read(w.root, MAP_PATH).includes(upstream.tip) && !read(w.root, MAP_PATH).includes(upstream.pin), 'the map is not at the new pin');
+  assert.equal(mapTool(w, '--check').status, 0, 'the generator calls the bump\'s map stale');
+  const fenced = out.prBody.split('```')[1].trim().split('\n');
+  assert.match(fenced[fenced.length - 1],
+    /^staged: engine\.config\.json, vendor\/ServiceNowDocs, .*tests\/fixtures\/doctor\/status-live\.json, vendor\/docs-map\.md — review, then: /);
+});
+
+test('ARC-09-C280 — a dry run puts the files that follow the pin and the map back too, not just the pin', () => {
+  const w = ready();
+  withFollowersAndMap(w);
+  const before = Object.fromEntries([...PIN_FOLLOWERS, MAP_PATH].map((f) => [f, read(w.root, f)]));
+
+  const r = bump(w, '--dry-run');
+
+  assert.match(r.stdout, /dry run — tree restored, porcelain empty, nothing staged/);
+  for (const [f, text] of Object.entries(before)) assert.equal(read(w.root, f), text, `${f} was left modified`);
+  assert.equal(git(['status', '--porcelain'], w.root).trim(), '');
+});
+
+test('ARC-09-C280 — a map the generator will not write is reported before the staged line, and the rest is still staged', () => {
+  const w = ready();
+  withFollowersAndMap(w);
+  // The generator refuses a sparse corpus (exit 2): the map is made from the whole corpus at the pin.
+  git(['sparse-checkout', 'set', '--cone', 'markdown/alpha'], join(w.root, CORPUS_DIR));
+  assert.ok(!existsSync(join(w.root, CORPUS_DIR, 'markdown/beta')), 'the cone did not leave beta out');
+  const mapBefore = read(w.root, MAP_PATH);
+
+  const r = bump(w, '--json');
+
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  assert.equal(out.map, 'refused', 'the report says nothing about the corpus map');
+  assert.equal(read(w.root, MAP_PATH), mapBefore, 'a map the generator refused was touched');
+  assert.deepEqual(out.staged, ['engine.config.json', CORPUS_DIR, ...PIN_FOLLOWERS]);
+  const fenced = out.prBody.split('```')[1].trim().split('\n');
+  assert.match(fenced.at(-2), /^map: vendor\/docs-map\.md was NOT regenerated/);
+  assert.match(fenced.at(-1), /^staged: /);
+});
+
+test('ARC-09-C280 — a follower that no longer quotes the pin is reported before the staged line', () => {
+  const w = ready();
+  writeFollowers(w.root, upstream.pin, { except: [PIN_FOLLOWERS[0]] });
+  mkdirSync(dirname(join(w.root, PIN_FOLLOWERS[0])), { recursive: true });
+  writeFileSync(join(w.root, PIN_FOLLOWERS[0]), '# fixture\n\nreworded, and it names no pin\n');
+  git(['add', '-A'], w.root);
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'followers'], w.root);
+
+  const r = bump(w, '--json');
+
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  assert.equal(out.followers?.[PIN_FOLLOWERS[0]], 'lost', 'the report says nothing about the files that follow the pin');
+  assert.ok(!out.staged.includes(PIN_FOLLOWERS[0]));
+  const fenced = out.prBody.split('```')[1].trim().split('\n');
+  assert.match(fenced.at(-2), new RegExp(`^pin: ${PIN_FOLLOWERS[0].replaceAll('.', '\\.')} carries neither`));
+  assert.match(fenced.at(-1), /^staged: /);
+});
+
+/**
+ * ARC-09-C283 — a bump says whether the install page's corpus figures still hold.
+ *
+ * Nothing on the page follows the corpus, and the bump has both in front of it: the fresh corpus on disk and `docs/INSTALL.md` in the
+ * tree. The body's checklist gets one line with the corpus's files, areas and working tree next to the page's, so a stale page is
+ * visible at the bump and not a month later (ARC-09-C279 found it at 56 areas and 51,665 files against 54 and 51,186).
+ */
+/** The corpus as the bump left it, counted here by walking the disk, not by the code under test. */
+function corpusNow(w) {
+  const dir = join(w.root, CORPUS_DIR);
+  let files = 0, bytes = 0;
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      if (e.name === '.git') continue;
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.isFile()) { files += 1; bytes += statSync(p).size; }
+    }
+  };
+  walk(dir);
+  const areas = readdirSync(join(dir, 'markdown'), { withFileTypes: true }).filter((e) => e.isDirectory()).length;
+  return { files, areas, workingTreeMb: Math.round(bytes / 1e6) };
+}
+const commitAll = (w, message) => {
+  git(['add', '-A'], w.root);
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', message], w.root);
+};
+
+test('ARC-09-C283 — a bump prints the corpus figures next to a stale page\'s, and a page that holds gets a checked line', () => {
+  const w = ready();
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: 99, files: 99999, mb: 5 }));
+  commitAll(w, 'a stale page');
+
+  const first = bump(w, '--json');
+  assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  const corpus = corpusNow(w);
+  assert.deepEqual(out.figures?.corpus, corpus, 'the report does not carry the corpus figures, or they are not what is on disk');
+  assert.deepEqual(out.figures?.page, { areas: 99, files: 99999, workingTreeMb: 5 });
+  const lead = out.prBody.split('```')[0].split('\n');
+  const line = lead.find((l) => l.includes('install page figures'));
+  assert.ok(line, `the checklist has no install page figures line:\n${lead.join('\n')}`);
+  assert.ok(line.startsWith('- [ ] install page figures differ from the corpus'), line);
+  for (const part of [`files ${corpus.files.toLocaleString('en-US')} (page: 99,999)`, `areas ${corpus.areas} (page: 99)`,
+    `working tree ${corpus.workingTreeMb} MB (page: 5 MB)`]) assert.ok(line.includes(part), `${part} is not in: ${line}`);
+
+  // The page is brought up to the corpus, and the same bump, with nothing left to move, says so. The report file is the run's own
+  // output and not a change, so it goes before the commit: a bump refuses a tree that is not clean.
+  rmSync(join(w.root, 'bump.json'));
+  commitAll(w, 'bumped');
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: corpus.areas, files: corpus.files, mb: corpus.workingTreeMb }));
+  commitAll(w, 'the page follows');
+  const second = bump(w, '--json');
+  assert.equal(second.status, 0, `${second.stdout}${second.stderr}`);
+  const again = JSON.parse(read(w.root, 'bump.json'));
+  assert.equal(again.from, again.to, 'the second bump moved after all — this proves nothing');
+  assert.ok(again.prBody.split('```')[0].includes(
+    `- [x] install page figures match the corpus: ${corpus.files.toLocaleString('en-US')} files · ${corpus.areas} areas · ${corpus.workingTreeMb} MB working tree`),
+  again.prBody.split('```')[0]);
+});
+
+test('ARC-09-C283 — a tree with no install page says it did not check, and the report still carries the corpus', () => {
+  const w = ready();
+  const r = bump(w, '--json');
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  assert.equal(out.figures?.page, null, 'the report says nothing about the page');
+  assert.deepEqual(out.figures?.corpus, corpusNow(w));
+  assert.ok(out.prBody.includes('- [ ] install page figures not checked: there is no docs/INSTALL.md in this tree'));
 });
 
 /**

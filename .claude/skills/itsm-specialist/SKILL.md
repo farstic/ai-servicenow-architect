@@ -158,7 +158,7 @@ For each table:
 
 **Citation:** `markdown/it-service-management/<process>-data-model.md` or relevant per-process page.
 
-**Always evaluate, for a request about an audit trail or an escalation record (ARC-09-C161).** Part 2 names each of these, says what it records, and says whether it serves the need and why, before Part 3 decides:
+**Always evaluate, for a request about an audit trail or an escalation record.** Part 2 names each of these, says what it records, and says whether it serves the need and why, before Part 3 decides:
 - journal fields — the work notes and comments a record keeps [`sys_journal_field`] *(citation: `markdown/platform-administration/c_JournalFields.md`)*;
 - audit history — Audit [`sys_audit`], History Sets [`sys_history_set`] and History [`sys_history_line`] *(citation: `markdown/platform-security/c_DiffBtwnAuditHistSets.md`)*;
 - SLA records — Task SLA [`task_sla`] and SLA Definition [`contract_sla`] *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*;
@@ -356,7 +356,7 @@ After Technical Designer returns a spec for an ITSM-tagged design, you are re-di
 
 4. **Anti-pattern check.** Does the spec contain any anti-pattern from your Part 5 list? Each hit is a §1.1 violation.
 
-**What the review returns — exactly one of two (ARC-09-C160).** It answers one question: does the artefact keep this Envelope — its tables, fields and state values, and its Part 3 verdict? It is not a code review. Style, performance, security and quality are the Code Reviewer's, which the Architect proposes separately at Phase 2 Step 5.
+**What the review returns — exactly one of two.** It answers one question: does the artefact keep this Envelope — its tables, fields and state values, and its Part 3 verdict? It is not a code review. Style, performance, security and quality are the Code Reviewer's, which the Architect proposes separately at Phase 2 Step 5.
 
 - **Cleared** — every check above holds. Name the Envelope the artefact was checked against.
 - **§1.1 violation (what, where)** — one line for each deviation: the construct, where in the artefact it is, and the part of the Envelope it breaks (a table, field, scope or state value the Envelope does not carry, a baseline construct replaced, or a Part 5 anti-pattern). The artefact goes back to its builder with these lines as the brief, and the review runs again on what returns (CLAUDE.md Phase 2 Steps 3 and 4).

@@ -1,7 +1,6 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PROBE_FIELDS } from '../../src/servicenow/probes.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { LIVE, ALLOW_WRITES, hasOauth, liveConfig, type LiveConfig } from './env.js';
 import { findSecret, redact } from './redact.js';
+import { expectedProbeText } from './probe-text.js';
 import { ptyAvailable, runInPty, stdinPayload } from '../helpers/pty.js';
 import { trackTempDir } from '../helpers/server-child.js';
 import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
@@ -133,17 +133,14 @@ describe.skipIf(!ready)('ARC-07-S11 live E2E — the wizard against a real insta
       // rather than asserted: an instance without Now Assist is not a failing test.
       const entry = (readStore() as unknown as { instances: Record<string, { lastProbe: Record<string, string> }> })
         .instances.e2e;
-      // ARC-07-C8 — THE LABEL COMES FROM THE PRODUCT, the value from the store, and they are not
-      // the same string. `PROBE_FIELDS` derives `label` from the FLAG name (`NOW_ASSIST_ENABLED` →
-      // `now_assist`) and carries `key` as the store field (`nowAssist`). This retyped the key as
-      // though it were the label, so it asserted `nowAssist ok` against a line that says
-      // `now_assist ok` — and it failed on the first nightly that ever ran against the branch under
-      // development. A test that spells a label the product renders from a constant is the
-      // `sortTags` shape: one definition, a second writer, and nothing to notice until they differ.
+      // ARC-09-C278 — THE EXPECTED TEXT IS THE PRODUCT'S OWN RENDERING. ARC-07-C8 took the label from
+      // `PROBE_FIELDS` and wrote the rest of the line here, as `<label> <stored value>`; ARC-07-W16 had made
+      // `probeFieldText` the one renderer by then, so the case asserted `now_assist ok` against a line that
+      // says `now_assist: ok`, and a spelling kept in the test could not follow a change made in the product.
+      // `expectedProbeText` asks the renderer, and `probe-text.test.ts` holds it against the wizard's line
+      // without an instance.
       for (const key of ['nowAssist', 'fluent'] as const) {
-        const field = PROBE_FIELDS.find((f) => f.key === key);
-        expect(field, `PROBE_FIELDS no longer carries ${key}`).toBeDefined();
-        expect(run.output).toContain(`${field!.label} ${entry?.lastProbe?.[key]}`);
+        expect(run.output).toContain(expectedProbeText(key, entry?.lastProbe));
       }
 
       expect(findSecret(run.output, c()), 'the transcript leaked a secret').toBeNull();

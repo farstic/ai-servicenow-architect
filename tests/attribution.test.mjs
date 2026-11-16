@@ -53,9 +53,9 @@ test('the install figures are attributed to a measurement, not asserted from now
   // default and measured it on all three platforms in one `docs-real.yml` run: the tree you read against the tree
   // plus `.git` the disk loses, both attributed to that measurement.
   assert.match(readme, /about 490 MB on disk/);
-  assert.match(readme, /293 MB on Linux and macOS/);
-  assert.match(readme, /51,665 files/);
-  assert.match(readme, /measured\s+2026-10-30\s+by\s+`docs-real\.yml`/);
+  assert.match(readme, /286 MB on Linux and macOS/);
+  assert.match(readme, /51,186 files/);
+  assert.match(readme, /measured\s+2026-11-15\s+by\s+`docs-real\.yml`/);
 });
 
 test('NOTICE claims only what the checkout enforces', () => {

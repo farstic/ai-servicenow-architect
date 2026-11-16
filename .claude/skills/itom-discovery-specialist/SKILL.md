@@ -469,7 +469,7 @@ You fire twice per ITOM-tagged request. Second fire is post-build review.
 
 **Check 4 — Anti-pattern check.** Spec violates any Part 5 anti-pattern?
 
-**What the review returns — exactly one of two (ARC-09-C160).** It answers one question: does the artefact keep this Envelope — its tables, fields and state values, and its Part 3 verdict? It is not a code review. Style, performance, security and quality are the Code Reviewer's, which the Architect proposes separately at Phase 2 Step 5.
+**What the review returns — exactly one of two.** It answers one question: does the artefact keep this Envelope — its tables, fields and state values, and its Part 3 verdict? It is not a code review. Style, performance, security and quality are the Code Reviewer's, which the Architect proposes separately at Phase 2 Step 5.
 
 - **Cleared** — every check above holds. Name the Envelope the artefact was checked against.
 - **§1.1 violation (what, where)** — one line for each deviation: the construct, where in the artefact it is, and the part of the Envelope it breaks (a table, field, scope or state value the Envelope does not carry, a baseline construct replaced, or a Part 5 anti-pattern). The artefact goes back to its builder with these lines as the brief, and the review runs again on what returns (CLAUDE.md Phase 2 Steps 3 and 4).
