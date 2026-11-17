@@ -46,7 +46,7 @@ test('ARC-09-C290 — a Windows guide\'s files and working tree are read from it
 
 test('ARC-09-C290 — a guide that does not state a figure in that shape gives null for it, never a guess', () => {
   assert.deepEqual(figures.windowsPageFigures('# Install\n\nthe corpus is big\n'), { files: null, pages: null, workingTreeMb: null });
-  const noScreen = figures.windowsPageFigures(markdown({ files: 51186, pages: 51178, mb: 293 }).replace('[docs] ', ''));
+  const noScreen = figures.windowsPageFigures(markdown({ files: 51186, pages: 51178, mb: 293 }).replaceAll('[docs] ', ''));
   assert.deepEqual(noScreen, { files: null, pages: 51178, workingTreeMb: null });
   const noSentence = figures.windowsPageFigures(markdown({ files: 51186, pages: 51178, mb: 293 }).replace('downloads all', 'downloads'));
   assert.deepEqual(noSentence, { files: 51186, pages: null, workingTreeMb: 293 });

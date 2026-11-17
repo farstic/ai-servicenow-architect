@@ -18,7 +18,8 @@ import { CORPUS_DIR, EXIT, SyncError } from '../tools/snowarch/lib/docs/sync.mjs
 import { syncUpstream, formatUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { follow } from './lib/pin-followers.mjs';
-import { figuresChecklist, pageFigures } from './lib/page-figures.mjs';
+import { figuresChecklist, installWindowsMb, pageFigures, windowsChecklist, windowsPageFigures } from './lib/page-figures.mjs';
+import { diskPages } from '../tools/snowarch/lib/docs/resolve.mjs';
 import { docsStatus } from '../tools/snowarch/lib/docs/status.mjs';
 import { megabytes } from '../tools/snowarch/lib/size.mjs';
 
@@ -49,9 +50,20 @@ function figuresOf(root) {
   const corpus = status.present && status.fileCount !== null
     ? { files: status.fileCount, areas: status.areaCount, workingTreeMb: megabytes(status.sizeBytes) }
     : null;
-  const file = join(root, 'docs', 'INSTALL.md');
-  return { corpus, page: existsSync(file) ? pageFigures(readFileSync(file, 'utf8')) : null };
+  const read = (rel) => { const file = join(root, rel); return existsSync(file) ? readFileSync(file, 'utf8') : null; };
+  const install = read('docs/INSTALL.md');
+  // ARC-09-C290 — the Windows guides state the corpus too: its files and its pages as the corpus has them (the pages as the names index counts them,
+  // `docs lookup`'s `pages=`), and the Windows working tree as the install page gives it, which no Linux checkout can measure.
+  const windows = {
+    corpus: corpus ? { files: corpus.files, pages: diskPages(join(root, CORPUS_DIR)).length } : null,
+    workingTreeMb: install === null ? null : installWindowsMb(install),
+    guides: WINDOWS_GUIDES.map((file) => { const text = read(file); return { file, figures: text === null ? null : windowsPageFigures(text) }; }),
+  };
+  return { corpus, page: install === null ? null : pageFigures(install), windows };
 }
+
+/** The two guides that show the corpus's figures on an example screen (ARC-09-C290). */
+const WINDOWS_GUIDES = ['docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html'];
 
 /**
  * The lines for what did not follow the pin: a file that quotes neither pin (reworded since, so there is nothing to
@@ -88,6 +100,8 @@ export function prBody(report) {
     '- [ ] release notes skimmed: `vendor/ServiceNowDocs/markdown/release-notes/`',
     // ARC-09-C283 — whether the install page's corpus figures still hold, from the corpus this bump just checked out.
     ...figuresChecklist(report.figures ?? { corpus: null, page: null }),
+    // ARC-09-C290 — and whether the Windows guides' figures hold: the same corpus, and the Windows working tree of the install page.
+    ...windowsChecklist({ corpus: report.figures?.windows?.corpus ?? null, windows: report.figures?.windows ?? null }),
     '',
     '```',
     shown.join('\n'),
