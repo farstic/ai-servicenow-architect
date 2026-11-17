@@ -513,3 +513,84 @@ test('AC 5 — both PR paths pass the computed labels, so an existing PR gains i
   assert.match(wf, /gh pr edit "\$existing" --body-file body\.md --add-label "\$labels"/);
   assert.match(wf, /--body-file body\.md --label "\$labels"/);
 });
+
+/**
+ * ARC-09-C290 — a bump says whether the Windows guides' corpus figures hold. The two guides show a real run of the bootstrap (`[docs] <files> files ·
+ * <n> MB working tree`, a Windows run's) and say how many pages the Architect reads; they were left on the old pin when the install page moved
+ * (ARC-09-C279), and the bump read only the install page. The files are the corpus's, the pages are counted as the names index counts them, and the
+ * working tree is the install page's own figure for Windows, which no Linux checkout can measure.
+ */
+/** The pages of the corpus as the bump left it: the `.md` files below an area folder, counted here by walking the disk, not by the code under test. */
+function pagesNow(w) {
+  const md = join(w.root, CORPUS_DIR, 'markdown');
+  let pages = 0;
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.isFile() && e.name.endsWith('.md')) pages += 1;
+    }
+  };
+  for (const e of readdirSync(md, { withFileTypes: true })) if (e.isDirectory()) walk(join(md, e.name));
+  return pages;
+}
+const commas = (n) => n.toLocaleString('en-US');
+const windowsGuide = ({ files, pages, mb }) => `On screen:\n\n\`\`\`\n[docs] ${commas(files)} files · ${mb} MB working tree\n\`\`\`\n\nThis downloads all ${commas(pages)} pages of ServiceNow documentation.\n`;
+
+test('ARC-09-C290 — a bump says, for each Windows guide, whether it states the corpus\'s files and pages and the install page\'s Windows working tree', () => {
+  const w = ready();
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  // The guides are stale: the install page says 5 MB on Linux and so 12 on Windows, a guide says 99,999 files, and the other says nothing that is right.
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: 99, files: 99999, mb: 5 }));
+  writeFileSync(join(w.root, 'docs', 'INSTALL-WINDOWS.md'), windowsGuide({ files: 99999, pages: 99990, mb: 11 }));
+  writeFileSync(join(w.root, 'docs', 'AI-Architect-Windows-Install-Guide.html'), 'a guide that states no figure\n');
+  commitAll(w, 'stale guides');
+
+  const first = bump(w, '--json');
+  assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  const corpus = corpusNow(w);                                              // after the bump: the report measures the corpus it left
+  const pages = pagesNow(w);
+  assert.notEqual(pages, corpus.files, 'precondition: the fixture corpus has a file that is no page, or this proves nothing about counting pages');
+  assert.deepEqual(out.figures?.windows?.corpus, { files: corpus.files, pages }, `the report does not carry the corpus's files and pages: ${JSON.stringify(out.figures?.windows)}`);
+  assert.equal(out.figures?.windows?.workingTreeMb, 12, 'the report does not carry the install page\'s Windows working tree');
+  const lead = out.prBody.split('```')[0].split('\n');
+  const stale = lead.find((l) => l.includes('docs/INSTALL-WINDOWS.md figures'));
+  assert.ok(stale?.startsWith('- [ ] docs/INSTALL-WINDOWS.md figures differ from the corpus: '), `no differing line for the Markdown guide:\n${lead.join('\n')}`);
+  for (const part of [`files ${commas(corpus.files)} (guide: 99,999)`, `pages ${commas(pages)} (guide: 99,990)`, 'Windows working tree 12 MB (guide: 11 MB)']) {
+    assert.ok(stale.includes(part), `${part} is not in: ${stale}`);
+  }
+  assert.ok(lead.includes('- [ ] docs/AI-Architect-Windows-Install-Guide.html figures not checked: it does not state the files, the pages and the working tree where the bump reads them'),
+    `no line for the guide that states nothing:\n${lead.join('\n')}`);
+
+  // The install page and the guides follow the corpus, and the same bump, with nothing left to move, says so for both.
+  rmSync(join(w.root, 'bump.json'));
+  commitAll(w, 'bumped');
+  const windowsMb = corpus.workingTreeMb + 7;                               // the fixture install page gives Windows 7 MB more than Linux
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: corpus.areas, files: corpus.files, mb: corpus.workingTreeMb }));
+  writeFileSync(join(w.root, 'docs', 'INSTALL-WINDOWS.md'), windowsGuide({ files: corpus.files, pages, mb: windowsMb }));
+  writeFileSync(join(w.root, 'docs', 'AI-Architect-Windows-Install-Guide.html'), windowsGuide({ files: corpus.files, pages, mb: windowsMb }));
+  commitAll(w, 'the guides follow');
+  const second = bump(w, '--json');
+  assert.equal(second.status, 0, `${second.stdout}${second.stderr}`);
+  const again = JSON.parse(read(w.root, 'bump.json'));
+  assert.equal(again.from, again.to, 'the second bump moved after all — this proves nothing');
+  const held = again.prBody.split('```')[0].split('\n');
+  for (const file of ['docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html']) {
+    assert.ok(held.includes(`- [x] ${file} figures match the corpus: ${commas(corpus.files)} files · ${commas(pages)} pages · ${windowsMb} MB working tree`), `no checked line for ${file}:\n${held.join('\n')}`);
+  }
+});
+
+test('ARC-09-C290 — a tree with no Windows guide says it did not check, for each guide', () => {
+  const w = ready();
+  const corpus = corpusNow(w);
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: corpus.areas, files: corpus.files, mb: corpus.workingTreeMb }));
+  commitAll(w, 'the install page only');
+  const r = bump(w, '--json');
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  const lead = JSON.parse(read(w.root, 'bump.json')).prBody.split('```')[0].split('\n');
+  for (const file of ['docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html']) {
+    assert.ok(lead.includes(`- [ ] ${file} figures not checked: there is no ${file} in this tree`), `no line for ${file}:\n${lead.join('\n')}`);
+  }
+});
