@@ -417,10 +417,10 @@ withInstall('ARC-09-C267 lever 2 — the hook reads its classes file as data: no
   asked(await run('{"blocking": ["citedUnread"]}'), PAGE.alpha);
 });
 
-withInstall('ARC-09-C267 lever 2 — as shipped: the data file names citedUnread, and a cited page that nothing read is asked about', async (t, i) => {
+withInstall('ARC-09-C267 lever 2 — as shipped: the data file names citedUnread (and, since ARC-09-C291, unsupportedName), and a cited page that nothing read is asked about', async (t, i) => {
   const { readFileSync } = await import('node:fs');
   const data = JSON.parse(readFileSync(new URL('../../tools/snowarch/lib/docs/grounding-classes.json', import.meta.url), 'utf8'));
-  assert.deepEqual(data.blocking, ['citedUnread']);
+  assert.deepEqual(data.blocking, ['citedUnread', 'unsupportedName']);
   asked(await stop(t, { rows: [], message: cite(PAGE.alpha), shipped: true }), PAGE.alpha);
   silent(await stop(t, { rows: bash('b', `cat ${i.abs(PAGE.alpha)}`), message: cite(PAGE.alpha), shipped: true }), 'read by cat');
   silent(await stop(t, { rows: [], message: 'Sure, here is the plan in plain words.', shipped: true }), 'nothing cited');
