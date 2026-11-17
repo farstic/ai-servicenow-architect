@@ -58,6 +58,13 @@ unreadable file, switches the grounding asks off. No `CLAUDE.md`, skill or agent
 continuation about 1.1 s; the first build took 2.4 to 3.9 s, and 10 s for the continuation. The names that a session's pages print, which were nearly all of
 that time, are now collected only for a class that asks for them. On the architect's sitting of 150 interleaved sessions (none failed), never-opened citations fell from 48 to 5, blind support rose from 82.1 % to 83.6 %, and every guard held: no dead path, no invented name, no verdict changed by an ask, a median time of 83.1 s against 86.0 s, at most one ask in a turn, and no false "never opened" claim. A search (`grep`, `rg`, `Select-String`) shows a page it names only when its result holds a line of that page, so a multi-file grep that matched nothing in one of its files, and a pattern that missed the page's markdown escapes, no longer count as reading it.
 
+**The Windows install guides show the corpus of the current pin.** `docs/INSTALL-WINDOWS.md` and `docs/AI-Architect-Windows-Install-Guide.html` still showed a
+run at the old pin (`[docs] 51,665 files · 299 MB working tree`, "all 51,665 pages") after the install page moved to 54 areas, 51,186 files and a 293 MB
+Windows working tree (ARC-09-C279), because the check of ARC-09-C283 read only the install page. They now say 51,186 files and 293 MB on the screen and 51,178
+pages in the sentence, the pages as `docs lookup` counts them (the corpus has 8 more files that are no page), and the example screens show the 96d3212 pin. A docs bump reads both guides as it reads the
+install page and says in its pull request which of their figures differ from the corpus and from the install page's Windows working tree, and a standing
+test holds the real guides to `docs/INSTALL.md` (ARC-09-C290).
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -138,6 +145,8 @@ that time, are now collected only for a class that asks for them. On the archite
   that ran it because its inputs had moved (a changed `.claude/settings.json`, say) printed
   `release manifest: could not be reached` with the licences repository out of reach, though the manifest was held and E-32
   verified, and with the repository reachable it fetched the manifest again and rewrote the cache (ARC-09-C268).
+- The two Windows install guides state the corpus of the current pin: 51,186 files and a 293 MB working tree on the example screen and 51,178 pages in the
+  sentence under it, where they said 51,665 and 299 MB, and their example screens show the 96d3212 pin. A docs bump now checks both guides against the corpus and the install page (ARC-09-C290).
 
 ## 2.2.6 — 2026-11-15
 
