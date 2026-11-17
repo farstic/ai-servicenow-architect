@@ -387,7 +387,7 @@ On screen:
 release manifest: v2.2.5 fetched (473 files)
 [B01/09] workspace … ok (4 s)
 [docs] checkout --detach c10276e … 89.9 s
-[docs] 51,665 files · 299 MB working tree
+[docs] 51,186 files · 293 MB working tree
 citations: checked: 588 | dead: 0
 [B02/09] docs … ok (147 s)
 [B03/09] mode … ok (0.0 s)
@@ -396,7 +396,7 @@ citations: checked: 588 | dead: 0
 [B05/09] tool list … ok (0.0 s)
 ```
 
-This downloads all 51,665 pages of ServiceNow documentation that the Architect reads before it answers. The screen can sit still for a minute or two. Let it run. In our test it took two and a half minutes.
+This downloads all 51,178 pages of ServiceNow documentation that the Architect reads before it answers. The screen can sit still for a minute or two. Let it run. In our test it took two and a half minutes.
 
 ### 6d · The instance wizard: seven questions
 
