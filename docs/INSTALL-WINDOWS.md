@@ -386,7 +386,7 @@ On screen:
 ```
 release manifest: v2.2.5 fetched (473 files)
 [B01/09] workspace … ok (4 s)
-[docs] checkout --detach c10276e … 89.9 s
+[docs] checkout --detach 96d3212 … 89.9 s
 [docs] 51,186 files · 293 MB working tree
 citations: checked: 588 | dead: 0
 [B02/09] docs … ok (147 s)
@@ -640,7 +640,7 @@ On screen after step 3:
 Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
 Licence: ok · LIC-2026-0000 · until 2026-12-31
 Integrity: verified · v2.2.5 · 473 files
-Docs: vendor/ServiceNowDocs @ c10276e95345 (australia) · full
+Docs: vendor/ServiceNowDocs @ 96d32129bb43 (australia) · full
 ```
 
 > **You are done.** The AI Architect is installed, licensed and connected. The User Guide in your folder, `docs\USER-GUIDE.md`, shows how to work with it, with examples for analysts, architects and developers.
