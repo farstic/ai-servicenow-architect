@@ -56,7 +56,7 @@ continuation stays open until a page is read, by any route the ask counted, or a
 closes nothing; it lists no item that the ask did not name (the first twelve it listed, and a count of the rest). `tools/snowarch/lib/docs/grounding-classes.json` decides what may ask: it names `citedUnread` only, and an empty list, or a missing or
 unreadable file, switches the grounding asks off. No `CLAUDE.md`, skill or agent changes. On a 63 MB session file the hook takes 0.5 to 1.1 s, and the
 continuation about 1.1 s; the first build took 2.4 to 3.9 s, and 10 s for the continuation. The names that a session's pages print, which were nearly all of
-that time, are now collected only for a class that asks for them.
+that time, are now collected only for a class that asks for them. On the architect's sitting of 150 interleaved sessions (none failed), never-opened citations fell from 48 to 5, blind support rose from 82.1 % to 83.6 %, and every guard held: no dead path, no invented name, no verdict changed by an ask, a median time of 83.1 s against 86.0 s, at most one ask in a turn, and no false "never opened" claim. A search (`grep`, `rg`, `Select-String`) shows a page it names only when its result holds a line of that page, so a multi-file grep that matched nothing in one of its files, and a pattern that missed the page's markdown escapes, no longer count as reading it.
 
 ### Added
 
@@ -79,7 +79,7 @@ that time, are now collected only for a class that asks for them.
   adds the glob and brace words of an unresolved call, a folder reset before each call of a sub-agent, an input cut short that asks nothing, a glob
   budget for each pattern, a notice that closes a page by the rules of the ask, and a bare file name as a citation. The second review adds a name filter of
   any search read as written, a folder fed to a viewer, a script the turn wrote and ran, a client file named like a page, a notice that lists what the ask listed,
-  and a call that only lists.
+  and a call that only lists. The architect's sitting measured it on 150 sessions: never-opened citations 48 against 5, blind support 82.1 % against 83.6 %, every guard held. A search verb shows a page it names only when its result holds a line of that page.
 
 ### Changed
 

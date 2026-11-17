@@ -476,6 +476,13 @@ const silentSearch = (words, powershell) => words.some((w) => (powershell
   ? /^-quiet$/i.test(w)
   : SILENT_LONG.has(w) || (/^-[A-Za-z0-9]+$/.test(w) && /[clLq]/.test(w))));
 
+/**
+ * Whether a search is given a flag that changes what it prints from the lines of the page to something else (`-o` prints the match, `rg -r` the replacement, `--json` a record).
+ * What such a search printed cannot be compared with the page, so it shows the page as it did before B8, unless it printed nothing at all.
+ */
+const printsOtherThanLines = (key, words, powershell) => !powershell && words.some((w) => w === '--only-matching' || w === '--json' || w === '--passthru'
+  || (/^-[A-Za-z0-9]+$/.test(w) && w.includes('o')) || (key === 'rg' && (w === '-r' || w === '--replace' || w.startsWith('--replace='))));
+
 // What cannot be resolved from the words of a call: the call is then returned as text (`unresolved`), for the names rule.
 /** Loops, and the commands that run what they are given or read it from a pipe or a list. */
 const LOOPS = new Set(['for', 'while', 'until', 'select']);
@@ -791,7 +798,14 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
   const printing = [];                                             // the name filters of each search under the corpus that prints lines: `searchPatterns` (B3)
   const runs = new Set();                                          // the base names of the files the call runs (read-routes.mjs, `ranFiles`)
   const segInfo = [];                                              // the words of each segment and the folder it ran in, for the patterns of a call left unresolved
-  const add = (page, verb) => { if (!reads.has(page)) reads.set(page, verb); };
+  const whole = new Set();                                         // the pages that some whole-file viewer (cat, sed, head…) names; the others are named by searches only (B8)
+  const odd = new Set();                                           // the pages named by a search whose output is not the lines of the page (`grep -o`)
+  let oddNow = false;
+  const add = (page, verb) => {
+    if (!isSearchVerb(verb)) whole.add(page);
+    if (oddNow) odd.add(page);
+    if (!reads.has(page)) reads.set(page, verb);
+  };
   /** A pattern word as the shell would have seen it: joined to the folder it ran in (those it knows), or as written when no folder is known or it is lost. */
   const addPattern = (word, folder, folderGone, asWritten = false) => {
     if (patterns.size >= 64 || word.length > MAX_WORD) return;
@@ -907,7 +921,9 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       if (dirs.length > 0) printing.push(named.filters.filter((f) => f.value.length <= MAX_WORD).slice(0, 16).map((f) => ({ w: posix(f.value), ci: f.ci, dirs })));
     }
     if (powershell && showsLines && files.length === 0 && seg.op === '|') { opaque = true; return; }       // Get-Content reads what the pipe gives it
+    oddNow = searchesFiles && printsOtherThanLines(key, rest.slice(1), powershell);
     for (const w of files) consider(powershell ? w : w.replace(/^<+/, ''), key);                          // cat <page.md
+    oddNow = false;
   });
   while (saved.length) [at, folderLost] = saved.pop();                // the line ended inside a subshell: its folder goes with it
   // B3 applies only when the filtered search is the call's only segment that prints (the replay, B4 (b)): alone, or fed into head, tail, cut, sort or uniq. Any other
@@ -948,7 +964,7 @@ export function commandReads(command, { powershell = false, cwd = null, rowCwd =
       for (const script of scripts) for (const token of patternsInText(script)) addPattern(token, null, true, true);
     }
   }
-  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer, runs: [...runs], patterns: [...patterns.values()], searchPatterns };
+  return { reads, cwd: at, lost: folderLost, moved, heredocs, searched, unresolved, viewer, runs: [...runs], patterns: [...patterns.values()], searchPatterns, searchOnly: [...reads.keys()].filter((page) => !whole.has(page)), odd: [...odd] };
 }
 
 /**
@@ -1036,6 +1052,10 @@ const OUTPUT_CAP = 500_000;
 const RAN = /^\s*Exit code\b/i;
 /** A line of a page shorter than this is no evidence that a result holds the page (a heading, a rule). */
 const MIN_EVIDENCE = 16;
+/** The shortest text of a result line that is compared with a page for a search (B8): shorter than a word or two, it would be any page's. */
+const MIN_PRINTED = 8;
+const MAX_RESULT_LINES = 600;
+const ANSI = /\x1b\[[0-9;]*[A-Za-z]/g;
 
 // ---- one thread of rows -----------------------------------------------------------------------------------------------------------------
 /** Tools that write a file, and the input fields that hold the text written. */
@@ -1082,16 +1102,37 @@ export function walkThread(rows, { glob = null, pageExists = null, pageText = nu
   const known = typeof pageExists === 'function' ? (page) => { if (!asked.has(page)) asked.set(page, Boolean(pageExists(page))); return asked.get(page); } : null;
   const onDisk = known ?? (() => false);
   const seams = known ? { pageExists: known } : {};
+  const bodies = new Map();
+  /** The text of a page (`pageText`, which the hook reads from the corpus folder, the first 200,000 characters), or null when there is none to compare with. */
+  const bodyOf = (page) => {
+    if (!bodies.has(page)) { const text = typeof pageText === 'function' ? pageText(page) : null; bodies.set(page, typeof text === 'string' ? text : null); }
+    return bodies.get(page);
+  };
   const evidence = new Map();
-  /** The lines of a page long enough to be evidence that a result holds it (B2); none without the page's text (`pageText`, which the hook reads from the corpus folder). */
+  /** The lines of a page long enough to be evidence that a result holds it (B2); none without the page's text. */
   const linesOf = (page) => {
     if (!evidence.has(page)) {
-      const text = typeof pageText === 'function' ? pageText(page) : null;
-      evidence.set(page, typeof text === 'string' ? text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= MIN_EVIDENCE).slice(0, 300) : []);
+      const text = bodyOf(page);
+      evidence.set(page, text === null ? [] : text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= MIN_EVIDENCE).slice(0, 300));
     }
     return evidence.get(page);
   };
   const holdsLineOf = (said, page) => linesOf(page).some((line) => said.includes(line));
+  const ownLines = new Map();
+  /**
+   * Did a search print a line of this page (B8)? A grep prints a whole line of the page after a prefix that depends on its flags (`path:N:`, `path-N-`, `N:`, `N-`, nothing, or
+   * a tab after a number), so a printed line holds a line of the page when it ENDS with it. A page with no text to compare with, or with no line long enough to compare, is not
+   * judged: a search that names it shows it, as it did before.
+   */
+  const printsLineOf = (said, page) => {
+    const body = bodyOf(page);
+    if (body === null) return true;
+    if (!ownLines.has(page)) ownLines.set(page, body.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length >= MIN_PRINTED));
+    const own = ownLines.get(page);
+    if (own.length === 0) return true;
+    const printed = said.replace(ANSI, '').split(/\r?\n/, MAX_RESULT_LINES).map((l) => l.trim()).filter((l) => l.length >= MIN_PRINTED);       // `--color=always` puts escapes in the line
+    return printed.some((line) => own.some((text) => line.endsWith(text)));
+  };
   const output = (b) => posix(textOfResult(b)).slice(0, OUTPUT_CAP);
   const reach = (page, route, at) => { if (!reached.has(page)) reached.set(page, { route, at }); };
   const keep = (into, list) => { for (const q of list) into.set(q.dir !== undefined ? `d\0${q.dir}` : `${q.ci}\0${q.w}\0${(q.dirs ?? []).join(',')}`, q); };
@@ -1148,6 +1189,13 @@ export function walkThread(rows, { glob = null, pageExists = null, pageText = nu
         const done = commandReads(input.command, { powershell: name === 'PowerShell', cwd, rowCwd: use.rowCwd, lost, glob });
         const shown = new Map(done.reads);
         const printed = done.searched.length ? pagesInLines(textOfResult(b), [...done.searched, use.rowCwd], seams) : new Set();
+        // A search shows a page it names only when its result holds a line of that page (the replay, B8): a multi-file grep that matched nothing in one of its files, and a
+        // pattern that missed the page's markdown escapes, printed none. A whole-file viewer keeps "named is shown"; so does a search printed in a shape that cannot be compared.
+        const said = textOfResult(b);
+        for (const page of done.searchOnly) {
+          if (done.odd.includes(page) && said.trim() !== '') continue;
+          if (said.trim() === '' ? bodyOf(page) !== null : !printsLineOf(said, page)) shown.delete(page);
+        }
         for (const page of printed) if (!shown.has(page)) shown.set(page, 'search');
         for (const [page, verb] of shown) reach(page, verb, use.at);
         // A search that printed lines with no file name (`grep -rh`, `rg -I`) names no page: its name filter does (B3).
