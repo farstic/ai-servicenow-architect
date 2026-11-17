@@ -23,7 +23,7 @@ const TEXT = {
   [SELF]: 'Self-service options for customers of CSM.\nCustomers can attach a file to a case from the portal.\nThey can also reopen a case that they closed.\n',
   [CASE]: 'Case management covers the whole life of a case.\nAn agent may attach a document when updating the case.\nThe case is closed when the customer accepts.\n',
   [AIA]: 'The agent tools are stored in sn\\_aia\\_tool and grouped by sn\\_aia\\_usecase and sn\\_aia\\_team.\n',
-  [RULES]: 'Assignment rules run in order.\n-   The task record must be unassigned before a rule applies.\nA rule never reassigns a task.\n',
+  [RULES]: 'Assignment rules run in order.\n-   The task record must be unassigned before a rule applies.\nA rule never reassigns a task.\nPriority 1.\n',
   [LONG]: `${Array.from({ length: 600 }, (_, k) => `Line ${k} of a long page that carries enough words.`).join('\n')}\n`,
   [TERSE]: 'A.\nB.\n',
 };
@@ -77,7 +77,8 @@ test('ARC-09-C267 B8 — whole-file viewers keep "named is shown", in either ord
     assert.deepEqual(reached(ran(`${viewer} c_AssignmentRulesModule.md`, '')), [RULES], viewer);
   }
   // a page that a viewer and a search both name is the viewer's, whichever comes first
-  assert.deepEqual(reached(ran('grep -n zzz c_AssignmentRulesModule.md; sed -n 1,2p c_AssignmentRulesModule.md', 'Assignment rules run in order.')), [RULES]);
+  // (the viewer's output is empty here, as a `sed -n 99,100p` past the end of the page is: the viewer names the page, and the page is shown by that alone)
+  assert.deepEqual(reached(ran('grep -n zzz c_AssignmentRulesModule.md; sed -n 99,100p c_AssignmentRulesModule.md', '')), [RULES]);
   assert.deepEqual(reached(ran('sed -n 1,2p c_AssignmentRulesModule.md; grep -n zzz c_AssignmentRulesModule.md', 'Assignment rules run in order.')), [RULES]);
   // with no page text to compare with, or a page with no line to compare, the search shows the page as it did
   assert.deepEqual(reached(ran('grep -n zzz c_AssignmentRulesModule.md', ''), { seam: false }), [RULES]);
@@ -87,6 +88,13 @@ test('ARC-09-C267 B8 — whole-file viewers keep "named is shown", in either ord
   assert.deepEqual(reached(ran('grep -on unassigned c_AssignmentRulesModule.md', '2:unassigned')), [RULES]);
   assert.deepEqual(reached(ran('grep --only-matching unassigned c_AssignmentRulesModule.md', 'unassigned')), [RULES]);
   assert.deepEqual(reached(ran('grep -on unassigned c_AssignmentRulesModule.md', '')), []);
+  // a printed line that merely holds a line of the page, with more after it, is not a grep's print of that line
+  assert.deepEqual(reached(ran('grep -n zzz c_AssignmentRulesModule.md', '9:Assignment rules run in order. And words after it.')), []);
+  // a short line of a page is evidence too
+  assert.deepEqual(reached(ran('grep -n "Priority 1" c_AssignmentRulesModule.md', '4:Priority 1.')), [RULES]);
+  // rg prints the replacement with -r, and a record with --json: not the lines of the page
+  assert.deepEqual(reached(ran('rg -r X unassigned c_AssignmentRulesModule.md', '2:-   The task record must be X before a rule applies.')), [RULES]);
+  assert.deepEqual(reached(ran('rg --json unassigned c_AssignmentRulesModule.md', '{"type":"match","data":{"line_number":2}}')), [RULES]);
   // `--color=always` puts escapes inside the line that is printed
   assert.deepEqual(reached(ran('grep --color=always -n unassigned c_AssignmentRulesModule.md', '2:-   The task record must be \x1b[01;31m\x1b[Kunassigned\x1b[m\x1b[K before a rule applies.')), [RULES]);
   // a match anywhere in a long page, and a context line, are the page's text
