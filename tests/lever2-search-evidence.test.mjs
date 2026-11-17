@@ -81,11 +81,14 @@ test('ARC-09-C267 B8 — whole-file viewers keep "named is shown", in either ord
   assert.deepEqual(reached(ran('sed -n 1,2p c_AssignmentRulesModule.md; grep -n zzz c_AssignmentRulesModule.md', 'Assignment rules run in order.')), [RULES]);
   // with no page text to compare with, or a page with no line to compare, the search shows the page as it did
   assert.deepEqual(reached(ran('grep -n zzz c_AssignmentRulesModule.md', ''), { seam: false }), [RULES]);
-  assert.deepEqual(reached(ran('grep -n zzz c_Terse.md', '')), [TERSE]);
+  assert.deepEqual(reached(ran('grep -n A c_Terse.md', '1:A.')), [TERSE]);
+  assert.deepEqual(reached(ran('grep -n zzz c_Terse.md', '')), [], 'a search that printed nothing shows no page');
   // an output whose shape is not the lines of the page (`-o` prints the match) shows the page, unless it printed nothing at all
   assert.deepEqual(reached(ran('grep -on unassigned c_AssignmentRulesModule.md', '2:unassigned')), [RULES]);
   assert.deepEqual(reached(ran('grep --only-matching unassigned c_AssignmentRulesModule.md', 'unassigned')), [RULES]);
   assert.deepEqual(reached(ran('grep -on unassigned c_AssignmentRulesModule.md', '')), []);
+  // `--color=always` puts escapes inside the line that is printed
+  assert.deepEqual(reached(ran('grep --color=always -n unassigned c_AssignmentRulesModule.md', '2:-   The task record must be \x1b[01;31m\x1b[Kunassigned\x1b[m\x1b[K before a rule applies.')), [RULES]);
   // a match anywhere in a long page, and a context line, are the page's text
   assert.deepEqual(reached(ran('grep -n "Line 450 " c_LongPage.md', '451:Line 450 of a long page that carries enough words.')), [LONG]);
   assert.deepEqual(reached(ran('grep -n -C1 "Line 450 " c_LongPage.md', '450-Line 449 of a long page that carries enough words.\n451:Line 450 of a long page that carries enough words.')), [LONG]);

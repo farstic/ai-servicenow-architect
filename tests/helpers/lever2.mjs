@@ -45,9 +45,10 @@ export const U = (content, extra = {}) => ({ type: 'user', message: { role: 'use
 export const use = (id, name, input, extra = {}) => A([{ type: 'tool_use', id, name, input }], extra);
 export const res = (id, content, extra = {}) => U([{ type: 'tool_result', tool_use_id: id, content, ...(extra.is_error ? { is_error: true } : {}) }]);
 // A shell call that ran and failed says "Exit code N" and holds the lines it printed before it failed (a page counts only if the result holds a line of it: tests/lever2-replay.test.mjs).
+// A search counts a page only if its result holds a line of it too (B8: tests/lever2-search-evidence.test.mjs), so a call that succeeded prints the fixture page's line as well.
 const PRINTED = '1\tThe sn\\_example table.';
 export const bash = (id, command, { error = false, extra = {} } = {}) => [use(id, 'Bash', { command, description: 'x' }, extra), res(id, error ? `Exit code 1\n${PRINTED}\ncat: missing.md: No such file or directory` : PRINTED, { is_error: error })];
-export const powershell = (id, command, extra = {}, { error = false } = {}) => [use(id, 'PowerShell', { command, description: 'x' }, extra), res(id, error ? `Exit code 1\n${PRINTED}\nGet-Content : Cannot find path` : '1\tThe table.', { is_error: error })];
+export const powershell = (id, command, extra = {}, { error = false } = {}) => [use(id, 'PowerShell', { command, description: 'x' }, extra), res(id, error ? `Exit code 1\n${PRINTED}\nGet-Content : Cannot find path` : PRINTED, { is_error: error })];
 export const readPage = (id, file, extra = {}) => [use(id, 'Read', { file_path: file }, extra), res(id, '1\tThe sn\\_example table.')];
 export const compaction = () => [{ type: 'system', subtype: 'compact_boundary', content: 'Conversation compacted' },
   U('This session is being continued from a previous conversation that ran out of context. Summary: ...', { isCompactSummary: true })];
