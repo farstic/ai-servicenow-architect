@@ -69,7 +69,7 @@ test holds the real guides to `docs/INSTALL.md` (ARC-09-C290).
 says that a page is opened with the Read tool at that folder plus the path printed below (`offset` and `limit` select lines); `--json` has the folder as
 `corpus`. The page lines are unchanged. A path the lookup printed is relative to the corpus, so a reader built the Read path or went into the folder with `cd` and
 read with `sed`, and a compound with a `cd` is what the permission rules of the C268 sitting refused: 15 of its 39 refused calls touched the corpus, 3 of them
-lookups run from inside it (ARC-09-C287).
+lookups run from inside it. On the architect's sitting the refused calls of the classes the line can reach fell from 18 to 12, corpus Reads rose 7 %, `cd`-into-corpus calls fell 9 % and shell reads 7 % (ARC-09-C287).
 
 ### Added
 
@@ -99,7 +99,7 @@ lookups run from inside it (ARC-09-C287).
 - The generated `.claude/settings.json` allows `./snowarch status` and `.\snowarch.cmd status` without a prompt, beside `docs lookup`: the generator's pair becomes
   a list of the two read-only commands that the instructions tell a session to run. 240 allow entries (ARC-09-C288).
 - `./snowarch docs lookup` prints `corpus: <folder>` under its header, once, as an absolute path in the platform's spelling, with how to open a page with the
-  Read tool, and `--json` has a `corpus` field; the page lines are unchanged and carry no folder. No allow entry, `CLAUDE.md` or skill changes (ARC-09-C287).
+  Read tool, and `--json` has a `corpus` field; the page lines are unchanged and carry no folder. No allow entry, `CLAUDE.md` or skill changes. Measured on the architect's sitting: the refused calls of the classes it can reach fell from 18 to 12 (ARC-09-C287).
 - The release writes the interactive Windows guide (`writeGuideRelease`, beside `writeInstallTag`): its clone command, and the `release` field its
   hero and help message read. A release candidate leaves the page alone, as it leaves the other pages, and a page without the field is refused. The
   page is in the signed manifest's coverage (`packages/snowarch/src/licence/integrity.ts`), so a distribution carries it, and `release.yml` attaches
