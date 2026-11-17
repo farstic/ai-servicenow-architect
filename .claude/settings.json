@@ -3,6 +3,8 @@
     "allow": [
       "Bash(./snowarch docs lookup *)",
       "PowerShell(.\\snowarch.cmd docs lookup *)",
+      "Bash(./snowarch status *)",
+      "PowerShell(.\\snowarch.cmd status *)",
       "mcp__servicenow__snow_agile_epics_index",
       "mcp__servicenow__snow_agile_scrum_tasks_index",
       "mcp__servicenow__snow_agile_stories_index",

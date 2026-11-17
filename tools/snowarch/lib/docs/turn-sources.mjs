@@ -1,0 +1,421 @@
+// Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
+// snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
+// ARC-09-C263 (M4) — what this session has actually READ, from the transcript Claude Code keeps.
+//
+// The Stop hook's grounding check (grounding-check.mjs) asks of every name and citation in an answer: did this session get it from a
+// corpus page it Read, a skill it loaded, something the user wrote, or a roster builder — or from nowhere? This file answers from the
+// session JSONL (`transcript_path`), and from nothing else. Its facts were measured at Claude Code 2.1.214, 2.1.309 and 2.1.318,
+// `claude -p` and interactive (tests/fixtures/transcripts/MANIFEST.json; the architect's P0 rulings of 2026-11-07):
+//
+//   - a row is classified by its text PREFIX, whether or not a flag is set: on disk a hook's injected row is `isMeta: true` with a
+//     string content, in stream-json `isSynthetic: true` with a text block. The flags are recorded and never required.
+//   - sub-agent rows are NOT in the main file (`<session>/subagents/agent-<id>.jsonl`, `isSidechain: true`); in stream-json they carry
+//     `parent_tool_use_id`. Both are dropped here, whatever the caller passes. A sub-agent's result reaches the main thread as the
+//     Agent tool's result, or — an async agent — as a `<task-notification>` user row, which also starts a turn.
+//   - at Stop the file holds every tool row and every earlier text block of the turn, but not the final text, which lands 50–130 ms
+//     later: the final reply is `last_assistant_message`, and the file's text blocks are the ones before it.
+//   - compaction writes a `system` row `compact_boundary`; every source before the LAST one stops grounding, whatever the trigger.
+//
+// WHAT COUNTS (the architect's table). read: a successful Read of a corpus page (only the lines returned, so offset and limit are
+// honoured); and, since ARC-09-C267, the same page shown by a Bash `cat`, `head`, `tail`, `sed`, `nl`, `less`, `more`, `awk` or `bat`, by
+// PowerShell's `Get-Content`, `gc` or `type`, or by the shell lines of an MCP call (its `command`, each `commands[].command`, its `code` in
+// shell), or named by the `path`, `file_path` or `paths` of an MCP call (the file tool of the context-mode server takes a `path`). skill: a
+// loaded skill body, a Read of a roster SKILL.md or EXAMPLES.md. named: the user's prompts, the always-loaded rules and governance read
+// from the checkout (given by the caller, never from api-request or prompt_snapshot rows), MCP results, Reads of client inputs.
+// builder: the result of a roster builder sub-agent. A saved Envelope: its own citations, and the names its cited pages print. NEVER a
+// source: assistant text, a non-roster agent's result, a Workflow result, a failed Read, Bash or PowerShell, a Glob, a Grep line, a shell
+// command that finds, lists or counts (`grep`, `rg`, `ls`, `find`, `wc`, `stat`) instead of showing a page, every row of our own hooks.
+//
+// PURE where it can be: `turnSources(rows, options)` does no I/O and reads no clock. `readTurnSources(path)` reads the file.
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { MB } from '../size.mjs';
+import { pageNames } from './name-rules.mjs';
+import { corpusRelative } from './resolve.mjs';
+import { commandReads, isSearchVerb, pagesOfInput, shellWords, walkThread } from './read-routes.mjs';
+
+export { pagesOfInput, shellWords };
+
+/** Over this many bytes a transcript is not read: the check runs on the reply alone. */
+export const MAX_TRANSCRIPT_BYTES = 64 * MB;
+
+/** The prefixes by which a user row is known, in the order tried. A flag never decides; the prefix does. */
+const PREFIXES = Object.freeze([
+  [/^Stop hook feedback:/, 'hook-feedback'],
+  [/ Do not mention this notice\.\s*$/, 'hook-notice'],
+  [/^Base directory for this skill:/, 'skill-body'],
+  [/^This session is being continued from a previous conversation/, 'compaction-summary'],
+  [/^<task-notification>/, 'task-notification'],
+  [/^<(?:local-command-caveat|local-command-stdout|local-command-stderr|command-name|command-message|command-args|bash-input|bash-stdout|bash-stderr|system-reminder)>/, 'command'],
+  [/^\[Request interrupted by user/, 'interrupt'],
+]);
+
+const FLAGS = ['isMeta', 'isSynthetic', 'isCompactSummary', 'isVisibleInTranscriptOnly'];
+
+/**
+ * Rows parsed from the text of a transcript: CRLF and a BOM tolerated, a line that does not parse counted and skipped (`badLines`). `lostLines` are
+ * those that were not the LAST line of the file: a write in progress tears the last line, and nothing was lost with it that a reader of the rows could
+ * have used; a bad line before it held something (a read, a page cited) and is gone (the architect's review of #600, A3).
+ */
+export function parseTranscript(text) {
+  const rows = [];
+  let badLines = 0;
+  let lostLines = 0;
+  const body = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  const lines = body.split(/\r?\n/);
+  let last = lines.length - 1;
+  while (last >= 0 && !lines[last].trim()) last -= 1;
+  lines.forEach((line, at) => {
+    if (!line.trim()) return;
+    let row = null;
+    try { row = JSON.parse(line); } catch { /* counted below */ }
+    if (row && typeof row === 'object' && !Array.isArray(row)) { rows.push(row); return; }
+    badLines += 1;
+    if (at !== last) lostLines += 1;
+  });
+  return { rows, badLines, lostLines, crlf: text.includes('\r\n') };
+}
+
+/** The shape of Claude Code's session JSONL: at least one row with a string `type`, and most lines parse. */
+export const looksLikeTranscript = ({ rows, badLines }) =>
+  rows.length > 0 && rows.some((r) => typeof r.type === 'string') && badLines <= rows.length;
+
+const blocksOf = (row) => {
+  const c = row?.message?.content;
+  if (typeof c === 'string') return [{ type: 'text', text: c }];
+  return Array.isArray(c) ? c.filter((b) => b && typeof b === 'object') : [];
+};
+const textOfResult = (b) => {
+  const c = b?.content;
+  if (typeof c === 'string') return c;
+  if (Array.isArray(c)) return c.filter((x) => x && x.type === 'text' && typeof x.text === 'string').map((x) => x.text).join('\n');
+  return '';
+};
+const textOf = (row) => blocksOf(row).filter((b) => b.type === 'text' && typeof b.text === 'string').map((b) => b.text).join('\n');
+/** The text blocks of a row, joined: what a hook's feedback row says. */
+export const rowText = textOf;
+const posix = (p) => String(p ?? '').replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+
+/** Which flags a row carries, for the record. */
+export const flagsOf = (row) => FLAGS.filter((f) => row?.[f] === true);
+
+/**
+ * What a user row's TEXT is, by prefix first. `prompt` is the only kind that is the user's own request. A flagged row with a prefix
+ * nothing here knows (command output, a caveat, a reminder) is `flagged` — neither the request nor a source.
+ */
+export function classifyUserText(text, row = {}) {
+  const t = String(text ?? '');
+  const head = t.trimStart();
+  for (const [re, kind] of PREFIXES) if (re.test(head)) return kind;
+  return flagsOf(row).length ? 'flagged' : 'prompt';
+}
+
+/** Is this a main-thread row? Sub-agent rows (`isSidechain`, or a `parent_tool_use_id`) are dropped, whatever the caller passes. */
+export const isMainRow = (row) => row && row.isSidechain !== true && (row.parent_tool_use_id === undefined || row.parent_tool_use_id === null);
+
+/** The names a text prints: underscore tokens and dotted names, normalised as the names index normalises them. */
+export function namesIn(text) {
+  const { tokens, dotted } = pageNames(String(text ?? ''));
+  const out = new Set(tokens);
+  for (const d of dotted) out.add(d);
+  return out;
+}
+
+const addAll = (set, names) => { for (const n of names) set.add(n); };
+const NO_NAMES = Object.freeze(new Set());
+
+// What a Read path is, by its tail: the install's root is not needed, only the folder names the product owns.
+const PATH_KINDS = Object.freeze([
+  [/(?:^|\/)\.claude\/skills\/[^/]+\/(?:SKILL|EXAMPLES)\.md$/i, 'skill'],
+  [/(?:^|\/)clients\/[^/]+\/envelopes\/[^/]+\.md$/i, 'envelope'],
+  [/(?:^|\/)clients\/_unfiled\/[^/]+\.md$/i, 'envelope'],
+  [/(?:^|\/)clients\//i, 'named'],
+  [/(?:^|\/)(?:governance|templates|docs)\/.+\.md$/i, 'named'],
+  [/(?:^|\/)\.claude\/rules\/[^/]+\.md$/i, 'named'],
+  [/(?:^|\/)CLAUDE\.md$/, 'named'],
+  [/(?:^|\/)vendor\/docs-map\.md$/, 'named'],
+]);
+const pathKind = (p) => {
+  const q = posix(p);
+  for (const [re, kind] of PATH_KINDS) if (re.test(q)) return kind;
+  return null;
+};
+
+const CITATION = /markdown\/[A-Za-z0-9_./-]+?\.md/g;
+
+// ---- a page read through a shell or an MCP tool (ARC-09-C267) -----------------------------------------------------------------
+// The readers live in read-routes.mjs (the shell's words and folder, here-documents kept out, the reading verbs, an MCP call's input, a Grep in
+// content mode). `pagesRead` below is the set the NAMES come from: the pages whose lines a command SHOWED, so a `grep` or an `rg`, which show the
+// lines that match and not the page, are left out of it. The question `citedUnread` asks, whether a page reached the session at all, is
+// `reached`: every route, a search that names the page among them.
+
+/** The corpus pages a command line SHOWS (`cat`, `head`, `tail`, `sed`, `nl`, `less`, `more`, `awk`, `bat`; PowerShell's `Get-Content`, `gc`, `type`), a Set. Pure. */
+export function pagesOfCommand(command, { powershell = false, cwd = null, rowCwd = null } = {}) {
+  const pages = new Set();
+  for (const [page, verb] of commandReads(command, { powershell, cwd, rowCwd }).reads) if (!isSearchVerb(verb)) pages.add(page);
+  return pages;
+}
+
+/**
+ * The session's sources, from its rows. `rows` are session-JSONL rows (or stream-json rows converted to that shape).
+ * `options`: `builders` — the subagent_type names of the roster builders (.claude/agents/), `rosterSkills` — the roster's skill names,
+ * `lead` — the opening words of our own block reason, to know a continuation is ours; `names: false` — the names a page prints are not collected (no class
+ * that asks for them blocks, and collecting them is nearly all of the walk's time: 2 s of 2.1 s on a 63 MB session); `carryFolder: false` — the main
+ * thread's folder is reset before every Bash call; `shouldStop()` — the run's deadline, `aborted` says it was reached. Pure.
+ */
+export function turnSources(rows, options = {}) {
+  const builders = options.builders ?? new Set();
+  const rosterSkills = options.rosterSkills ?? new Set();
+  const wantNames = options.names !== false;
+  const main = (Array.isArray(rows) ? rows : []).filter(isMainRow);
+
+  // The last compact boundary: nothing before it is a source, a request or a prior reply.
+  let boundary = -1;
+  main.forEach((r, i) => { if (r.type === 'system' && r.subtype === 'compact_boundary') boundary = i; });
+  const live = main.slice(boundary + 1);
+  const out = {
+    rowCount: main.length, live, boundary, compacted: main.filter((r) => r.type === 'system' && r.subtype === 'compact_boundary').length,
+    request: [],                 // the user's prompts after the boundary
+    replyBlocks: [],             // the assistant text blocks of the current turn that the file holds
+    finalBlocks: [],             // those after the turn's last tool result: what the user reads last
+    turnStart: -1,               // index into `live` of the row that began the current turn
+    startedBy: null,             // 'prompt' | 'task-notification' | null
+    pagesRead: new Set(),        // `markdown/<area>/….md`, distinct, after the boundary
+    names: { read: new Set(), skill: new Set(), named: new Set(), builder: new Set() },
+    savedCitations: new Set(),   // pages cited by saved Envelopes this session read
+    reached: new Map(),          // every corpus page that reached the session, by any route (read-routes.mjs), whenever it did: a compaction does not undo it
+    written: [],                 // [{ tool, text, file, script }] the text of the files the current turn wrote (Write, Edit, MultiEdit, NotebookEdit, a heredoc that writes); `script` says that a later call ran the file
+    ownFiles: new Set(),         // the lower-case base names of the files outside the corpus that the session read, wrote or edited: a bare mention of one is not a citation of a page of the same name
+    typed: '',                   // what the user typed, in every prompt of the session, as lower-case text with forward slashes
+    opaque: [],                  // the text of each call (any row) that may have shown a page without naming it: a loop, xargs, code of another language (read-routes.mjs)
+    opaqueFailed: [],            // the same for a call with a viewer verb that failed; the caller uses it only for a page that is on disk
+    envelopeNames: new Set(),    // names a saved Envelope prints (grounded only through the pages it cites)
+    searches: [],                // [{ pattern, path, result }]
+    feedback: [],                // [{ index, ours }] Stop-hook feedback rows of the current turn
+    scope: { rosterSkill: false, corpus: false },
+    classes: {},                 // how many rows of each user-row kind, for the debug record
+    patterns: [],                // the glob and brace words of the calls that could not be resolved, `{ w, ci }` (read-routes.mjs, `wordNamesPage`)
+    patternsFailed: [],          // the same for a call with a viewer verb that failed; the caller uses it only for a page that is on disk
+    aborted: false,              // the run's deadline was reached before the rows were walked
+    stats: { namesScanned: 0 },  // how many bodies were scanned for names: 0 when no class that asks for them blocks
+  };
+  const scan = (text) => {
+    if (!wantNames) return NO_NAMES;
+    out.stats.namesScanned += 1;
+    return namesIn(text);
+  };
+  let ticks = 0;
+  const stopped = () => {
+    if (!options.shouldStop || out.aborted) return out.aborted;
+    ticks += 1;
+    if (ticks % 64 === 0 && options.shouldStop()) out.aborted = true;
+    return out.aborted;
+  };
+
+  // The shell's folder and every route by which a page reached the main thread are one walk of its rows (read-routes.mjs).
+  const walked = walkThread(main, { glob: options.glob, pageExists: options.pageExists, pageText: options.pageText, carryFolder: options.carryFolder !== false, shouldStop: options.shouldStop });
+  if (walked.aborted) out.aborted = true;
+
+  // Pass 1 — the tool calls, by id; and where the current turn begins.
+  const uses = new Map();
+  let lastResult = -1;
+  live.forEach((r, i) => {
+    if (stopped()) return;
+    if (r.type === 'user' && blocksOf(r).some((b) => b.type === 'tool_result')) lastResult = i;
+    if (r.type === 'assistant') {
+      for (const b of blocksOf(r)) if (b.type === 'tool_use' && b.id) uses.set(b.id, { name: b.name, input: b.input ?? {}, at: i });
+    } else if (r.type === 'user') {
+      const hasResult = blocksOf(r).some((b) => b.type === 'tool_result');
+      const text = textOf(r);
+      if (hasResult && !text) return;
+      const kind = classifyUserText(text, r);
+      if (kind === 'prompt') { out.turnStart = i; out.startedBy = 'prompt'; }
+      else if (kind === 'task-notification') { out.turnStart = i; out.startedBy = 'task-notification'; }
+    }
+  });
+
+  const classOfAgent = (use) => {
+    const type = use?.input?.subagent_type ?? use?.input?.subagentType ?? null;
+    return type && builders.has(type) ? 'builder' : null;       // anything else — a reader, general-purpose, Explore, Plan, unknown — is never a source
+  };
+
+  live.forEach((r, i) => {
+    if (stopped()) return;
+    if (r.type === 'assistant') {
+      if (i > out.turnStart && i > (options.replyAfter ?? -1)) {
+        for (const b of blocksOf(r)) {
+          if (b.type !== 'text' || typeof b.text !== 'string' || !b.text) continue;
+          out.replyBlocks.push(b.text);
+          if (i > lastResult) out.finalBlocks.push(b.text);
+        }
+      }
+      for (const b of blocksOf(r)) {
+        if (b.type !== 'tool_use') continue;
+        const input = b.input ?? {};
+        if (b.name === 'Skill' && typeof input.skill === 'string' && (rosterSkills.size === 0 || rosterSkills.has(input.skill))) out.scope.rosterSkill = true;
+        if (b.name === 'Read' && corpusRelative(input.file_path)) out.scope.corpus = true;
+        if (b.name === 'Grep' && (/ServiceNowDocs/i.test(posix(input.path)) || /ServiceNowDocs/i.test(String(input.pattern ?? '')))) out.scope.corpus = true;
+      }
+      return;
+    }
+    if (r.type !== 'user') return;
+
+    const text = textOf(r);
+    const resultBlocks = blocksOf(r).filter((b) => b.type === 'tool_result');
+    if (text && (resultBlocks.length === 0 || text.trim())) {
+      const kind = classifyUserText(text, r);
+      out.classes[kind] = (out.classes[kind] ?? 0) + 1;
+      switch (kind) {
+        case 'prompt': out.request.push(text); addAll(out.names.named, scan(text)); break;
+        case 'skill-body':
+          addAll(out.names.skill, scan(text));
+          if (/[/\\]\.claude[/\\]skills[/\\]/.test(text.slice(0, 400))) out.scope.rosterSkill = true;
+          break;
+        case 'task-notification': {
+          const id = /<tool-use-id>\s*([^<\s]+)\s*<\/tool-use-id>/.exec(text)?.[1];
+          if (classOfAgent(id ? uses.get(id) : null) === 'builder') addAll(out.names.builder, scan(text));
+          break;
+        }
+        case 'hook-feedback': {
+          if (i > out.turnStart) out.feedback.push({ index: i, ours: Boolean(options.lead) && text.includes(options.lead) });
+          break;
+        }
+        default: break;           // hook-notice, compaction-summary, command, interrupt, flagged: neither the request nor a source
+      }
+    }
+
+    for (const b of resultBlocks) {
+      if (b.is_error === true) continue;                                    // a failed Read is not a source, and is not a page read
+      const use = uses.get(b.tool_use_id);
+      if (!use) continue;                                                    // its call is before the boundary, or unknown
+      const body = textOfResult(b);
+      switch (use.name) {
+        case 'Read': {
+          const file = use.input.file_path;
+          const rel = corpusRelative(file);
+          if (rel && rel.endsWith('.md')) { out.pagesRead.add(rel); addAll(out.names.read, scan(body)); break; }
+          const kind = pathKind(file);
+          if (kind === 'skill') { addAll(out.names.skill, scan(body)); out.scope.rosterSkill = true; }
+          else if (kind === 'named') addAll(out.names.named, scan(body));
+          else if (kind === 'envelope') {
+            addAll(out.envelopeNames, scan(body));
+            for (const m of body.replace(/\\/g, '/').matchAll(CITATION)) out.savedCitations.add(m[0]);
+          }
+          break;
+        }
+        case 'Grep':
+          out.searches.push({ pattern: String(use.input.pattern ?? ''), path: posix(use.input.path ?? ''), result: body });
+          break;
+        case 'Bash': case 'PowerShell': {
+          // A `cat`, `sed`, `Get-Content`… of a page reads it (the folder a `cd` set, kept across calls, is the walk's); a search shows lines of
+          // it and a command that lists shows none; any other command is never a source.
+          const shown = [...(walked.calls.get(b.tool_use_id) ?? [])].filter(([, route]) => !isSearchVerb(route)).map(([page]) => page);
+          for (const page of shown) out.pagesRead.add(page);
+          if (shown.length) addAll(out.names.read, scan(body));
+          break;
+        }
+        case 'Agent': case 'Task':
+          if (classOfAgent(use) === 'builder') addAll(out.names.builder, scan(body));
+          break;
+        default:
+          if (typeof use.name === 'string' && use.name.startsWith('mcp__')) {
+            const given = pagesOfInput(use.input);                            // a file tool given a corpus page reads it; any other MCP result is only named
+            for (const page of given) out.pagesRead.add(page);
+            addAll(given.size ? out.names.read : out.names.named, scan(body));
+          }
+          break;                                                              // Glob, Write, Workflow, WebFetch…: never a source
+      }
+    }
+  });
+  // ARC-09-C267 (lever 2) — what reached the session by any route, over EVERY main-thread row (a compaction does not undo a read), the files
+  // the current turn wrote, and the paths the user typed. A sub-agent's reads are another thread, walked by the caller.
+  for (const [page, how] of walked.reached) out.reached.set(page, how.route);
+  out.opaque = walked.opaque.map((o) => o.text);
+  out.opaqueFailed = walked.failedOpaque.map((o) => o.text);
+  out.patterns = walked.patterns;
+  out.patternsFailed = walked.failedPatterns;
+  const offset = boundary + 1;
+  const from = out.turnStart < 0 ? 0 : out.turnStart;
+  for (const w of walked.writes) if (w.at - offset >= from) out.written.push({ tool: w.tool, text: w.text, file: w.file, script: w.script });
+  out.ownFiles = walked.ownFiles;
+  const typed = [];
+  for (const r of main) {
+    if (r.type !== 'user') continue;
+    const t = textOf(r);
+    if (t && classifyUserText(t, r) === 'prompt') typed.push(t);
+  }
+  out.typed = posix(typed.join('\n')).toLowerCase();
+  return out;
+}
+
+/**
+ * The rows of the transcript at `transcriptPath` (`{ rows, badLines, crlf, bytes }`), or `null` when there is nothing to read: a
+ * missing or unreadable file, an unknown format, a file over MAX_TRANSCRIPT_BYTES. `onDebug` is told why, once. Never throws.
+ */
+export function readTranscriptRows(transcriptPath, { read = readFileSync, stat = statSync, maxBytes = MAX_TRANSCRIPT_BYTES, onDebug = () => {} } = {}) {
+  try {
+    if (typeof transcriptPath !== 'string' || !transcriptPath) { onDebug('no transcript path'); return null; }
+    const size = stat(transcriptPath).size;
+    if (size > maxBytes) { onDebug(`transcript is ${size} bytes, over the ${maxBytes} limit: reply-only checks`); return null; }
+    const parsed = parseTranscript(read(transcriptPath, 'utf8'));
+    if (!looksLikeTranscript(parsed)) { onDebug('transcript format not recognised'); return null; }
+    return { ...parsed, bytes: size };
+  } catch (e) {
+    onDebug(`transcript unreadable: ${e instanceof Error ? e.message : String(e)}`);
+    return null;
+  }
+}
+
+/**
+ * The rows of each sub-agent of the session whose file is `transcriptPath`: Claude Code keeps them in `<session>/subagents/agent-<id>.jsonl`, beside the
+ * session's own file and not in it, and a workflow's agents one folder deeper (`subagents/workflows/<run>/agent-<id>.jsonl`). `{ threads, incomplete }`:
+ * `threads` is an array of row arrays, `[]` when there are none or the folder is not there; `incomplete` is a list of reasons (each also told to
+ * `onDebug`) why what is in `threads` may not be all there was: more than `maxFiles` files, more than `maxBytes` in all (the rest are left), a file
+ * that could not be read, a line of a file that does not parse. A caller that needs to know a page was NOT read in any sub-agent must not trust an answer
+ * that is incomplete (the architect's review of #600, A3). Read only when a page is unread without them (grounding-check.mjs). Never throws.
+ */
+export function readSubagents(transcriptPath, { read = readFileSync, list = readdirSync, stat = statSync, maxBytes = MAX_TRANSCRIPT_BYTES, maxFiles = 200, onDebug = () => {} } = {}) {
+  const incomplete = [];
+  const say = (reason) => { incomplete.push(reason); onDebug(reason); };
+  try {
+    if (typeof transcriptPath !== 'string' || !transcriptPath.endsWith('.jsonl')) return { threads: [], incomplete };
+    const files = [];
+    let more = false;
+    const find = (dir, depth, top) => {
+      let names;
+      try { names = list(dir).sort(); } catch (e) { if (top && e?.code !== 'ENOENT') throw e; return; }
+      for (const name of names) {
+        if (more) return;
+        const file = join(dir, name);
+        if (/^agent-.+\.jsonl$/.test(name)) { if (files.length >= maxFiles) more = true; else files.push(file); }
+        else if (depth < 2 && !name.includes('.')) { try { if (stat(file).isDirectory()) find(file, depth + 1, false); } catch { /* not a folder we can read: skipped */ } }
+      }
+    };
+    find(join(transcriptPath.slice(0, -'.jsonl'.length), 'subagents'), 0, true);
+    if (more) say(`sub-agent transcripts: more than ${maxFiles} files, the rest are not read`);
+    const threads = [];
+    let total = 0;
+    for (const file of files) {
+      total += stat(file).size;
+      if (total > maxBytes) { say(`sub-agent transcripts are over the ${maxBytes} limit: the rest are not read`); break; }
+      let parsed;
+      try { parsed = parseTranscript(read(file, 'utf8')); } catch (e) { say(`a sub-agent transcript is unreadable: ${e instanceof Error ? e.message : String(e)}`); continue; }
+      if (parsed.lostLines > 0) say(`a sub-agent transcript has ${parsed.lostLines} line(s) that do not parse`);
+      else if (parsed.rows.length === 0 && parsed.badLines > 0) say('a sub-agent transcript has no line that parses');
+      if (parsed.rows.length) threads.push(parsed.rows);
+    }
+    return { threads, incomplete };
+  } catch (e) {
+    say(`sub-agent transcripts unreadable: ${e instanceof Error ? e.message : String(e)}`);
+    return { threads: [], incomplete };
+  }
+}
+
+/** The rows of each sub-agent of the session (`readSubagents`' threads), for a caller that does not need to know whether they are all there. */
+export const readSubagentRows = (transcriptPath, opts) => readSubagents(transcriptPath, opts).threads;
+
+/** The transcript's rows and the sources in them (`readTranscriptRows` + `turnSources`), or `null`. The architect's replay calls this. */
+export function readTurnSources(transcriptPath, { options = {}, ...io } = {}) {
+  const t = readTranscriptRows(transcriptPath, io);
+  return t ? { ...t, ...turnSources(t.rows, options) } : null;
+}

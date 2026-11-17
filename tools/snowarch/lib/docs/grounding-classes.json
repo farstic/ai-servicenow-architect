@@ -1,0 +1,10 @@
+{
+  "_about": "ARC-09-C263 — which classes of the grounding check may block, and the page count above which a name is too common to ask about. DATA, read by the Stop hook (tools/snowarch/hooks/stop-citations.mjs) on every turn, so the measurement can change them in a one-file diff while the code stays frozen. A class not listed in `blocking` is still computed and reported to a replay or a grader, and is never asked of the model. A file that is missing, unreadable or not this shape switches every ask OFF (ARC-09-C267). Options given to groundingFindings override both.",
+  "_phase0": "ARC-09-C263 Phase 0 (the registered replay, two blind readers and an adjudicator; bar: precision 0.90) set `blocking` to citedUnread alone (39 of 40 judged right, 0.975, kappa 1.00); every other class is computed and grader-only, pending the measured stage 2. `ubiquityPages` stays 500. A missing or unreadable file still means all seven kinds (the code is unchanged). Record: ~/.local/share/snowarch-verify/c263/r6/phase0/result.md.",
+  "_pilot": "ARC-09-C263 re-pilot (the registered pilot at the final notice text; two blind readers and an adjudicator; the bar is 0.90 on the pilot as well): citedUnread was judged warranted on 22 of 25 flags, 0.88, so no class blocks in this release. Every class is computed and grader-only, and a reply is never asked about it.",
+  "_lever2": "ARC-09-C267 lever 2 sets `blocking` to citedUnread alone: a corpus page cited in the answer, or in a file the turn wrote, that reached the session by no read route. The routes are those of lib/docs/read-routes.mjs (a Read; a Bash cat, sed, head, tail, awk, nl, grep or rg that names the page, taken from the shell's folder, which a cd sets and the next call keeps; a Grep in content mode; an MCP file read; a sub-agent's reads; reads before a compaction); not claims are a pointer sentence, a path the user typed and a page the answer says it did not open. It asks once a turn. The measurement is the architect's: the arm without the ask is this file with `blocking` empty, or absent.",
+  "blocking": [
+    "citedUnread"
+  ],
+  "ubiquityPages": 500
+}

@@ -488,20 +488,25 @@ test('ARC-09-C123 — the web tools are denied to every session, once, after a u
   assert.deepEqual(committed.permissions.deny, ['WebFetch', 'WebSearch']);
 });
 
-// ARC-09-C268 phase B — the product's one non-MCP allow entry. In design-only mode there is no tool to read the corpus with but the
-// shell, and the gateways tell a session to run `docs lookup` before it calls a construct absent; a prompt on each lookup would
-// sit in the middle of grounding. The entry is generated, and these cases read what the generator wrote.
+// ARC-09-C268 phase B and ARC-09-C288 — the product's non-MCP allow entries: the read-only commands of the launcher that the instructions tell a SESSION to
+// run. In design-only mode there is no tool to read the corpus with but the shell, and the gateways tell a session to run `docs lookup` before it calls a
+// construct absent; a prompt on each lookup would sit in the middle of grounding. CLAUDE.md §2 tells it to run `status` when the user types Status, which
+// no entry covered (the snowarch skill's own `allowed-tools` apply only while the skill is active). The entries are generated, one pair for each command
+// (Bash, then PowerShell), and these cases read what the generator wrote.
+const READ_ONLY_COMMANDS = ['docs lookup', 'status'];
 const LOOKUP_RULES = () => {
   const posix = spellings({ platform: 'linux', env: {} });
   const windows = spellings({ platform: 'win32', env: {} });
-  return { posix, windows, want: [`Bash(${posix.cli} docs lookup *)`, `PowerShell(${windows.cli} docs lookup *)`] };
+  const want = READ_ONLY_COMMANDS.flatMap((command) => [`Bash(${posix.cli} ${command} *)`, `PowerShell(${windows.cli} ${command} *)`]);
+  return { posix, windows, want };
 };
 const notMcp = (list) => list.filter((e) => !e.startsWith('mcp__'));
 
-test('ARC-09-C268 — the generator writes the lookup entry for each shell, once, after a user\'s own entries, and a hand edit is found', () => {
+test('ARC-09-C268 and C288 — the generator writes the entries of the lookup and of status for each shell, once, after a user\'s own entries, and a hand edit is found', () => {
   const { want } = LOOKUP_RULES();
+  assert.equal(want.length, 4, 'two commands, two shells');
 
-  // A fresh file carries the pair and no other command, and the deny list is the web tools alone.
+  // A fresh file carries the four entries and no other command, and the deny list is the web tools alone.
   const fresh = tree();
   try {
     run(fresh, ['--only', 'permissions']);
@@ -509,16 +514,16 @@ test('ARC-09-C268 — the generator writes the lookup entry for each shell, once
     assert.deepEqual(notMcp(allow), want);
     assert.deepEqual(notMcp(ask), [], 'a shell command is on the ask list');
     assert.deepEqual(deny, ['WebFetch', 'WebSearch']);
-    // Over its own output the pair is not written twice, and the check says the file is current.
+    // Over its own output the entries are not written twice, and the check says the file is current.
     run(fresh, ['--only', 'permissions']);
     assert.deepEqual(notMcp(settingsOf(fresh).permissions.allow), want);
     assert.equal(run(fresh, ['--check', '--only', 'permissions']).code, 0);
   } finally { cleanup(fresh); }
 
-  // A user's own entries keep the head of the list. A file that already has the pair, in another place and the other way round, ends
-  // with it once, after them.
+  // A user's own entries keep the head of the list. A file that already has some of the entries, in another place and the other way round, ends
+  // with all four once, after them. (`Bash(git status)` is the user's own, and is not ours.)
   const owned = tree(({ write }) => {
-    write(SETTINGS, `${JSON.stringify({ permissions: { allow: [want[1], 'Bash(git status)', want[0], 'mcp__other__thing'], ask: [], deny: [] } }, null, 2)}\n`);
+    write(SETTINGS, `${JSON.stringify({ permissions: { allow: [want[3], want[1], 'Bash(git status)', want[0], 'mcp__other__thing'], ask: [], deny: [] } }, null, 2)}\n`);
   });
   try {
     run(owned, ['--only', 'permissions']);
@@ -526,7 +531,7 @@ test('ARC-09-C268 — the generator writes the lookup entry for each shell, once
     assert.equal(settingsOf(owned).permissions.allow[1], 'mcp__other__thing', 'a stranger\'s MCP rule kept its place at the head');
   } finally { cleanup(owned); }
 
-  // The committed file with one of the two entries cut out is stale, and the diff names the entry.
+  // The committed file with one of the four entries cut out is stale, and the diff names the entry.
   for (const [i, entry] of want.entries()) {
     const edited = tree(({ write }) => {
       const committed = JSON.parse(readFileSync(join(root, SETTINGS), 'utf8'));
@@ -541,32 +546,50 @@ test('ARC-09-C268 — the generator writes the lookup entry for each shell, once
   }
 });
 
-test('ARC-09-C268 — the committed settings allow the lookup and only the lookup, for the launcher each shell types', () => {
+test('ARC-09-C268 and C288 — the committed settings allow the lookup and status and only them, for the launcher each shell types', () => {
   const { posix, windows, want } = LOOKUP_RULES();
   const { allow, ask, deny } = JSON.parse(readFileSync(join(root, SETTINGS), 'utf8')).permissions;
-  assert.deepEqual(notMcp(allow), want, 'the committed settings file does not carry the generated lookup pair: run npm run gen');
+  assert.deepEqual(notMcp(allow), want, 'the committed settings file does not carry the generated entries: run npm run gen');
   assert.deepEqual(notMcp(ask), []);
   assert.deepEqual(deny, ['WebFetch', 'WebSearch']);
 
-  const [bash, powershell] = want;
-  for (const [tool, rule, cli] of [['Bash', bash, posix.cli], ['PowerShell', powershell, windows.cli]]) {
-    // What a session types: the command, the words or names after it, flags after them, and the bare command (it prints its usage).
-    for (const typed of [`${cli} docs lookup requested item`, `${cli} docs lookup sc_req_item --json`, `${cli} docs lookup incident.assigned_to --names 5`, `${cli} docs lookup`]) {
-      assert.ok(ruleAllows(rule, tool, typed), `${rule} does not cover what a session types: ${typed}`);
+  const [bash, powershell, statusBash, statusPowershell] = want;
+  // What a session types for each command: the command, the words or names after it, flags after them, and the bare command (it prints its
+  // usage or, for status, the panel). A compound is split by Claude Code and every part judged; the matcher here is not that, so a compound
+  // (`status && touch x`) is the sitting's probe and not a case of this file.
+  const typedFor = {
+    'docs lookup': (cli) => [`${cli} docs lookup requested item`, `${cli} docs lookup sc_req_item --json`, `${cli} docs lookup incident.assigned_to --names 5`, `${cli} docs lookup`],
+    status: (cli) => [`${cli} status`, `${cli} status --json`, `${cli} status 2>&1`],
+  };
+  const rulesOf = { 'docs lookup': [bash, powershell], status: [statusBash, statusPowershell] };
+  for (const [command, [bashRule, powershellRule]] of Object.entries(rulesOf)) {
+    for (const [tool, rule, cli] of [['Bash', bashRule, posix.cli], ['PowerShell', powershellRule, windows.cli]]) {
+      for (const typed of typedFor[command](cli)) {
+        assert.ok(ruleAllows(rule, tool, typed), `${rule} does not cover what a session types: ${typed}`);
+      }
+      // And no other command of the launcher, nor a longer word that begins like the verb, nor the other command of the two.
+      const otherCommand = command === 'status' ? typedFor['docs lookup'](cli) : typedFor.status(cli);
+      for (const other of [cli, `${cli} docs`, `${cli} docs lookupx`, `${cli} statusx`, `${cli} status-json`, `${cli} docs sync`, `${cli} docs verify`, `${cli} docs status`,
+        `${cli} doctor`, `${cli} doctor --fix`, `${cli} upgrade`, `${cli} instance set-credentials x`, `${cli} licence check`, ...otherCommand]) {
+        if (typedFor[command](cli).includes(other)) continue;
+        assert.ok(!ruleAllows(rule, tool, other), `${rule} covers more than ${command}: ${other}`);
+      }
     }
-    // And no other command of the launcher, nor a longer word that begins like the verb.
-    for (const other of [cli, `${cli} docs`, `${cli} docs lookupx`, `${cli} docs sync`, `${cli} docs verify`, `${cli} docs status`, `${cli} doctor`,
-      `${cli} status`, `${cli} upgrade`, `${cli} instance set-credentials x`, `${cli} licence check`]) {
-      assert.ok(!ruleAllows(rule, tool, other), `${rule} covers more than the lookup: ${other}`);
-    }
+    // Each rule is for its own shell's launcher and its own tool. (The strings are built here and passed by name: the launcher audit reads a
+    // launcher spelled inside an assertion as a sentence the product must also print, and these are test data.)
+    const windowsTyped = `${windows.cli} ${command} x`;
+    const posixTyped = `${posix.cli} ${command} x`;
+    assert.ok(!ruleAllows(bashRule, 'Bash', windowsTyped), `the Bash rule for ${command} covers the Windows launcher`);
+    assert.ok(!ruleAllows(powershellRule, 'PowerShell', posixTyped), `the PowerShell rule for ${command} covers the POSIX launcher`);
+    assert.ok(!ruleAllows(powershellRule, 'Bash', windowsTyped), `a PowerShell rule for ${command} is read as a Bash rule`);
   }
-  // Each rule is for its own shell's launcher and its own tool. (The strings are built here and passed by name: the launcher audit reads a
-  // launcher spelled inside an assertion as a sentence the product must also print, and these are test data.)
+  // The entry for status is for the command CLAUDE.md §2 tells a session to run when the user types Status (a rule for a command the
+  // instruction no longer names would be an allowance nobody asked for).
+  const claude = readFileSync(join(root, 'CLAUDE.md'), 'utf8');
+  const statusCommand = `${posix.cli} status`;
+  assert.ok(claude.includes(`run \`${statusCommand}\``), 'CLAUDE.md no longer tells a session to run the status command the entry allows');
   const windowsTyped = `${windows.cli} docs lookup x`;
   const posixTyped = `${posix.cli} docs lookup x`;
-  assert.ok(!ruleAllows(bash, 'Bash', windowsTyped), 'the Bash rule covers the Windows launcher');
-  assert.ok(!ruleAllows(powershell, 'PowerShell', posixTyped), 'the PowerShell rule covers the POSIX launcher');
-  assert.ok(!ruleAllows(powershell, 'Bash', windowsTyped), 'a PowerShell rule is read as a Bash rule');
 
   // The instrument can fail: a broader rule WOULD cover what the loop above refuses, and a rule of another shape is not read at all.
   const broad = `Bash(${posix.cli} *)`;

@@ -16,11 +16,13 @@
  * `env`, `hooks`, and any key this renderer has never heard of. ARC-06-S01 merges its own blocks
  * into this file; it does not write over it.
  *
- * ONE NON-MCP ENTRY PAIR IS OURS (ARC-09-C268 phase B): `docs lookup`, the read-only search of the bundled corpus that the six
- * gateways tell a session to run before it calls a construct absent. In `design-only` mode there is no MCP tool to read the
- * corpus with, so the lookup runs through the shell, and a prompt on every lookup is a prompt in the middle of grounding. The
- * entry is written here, never by hand, so `npm run gen` regenerates it and `gen:check` finds a hand edit. It is exactly the
- * command and nothing broader: not `./snowarch *`, not `docs *`, not a bare `Bash`.
+ * TWO NON-MCP COMMANDS ARE OURS, an entry pair for each. `docs lookup` (ARC-09-C268 phase B), the read-only search of the bundled corpus that
+ * the six gateways tell a session to run before it calls a construct absent: in `design-only` mode there is no MCP tool to read the
+ * corpus with, so the lookup runs through the shell, and a prompt on every lookup is a prompt in the middle of grounding. And `status`
+ * (ARC-09-C288), the panel that `CLAUDE.md` §2 tells a session to run when the user types Status: the `snowarch` skill's own
+ * `allowed-tools` apply only while the skill is active, so the plain word prompted every time. The entries are written here, never by
+ * hand, so `npm run gen` regenerates them and `gen:check` finds a hand edit. Each is exactly its command and nothing broader: not
+ * `./snowarch *`, not `docs *`, not `doctor` (`doctor --fix` writes), not `instance` (it takes credentials), not a bare `Bash`.
  */
 
 import { askList } from '../lib/contract.mjs';
@@ -44,24 +46,26 @@ export const target = '.claude/settings.json';
 export const WEB_TOOLS = ['WebFetch', 'WebSearch'];
 
 /**
- * The one product command a session may run without asking (ARC-09-C268 phase B): the two words after the launcher.
+ * The product commands a session may run without asking (ARC-09-C268 phase B, ARC-09-C288): the words after the launcher. Each is read-only
+ * (`status` runs the quick doctor in-process with `noNetwork` and `fix` fixed, and writes only its cache under `.local/`) and each is a command
+ * that the instructions tell a SESSION to run; the commands a person types in a terminal are not here.
  *
- * TWO ENTRIES, ONE PER SHELL TOOL, because a `Bash` rule does not cover the `PowerShell` tool: Claude Code gives each its own
+ * TWO ENTRIES FOR EACH, ONE PER SHELL TOOL, because a `Bash` rule does not cover the `PowerShell` tool: Claude Code gives each its own
  * rule namespace, and on Windows the model types `.\snowarch.cmd`, which only the PowerShell tool runs. Each launcher is read
  * from the one definition (`launcher-spelling.mjs`) with its platform PINNED, like every other generator that spells one: this
  * file is committed, so its bytes are the same on every runner, and it renders both shells on purpose.
  *
  * THE SHAPE is the documented one: a trailing ` *` after the subcommand, which also matches the bare command and does not match
- * `docs lookupx` (the `ls *` / `lsof` row of Claude Code's permissions page). Claude Code's own "don't ask again" writes the same
+ * `docs lookupx` or `statusx` (the `ls *` / `lsof` row of Claude Code's permissions page). Claude Code's own "don't ask again" writes the same
  * form. Compound commands are split and every part is judged on its own, so a rule for this command lets nothing else through.
  */
-export const LOOKUP_COMMAND = 'docs lookup';
+export const READ_ONLY_COMMANDS = Object.freeze(['docs lookup', 'status']);
 const POSIX_CLI = spellings({ platform: 'linux', env: {} }).cli;
 const WINDOWS_CLI = spellings({ platform: 'win32', env: {} }).cli;
-export const LOOKUP_ALLOW = Object.freeze([
-  `Bash(${POSIX_CLI} ${LOOKUP_COMMAND} *)`,
-  `PowerShell(${WINDOWS_CLI} ${LOOKUP_COMMAND} *)`,
-]);
+export const READ_ONLY_ALLOW = Object.freeze(READ_ONLY_COMMANDS.flatMap((command) => [
+  `Bash(${POSIX_CLI} ${command} *)`,
+  `PowerShell(${WINDOWS_CLI} ${command} *)`,
+]));
 
 export function render(ctx) {
   const { contract, serverKey, config, current, retired } = ctx;
@@ -106,10 +110,10 @@ export function render(ctx) {
   const asked = new Set(writes.map((t) => t.name));
   const reads = contract.tools.filter((t) => !asked.has(t.name));
 
-  // A user's own entries keep the head of the list; the lookup pair is written once after them, so a file that already has it
-  // (the committed one, on every regeneration) does not gain a second copy; the MCP entries follow.
-  settings.permissions.allow = [...keep(settings.permissions.allow).filter((e) => !LOOKUP_ALLOW.includes(e)),
-    ...LOOKUP_ALLOW, ...entries(reads, prefix, style.allowStyle)];
+  // A user's own entries keep the head of the list; the entries of the read-only commands are written once after them, so a file that already has
+  // them (the committed one, on every regeneration) does not gain a second copy; the MCP entries follow.
+  settings.permissions.allow = [...keep(settings.permissions.allow).filter((e) => !READ_ONLY_ALLOW.includes(e)),
+    ...READ_ONLY_ALLOW, ...entries(reads, prefix, style.allowStyle)];
   settings.permissions.ask = [...keep(settings.permissions.ask), ...entries(writes, prefix, style.askStyle)];
   // ARC-09-C123: the main thread is denied the web tools, as ARC-09-C115 took them from the sub-agents. A user's own
   // deny entries keep their place at the head; these two are written once, after them.
