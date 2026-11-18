@@ -23,7 +23,7 @@ test('ARC-09-C291 — the prefixes snow_, x_ and u_ and a placeholder are never 
   assert.deepEqual(constructsOf('snow_core_records_query, x_acme_app_table, u_custom_field'), []);
   assert.deepEqual(constructsOf('sn_<scope>_table, {table}_name, sys_{id}, incident_<n>_state'), [], 'a token that holds < or { is a placeholder');
   assert.deepEqual(constructsOf('sn_<scope>_table_name and {app}_claim_score and incident_<n>_state_x'), [], 'a placeholder is one run, and not fragments that look like names');
-  assert.deepEqual(constructsOf('snow_x and sn_x_y'), ['sn_x_y'], 'sn_ is a platform prefix and stays');
+  assert.deepEqual(constructsOf('snow_core_capabilities_read and sn_x_y'), ['sn_x_y'], 'sn_ is a platform prefix and stays');
   assert.deepEqual(constructsOf('xx_y and ux_y and snowy_x'), ['xx_y', 'ux_y', 'snowy_x'], 'only the whole prefix counts');
 });
 
