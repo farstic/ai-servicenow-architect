@@ -19,6 +19,13 @@ test('ARC-09-C291 — a construct is a lower-case snake_case token with an under
   for (const not of ['incident and task', 'Sys_user, SYS_ID, camelCase_thing', '_', '__init__', '2_fast', 'a__b']) assert.deepEqual(constructsOf(not), [], not);
 });
 
+test('ARC-09-C293 — a token that ends with an underscore is a prefix and no construct; one with an underscore at both ends is emphasis, as before', () => {
+  assert.deepEqual(constructsOf('the `sn_ins_` tables, `sn_ins_*` and sn_bom_ and `a_b_c_`'), [], 'a stem of a family of names');
+  assert.deepEqual(constructsOf('the `sn_ins_` tables and `sn_ins_policy`'), ['sn_ins_policy'], 'the prefix is skipped, the name beside it is not');
+  assert.deepEqual(constructsOf('an _emphasised_name_ and _sn_ins_policy_ here'), ['emphasised_name', 'sn_ins_policy'], 'an underscore at both ends is markdown emphasis');
+  assert.deepEqual(constructsOf('a `_leading_name` here'), ['leading_name'], 'a leading underscore alone is trimmed, as before');
+});
+
 test('ARC-09-C291 — the prefixes snow_, x_ and u_ and a placeholder are never a construct', () => {
   assert.deepEqual(constructsOf('snow_core_records_query, x_acme_app_table, u_custom_field'), []);
   assert.deepEqual(constructsOf('sn_<scope>_table, {table}_name, sys_{id}, incident_<n>_state'), [], 'a token that holds < or { is a placeholder');
