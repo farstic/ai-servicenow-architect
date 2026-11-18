@@ -29,9 +29,12 @@ test('ARC-09-C291 — the prefixes snow_, x_ and u_ and a placeholder are never 
 
 test('ARC-09-C291 — a cited path, a file name and a file with an extension are no construct', () => {
   assert.deepEqual(constructsOf('See markdown/area/some_page_name.md and c_Some_page.md and other_notes.md for sys_user'), ['sys_user']);
+  assert.deepEqual(constructsOf('See markdown/some_area/sub_folder/page.md for sys_user'), ['sys_user'], 'a folder of the path is no construct');
+  assert.deepEqual(constructsOf('foo_bar.js_x and foo_baz.jsonx'), ['foo_bar', 'js_x', 'foo_baz'], 'an extension is the whole word after the dot');
   assert.deepEqual(constructsOf('run my_script.js then read data_file.json and notes_file.csv, not sys_log'), ['sys_log']);
   assert.deepEqual(constructsOf('run my_script.JS and sys_log'), ['sys_log'], 'an extension in capitals');
   assert.deepEqual(constructsOf('a Windows path markdown\\it-service-management\\c_Alpha.md uses sys_user'), ['sys_user']);
+  assert.deepEqual(constructsOf('a Windows path markdown\\some_area\\sub_folder\\page.md uses sys_user'), ['sys_user'], 'its folders are no construct either');
   assert.deepEqual(constructsOf('the glide.ui.foo_bar property'), ['foo_bar'], 'a dotted name is its parts; only a known file extension makes a file');
   assert.deepEqual(constructsOf('a my_host.com'), [], 'a host name is no construct');
   assert.deepEqual(constructsOf('a my_other.example.local'), ['my_other'], 'and an unknown extension makes none');
@@ -56,6 +59,19 @@ test('ARC-09-C291 — an anti-pattern line starts, after bullets, numbers and bo
   for (const line of yes) assert.equal(isAntiPattern(line), true, line);
   const no = ['You should never use `a_b`.', 'Avoiding `a_b` is wise.', 'Neverland has `a_b`.', 'The rule: do not use `a_b`.', '- Use `a_b`.', 'Doing so is fine.'];
   for (const line of no) assert.equal(isAntiPattern(line), false, line);
+});
+
+test('ARC-09-C291 — a line of 100,000 characters is read in linear time by every rule, in the shapes that took seconds', () => {
+  // The hook is synchronous and runs after every turn: a pattern that is scanned from every position of a long run cost 2.6 s for one word of 60,000 characters.
+  const shapes = {
+    'a word': 'a'.repeat(100000), 'snake segments': `${'x_'.repeat(50000)}y`, 'markdown/ repeated': 'markdown/'.repeat(11000), 'dots': 'a.'.repeat(50000),
+    'numbers': `${'1.'.repeat(50000)}x`, 'dotted names': 'sys_user.'.repeat(11000), 'does not': 'does not '.repeat(11000), 'bullets': `${'- '.repeat(50000)}Never`, 'spaces': `does not${' '.repeat(100000)}x`,
+  };
+  for (const [name, line] of Object.entries(shapes)) {
+    const start = performance.now();
+    constructsOf(line); isHedged(line); isAntiPattern(line); normalisePage(line);
+    assert.ok(performance.now() - start < 1000, `${name}: ${(performance.now() - start).toFixed(0)} ms`);
+  }
 });
 
 test('ARC-09-C291 — a page prints a name when its text holds it, with escapes dropped, case ignored and spaces normalised, or holds its label', () => {

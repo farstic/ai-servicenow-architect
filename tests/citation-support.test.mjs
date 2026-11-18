@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { KINDS, LEAD, groundingFindings, parseClasses } from '../tools/snowarch/lib/docs/grounding-check.mjs';
+import { KINDS, LEAD, groundingFindings, parseClasses, residualFindings, supportFindings } from '../tools/snowarch/lib/docs/grounding-check.mjs';
 import { normalisePage } from '../tools/snowarch/lib/docs/name-support.mjs';
 import { A as assistant, U, res, use } from './helpers/lever2.mjs';
 
@@ -61,6 +61,7 @@ test('ARC-09-C291 — a name that a cited page prints is supported, whatever the
   assert.deepEqual(items(check(`Set the \`assignment_group\` ${cite(RULES)}.`)), [], 'the page prints the label only, "assignment group"');
   assert.equal(check(`The \`sn_bom_claim\` table ${cite(RULES)}.`).reasonBody, null);
   assert.deepEqual(items(check(`The \`sysrule_assignment\` table ${cite(RULES)} and ${cite(TABLE)}.`)), [], 'any page the line cites will do');
+  assert.deepEqual(items(check(`The \`sn_bom_claim\` table ${cite(OTHER)} and ${cite(RULES)}.`, { index: fakeIndex({}) })), [], 'any page, when the index says nothing: the page\'s own text is what supports it');
   assert.deepEqual(items(check(`The \`sysrule_assignment\` table ${cite(RULES)}.`, { index: fakeIndex({ sysrule_assignment: [RULES] }) })), [], 'a name that the index puts on the cited page is printed on it');
 });
 
@@ -87,7 +88,7 @@ test('ARC-09-C291 — a hedged line, an anti-pattern line and a name that is non
     `\`sysrule_assignment\` is not on this page ${cite(RULES)}.`, `Open question: is \`sysrule_assignment\` the table? ${cite(RULES)}`,
     `- Don't use \`sysrule_assignment\` ${cite(RULES)}.`, `1. **Never** write \`sysrule_assignment\` ${cite(RULES)}.`, `**Avoid** \`sysrule_assignment\` ${cite(RULES)}.`,
     `Use \`u_claim_score\`, \`x_acme_claims_score\` and \`snow_core_records_query\` ${cite(RULES)}.`, `The table \`sn_<scope>_claim\` and \`{table}_name\` ${cite(RULES)}.`,
-    `Run my_script.js for the claim ${cite(RULES)}.`, `Names without an underscore: claim, score ${cite(RULES)}.`,
+    `Run my_script.js for the claim ${cite(RULES)}.`, `Names without an underscore: claim, score ${cite(RULES)}.`, 'The `sysrule_assignment` table, with no page cited.',
   ]) assert.deepEqual(items(check(line)), [], line);
   // the same line without the hedge is asked about: the hedge is what silences it
   assert.equal(check(`The page prints \`sysrule_assignment\` ${cite(RULES)}.`).findings.unsupportedName.length, 1);
@@ -132,12 +133,54 @@ test('ARC-09-C291 — the check reads the final reply only, and not a fenced blo
   assert.deepEqual(items(check(`The \`sysrule_assignment\` ${cite(RULES)} ${cite(OTHER)}.`, { norm: (p) => (p === RULES ? null : pageNorm(p)) })), [], 'nor when one of the pages cannot');
   assert.deepEqual(items(groundingFindings({ rows: null, reply: claim, index: INDEX, options: { blocking: ['unsupportedName'], askedOnly: true, pagesNamed: () => [] } })), [], 'no way to read a page');
   assert.deepEqual(items(check(claim, { index: null })), [], 'no names index: the two kinds cannot be told apart');
+  assert.deepEqual(items(check(claim, { index: {} })), [], 'an index that cannot say where a name is printed');
+  assert.deepEqual(items(check(claim, { norm: () => undefined })), [], 'a reader that says nothing of the page');
+  assert.deepEqual(items(groundingFindings({ rows: null, reply: `${claim} See also assignment-rules.md.`, index: INDEX, options: { blocking: ['unsupportedName'], askedOnly: true, pageNorm } })), [['sysrule_assignment', 'elsewhere', RULES]],
+    'a caller with no way to name a bare file still checks a path, and a bare file name is no citation then');
+  let reads = 0;
+  check(`See ${cite(RULES)} for the claim.`, { norm: (p) => { reads += 1; return pageNorm(p); } });
+  assert.equal(reads, 0, 'a page is not read for a line that names no construct');
   assert.equal(check(claim, { blocking: ['citedUnread'] }).reasonBody, null, 'a class that does not block does not ask');
   assert.equal(check(claim, { blocking: ['citedUnread'] }).findings.unsupportedName.length, 0, 'and is not computed for a caller that only asks');
   assert.equal(check(claim, { blocking: ['citedUnread'], options: { askedOnly: false } }).findings.unsupportedName.length, 1, 'but is for a replay or a grader, which computes every class');
   // a sparse index cannot say that no page prints a name: ABSENT is not asked, ELSEWHERE still is
   const sparse = check(`The \`sysrule_assignment\` and \`fso_claim_score\` ${cite(RULES)}.`, { index: fakeIndex({ sysrule_assignment: [TABLE] }, { coverage: 'disk' }) });
   assert.deepEqual(items(sparse), [['sysrule_assignment', 'elsewhere', RULES]]);
+});
+
+test('ARC-09-C291 — the notice to the user names no name: not one that stays after the ask, and not one that first appears in the continuation', () => {
+  const first = `The \`sysrule_assignment\` table ${cite(RULES)}.`;
+  const options = { blocking: ['unsupportedName'], askedOnly: true, pagesNamed: () => [], pageNorm, pageExists: () => true };
+  const ask = groundingFindings({ rows: [U('q'), text(first)], reply: first, index: INDEX, options }).reasonBody;
+  assert.ok(ask, 'the first answer is asked about');
+  const feedback = U(`Stop hook feedback:\n${ask}`, { isMeta: true });
+  for (const line of [`Still \`sysrule_assignment\` ${cite(RULES)}.`, `Now \`fso_claim_score\` ${cite(RULES)}.`]) {
+    const r = residualFindings({ rows: [U('q'), text(first), feedback, text(line)], reply: line, index: INDEX, options: { ...options, lead: LEAD } });
+    assert.equal(r.ours, true, 'the block is ours');
+    assert.deepEqual(r.open, [], line);
+    assert.equal(r.text, null, line);
+  }
+});
+
+test('ARC-09-C291 — the cap of six is for the names: the pages of a never-opened ask keep their own', () => {
+  const pages = Array.from({ length: 8 }, (_, k) => `markdown/it-service-management/c_Page${k}.md`);
+  const reply = `${pages.map((p) => `The rule is in ${cite(p)}.`).join('\n')}\nThe \`sysrule_assignment\` table ${cite(pages[0])}.`;
+  const r = groundingFindings({ rows: [U('q'), text(reply)], reply, index: INDEX, options: { blocking: ['citedUnread', 'unsupportedName'], askedOnly: true, pagesNamed: () => [], pageNorm: () => 'nothing', pageExists: () => true } });
+  assert.ok(r.reasonBody.includes(NEVER_OPENED(pages.join(', '))), 'all eight pages are listed');
+});
+
+test('ARC-09-C291 — a line of 100,000 characters is read in linear time by the whole check, and a line of citations by the function itself', () => {
+  const shapes = [`${'x_'.repeat(50000)}y`, 'a'.repeat(100000), 'a.'.repeat(50000), 'sys_user.'.repeat(11000), `does not${' '.repeat(100000)}x`];
+  for (const line of shapes) {
+    const start = performance.now();
+    check(`${line} ${cite(RULES)}`);
+    assert.ok(performance.now() - start < 1000, `${line.slice(0, 12)}…: ${(performance.now() - start).toFixed(0)} ms`);
+  }
+  // 40,000 `markdown/` in a line: the citation pattern of this class is bounded to a path's length, and does not rescan the rest of the line from each (the older loop of the
+  // citedUnread class takes 8 s on this line, on develop too; it is not this row's)
+  const start = performance.now();
+  supportFindings({ lines: [[`${'markdown/'.repeat(40000)} ${cite(RULES)}`, 0]], index: INDEX, pageNorm, pagesNamed: () => [] });
+  assert.ok(performance.now() - start < 1000, `markdown/ repeated: ${(performance.now() - start).toFixed(0)} ms`);
 });
 
 test('ARC-09-C291 — it folds into the one ask beside a never-opened page, and past the deadline asks nothing', () => {

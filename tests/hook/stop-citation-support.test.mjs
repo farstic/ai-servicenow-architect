@@ -76,10 +76,11 @@ withInstall('ARC-09-C291 hook — beside a never-opened page there is one ask wi
   assert.equal(d.reason.split('Then add one line for each').length, 2, 'one tail');
   assert.ok(d.reason.indexOf('never opened') < d.reason.indexOf('These names are not printed'), 'the never-opened list first');
   // a names-only ask, then the continuation: no second ask and no notice for the name, whether it stays or a new one appears
-  const only = await run(t, `The \`sysrule_assignment\` table ${cite(PAGE.alpha)}.`);
+  const first = `The \`sysrule_assignment\` table ${cite(PAGE.alpha)}.`;
+  const only = await run(t, first);
   asked(only, '`sysrule_assignment`');
   const feedback = U(`Stop hook feedback:\n${only.reason}`, { isMeta: true });
-  const next = (line) => stop(t, { rows: [text('first'), feedback, text(line)], message: line, input: { stop_hook_active: true }, seams: { loadIndex: () => INDEX, options: { blocking: ['unsupportedName'] } } });
+  const next = (line) => stop(t, { rows: [text(first), feedback, text(line)], message: line, input: { stop_hook_active: true }, seams: { loadIndex: () => INDEX, options: { blocking: ['unsupportedName'] } } });
   silent(await next(`Still \`sysrule_assignment\` ${cite(PAGE.alpha)}.`), 'the name stays');
   silent(await next(`Now \`fso_claim_score\` ${cite(PAGE.alpha)}.`), 'a name that first appears in the continuation');
 });
