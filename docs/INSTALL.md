@@ -55,7 +55,7 @@ checked out. It is harmless: a release tag is a tag object that points at the co
 release all the same, as `git describe --tags` shows.
 [Troubleshooting](TROUBLESHOOTING.md#two-things-that-are-true-of-several-codes-at-once) has the detail.
 
-**On a Mac, or if you want every step explained** — the programs to install with or without your Mac's administrator password, the plan screen, the seven wizard questions and how to change an answer later — follow [Install on macOS](INSTALL-MACOS.md). It installs Git, Node.js, Claude Code and draw.io one command at a time.
+**On a Mac with Apple silicon, or if you want every step explained** — the programs to install, the plan screen, the seven wizard questions and how to change an answer later — follow [Install on macOS](INSTALL-MACOS.md). It installs Git, Node.js, Claude Code, draw.io and LibreOffice one command at a time, into your home folder and without a password, except for Apple's Command Line Tools.
 
 Then run `claude` in that same folder, `snowarch` — the bootstrap's Next line prints its full path, such as `C:\Users\you\snowarch`. Started from any other folder, the one above it included, Claude Code loads none of this product, and `/mcp` shows nothing.
 

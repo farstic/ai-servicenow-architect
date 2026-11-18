@@ -77,16 +77,16 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 
 **The name check no longer asks about a prefix, and a Correction cites an opened page.** On the architect's sitting the hook asked "No corpus page prints `sn_ins`" about a backticked prefix, `sn_ins_`, that the model had written as shorthand for a family of tables, and the model had to explain it. A token that ends with an underscore is now a prefix and no construct, and a name that no page prints is not asked about as ABSENT when an indexed name starts with it and an underscore. The ELSEWHERE clause also asks for a Correction that "cites a page you have opened that prints it": all 13 of the extra never-opened citations of the sitting's N were Correction lines that cited a page seen only in a lookup listing. On the architect's replay of the hook over the 75 turns of that sitting's N sessions, 74 were unchanged, and the one that changed lost its whole ask, which had named a prefix; on a sitting of its own (150 sessions) the never-opened citations on the Correction lines written after an ask fell from 11 of 69 to 8 of 67, a small measured gain (one-sided p 0.34), and every guard held (ARC-09-C293).
 
-**The install guide for macOS, and a page that runs from disk.** `docs/INSTALL-MACOS.md` is for a Mac user who has never used a terminal. It covers both
-ways onto a Mac in full, and the reader chooses one at Step 2: path A, with the Mac's administrator password (Apple's Command Line Tools, the Node.js
-installer, draw.io in Applications), or path B, on a company Mac without administrator rights (the Node.js archive in the home folder, draw.io in the home
-folder's own Applications, and the company's IT team or Self Service for the Command Line Tools). Every command is one line to copy, and none uses `sudo` or
-Homebrew. `docs/AI-Architect-macOS-Install-Guide.html` is its form that runs from disk, the Windows page's design and features with a choice of path and, on path
-B, of chip: a Copy button on every command, helpers that read what a reader pastes back, and progress kept in the browser. The release writer moves the clone
-tag of both with every final, the signed manifest covers them, and each GitHub Release carries the page as its ninth asset. The guide installs Node.js 26.13.1,
-so CI now tests Node 26 on macOS, in `test` and in `bootstrap`, and the install page, the README and the Windows guide say that Node.js 20, 22, 24 and 26 are
-tested on all three systems. The guide still says "Not yet tested end to end on a Mac": the macOS CI jobs run design-only, and no live install on a Mac has been
-recorded until the owner runs it on a MacBook.
+**The install guide for macOS, and a page that runs from disk.** `docs/INSTALL-MACOS.md` is for a Mac user with Apple silicon who has never used a terminal, and every
+step is a command to copy. One path serves every such Mac. Git comes from Apple's Command Line Tools, which can ask a company Mac for an administrator once;
+everything else goes into the home folder without a password: Node.js 26.13.1 as an archive, and draw.io and LibreOffice from their disk images into
+`~/Applications`, each with a one-line command in `~/.local/bin` so that the AI Architect finds it on PATH. No command uses `sudo` or Homebrew, and an optional
+`shasum` check tells the reader that a download is the file the project published. `docs/AI-Architect-macOS-Install-Guide.html` is its form that runs from disk,
+the Windows page's design and features: a Copy button on every command, helpers that read what a reader pastes back, and progress kept in the browser. The
+release writer moves the clone tag of both with every final, the signed manifest covers them, and each GitHub Release carries the page as its ninth asset. The
+guide installs Node.js 26.13.1, so CI now tests Node 26 on macOS, in `test` and in `bootstrap`, and the install page, the README and the Windows guide say that
+Node.js 20, 22, 24 and 26 are tested on all three systems. The guide still says "Not yet tested end to end on a Mac": the macOS CI jobs run design-only, and no
+live install on a Mac has been recorded until the owner runs it on a MacBook.
 
 ### Added
 
@@ -96,12 +96,12 @@ recorded until the owner runs it on a MacBook.
   address and no password, and counters for the four slow commands. `tests/install-windows-guide-html.test.mjs` holds every command to the
   Markdown guide's, in order, and the version floors, the permission presets, the licence words and the installer's check keys to the product;
   it runs the page's own checks on the lines `checkLine` and `bannerLine` print (ARC-09-C285).
-- `docs/INSTALL-MACOS.md` and `docs/AI-Architect-macOS-Install-Guide.html`: the install guide for macOS and its interactive form. The reader chooses at Step 2
-  between path A, with the Mac's administrator password, and path B, on a company Mac without administrator rights, and the page shows no Step 2 command until
-  the path (and, on path B, the kind of Mac) is chosen. The guide has 65 commands, one to a block; the page has Copy and "ran it" on each, with 25 counted
-  commands on path A and 30 on path B. `tests/install-macos-guide.test.mjs` holds the guide to the product (the plan screen, the wizard's questions, the settings
-  commands, the licence words, the clone tag, where the renderer looks for draw.io), and `tests/install-macos-guide-html.test.mjs` holds the page to the guide
-  (ARC-09-C300).
+- `docs/INSTALL-MACOS.md` and `docs/AI-Architect-macOS-Install-Guide.html`: the install guide for macOS and its interactive form. Step 1 checks with `uname -m` that the Mac
+  has Apple silicon; Step 2 installs Git, Node.js, Claude Code, draw.io and LibreOffice one command at a time, with the home folder as the only place a program goes,
+  except Apple's Command Line Tools. The guide has 70 commands, one to a block; the page has Copy and "ran it" on each, and one counter of 38 commands (the
+  bash-only check, the bash form of the PATH line and the optional checks are never counted). `tests/install-macos-guide.test.mjs` holds the guide to the product (the plan
+  screen, the wizard's questions, the settings commands, the licence words, the clone tag, where the renderer and the doctor look for draw.io and LibreOffice), and
+  `tests/install-macos-guide-html.test.mjs` holds the page to the guide (ARC-09-C300).
 - `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
   word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints
   whether the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a
