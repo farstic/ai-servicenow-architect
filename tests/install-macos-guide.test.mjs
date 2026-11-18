@@ -3,18 +3,21 @@
 /**
  * ARC-09-C300 — docs/INSTALL-MACOS.md is true of the product it describes.
  *
- * The page is for a Mac user who has nothing installed and follows it from top to bottom, one command at a time, on one of two paths: with the
- * Mac's administrator password (path A), or on a company Mac without it (path B). It is the twin of docs/INSTALL-WINDOWS.md and of the test beside
- * that page (tests/install-windows-guide.test.mjs, ARC-09-C271), and it goes wrong in the same two ways: a screen it quotes stops being what the
- * product prints, or a command it tells the reader to type stops being one the product has. This file holds both, and the shape the reader depends
- * on: one command per block, no administrator rights outside path A, the licence in place before the installer, a bash line for every zsh line.
+ * The page is for a Mac user with Apple silicon who has nothing installed and follows it from top to bottom, one command at a time. There is ONE path
+ * for every such Mac (the owner's ruling of 18 November 2026, after a first version with two paths and two chips): everything the guide installs goes
+ * into the home folder with no password, and the one command that may ask for an administrator is Apple's Command Line Tools in 2a. It is the twin of
+ * docs/INSTALL-WINDOWS.md and of the test beside that page (tests/install-windows-guide.test.mjs, ARC-09-C271), and it goes wrong in the same two
+ * ways: a screen it quotes stops being what the product prints, or a command it tells the reader to type stops being one the product has. This file
+ * holds both, and the shape the reader depends on: one command per block, no administrator outside 2a, nothing written outside the home folder, the
+ * licence in place before the installer, a bash line for every zsh line, and only the files made for Apple silicon.
  *
  * WHAT IS DERIVED, AND FROM WHAT. The product's own constants and functions where it exports them (the plan screen and the steps it lists, the
  * permissions screen and the presets, the instance sub-command table, the licence file's path and its banner line, the store line, the launcher's
  * spelling); its source text, without the lines that are only comments, where it does not (the wizard's questions and menus are strings inside
  * functions), so a phrase on the page must occur there verbatim. Nothing here is a copy of the product's text kept for the test: the
- * phrase list names what the PAGE says, and the product is asked whether it still says so. Three things the product does not hold are pinned to the page
- * and nothing else, each with where it was measured: the macOS floor of the Node.js release, the size of the draw.io image, and the closing line.
+ * phrase list names what the PAGE says, and the product is asked whether it still says so. What the product does not hold is pinned to the page and
+ * nothing else, each with where it was read: the macOS floor of the Node.js release, the size and the SHA-256 of each download, and the closing line.
+ * A new Node.js, draw.io or LibreOffice release is a change of those constants and of the page, and nothing else here.
  *
  * WHAT THE WINDOWS TWIN CHECKS AND THIS FILE DOES NOT, because it has no meaning on a Mac: the administrator-window check (Win + R, the integrity level,
  * `whoami /groups`); the four outcomes of the permission lock on a Windows store and the F9 repair that applies them (a Mac has one store line, one
@@ -27,13 +30,16 @@
  * name no step of this page; rewriting them, and TROUBLESHOOTING's Mac paragraph, are rows of 2.2.8) and the twin of the check that both pages hold
  * the same troubleshooting messages.
  *
- * The commands the page makes the reader type that are safe to run, and whose behaviour the page describes (the PATH lines, the licence copy, the
- * `drawio` command of path B), are run here against a temporary home folder with bash, where bash is. Nothing runs outside it.
+ * The commands the page makes the reader type that are safe to run, and whose behaviour the page describes (the PATH line, the licence copy, the
+ * `drawio` and `soffice` commands, the checksum, and on a Mac the disk-image steps against a synthetic image), are run here against a temporary home
+ * folder, with bash where bash is. Nothing runs outside that folder, and NO CASE STARTS DRAW.IO OR LIBREOFFICE: both are installed on machines that run
+ * this suite, an earlier test of the renderer once started the real draw.io and macOS asked for a keychain (ARC-09-C273), so the apps are stand-ins that
+ * a case writes, and the lookups of the renderers are asked by sourcing them or by running the one line that looks.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -114,9 +120,31 @@ const prose = proseOf(page);
 const onScreens = fold(screens.flatMap((b) => b.lines).join('\n'));
 const closing = page.trimEnd().split('\n').at(-1);
 
-/** The Node.js release the page installs, from its first download (the installer file); the test of the downloads holds the other two to it. */
-const NODE_PKG = /^curl -fL -o ~\/snowarch-dl\/node\.pkg https:\/\/nodejs\.org\/dist\/v(\d+\.\d+\.\d+)\/node-v(\d+\.\d+\.\d+)\.pkg$/;
-const node = commands.map((c) => NODE_PKG.exec(c.line)).find(Boolean)?.[1] ?? null;
+/** Bash is on every runner that has a Mac or a Linux in it. Nothing below runs on Windows, where a Mac's commands have no meaning. */
+const BASH = { skip: process.platform === 'win32' ? 'a Mac\'s commands are run where there is a bash' : false };
+
+/** Run `command` under bash, with `home` as the home folder and `cwd` as the folder, and return what it did. */
+const bash = (command, { home, cwd = home }) => spawnSync('bash', ['-c', command], {
+  cwd, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home, LANG: 'C' },
+});
+
+/**
+ * The three downloads of Step 2, and the file each is saved as. ONE file per program, made for Apple silicon: the vendors call the chip `arm64` for
+ * Node.js and draw.io and `aarch64` for LibreOffice. The shapes are anchored, so a download of anything else (an Intel file, a universal image, an
+ * installer package) is not read as one of the three, and fails the case that counts them. Each has the version twice, in the folder and in the file name.
+ */
+const DOWNLOADS = {
+  node: { file: 'node.tar.gz', re: /^curl -fL -o ~\/snowarch-dl\/node\.tar\.gz https:\/\/nodejs\.org\/dist\/v(\d+\.\d+\.\d+)\/node-v(\d+\.\d+\.\d+)-darwin-arm64\.tar\.gz$/ },
+  drawio: { file: 'drawio.dmg', re: /^curl -fL -o ~\/snowarch-dl\/drawio\.dmg https:\/\/github\.com\/jgraph\/drawio-desktop\/releases\/download\/v(\d+\.\d+\.\d+)\/draw\.io-arm64-(\d+\.\d+\.\d+)\.dmg$/ },
+  libreoffice: { file: 'libreoffice.dmg', re: /^curl -fL -o ~\/snowarch-dl\/libreoffice\.dmg https:\/\/download\.documentfoundation\.org\/libreoffice\/stable\/(\d+\.\d+\.\d+)\/mac\/aarch64\/LibreOffice_(\d+\.\d+\.\d+)_MacOS_aarch64\.dmg$/ },
+};
+/** The release a download names (once the folder and the file name agree), or null when the page has not exactly one such command. */
+const versionOf = (name) => {
+  const hits = commands.map((c) => DOWNLOADS[name].re.exec(c.line)).filter(Boolean);
+  return hits.length === 1 && hits[0][1] === hits[0][2] ? hits[0][1] : null;
+};
+/** The Node.js release the page installs; the plan screens and the check screens are held to it. */
+const node = versionOf('node');
 
 /** The states of the licence, as the product declares them. */
 function licenceStates() {
@@ -151,42 +179,37 @@ function productText() {
 
 // ───────────────────────────── the shape of the page ─────────────────────────────
 
-test('ARC-09-C300 — the page has the steps it is read in, and the two paths sit under the three steps where they differ', () => {
-  for (const heading of ['Step 1 · Open Terminal', 'Which shell your Terminal uses', 'Step 2 · Install the programs', 'Path A or path B: choose yours first',
-    '2a · Git (Apple\'s Command Line Tools)', '2b · Node.js', '2c · Claude Code', '2d · Tell your Mac where Claude Code is',
-    '2e · Open a fresh window and check', '2f · draw.io Desktop (for the diagrams)',
-    'Step 3 · Sign in to Claude Code', 'Step 4 · Download the AI Architect', 'Step 5 · Add your licence', 'Step 6 · Run the installer',
-    'Step 7 · Check your licence', 'Step 8 · Start the AI Architect', 'Optional tools', 'Every day', 'Change settings later', 'Licence renewal',
-    'New releases', 'If something goes wrong', 'Asking for help', 'Uninstall', 'Your data and safety', 'What has not been tested']) {
+/** The steps of the page in the order it is read: the one path of Step 2 is seven sub-steps, 2a to 2g, and Step 1 checks the chip before anything is installed. */
+const STEP_HEADINGS = ['Step 1 · Open Terminal', 'Check that your Mac has Apple silicon', 'Which shell your Terminal uses', 'Step 2 · Install the programs',
+  '2a · Git (Apple\'s Command Line Tools)', '2b · Node.js', '2c · Claude Code', '2d · Tell your Mac where Claude Code and Node.js are',
+  '2e · Open a fresh window and check', '2f · draw.io Desktop (for the diagrams)', '2g · LibreOffice (to check your Word documents as PDF)',
+  'Step 3 · Sign in to Claude Code', 'Step 4 · Download the AI Architect', 'Step 5 · Add your licence', 'Step 6 · Run the installer',
+  'Step 7 · Check your licence', 'Step 8 · Start the AI Architect'];
+
+test('ARC-09-C300 — the page has the steps it is read in, on one path: Step 1 checks the chip, 2a to 2g follow, and nothing offers a choice', () => {
+  for (const heading of [...STEP_HEADINGS, 'Optional tools', 'Every day', 'Change settings later', 'Licence renewal', 'New releases', 'If something goes wrong',
+    'Asking for help', 'Uninstall', 'Your data and safety', 'What has not been tested']) {
     assert.ok(titles.includes(heading), `no heading "${heading}"`);
   }
+  const inOrder = STEP_HEADINGS.map((h) => titles.indexOf(h));
+  assert.deepEqual(inOrder, [...inOrder].sort((a, b) => a - b), 'the steps of the page are not in the order they are read');
   // The sub-steps are named by their number: their words may change, the number is what the rest of the page points at.
   for (const ref of ['5a', '5b', '5c', '6a', '6b', '6c', '6d', '6e']) assert.ok(titles.some((t) => t.startsWith(`${ref} · `)), `no sub-step ${ref}`);
-  assert.ok(titles.indexOf('Path A or path B: choose yours first') < titles.findIndex((t) => t.startsWith('2a · ')), 'the choice of a path comes before 2a');
-  assert.match(page, /^\| \| Path A \| Path B \|$/m, 'the table that sets the two paths side by side is gone');
 
-  // 2a, 2b and 2f are where the paths differ: each has exactly one Path A and one Path B heading, in that order. 2c, 2d and 2e are the same for both.
-  const under = (ref) => {
-    const from = headings.findIndex((h) => h.level === 3 && h.title.startsWith(`${ref} · `));
-    assert.ok(from >= 0, `no ${ref} heading`);
-    const subs = [];
-    for (const h of headings.slice(from + 1)) { if (h.level <= 3) break; subs.push(h.title); }
-    return subs;
-  };
-  for (const ref of ['2a', '2b', '2f']) {
-    const subs = under(ref);
-    assert.equal(subs.length, 2, `${ref} should have one Path A and one Path B heading, it has: ${subs.join(' / ')}`);
-    assert.ok(subs[0].startsWith('Path A · ') && subs[1].startsWith('Path B · '), `${ref}: the two paths are not Path A then Path B: ${subs.join(' / ')}`);
-  }
-  for (const ref of ['2c', '2d', '2e']) assert.deepEqual(under(ref), [], `${ref} is the same for both paths and has no Path heading`);
-  assert.equal(titles.filter((t) => /^Path [AB] · /.test(t)).length, 6, 'the page has six Path headings: A and B under each of 2a, 2b and 2f');
+  // ONE PATH: no Path A or Path B heading, no table that sets two paths side by side, no choice of chip, and no heading below a sub-step of Step 2 or
+  // below any section but the seven questions of the wizard.
+  assert.deepEqual(titles.filter((t) => /\bPath [AB]\b|\bpath [AB]\b|choose yours/i.test(t)), [], 'a heading offers a path');
+  assert.doesNotMatch(page, /\b[Pp]ath [AB]\b|\| Path A \||choose yours first/, 'the page still speaks of two paths');
+  assert.deepEqual(commands.filter((c) => /^\*\*(?:Apple silicon|Intel)\*\*/.test(c.label)).map((c) => c.line), [], 'a command is labelled for one chip: there is one chip');
+  assert.deepEqual(headings.filter((h) => h.level === 4 && !/^Question \d of 7 · /.test(h.title)).map((h) => h.title), [], 'a heading below a step that is not one of the wizard\'s seven questions');
+  for (const ref of ['2a', '2b', '2c', '2d', '2e', '2f', '2g']) assert.equal(headings.filter((h) => h.level === 3 && h.title.startsWith(`${ref} · `)).length, 1, `${ref} is not one level-3 heading`);
 });
 
 test('ARC-09-C300 — every step, sub-step and section the page sends the reader to exists', () => {
-  const refs = new Set([...prose.matchAll(/\b([2-6][a-f])\b/g)].map((m) => m[1]));
+  const refs = new Set([...prose.matchAll(/\b([2-6][a-z])\b/g)].map((m) => m[1]));      // any letter: a reference to a sub-step the page does not have is the finding
   assert.ok(refs.size >= 10, `only ${refs.size} sub-step references found: the reading is broken`);
   for (const ref of refs) assert.ok(titles.some((t) => t.startsWith(`${ref} · `)), `the page points at ${ref}, which it has no heading for`);
-  for (const n of new Set([...prose.matchAll(/\bStep (\d)\b/g)].map((m) => m[1]))) {
+  for (const n of new Set([...prose.matchAll(/\bStep (\d+)\b/g)].map((m) => m[1]))) {
     assert.ok(titles.some((t) => t.startsWith(`Step ${n} · `)), `the page points at Step ${n}, which it has no heading for`);
   }
   // A section named in quotation marks is a heading, or a bold lead-in such as "Add another instance".
@@ -194,7 +217,7 @@ test('ARC-09-C300 — every step, sub-step and section the page sends the reader
   assert.ok(named.size >= 8, `only ${named.size} quoted section names found: the reading is broken`);
   for (const name of named) assert.ok(titles.includes(name) || page.includes(`**${name}.**`), `the page sends the reader to "${name}", which is no section of it`);
   // A repository path the page names is a file of the repository (a folder of the install, such as .local/ or vendor/, is the reader's own).
-  for (const m of prose.matchAll(/(?<![\w/.-])((?:docs|scripts)\/[A-Za-z0-9._/-]*[A-Za-z0-9])/g)) assert.ok(existsSync(join(root, m[1])), `the page names ${m[1]}, which is not in the repository`);
+  for (const m of prose.matchAll(/(?<![\w/.-])((?:docs|scripts|tools|packages|governance)\/[A-Za-z0-9._/-]*[A-Za-z0-9])/g)) assert.ok(existsSync(join(root, m[1])), `the page names ${m[1]}, which is not in the repository`);
 });
 
 test('ARC-09-C300 — every command block holds exactly one command', () => {
@@ -204,28 +227,50 @@ test('ARC-09-C300 — every command block holds exactly one command', () => {
     'a pasted block of several lines arrived broken on the first end-to-end install on Windows, and the shell asked a question nobody expected');
 });
 
-// ───────────────────────────── no administrator, no hole ─────────────────────────────
+// ───────────────────────────── no administrator, nothing outside the home folder ─────────────────────────────
 
-/** What may ask a Mac user for an administrator, and so is allowed only under a Path A heading: Apple's tools installer and the Node.js installer. */
-const PATH_A_ONLY = [/^xcode-select --install$/, /^open ~\/snowarch-dl\/node\.pkg$/];
+/** The one command that may ask a Mac user for an administrator: Apple's Command Line Tools, in 2a. Everything else the page installs goes into the home folder. */
+const ADMIN_ONLY = /^xcode-select --install$/;
+/** The only forms of the commands that open a disk image, copy an app out of it and close it: the mount point is a folder of the download folder. */
+const HDIUTIL_ATTACH = /^hdiutil attach -nobrowse -mountpoint ~\/snowarch-dl\/(mnt-[a-z]+) ~\/snowarch-dl\/([a-z]+\.dmg) > \/dev\/null$/;
+const HDIUTIL_DETACH = /^hdiutil detach ~\/snowarch-dl\/(mnt-[a-z]+) > \/dev\/null$/;
+const COPY_APP = /^cp -R ~\/snowarch-dl\/(mnt-[a-z]+)\/([A-Za-z.]+\.app) ~\/Applications\/$/;
+const COPY_LICENCE = 'cp ~/Downloads/LIC-*.json .local/licence.json';
+/** The two small commands that make `drawio` and `soffice` in the folder 2d puts on PATH, each starting the app 2f or 2g copied into ~/Applications. */
+const WRAPPER = /^printf '#!\/bin\/sh\\nexec "\$HOME\/Applications\/([A-Za-z.]+\.app)\/Contents\/MacOS\/([A-Za-z.]+)" "\$@"\\n' > ~\/\.local\/bin\/(drawio|soffice) && chmod \+x ~\/\.local\/bin\/\3$/;
 
-test('ARC-09-C300 — no command needs an administrator except under a Path A heading, and nothing under Path B leaves the home folder', () => {
+test('ARC-09-C300 — no command needs an administrator but Apple\'s tools in 2a, and everything else the page writes goes into the home folder', () => {
   for (const { line, heading } of commands) {
     assert.doesNotMatch(line, /\b(?:sudo|brew|softwareupdate|chown|chsh|xattr|spctl|launchctl)\b|\bdefaults\s+write\b/, `${heading}: ${line}`);
-    // The page deletes nothing by command: the Uninstall step moves the folder to the Trash in Finder, which can be undone.
+    // The page deletes nothing by command: the Uninstall step moves the folders to the Trash in Finder, which can be undone.
     assert.doesNotMatch(line, /\b(?:rm|rmdir|mv)\b/, `${heading}: a command that deletes or moves: ${line}`);
-    if (PATH_A_ONLY.some((re) => re.test(line))) assert.ok(heading.startsWith('Path A'), `${heading}: ${line} may ask for an administrator's password and belongs under a Path A heading`);
-    if (heading.startsWith('Path B')) {
-      // An absolute path starts after a space, a quote or an equals sign: `$HOME/…` and `~/…` do not, and a shebang or a URL has a character before its slash.
-      assert.doesNotMatch(line, /(?:^|[\s"'=])\/[A-Za-z]/, `${heading}: path B has no password, so it writes only inside the home folder: ${line}`);
-    }
+    if (ADMIN_ONLY.test(line)) assert.ok(heading.startsWith('2a · '), `${heading}: ${line} may ask for an administrator's password and belongs to 2a`);
+    // An absolute path starts after a space, a quote or an equals sign: `$HOME/…` and `~/…` do not, and a shebang or a URL has a character before its slash.
+    // `/dev/null` is where the two disk-image commands send what they print; it is no place the page writes a file to.
+    assert.doesNotMatch(line.replace(/ > \/dev\/null$/, ''), /(?:^|[\s"'=])\/[A-Za-z]/, `${heading}: this names a place outside the home folder (no /Applications, /usr or /opt): ${line}`);
+    if (/^cp\b/.test(line)) assert.ok(line === COPY_LICENCE || COPY_APP.test(line), `${heading}: a copy that is neither the licence nor an app into ~/Applications: ${line}`);
+    if (/^hdiutil\b/.test(line)) assert.ok(HDIUTIL_ATTACH.test(line) || HDIUTIL_DETACH.test(line), `${heading}: a disk-image command in neither of the two forms the page allows: ${line}`);
+    if (/\bchmod\b/.test(line)) assert.match(line, WRAPPER, `${heading}: chmod belongs to the two small commands of 2f and 2g, and nothing else: ${line}`);
+    if (/^mkdir\b/.test(line)) assert.match(line, /^mkdir -p (?:~\/[A-Za-z.\-/]+|\.local)$/, `${heading}: a folder made outside the home folder: ${line}`);
+    if (/^tar\b/.test(line)) assert.match(line, / -C ~\/\.local\/node /, `${heading}: an archive unpacked outside ~/.local/node: ${line}`);
   }
-  // The allowance is not vacuous: each of the two commands is on the page once, and is Path A's.
-  for (const re of PATH_A_ONLY) assert.equal(commands.filter((c) => re.test(c.line)).length, 1, `${re}: expected exactly one command`);
-  // ...and neither is the rule: path B has the commands that make its folders (a heading that lost them would pass the loop above with nothing to hold).
-  const pathB = commands.filter((c) => c.heading.startsWith('Path B'));
-  assert.ok(pathB.length >= 10, `only ${pathB.length} commands sit under a Path B heading: the reading is broken`);
-  for (const expected of ['git --version', 'mkdir -p ~/.local/node', 'mkdir -p ~/Applications']) assert.ok(pathB.some((c) => c.line === expected), `path B lost the command: ${expected}`);
+  // The allowance is not vacuous: Apple's tools are on the page once, in 2a.
+  assert.equal(commands.filter((c) => ADMIN_ONLY.test(c.line)).length, 1, 'expected exactly one command that may ask for an administrator');
+  // The disk-image steps come as triples on one mount point and one image: attach, copy the app, detach. One triple for draw.io, one for LibreOffice.
+  const triples = [];
+  commands.forEach((c, i) => {
+    const attach = HDIUTIL_ATTACH.exec(c.line);
+    if (!attach) return;
+    const copy = COPY_APP.exec(commands[i + 1]?.line ?? '');
+    const detach = HDIUTIL_DETACH.exec(commands[i + 2]?.line ?? '');
+    assert.ok(copy && detach, `${c.heading}: the attach command is not followed by the copy of the app and by the detach: ${commands[i + 1]?.line} / ${commands[i + 2]?.line}`);
+    assert.deepEqual([copy[1], detach[1]], [attach[1], attach[1]], `${c.heading}: the copy or the detach names another mount point than the attach: ${attach[1]}`);
+    triples.push({ mount: attach[1], image: attach[2], app: copy[2] });
+  });
+  assert.deepEqual(triples, [{ mount: 'mnt-drawio', image: DOWNLOADS.drawio.file, app: 'draw.io.app' }, { mount: 'mnt-libreoffice', image: DOWNLOADS.libreoffice.file, app: 'LibreOffice.app' }],
+    'the disk images the page opens are not the two it downloads, one app out of each');
+  // `~/Applications` is made once, before the first copy.
+  assert.ok(at((c) => c.line === 'mkdir -p ~/Applications') >= 0 && at((c) => c.line === 'mkdir -p ~/Applications') < at((c) => COPY_APP.test(c.line)), 'the Applications folder of the home folder is not made before the first app is copied into it');
 });
 
 test('ARC-09-C300 — a command is paste-ready: no placeholder the reader must replace', () => {
@@ -241,22 +286,23 @@ test('ARC-09-C300 — a command is paste-ready: no placeholder the reader must r
 // ───────────────────────────── PATH, the shells and the user's own files ─────────────────────────────
 
 const BASH_CHECK = 'ls ~/.bash_profile ~/.bash_login ~/.profile';
-/** The one shape of a line that changes the user's PATH: it puts a folder of their own in front, in the file their shell reads, and applies it to the window. */
-const PATH_LINE = /^echo 'export PATH="\$HOME\/(\.local(?:\/node)?\/bin):\$PATH"' >> ~\/\.(zshrc|bash_profile) && source ~\/\.(zshrc|bash_profile)$/;
-/** The folders the page puts on PATH: Node.js on path B (2b) and Claude Code's own (2d). A third is a deliberate change of this list. */
-const PATH_FOLDERS = ['.local/node/bin', '.local/bin'];
+/**
+ * The one shape of a line that changes the user's PATH, and the page has it once per shell: it puts the two folders of the user's own in front, Claude Code's
+ * (`.local/bin`) and Node.js's (`.local/node/bin`, where 2b unpacks it), in that order, in the file their shell reads, and applies the change to the window.
+ */
+const PATH_LINE = /^echo 'export PATH="\$HOME\/\.local\/bin:\$HOME\/\.local\/node\/bin:\$PATH"' >> ~\/\.(zshrc|bash_profile) && source ~\/\.(zshrc|bash_profile)$/;
 
-test('ARC-09-C300 — a PATH change is the user\'s, in one shape, and every zsh line has its bash line', () => {
+test('ARC-09-C300 — a PATH change is the user\'s, in one shape for both folders, and every zsh line has its bash line', () => {
   const changes = commands.filter((c) => c.line.includes('>>'));
-  assert.ok(changes.length >= 4, `only ${changes.length} commands append to a file: the reading is broken`);
+  assert.equal(changes.length, 2, `${changes.length} commands append to a file: one PATH line for zsh and its twin for bash are the whole of it`);
   for (const { line, heading } of changes) {
     const m = PATH_LINE.exec(line);
-    assert.ok(m, `${heading}: this appends something other than an export PATH line that puts the user's own folder first: ${line}`);
-    assert.equal(m[2], m[3], `${heading}: the file appended to is not the file that is sourced: ${line}`);
-    assert.ok(PATH_FOLDERS.includes(m[1]), `${heading}: a folder this list does not know goes on PATH: ${m[1]}`);
+    assert.ok(m, `${heading}: this appends something other than the export PATH line that puts Claude Code's folder and Node.js's in front, in that order: ${line}`);
+    assert.equal(m[1], m[2], `${heading}: the file appended to is not the file that is sourced: ${line}`);
+    assert.ok(heading.startsWith('2d · '), `${heading}: the PATH line is the one of 2d, and 2b adds no second one`);
   }
-  // Every redirect on the page writes one of three places: the zsh file or the bash file by appending, and the `drawio` command of path B by creating it.
-  const WRITES = { '>>': ['~/.zshrc', '~/.bash_profile'], '>': ['~/.local/bin/drawio'] };
+  // Every redirect on the page writes one of three places: the zsh file or the bash file by appending, and the `drawio` and `soffice` commands by creating them.
+  const WRITES = { '>>': ['~/.zshrc', '~/.bash_profile'], '>': ['~/.local/bin/drawio', '~/.local/bin/soffice'] };
   for (const { line, heading } of commands) {
     for (const m of line.matchAll(/(>>?)\s*(~\/\S+)/g)) assert.ok(WRITES[m[1]]?.includes(m[2]), `${heading}: ${m[1]} ${m[2]} writes a file this page does not account for: ${line}`);
   }
@@ -271,7 +317,7 @@ test('ARC-09-C300 — a PATH change is the user\'s, in one shape, and every zsh 
       assert.equal(commands[i - 1]?.line, c.line.replaceAll('~/.bash_profile', '~/.zshrc'), `${c.heading}: the bash command ${c.line} has no zsh command straight before it`);
     }
   });
-  assert.ok(changes.filter((c) => /~\/\.zshrc\b/.test(c.line)).length >= 2, 'the page no longer changes PATH under zsh twice (Node.js on path B, Claude Code)');
+  assert.equal(changes.filter((c) => /~\/\.zshrc\b/.test(c.line)).length, 1, 'the page does not change PATH under zsh exactly once');
 });
 
 test('ARC-09-C300 — bash is checked before it is written to: a .bash_profile that would hide the reader\'s own file', () => {
@@ -315,19 +361,26 @@ test('ARC-09-C300 — the licence is in place before the installer, under the na
 
 // ───────────────────────────── step 2d, the plan screen, the words on the screens ─────────────────────────────
 
-test('ARC-09-C300 — step 2d is the line the installer prints when it finds Claude Code off PATH', () => {
-  // ARC-09-C270: when `claude` is not on PATH and the native installer's file is there, B00 prints the fix for the platform, and the fix ends the line.
-  // The page gives the reader the same command in the main steps, so the reader is not sent to a failure to meet it. On a Mac the fix is for zsh, with
-  // the bash file named in its text, so the page has the line and its bash twin, once each.
+test('ARC-09-C300 — step 2d is the product\'s line for Claude Code with the folder of Node.js added, and says what the installer prints instead', () => {
+  // ARC-09-C270: when `claude` is not on PATH and the native installer's file is there, B00 prints the fix for the platform, and the fix ends the line. It
+  // names one folder, Claude Code's. After 2b and 2c two programs are off PATH (Node.js is unpacked into ~/.local/node, which nothing else puts there), so
+  // 2d is the product's command with the second folder after the first: the same file, the same `source`, once for zsh and once for bash.
   const fix = JSON.parse(read('tools/snowarch/lib/remedies.json')).claudeCode.offPath.darwin;
-  const command = fix.slice(fix.indexOf('echo \''));
-  assert.ok(command.startsWith('echo \'export PATH="$HOME/.local/bin:$PATH"\' >> ~/.zshrc && source ~/.zshrc'), `the product's fix no longer ends in the zsh line: ${fix}`);
+  const product = fix.slice(fix.indexOf('echo \''));
+  assert.ok(product.startsWith('echo \'export PATH="$HOME/.local/bin:$PATH"\' >> ~/.zshrc && source ~/.zshrc'), `the product's fix no longer ends in the zsh line: ${fix}`);
   assert.ok(fix.includes('bash on macOS: ~/.bash_profile instead'), `the product's fix no longer says which file bash reads: ${fix}`);
+  const command = product.replace('$HOME/.local/bin:', '$HOME/.local/bin:$HOME/.local/node/bin:');
   const found = commands.filter((c) => c.line === command);
-  assert.equal(found.length, 1, 'the page does not give the command the installer prints, once');
-  assert.ok(found[0].heading.startsWith('2d · '), 'the command the installer prints is the one of step 2d');
-  assert.equal(commands.filter((c) => c.line === command.replaceAll('~/.zshrc', '~/.bash_profile')).length, 1, 'the page does not give the bash twin of the installer\'s command, once');
-  assert.match(page, /The AI Architect's installer prints this same command if it ever finds Claude Code installed but its folder not on PATH\./);
+  assert.equal(found.length, 1, 'the page does not give the product\'s command with the Node.js folder added, once');
+  assert.ok(found[0].heading.startsWith('2d · ') && found[0].label.startsWith('**zsh**'), 'the command is the zsh one of step 2d');
+  assert.equal(commands.filter((c) => c.line === command.replaceAll('~/.zshrc', '~/.bash_profile')).length, 1, 'the page does not give the bash twin of the command, once');
+  // The folder added is the one 2b unpacks Node.js into, and it comes after Claude Code's, which the installer's own line has first.
+  const unpacked = /^tar -xzf \S+ -C ~\/(\.local\/node) --strip-components=1$/.exec(commands.find((c) => /^tar\b/.test(c.line))?.line ?? '')?.[1];
+  assert.ok(unpacked && command.includes(`:$HOME/${unpacked}/bin:`), `the PATH line does not name the folder 2b unpacks Node.js into (${unpacked})`);
+  assert.ok(command.indexOf('$HOME/.local/bin:') < command.indexOf(`$HOME/${unpacked}/bin:`), 'the folder of Node.js comes before the folder of Claude Code');
+  // What the reader is told about the installer's own line, which is the shorter one.
+  assert.ok(prose.includes('If the AI Architect\'s installer ever finds Claude Code installed but its folder not on PATH, it prints a shorter command for that one folder; use the one below instead, which has both.'),
+    'the page does not say that the installer prints a shorter command for the one folder');
 });
 
 test('ARC-09-C300 — the plan screen is the product\'s: its lines, its header, its keys, and the steps a licence in force adds', async () => {
@@ -430,6 +483,8 @@ const OUTSIDE = [
   ['bootstrap.sh', 'note: Node.js not found'],
   ['snowarch', 'snowarch: Node.js 20+ is required and was not found on PATH.'],
   ['scripts/render-drawio.sh', 'ERROR: draw.io Desktop not found'],
+  // The renderer of the PDF check says the same when no `soffice` is on PATH, and suggests brew, which the page's table tells the reader to leave alone.
+  ['scripts/render-pdf.sh', 'ERROR: LibreOffice (soffice) not found'],
 ];
 
 test('ARC-09-C300 — the words on the screens are the product\'s, in both directions', () => {
@@ -590,8 +645,24 @@ test('ARC-09-C300 — Step 7 shows the licence line the product prints, and says
  * (Claude Code's own floor, 13.0, is the lower of the two, so the page states the higher).
  */
 const MACOS_FLOOR_OF_NODE = { '26.13.1': '13.5' };
-/** The size of the draw.io image, in whole megabytes: draw.io-universal-32.7.4.dmg is 260,790,513 bytes (the release's asset list, 2026-11-17). */
-const MEASURED_MB = { '32.7.4': 260 };
+/**
+ * THE SIZE AND THE SHA-256 OF EACH DOWNLOAD, by program and release: what `shasum -a 256` must answer for the file, and what "about N MB" the page says of it.
+ * The product holds none of it, so the page is held to these constants, and a new release is looked up and added here before its page is right. Each was
+ * read on 2026-11-18 from the publisher's own listing, not computed from a download:
+ *   node         SHASUMS256.txt of Node.js v26.13.1 (nodejs.org/dist/v26.13.1/), the line for node-v26.13.1-darwin-arm64.tar.gz
+ *   drawio       the asset list of the draw.io 32.7.4 release on GitHub (jgraph/drawio-desktop, the API's `digest`), draw.io-arm64-32.7.4.dmg, 158,930,055 bytes
+ *   libreoffice  the listing of The Document Foundation for 26.8.3 (download.documentfoundation.org/libreoffice/stable/26.8.3/mac/aarch64/), 299,927,705 bytes
+ * The size the page rounds to the nearest 10 MB (decimal, as the page and the product count them).
+ */
+const SHA256 = {
+  node: { '26.13.1': 'aec2514ea1ceb2ba52455e9ec65986f6749a06dd759e5db2a72e6889668c9735' },
+  drawio: { '32.7.4': 'b0ba01224cdc4817ebf218d73b2a45ff3569f8c9135ad422c5157655062900b3' },
+  libreoffice: { '26.8.3': 'de943203795e5057785f65515063e2db5eb60b0bb6d8e2534fec59e5cc5fb988' },
+};
+const BYTES = { drawio: { '32.7.4': 158930055 }, libreoffice: { '26.8.3': 299927705 } };
+/** The word of the architecture that Step 1 asks `uname -m` to answer, and what The Document Foundation calls the same chip in the name of its file. */
+const ARCH = 'arm64';
+const ARCH_OF_LIBREOFFICE = 'aarch64';
 
 test('ARC-09-C300 — what a reader is told about Node.js on the page, the README and the install page is one sentence', () => {
   const row = /\| Node\.js \| ([^|]*) \|/.exec(page);
@@ -610,60 +681,91 @@ test('ARC-09-C300 — the sentence about Node.js 26 on a Mac is what CI runs', (
   }
 });
 
-test('ARC-09-C300 — each program the page downloads is one version: in the downloads, on the check screens and in the closing paragraph', () => {
-  const one = (re, what) => {
-    const found = commands.filter((c) => re.test(c.line));
-    assert.equal(found.length, 1, `${what}: expected one command, found ${found.length}`);
-    return found[0];
-  };
-  // Node.js: the installer for path A, and the archive of each chip for path B, all three of one release, the folder named for the file.
-  const downloads = commands.filter((c) => /nodejs\.org\/dist\//.test(c.line));
-  assert.equal(downloads.length, 3, 'the page has one installer and two archives of Node.js, and no other download from nodejs.org');
-  const versions = new Set();
-  for (const [what, re, label] of [
-    ['the installer', NODE_PKG, null],
-    ['the Apple silicon archive', /^curl -fL -o ~\/snowarch-dl\/node\.tar\.gz https:\/\/nodejs\.org\/dist\/v(\d+\.\d+\.\d+)\/node-v(\d+\.\d+\.\d+)-darwin-arm64\.tar\.gz$/, '**Apple silicon**'],
-    ['the Intel archive', /^curl -fL -o ~\/snowarch-dl\/node\.tar\.gz https:\/\/nodejs\.org\/dist\/v(\d+\.\d+\.\d+)\/node-v(\d+\.\d+\.\d+)-darwin-x64\.tar\.gz$/, '**Intel**'],
-  ]) {
-    const command = one(re, what);
-    const m = re.exec(command.line);
-    assert.equal(m[1], m[2], `${what}: the folder and the file name are different versions: ${command.line}`);
-    versions.add(m[1]);
-    // A reader with the other chip runs the other file and meets `bad CPU type in executable`: the chip's label is the whole protection.
-    if (label) assert.ok(command.label.startsWith(label), `${what} is not under the label ${label}: ${command.label}`);
-    assert.ok(command.heading.startsWith(label ? 'Path B' : 'Path A'), `${what} is under the wrong path: ${command.heading}`);
+test('ARC-09-C300 — each program the page downloads is one version and a file for Apple silicon: in the downloads, on the check screens and in the closing paragraph', () => {
+  // Every download of the page: the three files of Step 2, saved in the download folder, and Claude Code's own installer, which is no file of ours.
+  const curls = commands.filter((c) => /^curl\b/.test(c.line));
+  assert.equal(curls.length, 4, `the page has ${curls.length} downloads: expected the three files of Step 2 and the installer of Claude Code`);
+  assert.ok(curls.some((c) => c.line === 'curl -fsSL https://claude.ai/install.sh | bash' && c.heading.startsWith('2c · ')), 'the installer of Claude Code is not what 2c runs');
+  const release = {};
+  for (const [name, step] of [['node', '2b · '], ['drawio', '2f · '], ['libreoffice', '2g · ']]) {
+    const found = commands.filter((c) => DOWNLOADS[name].re.test(c.line));
+    assert.equal(found.length, 1, `${name}: expected one download of the file made for Apple silicon, found ${found.length}`);
+    const m = DOWNLOADS[name].re.exec(found[0].line);
+    assert.equal(m[1], m[2], `${name}: the folder and the file name are different versions: ${found[0].line}`);
+    assert.ok(found[0].heading.startsWith(step), `${name}: the download is not under ${step.trim()}: ${found[0].heading}`);
+    release[name] = m[1];
   }
-  assert.equal(versions.size, 1, `the Node.js downloads are not one release: ${[...versions].join(', ')}`);
-  assert.equal([...versions][0], node);
+  // The word of the chip that Step 1 asks for is the word in the file names; The Document Foundation's name for the same chip is the one of its own listing.
+  assert.ok(commands.some((c) => c.line.includes(`darwin-${ARCH}.tar.gz`)) && commands.some((c) => c.line.includes(`/draw.io-${ARCH}-`)), `the downloads of Node.js and draw.io do not name ${ARCH}`);
+  assert.ok(commands.some((c) => c.line.includes(`/mac/${ARCH_OF_LIBREOFFICE}/`) && c.line.includes(`_MacOS_${ARCH_OF_LIBREOFFICE}.dmg`)), `the download of LibreOffice does not name ${ARCH_OF_LIBREOFFICE}`);
+  // ONLY those files: nothing for an Intel Mac, no universal image, no installer package, no download that decides by itself which file to fetch.
+  for (const { line, heading } of commands) {
+    assert.doesNotMatch(line, /x64|x86|amd64|i386|universal|\.pkg\b|intel|\.zip\b/i, `${heading}: a command that names a file for another chip or another format: ${line}`);
+    if (/^curl\b/.test(line)) assert.doesNotMatch(line, /\buname\b|\$\(|`/, `${heading}: a download that works out for itself which file to fetch: ${line}`);
+  }
+  assert.doesNotMatch(page, /draw\.io-(?:x64|universal)|x86-64|darwin-x64|\.pkg\b|-windows\.zip/, 'the page names a file that is not for Apple silicon');
+  assert.equal(release.node, node);
+  // Where each release is shown to the reader: the check of 2e, the checks of 6a, the closing paragraph; the sample of LibreOffice's own version line.
   assert.ok(screens.some((b) => b.lines.includes(`v${node}`)), `the check in 2e does not show v${node}`);
   assert.ok(screens.some((b) => b.lines.some((l) => l.startsWith(`ok B00 node: ${node} · npm `))), `the checks of 6a do not show Node.js ${node}`);
-  assert.ok(closing.includes(`Node.js ${node},`), `the closing paragraph does not name Node.js ${node}`);
-  // The archive goes into the folder 2b puts on PATH, and the installer's file is the one that `open` opens.
+  assert.ok(closing.includes(`Node.js ${release.node},`), `the closing paragraph does not name Node.js ${release.node}`);
+  assert.ok(closing.includes(`draw.io ${release.drawio},`), `the closing paragraph does not name draw.io ${release.drawio}`);
+  assert.ok(closing.includes(`LibreOffice ${release.libreoffice},`), `the closing paragraph does not name LibreOffice ${release.libreoffice}`);
+  const version = new RegExp(`^LibreOffice ${release.libreoffice.replaceAll('.', '\\.')}\\.\\d+ [0-9a-f]{40}$`);
+  const soffice = screens.filter((b) => b.lines.some((l) => version.test(l)));
+  assert.equal(soffice.length, 1, `the page shows no sample of "LibreOffice ${release.libreoffice}.<build> <40 letters and digits>", or shows it twice`);
+  assert.equal(soffice[0].lines.filter((l) => l.trim() !== '').length, 1, 'the sample of the LibreOffice version is not one line');
+  assert.ok(soffice[0].heading.startsWith('2g · '), 'the sample of the LibreOffice version is not in 2g');
+  // The archive goes into the folder 2d puts on PATH, and the download folder exists before the first download and is where Step 3 starts.
   assert.ok(lines.includes('tar -xzf ~/snowarch-dl/node.tar.gz -C ~/.local/node --strip-components=1'), 'the archive is not unpacked into ~/.local/node');
   assert.ok(lines.includes('mkdir -p ~/.local/node'), 'the folder the archive goes into is not made');
+  assert.ok(lines.indexOf('mkdir -p ~/.local/node') < lines.indexOf('tar -xzf ~/snowarch-dl/node.tar.gz -C ~/.local/node --strip-components=1'), 'the archive is unpacked before its folder is made');
   assert.ok(lines.indexOf('mkdir -p ~/snowarch-dl') >= 0 && lines.indexOf('mkdir -p ~/snowarch-dl') < at((c) => /^curl -fL -o ~\/snowarch-dl\//.test(c.line)), 'the download folder is made after the first download');
   assert.ok(lines.includes('cd ~/snowarch-dl'), 'Step 3 does not start in the download folder');
+
   // The macOS the release needs: the page states it everywhere it states a floor, and the product holds only Claude Code's.
   assert.ok(node in MACOS_FLOOR_OF_NODE, `read BUILDING.md of Node.js ${node} for the macOS it needs and add it to MACOS_FLOOR_OF_NODE`);
   const floor = MACOS_FLOOR_OF_NODE[node];
   const major = node.split('.')[0];
   assert.ok(page.split('\n')[2].startsWith(`AI ServiceNow Architect · macOS ${floor} or later `), 'the title line does not state the macOS floor');
-  const need = page.split('\n').find((l) => l.startsWith('- A Mac with '));
-  assert.ok(need.includes(`**macOS ${floor} or later**`) && need.includes(`Claude Code needs 13.0, Node.js ${major} needs ${floor}`), `"What you need" does not state the floor, and whose it is: ${need}`);
+  const need = page.split('\n').find((l) => l.startsWith('- **macOS '));
+  assert.ok(need?.includes(`**macOS ${floor} or later**`) && need.includes(`Claude Code needs 13.0, Node.js ${major} needs ${floor}`), `"What you need" does not state the floor, and whose it is: ${need}`);
   assert.ok(prose.includes(`this guide needs ${floor} or later`), 'the dyld row does not name the floor');
   assert.ok(prose.includes(`macOS ${floor} to 15`), 'the list of what has not been tested does not start at the floor');
   for (const m of prose.matchAll(/macOS (\d+(?:\.\d+)?) or later/g)) assert.ok([floor, '10.15'].includes(m[1]), `the page states a macOS floor of ${m[1]}: only ${floor} and the zsh default of 10.15 belong to it`);
 
-  // draw.io: one image for both paths and both chips, one version in the URL and the file, the size measured on that file, one folder it is saved to.
-  const dl = one(/jgraph\/drawio-desktop\/releases\/download\//, 'the draw.io download');
-  const d = /^curl -fL -o (~\/snowarch-dl\/drawio\.dmg) https:\/\/github\.com\/jgraph\/drawio-desktop\/releases\/download\/v(\d+\.\d+\.\d+)\/draw\.io-universal-(\d+\.\d+\.\d+)\.dmg$/.exec(dl.line);
-  assert.ok(d && d[2] === d[3], `the draw.io download is not one versioned universal image: ${dl.line}`);
-  assert.ok(dl.heading.startsWith('2f · '), 'the draw.io download is not shared by the two paths: it is under a Path heading');
-  assert.doesNotMatch(page, /draw\.io-(?:arm64|x64)-|-windows\.zip/, 'the page names a draw.io image other than the universal one');
-  assert.deepEqual(commands.filter((c) => c.line === `open ${d[1]}`).map((c) => c.heading.slice(0, 6)), ['Path A', 'Path B'], 'each path opens the image the download saves');
-  assert.ok(closing.includes(`draw.io ${d[2]},`), `the closing paragraph does not name draw.io ${d[2]}`);
-  assert.ok(d[2] in MEASURED_MB, `measure draw.io-universal-${d[2]}.dmg (the release's asset list) and add its size to MEASURED_MB`);
-  assert.match(page, new RegExp(`It is about ${MEASURED_MB[d[2]]} MB\\.`));
+  // The size of each image, as the page says it: the nearest ten megabytes of what the publisher lists.
+  for (const name of ['drawio', 'libreoffice']) {
+    assert.ok(release[name] in BYTES[name], `read the size of the ${name} ${release[name]} download in the publisher's listing and add it to BYTES`);
+    assert.ok(prose.includes(`It is about ${Math.round(BYTES[name][release[name]] / 1e7) * 10} MB`), `the page does not give the size of the ${name} download as about ${Math.round(BYTES[name][release[name]] / 1e7) * 10} MB`);
+  }
+});
+
+test('ARC-09-C300 — the three optional checksums are the publishers\' own: each screen holds the pinned SHA-256 and names the file its command checks', async (t) => {
+  // `shasum -a 256 <file>` answers `<64 letters and digits>  <path>`, two spaces between them. The page shows what the publisher lists for the file it
+  // downloaded one step before; the values are pinned above, with where each was read, and are the page's alone: a new release is a new line there.
+  const checks = commands.map((c, i) => ({ ...c, i })).filter((c) => /^shasum\b/.test(c.line));
+  assert.deepEqual(checks.map((c) => c.line), ['node', 'drawio', 'libreoffice'].map((n) => `shasum -a 256 ~/snowarch-dl/${DOWNLOADS[n].file}`), 'the checksum commands are not the three, one for each download, in the order of the downloads');
+  for (const [n, name] of ['node', 'drawio', 'libreoffice'].entries()) {
+    const check = checks[n];
+    const release = versionOf(name);
+    assert.ok(release in SHA256[name], `read the SHA-256 of the ${name} ${release} download in the publisher's listing and add it to SHA256`);
+    // The check comes after the download of the same file and before anything that uses it.
+    const download = at((c) => DOWNLOADS[name].re.test(c.line));
+    assert.ok(download >= 0 && download < check.i, `${name}: the checksum is asked before the download`);
+    const block = blocks.findIndex((b) => b.kind === 'run' && b.lines.includes(check.line));
+    const shown = blocks.slice(block + 1).find((b) => b.kind === 'screen');
+    assert.deepEqual(shown?.lines.filter((l) => l.trim() !== ''), [`${SHA256[name][release]}  /Users/you/snowarch-dl/${DOWNLOADS[name].file}`], `${name}: the screen after the checksum is not the pinned SHA-256 of ${release}, two spaces, and the file the command checks`);
+    assert.ok(check.label.startsWith('**Optional.**'), `${name}: the checksum is not marked optional`);
+  }
+  // A shasum on a Mac prints exactly that shape; the page's screen is the shape of a real run, with the home folder written out.
+  if (process.platform === 'win32' || spawnSync('bash', ['-c', 'command -v shasum'], { stdio: 'ignore' }).status !== 0) return t.skip('shasum runs where bash and shasum are');
+  const home = tempDir('install-macos-guide-', t);
+  mkdirSync(join(home, 'snowarch-dl'));
+  writeFileSync(join(home, 'snowarch-dl', 'node.tar.gz'), 'a stand-in for the archive\n');
+  const ran = bash(checks[0].line, { home });
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.match(ran.stdout.replace(home, '/Users/you'), /^[0-9a-f]{64}  \/Users\/you\/snowarch-dl\/node\.tar\.gz\n$/, 'shasum does not answer in the shape the page shows');
 });
 
 test('ARC-09-C300 — the page ends as long as no Mac has run it: "Not yet tested end to end on a Mac."', () => {
@@ -679,6 +781,11 @@ test('ARC-09-C300 — the page ends as long as no Mac has run it: "Not yet teste
 test('ARC-09-C300 — the page is linked from where a Mac reader starts, and carries a release tag the release writes', () => {
   assert.match(read('README.md'), /\]\(docs\/INSTALL-MACOS\.md\)/);
   assert.match(read('docs/INSTALL.md'), /\]\(INSTALL-MACOS\.md\)/);
+  // The paragraph that sends a reader there says whose Mac it is for: the page stops an Intel Mac in Step 1, so the link does not offer it to one.
+  for (const [rel, link] of [['README.md', '](docs/INSTALL-MACOS.md)'], ['docs/INSTALL.md', '](INSTALL-MACOS.md)']]) {
+    const paragraph = read(rel).split('\n').find((l) => l.includes(link));
+    assert.ok(paragraph?.startsWith('**On a Mac with Apple silicon'), `${rel}: the paragraph that links the macOS page does not say that it is for Apple silicon: ${paragraph?.slice(0, 120)}`);
+  }
   // One clone command, pinned to a release; the release's writer owns the tag (scripts/lib/release/writers.mjs).
   const clones = commands.filter((c) => /^git -c advice\.detachedHead=false clone --branch v\d+\.\d+\.\d+ https:\/\/github\.com\/farstic\/snowarch\.git AI-Arch$/.test(c.line));
   assert.equal(clones.length, 1);
@@ -688,44 +795,136 @@ test('ARC-09-C300 — the page is linked from where a Mac reader starts, and car
   assert.match(page, /The screens in this guide are examples\./);
 });
 
-// ───────────────────────────── draw.io and the Word converter: the renderer's side ─────────────────────────────
-
-test('ARC-09-C300 — draw.io is where the renderer looks, and path B has the command the renderer needs until it looks in the home folder', async () => {
-  const sh = read('scripts/render-drawio.sh');
-  const { DRAWIO_CANDIDATES, drawioCandidates } = await import(href('tools/snowarch/lib/doctor/checks/engine-prereqs.mjs'));
-  const checks = commands.filter((c) => /^ls \S*Applications\/draw\.io\.app\//.test(c.line));
-  assert.equal(checks.length, 2, 'the page checks draw.io once on each path');
-  const [a, b] = ['Path A', 'Path B'].map((p) => checks.find((c) => c.heading.startsWith(p)));
-  assert.ok(a && b, 'each path has its own check of draw.io');
-  // Path A: the check path is the first place the renderer looks on a Mac, and the doctor's list starts there too.
-  const pathA = a.line.slice('ls '.length);
-  assert.equal(/^\s+mac\)\s*\n\s+pick "([^"]+)"/m.exec(sh)?.[1], pathA, 'the renderer\'s first place for draw.io on a Mac is not the path the page checks');
-  assert.equal(DRAWIO_CANDIDATES.posix[0], pathA, 'the doctor\'s first place for draw.io on a Mac is not the path the page checks');
-  // Path B: the home folder's Applications. Until the renderer looks there by itself, the page makes the command it finds on PATH.
-  const pathB = b.line.slice('ls '.length);
-  assert.equal(pathB, '~/Applications/draw.io.app/Contents/MacOS/draw.io');
-  const code = sh.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
-  const looksInHome = /\$\{?HOME\}?\/Applications\//.test(code);
-  const wrappers = commands.filter((c) => c.line.includes('> ~/.local/bin/drawio'));
-  if (!looksInHome) {
-    assert.equal(wrappers.length, 1, 'the renderer does not look in ~/Applications, and the page does not make the command that starts draw.io from there');
-    assert.equal(wrappers[0].line, `printf '#!/bin/sh\\nexec "${pathB.replace('~', '$HOME')}" "$@"\\n' > ~/.local/bin/drawio && chmod +x ~/.local/bin/drawio`, 'the command of path B does not start the app that the check finds');
-    assert.ok(wrappers[0].heading.startsWith('Path B'), 'the drawio command is made under path B');
-    // It goes into the folder 2d puts on PATH (the product's own line for Claude Code, which the 2d case holds the page to), under a name the renderer
-    // looks for on PATH, in the first of its names.
-    const offPath = JSON.parse(read('tools/snowarch/lib/remedies.json')).claudeCode.offPath.darwin;
-    assert.ok(offPath.includes('export PATH="$HOME/.local/bin:$PATH"'), 'the product no longer puts ~/.local/bin on PATH when it finds Claude Code off it');
-    assert.match(sh, /for n in drawio draw\.io draw\.io\.exe; do/, 'the renderer no longer looks for a command called drawio on PATH');
-    assert.ok(prose.includes('which makes the `drawio` command'), 'the troubleshooting row does not send path B to the command that makes `drawio`');
-  } else {
-    // The renderer looks in ~/Applications itself (and the doctor's list must follow): the command and its paragraph go, and the page says so as Windows 2f does.
-    assert.equal(wrappers.length, 0, 'the renderer looks in ~/Applications now: the drawio command and its paragraph go from path B');
-    assert.doesNotMatch(prose, /`drawio` command|command named `drawio`/, 'a paragraph still tells path B to make a drawio command');
-    assert.ok(prose.includes('looks for draw.io in that folder by itself'), 'path B does not say that the AI Architect finds draw.io in your own Applications folder by itself');
-    assert.ok(drawioCandidates({ platform: 'darwin', env: { HOME: '/Users/you' } }).includes('/Users/you/Applications/draw.io.app/Contents/MacOS/draw.io'),
-      'the doctor does not look in ~/Applications although the renderer does');
+/** The text of a section of the page, fenced blocks included: from its heading to the next heading of the same level or a higher one. */
+function sectionOf(title) {
+  const all = page.split('\n');
+  const start = all.findIndex((l) => /^#{1,4} /.test(l) && l.replace(/^#+ /, '') === title);
+  assert.ok(start >= 0, `no section "${title}"`);
+  const level = /^#+/.exec(all[start])[0].length;
+  let fenced = false;
+  const out = [];
+  for (const l of all.slice(start + 1)) {
+    if (l.startsWith('```')) fenced = !fenced;
+    else if (!fenced && /^#+ /.test(l) && /^#+/.exec(l)[0].length <= level) break;
+    out.push(l);
   }
-  assert.ok(prose.includes('The AI Architect looks for draw.io there by itself, so there is no PATH command to run.'), 'path A no longer says that there is nothing more to do once draw.io is in Applications');
+  return out.join('\n');
+}
+
+/** Every line of the page with the heading it sits under, and whether it is inside a fenced block. */
+const pageLines = (() => {
+  let heading = '';
+  let fenced = false;
+  return page.split('\n').map((line) => {
+    if (line.startsWith('```')) fenced = !fenced;
+    else if (!fenced && /^#{1,4} /.test(line)) heading = line.replace(/^#+ /, '');
+    return { line, heading, fenced };
+  });
+})();
+
+/** The screen a command is followed by: the first block that shows what the reader sees, after the block that holds the command. */
+const screenAfter = (line) => {
+  const at = blocks.findIndex((b) => b.kind === 'run' && b.lines.includes(line));
+  return at < 0 ? null : blocks.slice(at + 1).find((b) => b.kind === 'screen') ?? null;
+};
+
+test('ARC-09-C300 — the guide is for Apple silicon only: Step 1 asks `uname -m` for arm64, says what an Intel Mac does and how Rosetta is undone, and the rest of the page does not speak of Intel', () => {
+  const asks = commands.filter((c) => c.line === 'uname -m');
+  assert.equal(asks.length, 1, 'the page does not ask `uname -m` exactly once');
+  assert.equal(asks[0].heading, 'Check that your Mac has Apple silicon');
+  assert.ok(commands.indexOf(asks[0]) < at((c) => c.line === 'xcode-select --install'), 'the chip is checked after something was installed');
+  // The answer it must give is one word, and it is the word in the names of the files the page downloads.
+  assert.deepEqual(screenAfter('uname -m')?.lines.filter((l) => l.trim() !== ''), [ARCH], 'the screen after `uname -m` is not the one word the downloads are made for');
+  const step = sectionOf('Check that your Mac has Apple silicon');
+  assert.ok(step.includes('It must answer `arm64`. If it answers `x86_64`, your Mac has an Intel processor (About This Mac shows **Processor**, not **Chip**), and this guide is not for it: stop here and ask whoever helps you with the AI Architect.'), 'the stop text for an Intel Mac is gone or changed');
+  // A Mac with Apple silicon whose Terminal opens under Rosetta answers x86_64 too: the page says where the setting is, and sends the reader back to the command.
+  assert.ok(step.includes('If About This Mac shows a **Chip** that starts with *Apple M* but the command answers `x86_64`, Terminal is set to open using Rosetta'), 'the Rosetta case is gone or changed');
+  assert.ok(step.includes('press **Command+I**, untick **Open using Rosetta**, quit Terminal (**Terminal › Quit Terminal**), open it again as above and run the command again.'), 'the way to undo Rosetta is gone or changed');
+  assert.ok(prose.includes('see the Rosetta setting in Step 1'), 'the row for a Node.js that does not start no longer sends the reader to the Rosetta setting');
+  // Intel is named in the item of "What you need" that says this guide is not for it, and in this section, and nowhere else: not in a command, a screen, a label
+  // or a row of the table. (Rosetta is named in the row above and in the list of what has not been tested, which is not naming a chip.)
+  const named = pageLines.filter((l) => /\bIntel\b|\bx86|\bx64\b|amd64|i386|\buniversal\b/i.test(l.line));
+  assert.ok(named.length >= 3, `only ${named.length} lines name the chip that is not supported: the reading is broken`);
+  for (const l of named) {
+    const allowed = l.heading === 'Check that your Mac has Apple silicon' || (l.heading === 'What you need' && l.line.startsWith('- A Mac with **Apple silicon**'));
+    assert.ok(allowed, `${l.heading}: the page speaks of the chip it is not for outside Step 1 and the first item of "What you need": ${l.line.slice(0, 160)}`);
+  }
+  assert.ok(prose.includes('A Mac with an Intel processor shows **Processor** instead, and this guide is not for it. Step 1 checks it again with a command.'), 'the first item of "What you need" does not send the reader to Step 1');
+  assert.ok(prose.includes('on a Mac with Apple silicon (M1 or later)'), 'the title line does not say that the guide is for Apple silicon');
+});
+
+test('ARC-09-C300 — exactly four commands are optional, each says so in the line before its Run:, and every checksum and every opening of an app is one of them', () => {
+  const optional = commands.filter((c) => c.label.startsWith('**Optional.**'));
+  assert.deepEqual(optional.map((c) => c.line), [
+    `shasum -a 256 ~/snowarch-dl/${DOWNLOADS.node.file}`, `shasum -a 256 ~/snowarch-dl/${DOWNLOADS.drawio.file}`,
+    'open ~/Applications/draw.io.app', `shasum -a 256 ~/snowarch-dl/${DOWNLOADS.libreoffice.file}`,
+  ], 'the optional commands are not the three checksums and the one opening of draw.io, in the order of the page');
+  for (const c of optional) assert.match(c.label, /^\*\*Optional\.\*\* .*Run:$/, `${c.heading}: the label of an optional command is not "**Optional.** … Run:": ${c.label}`);
+  for (const c of commands.filter((x) => /^(?:shasum|open)\b/.test(x.line))) assert.ok(c.label.startsWith('**Optional.**'), `${c.heading}: ${c.line} is not marked optional, and nothing after it depends on it`);
+  // The one `open` starts the app the reader has just installed, so that macOS's questions come up while they watch; it is the app the `drawio` command starts.
+  const app = /\$HOME\/Applications\/(draw\.io\.app)\//.exec(commands.find((c) => WRAPPER.test(c.line) && /drawio$/.test(c.line))?.line ?? '')?.[1];
+  assert.equal(optional.find((c) => c.line.startsWith('open '))?.line, `open ~/Applications/${app}`);
+  assert.match(page, /A command marked \*\*Optional\*\* can be skipped\./);
+});
+
+test('ARC-09-C300 — the page says what the install takes: about 45 minutes, 6 GB to start with, and the 1.5 GB the installer checks; and Uninstall names what Step 2 made', () => {
+  assert.ok(prose.includes('Plan about 45 minutes, more if your Mac first has to download Apple\'s Command Line Tools; most of it is waiting for downloads.'), 'the page does not say how long to plan');
+  assert.ok(prose.includes('On a company Mac, add the time your IT team needs for 2a.'), 'the page does not say that a company Mac adds the time of 2a');
+  assert.ok(prose.includes('- At least **6 GB of free disk space** before you start.'), 'the page does not ask for 6 GB of free disk space');
+  // The 1.5 GB is the installer's own floor for the whole corpus (B00's DISK_FULL), which the page quotes for Step 6a.
+  const floor = /export const DISK_FULL = ([\d.]+) \* GB;/.exec(read('tools/snowarch/lib/steps/B00.mjs'))?.[1];
+  assert.ok(floor && prose.includes(`the installer checks for ${floor} GB in Step 6a`), `the page does not say that the installer checks for ${floor} GB`);
+
+  // Uninstall step 4 names everything Step 2 makes in the home folder: the two apps, the two small commands, the Node.js folder and the download folder.
+  const uninstall = sectionOf('Uninstall');
+  const apps = commands.filter((c) => COPY_APP.test(c.line)).map((c) => COPY_APP.exec(c.line)[2].replace(/\.app$/, ''));
+  const small = commands.filter((c) => WRAPPER.test(c.line)).map((c) => WRAPPER.exec(c.line)[3]);
+  const unpacked = /-C ~\/(\.local)\/(node) /.exec(commands.find((c) => /^tar\b/.test(c.line))?.line ?? '');
+  assert.deepEqual([apps, small], [['draw.io', 'LibreOffice'], ['drawio', 'soffice']], 'the apps and small commands the page makes are not the two and two the Uninstall step is written for');
+  assert.ok(unpacked, 'the page does not unpack Node.js into ~/.local/node');
+  assert.ok(uninstall.includes('~/Applications') && apps.every((a) => uninstall.includes(`**${a}**`)), 'Uninstall does not say where the two apps are and name both');
+  assert.ok(uninstall.includes('~/.local/bin') && small.every((s) => uninstall.includes(`\`${s}\``)), 'Uninstall does not name the two small commands and the folder they are in');
+  assert.ok(uninstall.includes(`\`~/${unpacked[1]}\``) && uninstall.includes(`the folder \`${unpacked[2]}\``), 'Uninstall does not name the folder Node.js was unpacked into');
+  assert.ok(uninstall.includes('the folder `snowarch-dl` of your home folder'), 'Uninstall does not name the download folder');
+  assert.ok(uninstall.includes('The PATH line that 2d added to `.zshrc` (or `.bash_profile`) can stay'), 'Uninstall does not say what becomes of the PATH line');
+  assert.ok(uninstall.includes('The programs from Step 2 stay on your Mac unless you remove them as in step 4.'), 'the sentence under the Uninstall command does not point at step 4');
+});
+
+// ───────────────────────────── draw.io and LibreOffice: the two small commands, and the renderers' side ─────────────────────────────
+
+test('ARC-09-C300 — the two small commands of 2f and 2g start the apps the page copied, from the folder 2d puts on PATH, in the bundle layout the product knows', async () => {
+  const made = commands.filter((c) => WRAPPER.test(c.line)).map((c) => ({ ...c, m: WRAPPER.exec(c.line) }));
+  assert.deepEqual(made.map((c) => [c.m[3], c.heading.slice(0, 2)]), [['drawio', '2f'], ['soffice', '2g']], 'the page does not make `drawio` in 2f and `soffice` in 2g, and nothing else');
+  // Each starts the app its step copies out of the disk image.
+  assert.deepEqual(made.map((c) => c.m[1]), commands.filter((c) => COPY_APP.test(c.line)).map((c) => COPY_APP.exec(c.line)[2]), 'a small command does not start the app that the step before it copied');
+  // The folder they go into is Claude Code's, the first folder of the PATH line of 2d, and the product's own line for Claude Code puts the same folder on PATH.
+  const offPath = JSON.parse(read('tools/snowarch/lib/remedies.json')).claudeCode.offPath.darwin;
+  assert.ok(offPath.includes('export PATH="$HOME/.local/bin:$PATH"'), 'the product no longer puts ~/.local/bin on PATH when it finds Claude Code off it');
+  assert.ok(commands.find((c) => PATH_LINE.test(c.line)).line.includes('export PATH="$HOME/.local/bin:'), 'the folder of the small commands is not the first folder of the PATH line of 2d');
+  // The product looks for a bundle with this layout in /Applications, and the page keeps the apps in the home folder: the layout inside the bundle is the same.
+  const { DRAWIO_CANDIDATES, SOFFICE_CANDIDATES } = await import(href('tools/snowarch/lib/doctor/checks/engine-prereqs.mjs'));
+  const inside = (path) => path.replace(/^\/Applications\//, '');
+  const drawioSh = read('scripts/render-drawio.sh');
+  const pdfSh = read('scripts/render-pdf.sh');
+  const [drawio, soffice] = made;
+  assert.equal(inside(DRAWIO_CANDIDATES.posix[0]), `${drawio.m[1]}/Contents/MacOS/${drawio.m[2]}`, 'the doctor\'s first place for draw.io on a Mac is not the layout the page starts');
+  assert.equal(inside(/^\s+mac\)\s*\n\s+pick "([^"]+)"/m.exec(drawioSh)?.[1] ?? ''), `${drawio.m[1]}/Contents/MacOS/${drawio.m[2]}`, 'the renderer\'s first place for draw.io on a Mac is not the layout the page starts');
+  assert.equal(inside(SOFFICE_CANDIDATES[0]), `${soffice.m[1]}/Contents/MacOS/${soffice.m[2]}`, 'the doctor\'s place for LibreOffice on a Mac is not the layout the page starts');
+  assert.ok(pdfSh.includes(`/Applications/${soffice.m[1]}/Contents/MacOS/${soffice.m[2]}`), 'the PDF renderer\'s place for LibreOffice on a Mac is not the layout the page starts');
+  // Both renderers look on PATH FIRST, under the names the page gives the commands, and only then in /Applications: that is why the page makes the commands.
+  assert.match(drawioSh, /for n in drawio draw\.io draw\.io\.exe; do/, 'the renderer no longer looks for a command called drawio on PATH');
+  const pdfCode = pdfSh.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');           // the script's header comment names both places, in the other order
+  assert.ok(pdfCode.includes('command -v soffice') && pdfCode.indexOf('command -v soffice') < pdfCode.indexOf('/Applications/LibreOffice.app'), 'the PDF renderer no longer looks for soffice on PATH before it looks in /Applications');
+  // The check of 2f: the app and the command, and the order in which `ls` prints two paths (byte order puts the dot first), as the screen shows them.
+  const ls = commands.find((c) => /^ls ~\/Applications\//.test(c.line));
+  assert.equal(ls?.heading.slice(0, 2), '2f', 'the check of draw.io is not in 2f');
+  const paths = ls.line.slice('ls '.length).split(' ');
+  assert.deepEqual([...paths].sort(), [`~/Applications/${drawio.m[1]}/Contents/MacOS/${drawio.m[2]}`, '~/.local/bin/drawio'].sort(), 'the check of 2f does not name the app and the command that 2f makes');
+  assert.deepEqual(screenAfter(ls.line)?.lines.filter((l) => l.trim() !== ''), paths.map((p) => p.replace('~', '/Users/you')).sort(), 'the screen of the check is not the two paths, home folder written out, in the order `ls` prints them');
+  assert.ok(lines.includes('soffice --version') && commands.find((c) => c.line === 'soffice --version').heading.startsWith('2g · '), 'the check of 2g is not `soffice --version`');
+  // Each check comes after the command it checks.
+  assert.ok(at((c) => c.line === 'soffice --version') > at((c) => c.line === soffice.line), 'the check of LibreOffice comes before the command that makes `soffice`');
+  assert.ok(at((c) => c.line === ls.line) > at((c) => c.line === drawio.line), 'the check of draw.io comes before the command that makes `drawio`');
 });
 
 test('ARC-09-C300 — the Word converter on a Mac is python3, and the doctor says so in the words the page quotes', async (t) => {
@@ -774,27 +973,24 @@ test('ARC-09-C300 — the page is written for a Mac: no Windows text in it, and 
 
 // ───────────────────────────── the commands, run ─────────────────────────────
 
-/** Bash is on every runner that has a Mac or a Linux in it. Nothing below runs on Windows, where a Mac's commands have no meaning. */
-const BASH = { skip: process.platform === 'win32' ? 'a Mac\'s commands are run where there is a bash' : false };
-
-/** Run `command` under bash, with `home` as the home folder and `cwd` as the folder, and return what it did. */
-const bash = (command, { home, cwd = home }) => spawnSync('bash', ['-c', command], {
-  cwd, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home, LANG: 'C' },
-});
-
-test('ARC-09-C300 — the PATH lines write the line they say, and a window that reads it has the folder first', BASH, (t) => {
+test('ARC-09-C300 — the PATH line writes the line it says, and a window that reads it finds Claude Code and Node.js, with Claude Code\'s folder first', BASH, (t) => {
   const changes = commands.filter((c) => c.line.includes('>>'));
-  assert.ok(changes.length >= 4);
+  assert.equal(changes.length, 2);
   for (const { line, heading } of changes) {
     const home = tempDir('install-macos-guide-', t);
-    const [, folder, file] = PATH_LINE.exec(line);
+    const [, file] = PATH_LINE.exec(line);
     const r = bash(line, { home });
     assert.equal(r.status, 0, `${heading}: ${line} failed: ${r.stderr}`);
     assert.equal(r.stdout + r.stderr, '', `${heading}: the page says the command normally prints nothing: ${r.stdout}${r.stderr}`);
-    assert.equal(readFileSync(join(home, `.${file}`), 'utf8'), `export PATH="$HOME/${folder}:$PATH"\n`, `${heading}: the file holds something other than the one PATH line`);
-    // A window of the shell that reads the file: the user's folder comes first, and what was on PATH before is still there.
-    const next = spawnSync('bash', ['-c', `. "$HOME/.${file}" && printf %s "$PATH"`], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: home } });
-    assert.equal(next.stdout, `${home}/${folder}:/usr/bin:/bin`, `${heading}: a window that reads the file does not have the folder first`);
+    assert.equal(readFileSync(join(home, `.${file}`), 'utf8'), 'export PATH="$HOME/.local/bin:$HOME/.local/node/bin:$PATH"\n', `${heading}: the file holds something other than the one PATH line`);
+    // Stand-ins for the two programs, where 2c and 2b put them. A window of the shell that reads the file finds both, Claude Code's folder first, and what
+    // was on PATH before is still there after them.
+    for (const stand of ['.local/bin/claude', '.local/node/bin/node']) {
+      mkdirSync(dirname(join(home, stand)), { recursive: true });
+      writeFileSync(join(home, stand), '#!/bin/sh\n', { mode: 0o755 });
+    }
+    const next = spawnSync('bash', ['-c', `. "$HOME/.${file}" && printf '%s\\n' "$PATH" && command -v claude && command -v node`], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: home } });
+    assert.equal(next.stdout, `${home}/.local/bin:${home}/.local/node/bin:/usr/bin:/bin\n${home}/.local/bin/claude\n${home}/.local/node/bin/node\n`, `${heading}: a window that reads the file does not find both programs, Claude Code's folder first`);
   }
 });
 
@@ -818,22 +1014,111 @@ test('ARC-09-C300 — the licence copy does what the page says: one file is copi
   assert.equal(readFileSync(join(folder, '.local', 'licence.json'), 'utf8'), '{"licence":"placeholder"}\n', 'a refused copy changed the licence in place');
 });
 
-test('ARC-09-C300 — the drawio command of path B is a working one: the page makes it, the doctor finds it, and it starts the app the page installs', BASH, async (t) => {
-  const command = commands.find((c) => c.line.includes('> ~/.local/bin/drawio'))?.line;
-  if (!command) return;                                  // the renderer looks in ~/Applications itself, and the command has gone from the page
+test('ARC-09-C300 — the small commands make `drawio` and `soffice` that pass their arguments on to the app, and the doctor and both renderers find them on PATH', BASH, async (t) => {
   const home = tempDir('install-macos-guide-', t);
-  mkdirSync(join(home, '.local', 'bin'), { recursive: true });      // Claude Code's installer makes this folder; 2d puts it on PATH
-  const app = join(home, 'Applications', 'draw.io.app', 'Contents', 'MacOS');
-  mkdirSync(app, { recursive: true });
-  writeFileSync(join(app, 'draw.io'), '#!/bin/sh\nprintf "started:%s" "$*"\n', { mode: 0o755 });
-  const made = bash(command, { home });
-  assert.equal(made.status, 0, made.stderr);
-  assert.equal(made.stdout + made.stderr, '', 'the page says the command prints nothing when it works');
-  // unlicensed start: the command is the wrapper of path B, which starts a stand-in draw.io this case wrote; it reads no licence and starts no product
-  const started = spawnSync(join(home, '.local', 'bin', 'drawio'), ['--version'], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: home } });
-  assert.equal(started.stdout, 'started:--version', 'the command does not pass its arguments to draw.io, or does not start it');
-  // E-04 looks for `drawio` on PATH first: a Mac whose PATH has the folder of 2d finds the app through the command.
+  const bin = join(home, '.local', 'bin');
+  mkdirSync(bin, { recursive: true });                          // Claude Code's installer makes this folder; 2d puts it on PATH
+  const made = commands.filter((c) => WRAPPER.test(c.line)).map((c) => ({ line: c.line, m: WRAPPER.exec(c.line) }));
+  assert.equal(made.length, 2);
+  for (const { line, m } of made) {
+    // The stand-in for the app: where the step before copied the real one. It says how it was started and exits with 3, so a command that does not
+    // pass the arguments on, or the exit code, or does not start the app at all, is seen. The real draw.io and LibreOffice are never started here.
+    const exe = join(home, 'Applications', m[1], 'Contents', 'MacOS', m[2]);
+    mkdirSync(dirname(exe), { recursive: true });
+    writeFileSync(exe, '#!/bin/sh\nprintf "%s|%s|%s" "$0" "$1" "$2"\nexit 3\n', { mode: 0o755 });
+    const ran = bash(line, { home });
+    assert.equal(ran.status, 0, ran.stderr);
+    assert.equal(ran.stdout + ran.stderr, '', `${m[3]}: the page says the command prints nothing when it works`);
+    const wrapper = join(bin, m[3]);
+    assert.ok((statSync(wrapper).mode & 0o111) !== 0, `${m[3]} is not executable`);
+    assert.equal(readFileSync(wrapper, 'utf8'), `#!/bin/sh\nexec "$HOME/Applications/${m[1]}/Contents/MacOS/${m[2]}" "$@"\n`, `${m[3]}: the file is not the two lines the page means to write`);
+    // unlicensed start: the command is the small command the page makes, which starts a stand-in app this case wrote; it reads no licence and starts no product
+    const started = spawnSync(wrapper, ['one', 'two words'], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: home } });
+    assert.equal(started.stdout, `${exe}|one|two words`, `${m[3]} does not pass its arguments to the app, or does not start it`);
+    assert.equal(started.status, 3, `${m[3]} does not hand the app's exit code back`);
+  }
+  // The check of 2f, as it prints on a Mac: `ls` of the app and the command, in the order the page shows (byte order, the dot first).
+  const ls = commands.find((c) => /^ls ~\/Applications\//.test(c.line)).line;
+  const listed = bash(ls, { home });
+  assert.equal(listed.status, 0, listed.stderr);
+  assert.deepEqual(listed.stdout.trimEnd().split('\n').map((l) => l.replace(home, '/Users/you')), screenAfter(ls).lines.filter((l) => l.trim() !== ''), 'the screen of the check is not what `ls` prints for the two paths');
+
+  // E-04 looks for `drawio` and for `soffice` on PATH first: a Mac whose PATH has the folder of 2d finds both apps through the two commands.
   const { capabilityPacks } = await import(href('tools/snowarch/lib/doctor/checks/engine-prereqs.mjs'));
-  const packs = capabilityPacks({ env: { PATH: join(home, '.local', 'bin') }, platform: 'darwin', exists: () => false });
-  assert.equal(packs.drawio.how, join(home, '.local', 'bin', 'drawio'), 'the doctor does not find draw.io through the command of path B');
+  const packs = capabilityPacks({ env: { PATH: bin }, platform: 'darwin', exists: () => false });
+  assert.equal(packs.drawio.how, join(bin, 'drawio'), 'the doctor does not find draw.io through the command of 2f');
+  assert.equal(packs.pdf.how, join(bin, 'soffice'), 'the doctor does not find LibreOffice through the command of 2g');
+
+  // The renderers. The one of the diagrams is SOURCED, which defines `find_drawio` and runs nothing, and asked where it would look: it only looks. The
+  // one of the PDFs cannot be sourced, so the one line of it that looks is run, and nothing else of it. The folder of PATH leads with the home folder's own.
+  const empty = join(home, 'empty');
+  mkdirSync(empty);
+  const onPath = { PATH: `${bin}:/usr/bin:/bin`, HOME: home };
+  // unlicensed start: the case sources the diagram renderer, which only looks for draw.io (find_drawio) and starts nothing
+  const sourced = spawnSync('bash', ['-c', 'source "$1" "$2" && find_drawio > /dev/null && printf %s "$DRAWIO"', 'bash', join(root, 'scripts', 'render-drawio.sh'), empty], { encoding: 'utf8', env: onPath });
+  assert.equal(sourced.stdout, join(bin, 'drawio'), `the diagram renderer does not choose the command of 2f: ${sourced.stderr}`);
+  const lookup = /^SOFFICE="\$\(command -v soffice \|\| true\)"$/m.exec(read('scripts/render-pdf.sh'));
+  assert.ok(lookup, 'the PDF renderer\'s line that looks for soffice on PATH is not the one this case runs');
+  // unlicensed start: the case runs the one line of the PDF renderer that looks for soffice on PATH, and starts nothing
+  const looked = spawnSync('bash', ['-c', `${lookup[0]}; printf %s "$SOFFICE"`], { encoding: 'utf8', env: onPath });
+  assert.equal(looked.stdout, join(bin, 'soffice'), 'the PDF renderer does not choose the command of 2g');
+});
+
+const DARWIN = { skip: process.platform === 'darwin' ? false : 'disk images are opened on a Mac' };
+
+test('ARC-09-C300 — on a Mac the disk-image steps do what the page says, and the messages of its table are the tools\' own', DARWIN, async (t) => {
+  // The commands are the page's, run as the reader runs them, against a synthetic image that holds a stand-in for each app: attach with no folder made for
+  // it, copy the app into ~/Applications, detach. The real draw.io and LibreOffice are not touched and nothing is downloaded. The mount point is a folder
+  // of the temporary home, and a case that fails still lets go of it (`-force` is the test's, never the page's). One image is made (a Mac takes a few
+  // seconds for each) and saved under both names the page downloads.
+  // The hook that lets go of the mounts is registered BEFORE the temporary home, so that it runs before the home is removed, never after.
+  const mounts = [];
+  t.after(() => { for (const mount of mounts) spawnSync('hdiutil', ['detach', '-force', mount], { stdio: 'ignore' }); });
+  const home = tempDir('install-macos-guide-', t);
+  const dl = join(home, 'snowarch-dl');
+  mkdirSync(dl, { recursive: true });
+  mkdirSync(join(home, 'Applications'));                        // the page makes it, one step earlier
+  const steps = commands.map((c, i) => ({ i, m: HDIUTIL_ATTACH.exec(c.line) })).filter((s) => s.m)
+    .map(({ i, m }) => ({ attach: commands[i].line, copy: commands[i + 1].line, detach: commands[i + 2].line, mount: m[1], image: m[2], app: COPY_APP.exec(commands[i + 1].line)[2] }));
+  assert.equal(steps.length, 2);
+  const src = join(home, 'stand-in');
+  for (const { app } of steps) {
+    mkdirSync(join(src, app, 'Contents', 'MacOS'), { recursive: true });
+    writeFileSync(join(src, app, 'Contents', 'MacOS', 'stand-in'), '#!/bin/sh\necho stand-in\n', { mode: 0o755 });
+  }
+  const created = spawnSync('hdiutil', ['create', '-quiet', '-volname', 'Stand-in', '-fs', 'APFS', '-srcfolder', src, '-format', 'UDZO', join(dl, steps[0].image)], { encoding: 'utf8' });
+  assert.equal(created.status, 0, created.stderr);
+  copyFileSync(join(dl, steps[0].image), join(dl, steps[1].image));
+  for (const { attach, copy, detach, mount, app } of steps) {
+    mounts.push(join(dl, mount));
+    const attached = bash(attach, { home });
+    assert.equal(attached.status, 0, `${attach}: ${attached.stderr}`);
+    assert.equal(attached.stdout + attached.stderr, '', 'the page says the attach prints nothing when it works');
+    assert.ok(existsSync(join(dl, mount, app)), 'the app is not in the image at the mount point the page names');
+    const copied = bash(copy, { home });
+    assert.equal(copied.status, 0, `${copy}: ${copied.stderr}`);
+    assert.equal(copied.stdout + copied.stderr, '', 'the page says the copy prints nothing when it works');
+    assert.ok((statSync(join(home, 'Applications', app, 'Contents', 'MacOS', 'stand-in')).mode & 0o111) !== 0, 'the app was copied without its executable');
+    // The detach can be told "resource busy" while the system is still looking at the image: it is tried again, and said so if it needed to be.
+    let detached;
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      detached = bash(detach, { home });
+      if (detached.status === 0) { if (attempt > 1) t.diagnostic(`${detach} needed ${attempt} tries: ${detached.stderr}`); break; }
+      await new Promise((resolveWait) => { setTimeout(resolveWait, 500); });
+    }
+    assert.equal(detached.status, 0, `${detach}: ${detached.stderr}`);
+    assert.equal(detached.stdout + detached.stderr, '', 'the page says the detach prints nothing when it works');
+    assert.equal(existsSync(join(dl, mount)), false, 'the mount folder is still there after the detach');
+  }
+  // The three messages of "If something goes wrong" that come from these tools are what the tools print. Nothing is attached now.
+  writeFileSync(join(dl, steps[0].image), 'a web page, saved in place of the image\n');
+  const notAnImage = bash(steps[0].attach, { home });
+  assert.ok(notAnImage.status !== 0 && notAnImage.stderr.includes('hdiutil: attach failed - image not recognized'), `hdiutil does not answer a file that is no image as the table says: ${notAnImage.stderr}`);
+  assert.ok(prose.includes('| hdiutil: attach failed - image not recognized |'), 'the table has no row for an image that is not recognised');
+  const notOpen = bash(steps[0].detach, { home });
+  assert.ok(notOpen.status !== 0 && notOpen.stderr.includes('hdiutil: detach failed - No such file or directory'), `hdiutil does not answer a detach of an image that is not open as the table says: ${notOpen.stderr}`);
+  assert.ok(prose.includes('| hdiutil: detach failed - No such file or directory |'), 'the table has no row for a detach of an image that is not open');
+  const noImage = bash(steps[0].copy, { home });
+  assert.ok(noImage.status !== 0 && noImage.stderr.replace(`${home}/snowarch-dl`, '…').includes('cp: …/mnt-drawio/draw.io.app: No such file or directory'), `cp does not answer a copy from an image that is not open as the table says: ${noImage.stderr}`);
+  assert.ok(prose.includes('| cp: …/mnt-drawio/draw.io.app: No such file or directory (or …/mnt-libreoffice/LibreOffice.app) |'), 'the table has no row for a copy from an image that is not open');
 });

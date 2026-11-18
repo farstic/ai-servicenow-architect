@@ -10,10 +10,10 @@
  * the product's own, and the page's helpers run here, as they stand, on lines the product prints (`checkLine`, `bannerLine`), because a helper that
  * reads a line the product does not print is a helper that says "all good" to somebody it should stop.
  *
- * WHAT THE MAC PAGE ADDS to the Windows page's design: the reader chooses a path (A, with the Mac's administrator password, or B, without it) and, on
- * path B, the kind of Mac (Apple silicon or Intel). A command shows only for the choices it belongs to; the bash form of a zsh command sits under it and
- * never counts; the counts a reader sees are 25 commands on path A and 30 on path B. Those rules are functions of the state, in the pure block, so this
- * file runs them.
+ * WHAT THE MAC PAGE ADDS to the Windows page's design: one path for every Mac (Apple silicon, everything in the home folder), so no choice and no gate. The
+ * bash form of a zsh command sits under it and never counts, and a command the Markdown guide labels Optional carries that label and never counts either;
+ * the one total a reader sees is every Run block of Steps 1 to 8 less those, and it is derived here from the Markdown guide alone. Those rules are functions
+ * of the state, in the pure block, so this file runs them.
  *
  * THE PAGE'S DATA IS ONE JSON BLOCK, so this file reads it without a browser; its pure functions sit between two markers and run here without a DOM.
  * The behaviour a browser decides (the scroll, the clipboard, the layout) is checked in one, not here.
@@ -62,9 +62,10 @@ const mdText = plain(md);
 
 /** The Markdown guide's fenced blocks: the commands it asks for (introduced by `Run:`) in order, and every line any block holds. */
 function mdBlocks() {
-  const out = []; let label = ''; let open = null;
+  const out = []; let label = ''; let open = null; let h2 = '';
   for (const line of md.split('\n')) {
-    if (line.startsWith('```')) { if (open) { out.push(open); open = null; } else open = { run: /(^|\s)Run:$/.test(label), lines: [] }; continue; }
+    if (!open && /^## /.test(line)) h2 = line.slice(3);
+    if (line.startsWith('```')) { if (open) { out.push(open); open = null; } else open = { run: /(^|\s)Run:$/.test(label), label, h2, lines: [] }; continue; }
     if (open) { open.lines.push(line); continue; }
     if (line.trim() !== '') label = line.trim();
   }
@@ -72,10 +73,17 @@ function mdBlocks() {
 }
 const blocks = mdBlocks();
 const mdCommands = blocks.filter((b) => b.run).flatMap((b) => b.lines.filter((l) => l.trim() !== ''));
+/** What the Markdown guide says of each command: its shell (the label `**zsh**. Run:` or `**bash**. Run:`), whether it is Optional (`**Optional.** … Run:`), and its section. */
+const mdRuns = blocks.filter((b) => b.run).flatMap((b) => b.lines.filter((l) => l.trim() !== '').map((code) => ({ code, h2: b.h2, shell: /^\*\*(zsh|bash)\*\*\. Run:$/.exec(b.label)?.[1], optional: /^\*\*Optional\.\*\*/.test(b.label) })));
+const mdStepRuns = mdRuns.filter((r) => /^Step [1-8] ·/.test(r.h2));
+/** The one total: every Run block of Steps 1 to 8 except the bash forms (and the bash-only check of Step 1) and the Optional ones. */
+const mdCounted = mdStepRuns.filter((r) => r.shell !== 'bash' && !r.optional);
+/** A comment may say what the page is not: the script without its comments. */
+const bare = (text) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
 const mdLines = new Set(blocks.flatMap((b) => b.lines.map((l) => l.trim())));
 
 /** The page's own functions, as they stand: the block between two markers needs only the data (`D`) and the flag list (`FL`). */
-const PURE = ['checkUrl', 'checkVersions', 'checkPre', 'checkLic', 'norm', 'presetOf', 'presetFlags', 'labelMessage', 'choiceReady', 'cmdShown', 'isCounted', 'doneKeyOf',
+const PURE = ['checkUrl', 'checkVersions', 'checkPre', 'checkLic', 'norm', 'presetOf', 'presetFlags', 'labelMessage', 'isCounted', 'doneKeyOf',
   'navModel', 'nextModel', 'resetState', 'resetKeys', 'resetLabel', 'resetWords', 'resetFlow'];
 function pureFunctions() {
   const a = code.indexOf('/* @pure-begin'); const b = code.indexOf('/* @pure-end */');
@@ -112,10 +120,11 @@ test('ARC-09-C300 — nothing the reader types or pastes is ever made into marku
 test('ARC-09-C300 — the saved state: the keys of the handoff under this page\'s own prefix, and every access to storage in a try', () => {
   // Two pages opened from disk can share one storage (Chrome keeps one for file pages in some versions), and both would read `aiarch.cmd.s2c`: so this page has its own prefix.
   const keys = new Set([...code.matchAll(/'(aiarch-mac\.[a-z.]*)'/g)].map((m) => m[1]));
-  assert.deepEqual([...keys].sort(), ['aiarch-mac.chip', 'aiarch-mac.chk', 'aiarch-mac.cmd.', 'aiarch-mac.label', 'aiarch-mac.lic', 'aiarch-mac.mode', 'aiarch-mac.need', 'aiarch-mac.path', 'aiarch-mac.reached', 'aiarch-mac.theme', 'aiarch-mac.url', 'aiarch-mac.view']);
+  assert.deepEqual([...keys].sort(), ['aiarch-mac.chk', 'aiarch-mac.cmd.', 'aiarch-mac.label', 'aiarch-mac.lic', 'aiarch-mac.mode', 'aiarch-mac.need', 'aiarch-mac.reached', 'aiarch-mac.theme', 'aiarch-mac.url', 'aiarch-mac.view']);
   assert.doesNotMatch(code, /['"`]aiarch\./, 'a key of the Windows page: its marks would be read, and cleared, as this page\'s');
-  const bare = code.split('\n').filter((l) => /localStorage/.test(l) && !/\btry\b/.test(l));
-  assert.deepEqual(bare, [], 'storage is read or written outside a try: the page must work when it is blocked');
+  const outside = code.split('\n').filter((l) => /localStorage/.test(l) && !/\btry\b/.test(l));
+  assert.deepEqual(outside, [], 'storage is read or written outside a try: the page must work when it is blocked');
+  assert.doesNotMatch(code, /aiarch-mac\.(?:path|chip)/, 'a saved choice: there is none to save');
 });
 
 // ── the commands ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -129,6 +138,10 @@ test('ARC-09-C300 — every command on the page is the Markdown guide\'s, in the
   assert.deepEqual(pageCommands.map((c) => sub(c.code)), mdCommands);
   assert.equal(new Set(data.commands.map((c) => c.id)).size, data.commands.length, 'two commands share an id, and the id is the saved state');
   for (const c of data.commands) assert.deepEqual([...c.code.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((t) => !['lic', 'label'].includes(t)), [], `${c.id}: a token the page does not fill`);
+  // The label `pdi` of the Markdown guide's commands is the reader's own instance label on the page: a command that names an instance carries the token the page fills from Your details.
+  const labelled = mdRuns.map((r, i) => [r, pageCommands[i]]).filter(([r]) => /\binstance (?:set-credentials|set-preset|set-flags|test|remove) pdi\b/.test(r.code));
+  assert.ok(labelled.length >= 6, 'the commands that name an instance were not found in the Markdown guide');
+  for (const [r, c] of labelled) assert.equal(c.code, r.code.replace(/(\binstance (?:set-credentials|set-preset|set-flags|test|remove) )pdi\b/, '$1{label}'), `${c.id}: the label is typed into the command, which the page can then not fill`);
   // The Markdown guide's defaults are the page's: the licence file and the label a reader who types nothing gets.
   assert.match(md, /`LIC-2026-0000\.json`/);
   assert.match(code, /SAMPLE_LIC = 'LIC-2026-0000\.json'/);
@@ -140,7 +153,7 @@ test('ARC-09-C300 — the boxes in the markup are the commands in the data, and 
   for (const id of PAGE_ONLY) assert.ok(code.includes(`'data-cmd': '${id}'`), `${id} is not made by the script`);
   const steps = data.steps.flatMap((s) => s.cmds.map((c) => c[0]));
   assert.deepEqual(steps, pageCommands.slice(0, pageCommands.findIndex((c) => c.id === 's8') + 1).map((c) => c.id), 'the steps list the commands of Steps 1 to 8, all of them, every variant included');
-  assert.equal(steps.length, 39);
+  assert.equal(steps.length, mdStepRuns.length, 'the steps list every Run block of Steps 1 to 8 of the Markdown guide');
   for (const id of Object.keys(data.timed)) assert.ok(steps.includes(id), `a timer for ${id}, which is not a command of the steps`);
   assert.deepEqual(Object.keys(data.timed).sort(), ['s2c', 's4-clone', 's6']);
   assert.deepEqual([...markup.matchAll(/data-timer="([^"]+)"/g)].map((m) => m[1]).sort(), Object.keys(data.timed).sort());
@@ -163,129 +176,90 @@ test('ARC-09-C300 — the boxes in the markup are the commands in the data, and 
   assert.deepEqual(data.nav.filter((n) => n.live).map((n) => n.id), ['step-6d']);
 });
 
-// ── the choices: path, chip, shell ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-test('ARC-09-C300 — the choices: a path, and on path B a chip; the reader must choose, and every attribute a command carries is one the page knows', () => {
-  assert.deepEqual(data.choices.path?.options.map((o) => o.v), ['A', 'B']);
-  assert.deepEqual(data.choices.chip?.options.map((o) => o.v), ['arm64', 'x64']);
-  // "default": null on both: a preselected path A and Apple silicon hid the other commands from a reader who did not notice the choice.
-  assert.equal(data.choices.path?.default, null);
-  assert.equal(data.choices.chip?.default, null);
-  assert.equal(data.choices.chip?.path, 'B', 'the chip is asked on path B only');
-  assert.equal(data.choices.path?.path, undefined);
-  for (const o of [...(data.choices.path?.options ?? []), ...(data.choices.chip?.options ?? [])]) assert.ok(o.t && o.hint, `the option ${o.v} has no text`);
-  assert.match(data.choicePrompt, /Choose your path/);
-  assert.match(data.choicePrompt, /path B/);
-  for (const c of data.commands) {
-    if ('path' in c) assert.ok(['A', 'B'].includes(c.path), `${c.id}: path ${c.path}`);
-    if ('chip' in c) { assert.ok(['arm64', 'x64'].includes(c.chip), `${c.id}: chip ${c.chip}`); assert.equal(c.path, 'B', `${c.id}: a chip command belongs to path B`); }
-    if ('shell' in c) assert.ok(['zsh', 'bash'].includes(c.shell), `${c.id}: shell ${c.shell}`);
-    if (c.path || c.chip) assert.equal(stepOf(c.id), 'step-2', `${c.id}: only Step 2 depends on the path or the chip`);
-  }
-  for (const n of data.need) if ('path' in n) assert.ok(['A', 'B'].includes(n.path), `${n.id}: path ${n.path}`);
-  assert.deepEqual(data.need.filter((n) => n.path).map((n) => [n.id, n.path]), [['n-admin', 'A'], ['n-it', 'B']], 'one item for each path');
-  assert.equal(data.need.filter((n) => !n.live).filter((n) => n.path === 'A' || !n.path).length, 5, 'five items for a reader on path A in design-only mode');
-  // Each chip command has its twin for the other chip right next to it, the same but for the file's name.
-  data.commands.forEach((c, i) => {
-    if (!c.chip) return;
-    const twin = [data.commands[i - 1], data.commands[i + 1]].find((o) => o && o.chip && o.chip !== c.chip && o.path === c.path);
-    assert.ok(twin, `${c.id}: no twin for the other chip next to it`);
-    assert.equal(c.code.replace(`darwin-${c.chip}`, 'darwin-X'), twin.code.replace(`darwin-${twin.chip}`, 'darwin-X'), `${c.id}: the twin differs by more than the chip`);
-  });
-  assert.deepEqual(data.commands.filter((c) => c.chip).map((c) => c.id), ['s2b-dl-arm64', 's2b-dl-x64']);
-  // The bash form of a zsh command is right under it, for the same path and in the same step; it never counts, and copying it marks the zsh command.
-  data.commands.forEach((c, i) => {
-    if (!c.altOf) return;
-    const before = data.commands[i - 1];
-    assert.equal(before?.id, c.altOf, `${c.id}: altOf names ${c.altOf}, and the command just before it is ${before?.id}`);
-    assert.equal(c.path, before.path, `${c.id}: not the path of the command it is the form of`);
-    assert.equal(stepOf(c.id), stepOf(before.id), `${c.id}: not in the step of the command it is the form of`);
-    assert.deepEqual([before.shell, c.shell], ['zsh', 'bash'], `${c.id}: the zsh command comes first and the bash form second`);
-    assert.equal(P.isCounted(c), false, `${c.id} counts`);
-    assert.equal(P.doneKeyOf(c.id), before.id, `${c.id}: copying it does not mark ${before.id}`);
-    assert.equal(P.isCounted(before), true, `${before.id} does not count`);
-  });
-  assert.deepEqual(data.commands.filter((c) => c.altOf).map((c) => c.id), ['s2b-path-bash', 's2d-bash', 't-path-bash']);
-  // A bash command without a zsh twin is a check for a bash reader only: shown to everybody under its label, never counted, never required.
-  const bashOnly = data.commands.filter((c) => c.shell === 'bash' && !c.altOf);
-  assert.deepEqual(bashOnly.map((c) => c.id), ['s1-bash']);
-  for (const c of bashOnly) assert.equal(P.isCounted(c), false);
-  for (const c of data.commands.filter((x) => x.shell !== 'bash')) assert.equal(P.isCounted(c), true, `${c.id} does not count`);
-  assert.equal(P.doneKeyOf('s1-bash'), 's1-bash');
-  assert.equal(P.doneKeyOf('s2d'), 's2d');
-  // The four buttons are in the markup with the ids a harness finds them by, and the script fills their words from the data.
-  for (const [group, o] of [['path', 'A'], ['path', 'B'], ['chip', 'arm64'], ['chip', 'x64']]) {
-    const id = `${group}-${o.toLowerCase()}`;
-    assert.match(markup, new RegExp(`<button type="button" id="${id}" data-choice="${group}" data-v="${o}" aria-pressed="false">`), `the button ${id}`);
-  }
-  assert.match(markup, /id="choice"/, 'the place the Next button takes a reader who has not chosen');
-  assert.match(code, /D\.choices/);
+// ── one path for every Mac: no choice, no gate; what the Markdown guide labels, the page carries ────────────────────────────────────────────────────
+test('ARC-09-C300 — one path for every Mac: no choice anywhere, nothing that hides a command, and Step 2 shows every command', () => {
+  assert.equal('choices' in data, false, 'the data still has a choice');
+  assert.equal('choicePrompt' in data, false, 'the data still has a prompt to choose');
+  for (const c of data.commands) assert.deepEqual(Object.keys(c).filter((k) => !['id', 'code', 'shell', 'altOf', 'optional', 'pageOnly'].includes(k)), [], `${c.id}: an attribute the page does not know`);
+  for (const n of data.need) assert.deepEqual(Object.keys(n).filter((k) => !['id', 't', 'hint', 'live'].includes(k)), [], `${n.id}: an attribute the page does not know`);
+  assert.doesNotMatch(markup, /data-(?:path|chip|choice|needs-choice)\b|id="(?:choice|choice-prompt|path-[ab]|chip-[\w-]+)"/, 'a choice control, or something that waits for one, is still in the markup');
+  assert.doesNotMatch(`${pageText} ${bare(code)}`, /Choose your path|\b[Pp]ath [AB]\b|\bchoice(?:Prompt|Ready)\b|\bD\.choices\b|\bx64\b/, 'the page still talks of a path or of a kind of Mac to choose');
+  assert.doesNotMatch(bare(code), /\b(?:choiceReady|cmdShown|pathWords|buildChoices|renderChoices|applyChoice|goChoice|optionOf|CHOICE_KEY|GATE)\b/, 'the code of the choice is still there');
+  assert.doesNotMatch(style, /#choice\b|\.mode\.choice|\.sec h4/, 'the style of the choice, or of the heading of a path, is still there');
+  // Step 2 shows every command with nothing chosen: nothing of Step 2 is hidden in the markup, and the script has no way to hide a box.
+  const step2 = /<section class="sec" id="step-2">[\s\S]*?<\/section>/.exec(markup)?.[0] ?? '';
+  assert.ok(step2.length > 1000, 'Step 2 is not in the page');
+  assert.doesNotMatch(step2.replace('<div class="oclist" id="oc-v-list" hidden></div>', ''), /\bhidden\b/, 'something of Step 2 is hidden in the markup (the list of results of the check of the versions is the one thing that waits, for what the reader pastes)');
+  assert.deepEqual([...step2.matchAll(/data-cmd="([^"]+)"/g)].map((m) => m[1]), (data.steps.find((s) => s.id === 'step-2')?.cmds ?? []).map((c) => c[0]), 'Step 2 has every command of its step, in the order of the Markdown guide');
+  assert.doesNotMatch(bare(code), /\bslot\.hidden\b|b\.slot\b/, 'the script hides a command box');
 });
 
-test('ARC-09-C300 — what a reader sees: a command shows for its path and chip only, Step 2 waits for the choice, and the counts are 25 on path A and 30 on path B', () => {
-  const state = (path, chip, done = {}) => ({ path, chip, done, chk: {}, need: {}, active: 'need', reached: 'need' });
-  const entry = (id) => ({ ...data.commands.find((c) => c.id === id), step: stepOf(id) });
-  const shown = (st) => data.steps.flatMap((s) => s.cmds.map((c) => c[0])).filter((id) => P.cmdShown(entry(id), st));
-  const counted = (st) => shown(st).filter((id) => P.isCounted(data.commands.find((c) => c.id === id)));
-  for (const [path, chip, n] of [['A', null, 25], ['A', 'arm64', 25], ['A', 'x64', 25], ['B', 'arm64', 30], ['B', 'x64', 30]]) {
-    const st = state(path, chip);
-    assert.equal(counted(st).length, n, `${path} ${chip}: the commands a reader counts`);
-    for (const live of [true, false]) {
-      const m = P.nextModel(st, live);
-      assert.equal(m.total, n, `${path} ${chip}: the total of the Next button`);
-      const perStep = P.navModel(st, live).items.filter((i) => data.steps.some((s) => s.id === i.id)).reduce((sum, i) => sum + (i.count ? Number(i.count.split('/')[1]) : 0), 0);
-      assert.equal(perStep, n, `${path} ${chip}: the counts of Contents add up to the total`);
-    }
+test('ARC-09-C300 — what the Markdown guide labels, the page carries: the shell of a command, the bash form of a zsh command, and Optional', () => {
+  assert.deepEqual(pageCommands.map((c) => [sub(c.code), c.shell ?? null, c.optional === true]), mdRuns.map((r) => [r.code, r.shell ?? null, r.optional]));
+  // The bash form of a zsh command is the next command and names it; a bash command with no zsh command before it (the check of Step 1) is for a bash reader alone.
+  mdRuns.forEach((r, i) => {
+    const c = pageCommands[i];
+    assert.equal(c.altOf ?? null, r.shell === 'bash' && mdRuns[i - 1]?.shell === 'zsh' ? pageCommands[i - 1].id : null, `${c.id}: altOf`);
+  });
+  assert.deepEqual(pageCommands.filter((c) => c.shell === 'bash' && !c.altOf).map((c) => c.id), ['s1-bash']);
+  assert.deepEqual(pageCommands.filter((c) => c.altOf).map((c) => c.id), ['s2d-bash', 't-path-bash']);
+  // Optional is a label of the Markdown guide, and the page says it in one word over the box. It is on exactly the commands the guide labels so.
+  assert.deepEqual(data.commands.filter((c) => c.optional).map((c) => sub(c.code)), mdRuns.filter((r) => r.optional).map((r) => r.code));
+  assert.ok(data.commands.filter((c) => c.optional).length >= 4, 'the checks of the three downloads and the first start of draw.io are Optional');
+  assert.match(code, /if \(c\.optional\) return 'Optional';/, 'an Optional command has no label on the page');
+  // Copying the bash form of a command marks the zsh command it is the form of, and a command with no such form marks itself.
+  for (const c of data.commands) assert.equal(P.doneKeyOf(c.id), c.altOf ?? c.id, `${c.id}: the mark of a copy`);
+  // The commands of Steps 1 to 8 are the steps of the data, and no later command is: the Markdown guide's Steps 1 to 8, in its order.
+  assert.deepEqual(data.steps.flatMap((s) => s.cmds.map((c) => sub(data.commands.find((x) => x.id === c[0]).code))), mdStepRuns.map((r) => r.code));
+});
+
+test('ARC-09-C300 — the counter: one total, every Run block of Steps 1 to 8 except the bash forms and the Optional commands, derived from the Markdown guide alone', () => {
+  const total = mdCounted.length;
+  assert.ok(total > 25 && total < mdStepRuns.length, `the total the Markdown guide gives is ${total}, of ${mdStepRuns.length} Run blocks`);
+  const state = (done = {}) => ({ done, chk: {}, need: {}, active: 'need', reached: 'need' });
+  const ofCmd = (id) => data.commands.find((c) => c.id === id);
+  for (const live of [true, false]) {
+    assert.equal(P.nextModel(state(), live).total, total, `the total of the Next button (live ${live})`);
+    const perStep = P.navModel(state(), live).items.filter((i) => data.steps.some((s) => s.id === i.id)).map((i) => Number(i.count.split('/')[1]));
+    assert.equal(perStep.reduce((a, b) => a + b, 0), total, `the counts of Contents add up to the total (live ${live})`);
   }
-  // Path A: the Command Line Tools, the Node.js installer, the disk image into Applications. Never a path B command, never a chip command.
-  const a = shown(state('A', null));
-  for (const id of ['s2a-clt', 's2b-pkg', 's2b-pkg-open', 's2f-open', 's2f-test', 's2b-dir', 's2c', 's2d', 's2d-bash', 's2f-dl']) assert.ok(a.includes(id), `path A lacks ${id}`);
-  for (const id of ['s2a-check', 's2b-dl-arm64', 's2b-dl-x64', 's2b-mkdir', 's2b-unz', 's2b-path', 's2b-path-bash', 's2f-appdir', 's2f-open-b', 's2f-appdir-open', 's2f-test-b', 's2f-cmd']) assert.equal(a.includes(id), false, `path A shows ${id}`);
-  // Path B: the check, the archive for the chip chosen, the home folder; and exactly one of the two downloads.
-  const bArm = shown(state('B', 'arm64')); const bX = shown(state('B', 'x64'));
-  for (const id of ['s2a-check', 's2b-mkdir', 's2b-unz', 's2b-path', 's2b-path-bash', 's2f-appdir', 's2f-open-b', 's2f-appdir-open', 's2f-test-b', 's2f-cmd']) assert.ok(bArm.includes(id) && bX.includes(id), `path B lacks ${id}`);
-  for (const id of ['s2a-clt', 's2b-pkg', 's2b-pkg-open', 's2f-open', 's2f-test']) assert.ok(!bArm.includes(id) && !bX.includes(id), `path B shows ${id}`);
-  assert.deepEqual([bArm.includes('s2b-dl-arm64'), bArm.includes('s2b-dl-x64'), bX.includes('s2b-dl-arm64'), bX.includes('s2b-dl-x64')], [true, false, false, true]);
-  // Everything outside Step 2 is the same for every reader, and the bash-only check of Step 1 is shown to all.
-  for (const st of [state('A', null), state('B', 'x64'), state(null, null)]) {
-    for (const id of ['s1-shell', 's1-bash', 's3-cd', 's3', 's4-cd', 's4-clone', 's4-cd2', 's5a', 's5b', 's5c', 's6', 's7', 's8']) assert.ok(P.cmdShown(entry(id), st), `${id} is hidden`);
+  assert.equal(data.steps.flatMap((s) => s.cmds).filter((c) => P.isCounted(ofCmd(c[0]))).length, total, 'the commands the page counts');
+  // The Next button walks the counted commands in the order of the Markdown guide, skips the Optional ones and the bash forms, and ends at the total.
+  const walked = []; let done = {};
+  for (let i = 0; i < total + 3; i++) {
+    const m = P.nextModel(state(done), true);
+    if (!m.next) break;
+    walked.push(m.next.cid); done = { ...done, [m.next.cid]: true };
   }
-  // Until the choices are made, Step 2 has no commands: the page shows the prompt instead. Path B needs its chip too.
-  for (const st of [state(null, null), state(null, 'arm64'), state('B', null), state('B', undefined)]) {
-    assert.equal(P.choiceReady(st), false);
-    assert.deepEqual(shown(st).filter((id) => stepOf(id) === 'step-2'), [], 'Step 2 shows a command before the choices are made');
-  }
-  assert.deepEqual([state('A', null), state('B', 'arm64'), state('B', 'x64')].map((st) => P.choiceReady(st)), [true, true, true]);
-  assert.equal(P.choiceReady({ path: 'C', chip: 'arm64' }), false, 'a saved value that is not an option is not a choice');
-  // Next command stops at Step 2: before the choice it names the choice, after Step 1, and no later command is offered first.
-  const rest = data.steps.filter((s) => s.id !== 'step-2').flatMap((s) => s.cmds.map((c) => c[0])).filter((id) => P.isCounted(data.commands.find((c) => c.id === id)));
-  assert.equal(P.nextModel(state(null, null), true).total, rest.length, 'the total before the choice counts what every reader sees');
-  assert.equal(P.nextModel(state(null, null), true).next.cid, 's1-shell');
-  const gated = P.nextModel(state(null, null, { 's1-shell': true }), true);
-  assert.deepEqual([gated.done, gated.next.gate, gated.next.cid], [1, true, null]);
-  assert.match(gated.text, /choose your path/i);
-  const ahead = P.nextModel(state('B', null, Object.fromEntries(['s1-shell', 's3-cd', 's3', 's8'].map((c) => [c, true]))), true);
-  assert.equal(ahead.next.gate, true, 'a command of a later step must not be offered while the choice is open');
-  assert.equal(ahead.done, 4);
-  const first = P.nextModel(state('A', null, { 's1-shell': true }), true);
-  assert.deepEqual([first.next.cid, first.next.gate], ['s2a-clt', undefined]);
-  assert.equal(P.nextModel(state('B', 'x64', { 's1-shell': true }), true).next.cid, 's2a-check');
-  // The Contents row of Step 2 does not claim a total it cannot know, and does not call itself complete.
-  const waiting = P.navModel(state(null, null), true).items.find((i) => i.id === 'step-2');
-  assert.deepEqual([waiting.count, waiting.complete, waiting.passed], ['?', false, false]);
-  assert.equal(P.navModel(state('A', null), true).items.find((i) => i.id === 'step-2').count, '0/13');
-  assert.equal(P.navModel(state('B', 'arm64'), true).items.find((i) => i.id === 'step-2').count, '0/18');
-  // The bash form never counts, and copying it marks the zsh command, so a reader on bash finishes with the same totals; the bash-only check is never required.
-  const bash = P.nextModel(state('B', 'x64', { 's1-bash': true, 's2b-path-bash': true, 's2d-bash': true }), true);
-  assert.equal(bash.done, 0, 'a bash form was counted');
-  const viaZsh = P.nextModel(state('B', 'x64', { 's2b-path': true, 's2d': true }), true);
-  assert.equal(viaZsh.done, 2);
-  // The checklist has six items per path (five in design-only mode): the item of the path chosen, and none before.
-  for (const [path, ids] of [['A', ['n-admin']], ['B', ['n-it']]]) {
-    const live = P.navModel(state(path, null), true); const design = P.navModel(state(path, null), false);
-    assert.deepEqual([live.needTotal, design.needTotal], [6, 5], `path ${path}`);
-    assert.ok(data.need.filter((n) => n.path === path).every((n) => ids.includes(n.id)));
-  }
-  assert.deepEqual([P.navModel(state(null, null), true).needTotal, P.navModel(state(null, null), false).needTotal], [5, 4], 'before the choice the checklist has no item for a path');
+  assert.deepEqual(walked.map((id) => sub(ofCmd(id).code)), mdCounted.map((r) => r.code));
+  const end = P.nextModel(state(done), true);
+  assert.deepEqual([end.done, end.total, end.next, end.text], [total, total, null, 'Install complete']);
+  // The Optional commands and the bash forms never count, marked or not, and are never required: a reader who ran only those has done none.
+  const extra = Object.fromEntries(data.commands.filter((c) => c.optional || c.shell === 'bash').map((c) => [c.id, true]));
+  const none = P.nextModel(state(extra), true);
+  assert.deepEqual([none.done, none.next.cid], [0, walked[0]]);
+  // A reader who ran every counted command and none of the others is complete, and the Contents shows every step done.
+  const all = Object.fromEntries(walked.map((id) => [id, true]));
+  assert.deepEqual(P.navModel(state(all), true).items.filter((i) => data.steps.some((s) => s.id === i.id)).map((i) => i.complete), data.steps.map(() => true));
+  // A bash form marked by hand counts for nothing; copying it marks the zsh command (the page does it with doneKeyOf, which the case above pins), and that counts once.
+  assert.equal(P.nextModel(state({ 's2d-bash': true }), true).done, 0);
+  assert.equal(P.nextModel(state({ [P.doneKeyOf('s2d-bash')]: true }), true).done, 1);
+  // Nothing in the total depends on the mode but the time of the installer step.
+  assert.equal(P.nextModel(state(), false).total, total);
+});
+
+test('ARC-09-C300 — the checklist has one item for each bullet of "What you need" (the instance only in live mode), and none for a path or a kind of Mac to choose', () => {
+  const part = md.slice(md.indexOf('## What you need'), md.indexOf('## How to use this guide'));
+  const bullets = part.split('\n').filter((l) => /^- /.test(l));
+  assert.ok(bullets.length >= 6, 'the Markdown guide\'s bullets were not found');
+  assert.equal(data.need.length, bullets.length, 'one item for each bullet');
+  assert.deepEqual(data.need.filter((n) => n.live).map((n) => n.id), ['n-inst']);
+  const state = { done: {}, chk: {}, need: {}, active: 'need', reached: 'need' };
+  assert.deepEqual([P.navModel(state, true).needTotal, P.navModel(state, false).needTotal], [bullets.length, bullets.length - 1]);
+  // The first bullet is the chip, the second the macOS floor, and the third the disk: the numbers of the Markdown guide.
+  const text = plain(bullets.join(' '));
+  for (const n of data.need.slice(0, 3)) assert.ok(text.includes(plain(n.t)), `${n.id}: the item says what its bullet does not: ${n.t}`);
+  assert.ok(data.need.find((n) => n.id === 'n-admin').t.includes('2a'), 'the administrator is for Apple\'s Command Line Tools (2a) only');
 });
 
 // ── the numbers the product owns ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -301,7 +275,7 @@ test('ARC-09-C300 — the version floors are the engine\'s, on the page and in t
   const wanted = [...new Set(data.commands.flatMap((c) => [...c.code.matchAll(/node-v(\d+\.\d+\.\d+)/g)].map((m) => m[1])))];
   assert.deepEqual(wanted, ['26.13.1'], 'the downloads name more than one Node.js version');
   assert.ok(data.terminals.versions.includes('v26.13.1'));
-  assert.ok(data.commands.filter((c) => /nodejs\.org/.test(c.code)).length === 3, 'the .pkg and the two archives');
+  assert.equal(data.commands.filter((c) => /nodejs\.org/.test(c.code)).length, 1, 'the one archive, for Apple silicon');
   // The check, on each side of each floor, as a Mac prints them (Apple's own build of git names its build).
   const below = (v) => { const [a, b, c] = v.split('.').map(Number); return c > 0 ? `${a}.${b}.${c - 1}` : b > 0 ? `${a}.${b - 1}.99` : `${a - 1}.99.99`; };
   const cases = { claudeCode: (v) => `${v} (Claude Code)`, git: (v) => `git version ${v} (Apple Git-146)`, node: (v) => `v${v}` };
@@ -433,7 +407,7 @@ test('ARC-09-C300 — the installer\'s check: the keys are B00\'s, it reads the 
   assert.match(P.checkPre('nothing of the kind').items[0].t, /No check lines found/);
 });
 
-test('ARC-09-C300 — Reset checkmarks, pressed from Step 3: no tick in Contents, % passed of the first section, no mark, Next at 0 of 25 on path A, a label that says so, and what the reader typed and chose kept', () => {
+test('ARC-09-C300 — Reset checkmarks, pressed from Step 3: no tick in Contents, % passed of the first section, no mark, Next at 0 of the total, a label that says so, and what the reader typed kept', () => {
   // The owner pressed it on the Windows page and "nothing seemed to happen": the furthest section reached was set to the one the reader was in, so every tick above the
   // reader stayed, and so did the percentage. The state a reset leaves is a function, so this runs the page's own.
   for (const live of [true, false]) {
@@ -441,26 +415,23 @@ test('ARC-09-C300 — Reset checkmarks, pressed from Step 3: no tick in Contents
     const ids = P.navModel(fresh, live).ids;
     const first = P.navModel(fresh, live);
     assert.equal(first.pct, `${Math.round(100 / ids.length)}%`, 'the first section is its share of the contents');
-    const from = { active: 'step-3', reached: 'step-3', done: Object.fromEntries(['s1-shell', 's2a-clt', 's2b-pkg', 's2c'].map((c) => [c, true])),
-      chk: { 'step-1': 'yes', 'step-2': 'no' }, need: { 'n-mac': true, 'n-disk': true }, timers: { s2c: 1 }, path: 'A', chip: null };
+    const from = { active: 'step-3', reached: 'step-3', done: Object.fromEntries(['s1-arch', 's1-shell', 's2a-clt', 's2c'].map((c) => [c, true])),
+      chk: { 'step-1': 'yes', 'step-2': 'no' }, need: { 'n-mac': true, 'n-disk': true }, timers: { s2c: 1 } };
     const before = P.navModel(from, live);
     assert.ok(before.items.some((i) => i.mark === '✓') && before.pct !== first.pct, 'the state it starts from shows progress');
     assert.equal(P.nextModel(from, live).done, 4);
     const r = P.resetState(ids[0]);
     assert.deepEqual([r.done, r.need, r.chk, r.timers], [{}, {}, {}, {}], 'no mark, no answer, no timer, nothing ticked in the checklist');
     assert.deepEqual([r.reached, r.active, r.focus], [ids[0], ids[0], ids[0]], 'the furthest section reached is the first, and so is the one the reader is in');
-    // The choices are not progress: the state the page keeps after a reset still holds the path and the chip.
-    assert.equal('path' in r || 'chip' in r, false, 'the reset state does not touch the path or the chip');
-    const kept = { ...r, path: 'A', chip: null };
-    const after = P.navModel(kept, live);
+    const after = P.navModel(r, live);
     assert.deepEqual(after.items.filter((i) => i.passed || i.mark === '✓'), [], 'no tick in Contents');
     assert.equal(after.pct, first.pct, "% passed is the first section's");
-    const next = P.nextModel(kept, live);
-    assert.deepEqual([next.done, next.total, next.next.cid], [0, 25, 's1-shell']);
-    assert.match(next.text, /^Next command · 0\/25 done · ~\d+ min left$/);
+    const next = P.nextModel(r, live);
+    assert.deepEqual([next.done, next.total, next.next.cid], [0, mdCounted.length, 's1-arch']);
+    assert.equal(next.text, `Next command · 0/${mdCounted.length} done · ~${Math.max(1, Math.round(next.left))} min left`);
   }
   // What it drops, and what it keeps: the commands' marks, the checklist and the answers; never what the reader typed or chose, and never the other page's marks.
-  const stored = ['aiarch-mac.lic', 'aiarch-mac.label', 'aiarch-mac.url', 'aiarch-mac.mode', 'aiarch-mac.view', 'aiarch-mac.theme', 'aiarch-mac.path', 'aiarch-mac.chip', 'aiarch-mac.need', 'aiarch-mac.reached', 'aiarch-mac.chk',
+  const stored = ['aiarch-mac.lic', 'aiarch-mac.label', 'aiarch-mac.url', 'aiarch-mac.mode', 'aiarch-mac.view', 'aiarch-mac.theme', 'aiarch-mac.need', 'aiarch-mac.reached', 'aiarch-mac.chk',
     'aiarch-mac.cmd.s1-shell', 'aiarch-mac.cmd.s2c', 'aiarch.cmd.s2c', 'aiarch.need', 'other.key'];
   assert.deepEqual(P.resetKeys(stored), ['aiarch-mac.need', 'aiarch-mac.chk', 'aiarch-mac.cmd.s1-shell', 'aiarch-mac.cmd.s2c']);
   // The furthest section is written back as the first, not removed (the reader who reloads finds the top), and the scroll spy may not raise it while the page scrolls up.
@@ -562,24 +533,42 @@ test('ARC-09-C300 — the page ships: it is covered by the signed manifest, and 
 
 // ── the words ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const SENTENCES = [
-  // How to use the guide, and the one thing a reader must not do.
+  // The time, who the guide is for, what a reader needs, and how to use the guide.
+  'Plan about 45 minutes, more if your Mac first has to download Apple\'s Command Line Tools; most of it is waiting for downloads. On a company Mac, add the time your IT team needs for 2a.',
+  'A Mac with Apple silicon: the M1 chip or a later one (M2, M3, M4 and so on)',
+  'on such a Mac it shows an item labelled Chip with a name that starts with Apple M. A Mac with an Intel processor shows Processor instead, and this guide is not for it. Step 1 checks it again with a command.',
+  'At least 6 GB of free disk space before you start',
+  'draw.io and LibreOffice need about 1.7 GB together with their downloads, and 2 GB must still be free once all of them are installed',
+  'For Apple\'s Command Line Tools (2a): your Mac\'s administrator password, the one macOS may ask for when you install a program.',
+  'Commands marked zsh or bash are for one shell (Step 1). Run only the one that fits your Terminal. A command marked Optional can be skipped.',
   'The screens in this guide are examples. Your version numbers, file counts, times, folders and free disk space differ.',
   'To change part of a command, paste it but do not press Return yet. Press the left arrow key until the cursor (the mark where your typing goes) is just after the part to change, press delete until that part is gone, type yours, then press Return.',
   'The installer\'s own screens say Enter. On a Mac that is the Return key.',
   'Paste one, press Return, wait, then the next.',
-  // Step 1, Step 2.
+  // Step 1: the chip, the shell.
+  'This guide is for Macs with Apple silicon, the M1 chip and later. This command only reads.',
+  'If it answers x86_64, your Mac has an Intel processor (About This Mac shows Processor, not Chip), and this guide is not for it: stop here and ask whoever helps you with the AI Architect.',
+  'Terminal is set to open using Rosetta, Apple\'s translation for programs made for Intel.',
   'If the answer contains zsh, use the commands marked zsh. If it contains bash, use the commands marked bash.',
   'If .bash_profile does not exist but .bash_login or .profile does, stop here and ask for help before Step 2',
+  // Step 2: 2a to 2g.
+  'Apple\'s Command Line Tools (2a) are the only part that can need an administrator. Everything else goes into your own home folder and needs no password.',
   'No command in this guide starts with sudo, and you should never put sudo in front of one',
-  'Not sure? Choose path A if you know a name and password that this Mac accepts when you install a program, even on a company Mac. Otherwise choose path B, for example on a company Mac where only your IT team installs programs.',
-  'The folder is snowarch-dl in your home folder. It holds only downloaded files; you can move it to the Trash once the install is done and 2f has worked.',
-  'If you have moved the folder snowarch-dl to the Trash since 2b, run the first command of 2b again first.',
-  'Download the disk image (both paths). The universal file is for both kinds of Mac, Apple silicon and Intel. It is about 260 MB.',
-  'The AI Architect\'s installer prints this same command if it ever finds Claude Code installed but its folder not on PATH.',
-  'The AI Architect looks for draw.io there by itself, so there is no PATH command to run.',
-  'If it answers No such file or directory, Finder has not finished copying, or draw.io went somewhere else: wait, drag draw.io onto Applications again, and run the check again.',
-  'If it answers No such file or directory, draw.io is not in your own Applications folder yet: wait for Finder to finish, drag draw.io into the window that open ~/Applications opened, and run the check again.',
+  'It is the only step of this guide that needs an administrator. While you wait, you can already do 2b, 2c, 2d, 2f and 2g; do 2e and the steps after it once git --version answers with a version.',
+  'The folder is snowarch-dl in your home folder. It holds only downloaded files; you can move it to the Trash once the install is done and 2g has worked.',
+  'Node.js comes as an archive that needs no installer and no password. Download it:',
+  'It answers with a line that starts with the same 64 letters and digits as the example; your folder name differs. If they differ, run the download again, and if they still differ, stop and ask for help (see "Asking for help").',
+  'There is no PATH command here: 2d tells your Mac where Node.js is, together with Claude Code.',
+  'This command adds both folders for your account only, and applies the change to this window.',
+  'If the AI Architect\'s installer ever finds Claude Code installed but its folder not on PATH, it prints a shorter command for that one folder; use the one below instead, which has both.',
   'v20. Step 2b installs v26.13.1. The AI Architect is tested with Node.js 20, 22, 24 and 26 on Windows, macOS and Linux.',
+  'If you have moved the folder snowarch-dl to the Trash since 2b, run the first command of 2b again first.',
+  'Download the disk image. It is about 160 MB.',
+  'It must answer with both paths, with your home folder written out. If it answers No such file or directory for one of them, see "If something goes wrong".',
+  'The AI Architect looks for draw.io on your PATH, so give it a small command named drawio that starts the program from your own Applications folder.',
+  'Download the disk image. It is about 300 MB, so it takes a few minutes.',
+  'Give the AI Architect a small command named soffice that starts LibreOffice from your own Applications folder, as 2f did for draw.io.',
+  'The disk images are no longer needed: you can move the folder snowarch-dl to the Trash once the install is done (at the end of Step 6).',
   // Step 4, Step 5.
   'readable only by your account (file mode 0600, folder mode 0700). It does this in whatever folder you choose, and the wizard says so when it saves.',
   'If you prefer another folder, use its name in these commands and in Every day.',
@@ -587,14 +576,16 @@ const SENTENCES = [
   'Without a licence the installer leaves out two of its steps, the instance wizard (6d) and the verify step that follows it, until you run it again with the licence in place.',
   // Step 6 and after.
   'Then this window cannot see Node.js, and the plan offers no live mode. Do not type 1 there: on this screen any answer but s or q starts the install. Type q and press Return; nothing has been changed yet.',
+  'Your Mac\'s system and chip: darwin is the core of macOS and arm64 an Apple silicon chip. The number is the version of that core, not your macOS version. Shown for information.',
   'A warn or a fail names the check it comes from. E-31 the licence warns in the last days before the licence ends. With a licence that runs for longer, this line shows no warning.',
   'The example above comes from an install whose licence was on its last day.',
   'Saved to .local/instances.json in this folder — readable only by you (0600).',
   'If the first word was not ok or expiring when you ran the installer, it left out the instance wizard (6d) and the verify step.',
   'Once a new licence file is in place (Step 5 or "Licence renewal"), run $BOOT again: it runs them. If its plan shows Mode design-only, switch to live as in 6b.',
   'This example licence has 43 days left, so it says ok, and the health check at the end of the install shows no E-31 warning for it.',
-  // After the install: the sentences the second review added.
-  'Node.js does not update itself: it stays at the version of 2b. To move to a newer one later, follow 2b in the newest copy of this guide (after $CLI upgrade, it is docs/INSTALL-MACOS.md in your AI-Arch folder; see "New releases"); on path B, leave out its PATH command, because the line is already there.',
+  // After the install: the sentences the second review added, and the new ones.
+  'Node.js does not update itself: it stays at the version of 2b. To move to a newer one later, follow 2b in the newest copy of this guide (after $CLI upgrade, it is docs/INSTALL-MACOS.md in your AI-Arch folder; see "New releases"); do not repeat 2d, because its PATH line is already there.',
+  'draw.io and LibreOffice (2f, 2g) need nothing from you here: the AI Architect starts them itself, in the background, when it makes a diagram or checks a Word document as a PDF.',
   'It asks for the user name first, with the current one shortened in brackets: press Return to keep it. Then type the new password (nothing is shown) and press Return. It is saved only if the instance accepts it.',
   'It asks whether to remove the instance and its stored credentials; the question ends in [y/N], so the default is no. Type y and press Return to remove it. Any other answer removes nothing.',
   'Before you save it, move the licence file that is already in your Downloads folder (the one from Step 5), if it is still there, to the Trash. Then save the new file in Downloads, so that it is the only one there.',
@@ -602,14 +593,18 @@ const SENTENCES = [
   'Check that the new licence is in place.',
   'Its first word should now be ok, with your new end date after until. If it still shows the old date, the old file was copied: make sure Downloads holds only the new licence file, then run the copy again.',
   'It shows a plan first and asks Proceed? [Y/n]. Press Return, or type y and press Return, to accept it; any other answer changes nothing. Your instances and passwords are not touched. Restart Claude afterwards.',
+  'If you also want the programs of Step 2 gone: in Finder, choose Go › Go to Folder… (Shift+Command+G), type ~/Applications, press Return and move draw.io and LibreOffice to the Trash.',
+  'The programs from Step 2 stay on your Mac unless you remove them as in step 4. They do not need the AI Architect.',
   'The installer makes that file, and the folder .local around it, readable only by your account (file mode 0600, folder mode 0700). An administrator of this Mac, such as your IT team, can still read it.',
   '$CLI doctor checks it (check SV-02); $CLI doctor --fix repairs it after showing what it will change.',
   // What has not been tested, and the closing line.
   'This guide was written from the AI Architect\'s own code and from its automatic tests on macOS, not from a person\'s install on a Mac.',
-  'Intel Macs, and macOS 13.5 to 15. The automatic tests run on a Mac with Apple silicon and macOS 26.',
-  'Path B as a whole: Node.js unpacked into your home folder with its PATH line, and draw.io in your own Applications folder with the drawio command.',
+  'macOS 13.5 to 15. The automatic tests run on a Mac with macOS 26.',
+  'The programs in your home folder (2b, 2f, 2g): the Node.js archive, and draw.io and LibreOffice copied from their disk images with hdiutil and cp.',
+  'The Rosetta setting of Terminal (Step 1): the place and the name of the setting are described from where macOS usually keeps it.',
   'If you meet a difference, $CLI version and $CLI doctor (see "Asking for help") are what to send.',
   'Not yet tested end to end on a Mac.',
+  'It installs Git from Apple\'s Command Line Tools, Node.js 26.13.1, Claude Code from its official installer, draw.io 32.7.4, LibreOffice 26.8.3, and the AI Architect release that Step 4 names.',
 ].map((s) => s.replaceAll('$CLI', CLI).replaceAll('$BOOT', BOOT));
 
 test('ARC-09-C300 — the sentences of the reviews are on the page, and they are the Markdown guide\'s', () => {
@@ -647,7 +642,6 @@ test('ARC-09-C300 — the sentences of the reviews are on the page, and they are
 });
 
 test('ARC-09-C300 — nothing of the Windows page is left: no PowerShell, no .cmd launcher, no Ctrl, no Windows folder, and Enter is Return', () => {
-  const bare = (text) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');   // a comment may say what the page is not
   const everything = `${pageText} ${bare(code)}`;
   for (const bad of [/PowerShell/i, /Command Prompt/i, /\b(?:snowarch|bootstrap)\.cmd\b/, /%(?:LOCALAPPDATA|APPDATA|TEMP|USERPROFILE)%|\$env:/i, /\bC:\\/, /\bCtrl\b/, /winget/i, /File Explorer/i, /Run as administrator/i, /\bWin\b/, /\bPS>|\bPS C:/, /is not recognized/i, /\.zip\b/, /Apps &amp; features|Apps & features/]) {
     assert.doesNotMatch(everything, bad, `a Windows leftover: ${bad}`);
