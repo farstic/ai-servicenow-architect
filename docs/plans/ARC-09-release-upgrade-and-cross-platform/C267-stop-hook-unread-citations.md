@@ -86,7 +86,7 @@ The registered tail says "do not write a withdrawn name or path again", so a mod
 
 ### The data
 
-`grounding-classes.json` is read on every Stop. A missing, unreadable or malformed file switches every grounding ask off (before this row it meant all seven classes); C254's dead-path line does not read the file and works without it. The hook also checks a turn whose answer cites nothing when `citedUnread` is listed and the session's file holds `markdown/` at all, since a file the turn wrote may cite.
+`grounding-classes.json` is read on every Stop. A missing, unreadable or malformed file switches every grounding ask off (before this row it meant all seven classes); C254's dead-path line does not read the file and works without it. The hook also checks a turn whose answer cites nothing when `citedUnread` is listed and the session's file holds `markdown/` at all, since a file the turn wrote may cite. Since ARC-09-C291 the file also names `unsupportedName`, a cited page that does not print the name it is cited for: [C291-citation-support.md](C291-citation-support.md).
 
 ## Where it is
 
