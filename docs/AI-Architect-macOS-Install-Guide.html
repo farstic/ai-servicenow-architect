@@ -371,12 +371,8 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   .grow { display: grid; grid-template-columns: minmax(120px, 210px) minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
   .grow .dt { font: 700 13px var(--mono); }
 
-  /* ── The Mac page: the choice of a path and of a chip, the label over a shell form, and the heading of a part for one path ── */
-  .mode.choice button b { font: 800 17px/1.25 var(--disp); text-transform: none; letter-spacing: -0.01em; }
-  #choice { scroll-margin-top: 16px; transition: box-shadow .15s linear; }
-  #choice.flash { box-shadow: 0 0 0 4px var(--accent); }
+  /* ── The Mac page: the label over a command (its shell, or Optional), and the hero chip of what is not yet tested ── */
   .shell-lab { font: 600 11px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 4px; }
-  .sec h4 { font: 700 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; margin: 24px 0 8px; padding-left: 10px; border-left: 6px solid var(--accent); }
   .chip.warn i { background: var(--warn); }
 </style>
 </head>
@@ -388,11 +384,11 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   <header class="hero">
     <div class="kick"><span class="sq"></span>AI ServiceNow Architect · macOS 13.5 or later · release <span data-bind="release"></span></div>
     <h1>Install the <em>AI Architect</em> on macOS</h1>
-    <p class="lead">This guide takes you from a Mac with nothing installed to a working AI Architect connected to your ServiceNow instance. Follow it from top to bottom. Every command has a Copy button. Plan about half an hour, more if your Mac first has to download Apple's Command Line Tools; most of it is waiting. On path B, add the time your IT team needs for 2a.</p>
+    <p class="lead">This guide takes you from a Mac with nothing installed to a working AI Architect connected to your ServiceNow instance. Follow it from top to bottom. Every command has a Copy button. Plan about 45 minutes, more if your Mac first has to download Apple's Command Line Tools; most of it is waiting for downloads. On a company Mac, add the time your IT team needs for 2a.</p>
     <div class="chips">
       <span class="chip"><i></i>macOS 13.5 or later</span>
-      <span class="chip"><i></i>Apple silicon or an Intel processor</span>
-      <span class="chip"><i></i>Two paths: with or without your Mac's administrator password</span>
+      <span class="chip"><i></i>Apple silicon (M1 or later)</span>
+      <span class="chip"><i></i>Everything goes into your home folder without a password, except Apple's Command Line Tools</span>
       <span class="chip warn"><i></i>Not yet tested end to end on a Mac</span>
     </div>
   </header>
@@ -439,22 +435,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <button type="button" id="mode-design" aria-pressed="false"><small>No instance yet</small><b>Design-only</b><span>Work from the ServiceNow documentation and the specialist skills. Add an instance later.</span></button>
         </div>
 
-        <div id="choice">
-          <h3><b>■</b>Which path will you follow?</h3>
-          <p class="muted">Step 2 installs the programs in one of two ways. Pick yours: the guide shows only the commands for your path, and Step 2 waits until you have chosen. You can change your mind later. Not sure? Step 2 has a table and one question to help you.</p>
-          <div class="mode choice" role="group" aria-label="Path">
-            <button type="button" id="path-a" data-choice="path" data-v="A" aria-pressed="false"><small></small><b></b><span></span></button>
-            <button type="button" id="path-b" data-choice="path" data-v="B" aria-pressed="false"><small></small><b></b><span></span></button>
-          </div>
-          <div data-path="B">
-            <h3><b>■</b>Which kind of Mac? (path B only)</h3>
-            <p class="muted">On path B the Node.js download differs between the two kinds of Mac. Open the Apple menu and choose <span class="ui">About This Mac</span>.</p>
-            <div class="mode choice" role="group" aria-label="Kind of Mac">
-              <button type="button" id="chip-arm64" data-choice="chip" data-v="arm64" aria-pressed="false"><small></small><b></b><span></span></button>
-              <button type="button" id="chip-x64" data-choice="chip" data-v="x64" aria-pressed="false"><small></small><b></b><span></span></button>
-            </div>
-          </div>
-        </div>
 
         <h3><b>■</b><span id="need-count">Check what you need</span></h3>
         <div class="need" id="need-list"></div>
@@ -485,7 +465,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <li>Click Copy, click inside the Terminal window, paste with <span class="key">Command</span>+<span class="key">V</span> and press <span class="key">Return</span>. (You can also select the command and press <span class="key">Command</span>+<span class="key">C</span>.)</li>
           <li>Wait until the line that ends in <code class="ic">%</code> comes back before you run the next command. (If your Terminal uses bash, which Step 1 checks, the line ends in <code class="ic">$</code> instead.)</li>
           <li>Dark boxes labelled <span class="ui">On screen</span> show what you will see. You do not type those. Press <span class="ui">▶ Play</span> to watch them typed out.</li>
-          <li>Parts headed <span class="ui">Path A</span> or <span class="ui">Path B</span> are for one path only; Step 2 explains both. Commands marked <span class="ui">Apple silicon</span> or <span class="ui">Intel</span> are for one kind of Mac, and commands marked <span class="ui">zsh</span> or <span class="ui">bash</span> are for one shell (Step 1). Run only the one that fits your Mac. This page shows only the parts for the path and the kind of Mac you chose at the top, and puts the bash form of a command under its zsh form.</li>
+          <li>Commands marked <span class="ui">zsh</span> or <span class="ui">bash</span> are for one shell (Step 1). Run only the one that fits your Terminal. A command marked <span class="ui">Optional</span> can be skipped. On this page the bash form of a command sits under its zsh form, and an optional command carries the label Optional; neither counts in the progress.</li>
           <li>Where a command contains the label <code class="ic">pdi</code>, use your own instance label (wizard question 1): type it in <a href="#need">Your details</a> at the top and the commands change to match.</li>
           <li>To change part of a command, paste it but do not press <span class="key">Return</span> yet. Press the <span class="key">left arrow</span> key until the cursor (the mark where your typing goes) is just after the part to change, press <span class="key">delete</span> until that part is gone, type yours, then press <span class="key">Return</span>.</li>
           <li>The installer's own screens say <i>Enter</i>. On a Mac that is the <span class="key">Return</span> key.</li>
@@ -509,6 +489,13 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>If Spotlight does not open, use Finder instead: open <span class="ui">Applications</span>, then <span class="ui">Utilities</span>, and double-click <span class="ui">Terminal</span>.</p>
         <div data-term="ps" data-label="On screen"></div>
 
+        <h3><b>■</b>Check that your Mac has Apple silicon</h3>
+        <p>This guide is for Macs with Apple silicon, the M1 chip and later. This command only reads.</p>
+        <div class="stack"><div data-cmd="s1-arch"></div></div>
+        <div data-term="arch" data-label="On screen"></div>
+        <p>It must answer <code class="ic">arm64</code>. If it answers <code class="ic">x86_64</code>, your Mac has an Intel processor (About This Mac shows <b>Processor</b>, not <b>Chip</b>), and this guide is not for it: stop here and ask whoever helps you with the AI Architect.</p>
+        <p>If About This Mac shows a <b>Chip</b> that starts with <i>Apple M</i> but the command answers <code class="ic">x86_64</code>, Terminal is set to open using Rosetta, Apple's translation for programs made for Intel. Change that: in Finder, choose <span class="ui">Applications</span>, then <span class="ui">Utilities</span>, click <span class="ui">Terminal</span> once, press <span class="key">Command</span>+<span class="key">I</span>, untick <span class="ui">Open using Rosetta</span>, quit Terminal (<span class="ui">Terminal › Quit Terminal</span>), open it again as above and run the command again.</p>
+
         <h3><b>■</b>Which shell your Terminal uses</h3>
         <p>The program inside Terminal that reads your commands is called the <span class="glw"><button type="button" class="gl" aria-describedby="tip-shell">shell</button><span class="tip" id="tip-shell" role="tooltip" data-gl="shellzshbash"></span></span>. A Mac account made on macOS 10.15 or later uses <b>zsh</b> unless someone changed it; an account first made on an older Mac may still use <b>bash</b>. A few commands in this guide differ between the two, so check once. This command only reads.</p>
         <div class="stack"><div data-cmd="s1-shell"></div></div>
@@ -523,88 +510,45 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       <!-- STEP 2 -->
       <section class="sec" id="step-2">
         <div class="sec-head"><div class="num">2</div><div class="t"><small>Step 2</small><h2>Install the programs</h2></div></div>
-        <p>You need three programs (Git, Node.js and Claude Code), plus draw.io Desktop for the diagrams in your Word documents (2f). You install them once per Mac. Each download command fetches one file from that program's official site.</p>
-
-        <div class="call acc" id="choice-prompt" hidden><strong>Choose your path first</strong><p><span id="choice-prompt-text"></span> <a href="#choice">Go to the choice</a>.</p></div>
-
-        <h3><b>■</b>Path A or path B: choose yours first</h3>
-        <p>There are two ways to install the programs. Choose the one that fits your Mac, and follow only its parts of 2a, 2b and 2f. 2c, 2d and 2e are the same for both paths, and so is everything from Step 3 on.</p>
-        <div class="tw"><table>
-          <thead><tr><th></th><th>Path A</th><th>Path B</th></tr></thead>
-          <tbody>
-            <tr><td>Choose it when</td><td><b>"I can type my Mac's administrator password."</b></td><td><b>"My Mac is managed by my company; I cannot install programs myself."</b></td></tr>
-            <tr><td>Git (2a)</td><td>Apple's Command Line Tools, installed with one command</td><td>Apple's Command Line Tools, installed once by your IT team or from your company's Self Service app</td></tr>
-            <tr><td>Node.js (2b)</td><td>The official Node.js installer</td><td>The official Node.js archive, unpacked into your home folder, with no password</td></tr>
-            <tr><td>draw.io (2f)</td><td>Into the Mac's Applications folder</td><td>Into an Applications folder inside your home folder, with no password</td></tr>
-          </tbody>
-        </table></div>
-        <p>Not sure? Choose path A if you know a name and password that this Mac accepts when you install a program, even on a company Mac. Otherwise choose path B, for example on a company Mac where only your IT team installs programs.</p>
-        <div class="call warn"><strong>No Homebrew, no sudo</strong><p>This guide does not use Homebrew. If a message from the AI Architect suggests <code class="ic">brew install …</code>, install that program as in this step instead: Git in 2a, Node.js in 2b, draw.io in 2f. No command in this guide starts with <code class="ic">sudo</code>, and you should never put <code class="ic">sudo</code> in front of one: the command would run with the administrator's rights, and the files it makes may not be changeable from your own account later.</p></div>
-
-        <div data-needs-choice>
+        <p>You need three programs (Git, Node.js and Claude Code), plus two for your Word documents: draw.io Desktop, for the diagrams (2f), and LibreOffice, which turns a Word document into a PDF so that it can be checked (2g). You install them once per Mac. Apple's Command Line Tools (2a) are the only part that can need an administrator. Everything else goes into your own home folder and needs no password. Each download command fetches one file from that program's official site.</p>
+        <div class="call warn"><strong>No Homebrew, no sudo</strong><p>This guide does not use Homebrew. If a message from the AI Architect suggests <code class="ic">brew install …</code>, install that program as in this step instead: Git in 2a, Node.js in 2b, draw.io in 2f, LibreOffice in 2g. No command in this guide starts with <code class="ic">sudo</code>, and you should never put <code class="ic">sudo</code> in front of one: the command would run with the administrator's rights, and the files it makes may not be changeable from your own account later.</p></div>
 
         <h3><b>2a</b>Git (Apple's Command Line Tools)</h3>
         <p>Git downloads the AI Architect and keeps it up to date. On a Mac, Git comes with Apple's Command Line Tools, also called the Xcode Command Line Tools.</p>
-        <div data-path="A">
-          <h4>Path A · Install the Command Line Tools</h4>
-          <div class="stack"><div data-cmd="s2a-clt"></div></div>
-          <p>A window from macOS offers to install the command line developer tools. In Terminal the line that ends in <code class="ic">%</code> may come back at once: the install goes on in that window, so wait for the window, not for Terminal. Click <span class="ui">Install</span> and accept the licence agreement. If macOS asks for a password, type your Mac's administrator password. The download can take a while: wait until the window says that the software was installed, then click <span class="ui">Done</span>.</p>
-          <p>If Terminal answers instead with a line saying that the command line tools are already installed (it may start with <code class="ic">xcode-select: error:</code>, which is harmless here), they are on your Mac already. Go on to 2b.</p>
-        </div>
-        <div data-path="B">
-          <h4>Path B · Get the Command Line Tools once</h4>
-          <p>On a company Mac, installing the Command Line Tools may need an administrator, once. First check whether your Mac has them already. This command changes nothing; on a Mac without the tools it may open a window that offers to install them.</p>
-          <div class="stack"><div data-cmd="s2a-check"></div></div>
-          <ul>
-            <li>If it answers with a line that starts with <code class="ic">git version</code>, Git is there. Go on to 2b.</li>
-            <li>If a window opens that offers to install the command line developer tools, or Terminal answers with an error, they are not there yet. Ask your IT team to install <b>Apple's Command Line Tools</b> (Xcode Command Line Tools) on this Mac, or install them yourself from your company's <span class="ui">Self Service</span> app if it lists them. You may also click <span class="ui">Install</span> in that window: if macOS then asks for an administrator's name and password that you do not have, click <span class="ui">Cancel</span> and ask your IT team. Once the tools are installed, run <code class="ic">git --version</code> again. While you wait for your IT team, you can already do 2b, 2c, 2d and 2f; do 2e and the steps after it once <code class="ic">git --version</code> answers with a version.</li>
-          </ul>
-        </div>
+        <div class="stack"><div data-cmd="s2a-clt"></div></div>
+        <p>A window from macOS offers to install the command line developer tools. In Terminal the line that ends in <code class="ic">%</code> may come back at once: the install goes on in that window, so wait for the window, not for Terminal. Click <span class="ui">Install</span> and accept the licence agreement. The download can take a while: wait until the window says that the software was installed, then click <span class="ui">Done</span>.</p>
+        <p>If Terminal answers instead with a line saying that the command line tools are already installed (it may start with <code class="ic">xcode-select: error:</code>, which is harmless here), they are on your Mac already. Go on.</p>
+        <p>Check that Git is there. On a Mac without the tools, this command may open the same window as above: install them as described there, then run it again.</p>
+        <div class="stack"><div data-cmd="s2a-check"></div></div>
+        <p>It must answer with a line that starts with <code class="ic">git version</code>.</p>
+        <div class="call warn"><strong>On a company Mac</strong><p>macOS may ask for an administrator's name and password that you do not have, or the <span class="ui">Install</span> button may be missing. Click <span class="ui">Cancel</span>, and ask your IT team to install <b>Apple's Command Line Tools</b> (Xcode Command Line Tools) on this Mac, or install them yourself from your company's <span class="ui">Self Service</span> app if it lists them. It is the only step of this guide that needs an administrator. While you wait, you can already do 2b, 2c, 2d, 2f and 2g; do 2e and the steps after it once <code class="ic">git --version</code> answers with a version.</p></div>
 
         <h3><b>2b</b>Node.js</h3>
-        <p>Runs the part of the AI Architect that talks to your ServiceNow instance. First make a folder for the files this guide downloads (both paths). It prints nothing.</p>
+        <p>Runs the part of the AI Architect that talks to your ServiceNow instance. First make a folder for the files this guide downloads. It prints nothing.</p>
         <div class="stack"><div data-cmd="s2b-dir"></div></div>
-        <p>The folder is <code class="ic">snowarch-dl</code> in your home folder. It holds only downloaded files; you can move it to the Trash once the install is done and 2f has worked.</p>
-        <p>The download commands of 2b and 2f show a small table of numbers while they work. Wait until the line that ends in <code class="ic">%</code> comes back.</p>
-        <div data-path="A">
-          <h4>Path A · The Node.js installer</h4>
-          <p>This release of Node.js has one installer file for Macs. Download it:</p>
-          <div class="stack"><div data-cmd="s2b-pkg"></div></div>
-          <p>Then open it. (Or, in Finder, choose <span class="ui">Go › Home</span> in the menu bar, open the folder <code class="ic">snowarch-dl</code> and double-click <code class="ic">node.pkg</code>.)</p>
-          <div class="stack"><div data-cmd="s2b-pkg-open"></div></div>
-          <p>The Node.js installer opens in its own window. Follow its screens to the end and keep the choices it proposes. If macOS asks for a password, type your Mac's administrator password. If its last screen asks you to make sure that a folder is on your PATH, you need not do anything: 2e checks it. Then close the installer. There is no PATH command to run on this path: 2e checks that a fresh window finds <code class="ic">node</code> and <code class="ic">npm</code>.</p>
-        </div>
-        <div data-path="B">
-          <h4>Path B · Node.js in your home folder</h4>
-          <p>This is the archive version, which needs no installer and no password. Download the file for your Mac's chip, the one you chose at the top of this page (see <a href="#need">What you need</a>).</p>
-          <div data-chip="arm64">
-            <p><b>Apple silicon</b> (About This Mac shows <i>Chip</i>).</p>
-            <div class="stack"><div data-cmd="s2b-dl-arm64"></div></div>
-          </div>
-          <div data-chip="x64">
-            <p><b>Intel</b> (About This Mac shows <i>Processor</i>).</p>
-            <div class="stack"><div data-cmd="s2b-dl-x64"></div></div>
-          </div>
-          <p>Make the folder Node.js goes into, <code class="ic">.local/node</code> in your home folder. It prints nothing.</p>
-          <div class="stack"><div data-cmd="s2b-mkdir"></div></div>
-          <p>Unpack Node.js into it. Wait until the line that ends in <code class="ic">%</code> comes back.</p>
-          <div class="stack"><div data-cmd="s2b-unz"></div></div>
-          <p>Tell your Mac where Node.js is. Your Mac looks for commands in a list of folders called <span class="glw"><button type="button" class="gl" aria-describedby="tip-path-b">PATH</button><span class="tip" id="tip-path-b" role="tooltip" data-gl="path"></span></span> (2d says more). This command adds the Node.js folder to that list for your account only, and applies it to this window. It is one long line; copy all of it. It normally prints nothing. Run only the one for your shell (Step 1).</p>
-          <div class="stack">
-            <div data-cmd="s2b-path"></div>
-            <div data-cmd="s2b-path-bash"></div>
-          </div>
-        </div>
+        <p>The folder is <code class="ic">snowarch-dl</code> in your home folder. It holds only downloaded files; you can move it to the Trash once the install is done and 2g has worked.</p>
+        <p>The download commands of 2b, 2f and 2g show a small table of numbers while they work. Wait until the line that ends in <code class="ic">%</code> comes back.</p>
+        <p>Node.js comes as an archive that needs no installer and no password. Download it:</p>
+        <div class="stack"><div data-cmd="s2b-dl-arm64"></div></div>
+        <p><b>Optional.</b> Check that you have the file that the Node.js project published.</p>
+        <div class="stack"><div data-cmd="s2b-sha"></div></div>
+        <p>It answers with a line that starts with the same 64 letters and digits as the example; your folder name differs. If they differ, run the download again, and if they still differ, stop and ask for help (see <a href="#help">Asking for help</a>).</p>
+        <div data-term="sha-node" data-label="On screen"></div>
+        <p>Make the folder Node.js goes into, <code class="ic">.local/node</code> in your home folder. It prints nothing.</p>
+        <div class="stack"><div data-cmd="s2b-mkdir"></div></div>
+        <p>Unpack Node.js into it. Wait until the line that ends in <code class="ic">%</code> comes back.</p>
+        <div class="stack"><div data-cmd="s2b-unz"></div></div>
+        <p>There is no PATH command here: 2d tells your Mac where Node.js is, together with Claude Code.</p>
 
         <h3><b>2c</b>Claude Code</h3>
-        <p>The AI assistant that the Architect runs in. The same command for both paths.</p>
+        <p>The AI assistant that the Architect runs in.</p>
         <div class="stack"><div data-cmd="s2c"></div></div>
         <div data-timer="s2c"></div>
         <p>It shows no progress while it downloads. When it has finished, it prints <code class="ic">Claude Code successfully installed!</code> and the line that ends in <code class="ic">%</code> comes back. Then read the <i>Setup notes</i> it prints at the end, but do not copy the commands they show: 2d gives you the same fix as one command.</p>
-        <div class="call acc"><strong>Two folders called .local</strong><p>Claude Code has just put itself into <code class="ic">~/.local</code>, a folder in your home folder; on path B, Node.js is there too (2b). The <code class="ic">.local</code> inside your AI-Arch folder (Step 5) is a different folder: it holds your licence and your saved password. Never delete <code class="ic">~/.local</code>: Claude Code, and on path B Node.js, would go with it.</p></div>
+        <div class="call acc"><strong>Two folders called .local</strong><p>Claude Code has just put itself into <code class="ic">~/.local</code>, a folder in your home folder; Node.js is there too (2b), and so are the two small commands of 2f and 2g. The <code class="ic">.local</code> inside your AI-Arch folder (Step 5) is a different folder: it holds your licence and your saved password. Never delete <code class="ic">~/.local</code>: Claude Code and Node.js would go with it.</p></div>
 
-        <h3><b>2d</b>Tell your Mac where Claude Code is</h3>
-        <p>Your Mac looks for commands in a list of folders called <span class="glw"><button type="button" class="gl" aria-describedby="tip-path">PATH</button><span class="tip" id="tip-path" role="tooltip" data-gl="path"></span></span>. The Claude Code installer puts <code class="ic">claude</code> in the folder <code class="ic">.local/bin</code> of your home folder, and it may not add that folder to the list: then Terminal answers <code class="ic">zsh: command not found: claude</code>, even in a new window. This command adds the folder for your account only, and applies it to this window. It is one long line; copy all of it. It normally prints nothing. The AI Architect's installer prints this same command if it ever finds Claude Code installed but its folder not on PATH.</p>
+        <h3><b>2d</b>Tell your Mac where Claude Code and Node.js are</h3>
+        <p>Your Mac looks for commands in a list of folders called <span class="glw"><button type="button" class="gl" aria-describedby="tip-path">PATH</button><span class="tip" id="tip-path" role="tooltip" data-gl="path"></span></span>. The Claude Code installer puts <code class="ic">claude</code> in the folder <code class="ic">.local/bin</code> of your home folder, and it may not add that folder to the list: then Terminal answers <code class="ic">zsh: command not found: claude</code>, even in a new window. Node.js, which 2b unpacked into <code class="ic">.local/node</code>, is not on the list either. This command adds both folders for your account only, and applies the change to this window. It is one long line; copy all of it. It normally prints nothing. If the AI Architect's installer ever finds Claude Code installed but its folder not on PATH, it prints a shorter command for that one folder; use the one below instead, which has both.</p>
         <p>If the <i>Setup notes</i> of 2c said <code class="ic">Native installation exists but ~/.local/bin is not in your PATH.</code>, this is the step that fixes it. Run it in any case. Run only the one for your shell (Step 1).</p>
         <div class="stack">
           <div data-cmd="s2d"></div>
@@ -641,40 +585,57 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           </div>
         </div>
         <p>If one of them answers <code class="ic">command not found</code>, see <a href="#trouble">If something goes wrong</a>.</p>
-        <p>If a number is lower than the table says, do not continue: ask for help, and send these four answers. For git, a number below 2.34.1 means that Apple's Command Line Tools on this Mac are old; on path B, your IT team can install their newest version.</p>
+        <p>If a number is lower than the table says, do not continue: ask for help, and send these four answers. For git, a number below 2.34.1 means that Apple's Command Line Tools on this Mac are old; on a company Mac, your IT team can install their newest version.</p>
 
         <h3><b>2f</b>draw.io Desktop (for the diagrams)</h3>
         <p>The AI Architect draws its diagrams in draw.io and turns them into pictures for your Word documents. Without draw.io Desktop on this Mac it stops with <code class="ic">ERROR: draw.io Desktop not found</code> and cannot make the Word file. draw.io renders on your own Mac; nothing about your diagrams is sent anywhere.</p>
-        <p>draw.io is needed only for those diagrams. If a download in 2f fails, carry on with Step 3 and come back to 2f later: the installer does not need draw.io.</p>
+        <p>draw.io is needed only for those diagrams. If a command in 2f fails, carry on with Step 3 and come back to 2f later: the installer does not need draw.io.</p>
         <p>If you have moved the folder <code class="ic">snowarch-dl</code> to the Trash since 2b, run the first command of 2b again first.</p>
-        <p>Download the disk image (both paths). The universal file is for both kinds of Mac, Apple silicon and Intel. It is about 260 MB.</p>
+        <p>Download the disk image. It is about 160 MB.</p>
         <div class="stack"><div data-cmd="s2f-dl"></div></div>
-        <div data-path="A">
-          <h4>Path A · Into Applications</h4>
-          <p>Open the disk image:</p>
-          <div class="stack"><div data-cmd="s2f-open"></div></div>
-          <p>A Finder window opens with <span class="ui">draw.io</span> in it. Drag <span class="ui">draw.io</span> onto the <span class="ui">Applications</span> folder, in that window or in the Finder sidebar. If macOS asks for a password, type your Mac's administrator password. Wait until Finder has finished copying, then check that the program is in place:</p>
-          <div class="stack"><div data-cmd="s2f-test"></div></div>
-          <p>It must answer with that same path. If it answers <code class="ic">No such file or directory</code>, Finder has not finished copying, or draw.io went somewhere else: wait, drag <span class="ui">draw.io</span> onto <span class="ui">Applications</span> again, and run the check again. The AI Architect looks for draw.io there by itself, so there is no PATH command to run.</p>
-          <p>Open draw.io once yourself: in Finder, open <span class="ui">Applications</span> and double-click <span class="ui">draw.io</span>, so that any question from macOS comes up while you are watching. If macOS asks whether you want to open an app downloaded from the internet, click <span class="ui">Open</span>. Then quit draw.io (in the menu bar, <span class="ui">draw.io › Quit draw.io</span>), and eject the draw.io disk: click the eject button next to its name in the Finder sidebar.</p>
-        </div>
-        <div data-path="B">
-          <h4>Path B · Into your own Applications folder</h4>
-          <p>Your home folder can have an Applications folder of its own, where you can put programs without a password. Make it; nothing happens if it is there already.</p>
-          <div class="stack"><div data-cmd="s2f-appdir"></div></div>
-          <p>Open the disk image:</p>
-          <div class="stack"><div data-cmd="s2f-open-b"></div></div>
-          <p>Open your own Applications folder:</p>
-          <div class="stack"><div data-cmd="s2f-appdir-open"></div></div>
-          <p>Two Finder windows are open now: one shows <span class="ui">draw.io</span>, the other your own Applications folder. Drag <span class="ui">draw.io</span> from the first into the second. If macOS asks for an administrator's name and password, you are dragging into the Mac's main Applications folder: click <span class="ui">Cancel</span> and drag into the window that the last command opened. Wait until Finder has finished copying, then check that the program is in place:</p>
-          <div class="stack"><div data-cmd="s2f-test-b"></div></div>
-          <p>It must answer with that path, with your home folder written out: <code class="ic">/Users/you/Applications/draw.io.app/Contents/MacOS/draw.io</code>, with your own user name in place of <code class="ic">you</code>. If it answers <code class="ic">No such file or directory</code>, draw.io is not in your own Applications folder yet: wait for Finder to finish, drag <span class="ui">draw.io</span> into the window that <code class="ic">open ~/Applications</code> opened, and run the check again.</p>
-          <p>The AI Architect does not look in this folder by itself, so give it a small command named <code class="ic">drawio</code> that starts draw.io from there. This command makes that file in Claude Code's folder from 2d, which is already on PATH. It is one long line; copy all of it. It prints nothing when it works.</p>
-          <div class="stack"><div data-cmd="s2f-cmd"></div></div>
-          <p>Open draw.io once yourself: double-click <span class="ui">draw.io</span> in your own Applications folder, so that any question from macOS comes up while you are watching. If macOS asks whether you want to open an app downloaded from the internet, click <span class="ui">Open</span>. Then quit draw.io (in the menu bar, <span class="ui">draw.io › Quit draw.io</span>), and eject the draw.io disk: click the eject button next to its name in the Finder sidebar.</p>
-        </div>
+        <p><b>Optional.</b> Check the download.</p>
+        <div class="stack"><div data-cmd="s2f-sha"></div></div>
+        <p>It must start with the same 64 letters and digits as the example; if not, run the download again.</p>
+        <div data-term="sha-drawio" data-label="On screen"></div>
+        <p>Your own Applications folder is where programs can go without a password. Make it; nothing happens if it is there already.</p>
+        <div class="stack"><div data-cmd="s2f-mkapps"></div></div>
+        <p>Open the disk image in the background, without a window. It prints nothing when it works.</p>
+        <div class="stack"><div data-cmd="s2f-attach"></div></div>
+        <p>Copy draw.io into your own Applications folder. It prints nothing when it works. Wait until the line that ends in <code class="ic">%</code> comes back.</p>
+        <div class="stack"><div data-cmd="s2f-cp"></div></div>
+        <p>Close the disk image. It prints nothing when it works.</p>
+        <div class="stack"><div data-cmd="s2f-detach"></div></div>
+        <p>The AI Architect looks for draw.io on your PATH, so give it a small command named <code class="ic">drawio</code> that starts the program from your own Applications folder. This command makes that file in Claude Code's folder from 2d, which is already on PATH. It is one long line; copy all of it. It prints nothing when it works.</p>
+        <div class="stack"><div data-cmd="s2f-wrapper"></div></div>
+        <p>Check that the program and the command are in place:</p>
+        <div class="stack"><div data-cmd="s2f-ls"></div></div>
+        <p>It must answer with both paths, with your home folder written out. If it answers <code class="ic">No such file or directory</code> for one of them, see <a href="#trouble">If something goes wrong</a>.</p>
+        <div data-term="ls-drawio" data-label="On screen"></div>
+        <p><b>Optional.</b> See draw.io once while you are watching, so that any question from macOS comes up now and not in the middle of your work.</p>
+        <div class="stack"><div data-cmd="s2f-open"></div></div>
+        <p>draw.io opens in its own window. If macOS asks a question, answer it as macOS suggests. Then quit draw.io (in the menu bar, <span class="ui">draw.io › Quit draw.io</span>); you do not need to do anything in it.</p>
 
-        </div>
+        <h3><b>2g</b>LibreOffice (to check your Word documents as PDF)</h3>
+        <p>The AI Architect turns a Word document into a PDF to check how it looks. It uses LibreOffice for that, on your own Mac; nothing about your documents is sent anywhere. LibreOffice is needed only for that check. If a command in 2g fails, carry on with Step 3 and come back to 2g later: the installer does not need LibreOffice.</p>
+        <p>If you have moved the folder <code class="ic">snowarch-dl</code> to the Trash since 2b, run the first command of 2b again first.</p>
+        <p>Download the disk image. It is about 300 MB, so it takes a few minutes.</p>
+        <div class="stack"><div data-cmd="s2g-dl"></div></div>
+        <p><b>Optional.</b> Check the download.</p>
+        <div class="stack"><div data-cmd="s2g-sha"></div></div>
+        <p>It must start with the same 64 letters and digits as the example; if not, run the download again.</p>
+        <div data-term="sha-libreoffice" data-label="On screen"></div>
+        <p>Open the disk image in the background, without a window. It prints nothing when it works.</p>
+        <div class="stack"><div data-cmd="s2g-attach"></div></div>
+        <p>Copy LibreOffice into your own Applications folder. It prints nothing when it works, and takes a few seconds. Wait until the line that ends in <code class="ic">%</code> comes back.</p>
+        <div class="stack"><div data-cmd="s2g-cp"></div></div>
+        <p>Close the disk image. It prints nothing when it works.</p>
+        <div class="stack"><div data-cmd="s2g-detach"></div></div>
+        <p>Give the AI Architect a small command named <code class="ic">soffice</code> that starts LibreOffice from your own Applications folder, as 2f did for draw.io. It is one long line; copy all of it. It prints nothing when it works.</p>
+        <div class="stack"><div data-cmd="s2g-wrapper"></div></div>
+        <p>Check that it works. It prints the version of LibreOffice and takes a few seconds.</p>
+        <div class="stack"><div data-cmd="s2g-ver"></div></div>
+        <div data-term="soffice" data-label="On screen (an example; the last numbers on your Mac may differ)"></div>
+        <p>The disk images are no longer needed: you can move the folder <code class="ic">snowarch-dl</code> to the Trash once the install is done (at the end of Step 6).</p>
 
         <div data-chk="step-2"></div>
       </section>
@@ -756,7 +717,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">disk</code></td><td>There is enough free space.</td></tr>
             <tr><td><code class="ic">network</code></td><td>Your Mac can reach github.com, where the installer downloads the ServiceNow documentation from.</td></tr>
             <tr><td><code class="ic">node</code></td><td>Node.js and its helper npm are installed.</td></tr>
-            <tr><td><code class="ic">platform</code></td><td>Your Mac's system and chip: <code class="ic">darwin</code> is the core of macOS, <code class="ic">arm64</code> an Apple silicon chip and <code class="ic">x64</code> an Intel processor. The number is the version of that core, not your macOS version. Shown for information.</td></tr>
+            <tr><td><code class="ic">platform</code></td><td>Your Mac's system and chip: <code class="ic">darwin</code> is the core of macOS and <code class="ic">arm64</code> an Apple silicon chip. The number is the version of that core, not your macOS version. Shown for information.</td></tr>
           </tbody>
         </table></div>
         <p>Every line should start with <code class="ic">ok</code>, and the node line must show a version number.</p>
@@ -1022,7 +983,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       <section class="sec" id="optional">
         <div class="sec-head"><div class="num ink">+</div><div class="t"><small>After the install</small><h2>Optional tools</h2></div></div>
         <p>The AI Architect works without them. Each one adds a feature.</p>
-        <p>Node.js does not update itself: it stays at the version of 2b. To move to a newer one later, follow 2b in the newest copy of this guide (after <code class="ic">./snowarch upgrade</code>, it is <code class="ic">docs/INSTALL-MACOS.md</code> in your AI-Arch folder; see <a href="#releases">New releases</a>); on path B, leave out its PATH command, because the line is already there.</p>
+        <p>Node.js does not update itself: it stays at the version of 2b. To move to a newer one later, follow 2b in the newest copy of this guide (after <code class="ic">./snowarch upgrade</code>, it is <code class="ic">docs/INSTALL-MACOS.md</code> in your AI-Arch folder; see <a href="#releases">New releases</a>); do not repeat 2d, because its PATH line is already there.</p>
         <div class="tw"><table>
           <thead><tr><th>Tool</th><th>What it adds</th></tr></thead>
           <tbody>
@@ -1043,7 +1004,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <h3><b>■</b>Word documents (python3)</h3>
         <p>On a Mac the AI Architect makes its Word documents with python3. Check that this Mac has it:</p>
         <div class="stack"><div data-cmd="o-py"></div></div>
-        <p>It must answer with a line that starts with <code class="ic">Python 3</code>. If a window offers to install the command line developer tools instead, those are the tools from 2a: install them as there (path B: ask your IT team). After the install, <code class="ic">./snowarch doctor</code> says the same on its <i>Capabilities</i> line: <code class="ic">docx yes (python3)</code>.</p>
+        <p>It must answer with a line that starts with <code class="ic">Python 3</code>. If a window offers to install the command line developer tools instead, those are the tools from 2a: install them as there (on a company Mac, as in 2a). After the install, <code class="ic">./snowarch doctor</code> says the same on its <i>Capabilities</i> line: <code class="ic">docx yes (python3)</code>.</p>
       </section>
 
       <!-- DAILY -->
@@ -1060,6 +1021,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <div data-cmd="d-claude"></div>
         </div>
         <div class="call warn"><strong>Only from this folder</strong><p>Start <code class="ic">claude</code> only from this folder. Started anywhere else, the AI Architect is not loaded and <code class="ic">/mcp</code> shows no servicenow line.</p></div>
+        <p>draw.io and LibreOffice (2f, 2g) need nothing from you here: the AI Architect starts them itself, in the background, when it makes a diagram or checks a Word document as a PDF.</p>
       </section>
 
       <!-- SETTINGS -->
@@ -1149,7 +1111,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <div data-cmd="t-path-bash"></div>
         </div>
         <h3 id="help"><b>■</b>Asking for help</h3>
-        <p>Run these two commands in your folder and copy their full output into your message: select it with the mouse, from the command down to the line that ends in <code class="ic">%</code>, then press <span class="key">Command</span>+<span class="key">C</span>. Neither shows your password or your instance address. Say also which path you followed (A or B) and whether your Mac has Apple silicon or an Intel processor. Before Step 4 there is no folder yet: then send what the last command printed instead.</p>
+        <p>Run these two commands in your folder and copy their full output into your message: select it with the mouse, from the command down to the line that ends in <code class="ic">%</code>, then press <span class="key">Command</span>+<span class="key">C</span>. Neither shows your password or your instance address. Before Step 4 there is no folder yet: then send what the last command printed instead.</p>
         <div class="stack">
           <div data-cmd="t-ver"></div>
           <div data-cmd="t-doc"></div>
@@ -1157,7 +1119,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <div class="tool">
           <div class="tool-h"><span>Your help message</span><span>no password, no instance address</span></div>
           <div class="tool-b">
-            <p class="muted">It collects where you are, which path you chose, what you skipped, the steps you marked as not working, and the output you pasted into the checks. On path A, add whether your Mac has Apple silicon or an Intel processor. Add a line about what you see, copy it, and paste it into an email or Teams. Then add the output of the two commands above.</p>
+            <p class="muted">It collects where you are, what you skipped, the steps you marked as not working, and the output you pasted into the checks. Add a line about what you see, copy it, and paste it into an email or Teams. Then add the output of the two commands above.</p>
             <div><label class="l" for="help-desc">What do you see?</label>
             <textarea id="help-desc" rows="3" placeholder="e.g. After 2c, claude --version says zsh: command not found: claude"></textarea></div>
             <div><label class="l" for="help-msg">The message</label>
@@ -1174,9 +1136,10 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <li>In your folder, switch the AI Architect off. This is always safe (command below).</li>
           <li>Quit Claude (<code class="ic">/exit</code>) and Terminal. Then, in Finder, choose <span class="ui">Go › Home</span> in the menu bar and move the folder <code class="ic">AI-Arch</code> to the Trash. Your saved password goes with it, and is gone for good once the Trash is emptied.</li>
           <li>If you ever made the folder <code class="ic">~/.config/snowarch</code> (this guide does not), delete it too.</li>
+          <li>If you also want the programs of Step 2 gone: in Finder, choose <span class="ui">Go › Go to Folder…</span> (<span class="key">Shift</span>+<span class="key">Command</span>+<span class="key">G</span>), type <code class="ic">~/Applications</code>, press <span class="key">Return</span> and move <span class="ui">draw.io</span> and <span class="ui">LibreOffice</span> to the Trash. Do the same for <code class="ic">~/.local/bin</code>: move the two small files <code class="ic">drawio</code> and <code class="ic">soffice</code> to the Trash. Then for <code class="ic">~/.local</code>: move the folder <code class="ic">node</code> to the Trash. Move the folder <code class="ic">snowarch-dl</code> of your home folder to the Trash too, if it is still there. The PATH line that 2d added to <code class="ic">.zshrc</code> (or <code class="ic">.bash_profile</code>) can stay: it does no harm. Claude Code and Git have their own uninstall instructions, which this guide does not repeat.</li>
         </ol>
         <div class="stack"><div data-cmd="x-design"></div></div>
-        <p>The programs from Step 2 stay on your Mac. They do not need the AI Architect.</p>
+        <p>The programs from Step 2 stay on your Mac unless you remove them as in step 4. They do not need the AI Architect.</p>
       </section>
 
       <!-- SAFETY -->
@@ -1197,9 +1160,10 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>This guide was written from the AI Architect's own code and from its automatic tests on macOS, not from a person's install on a Mac. These things in it rest on something other than a run:</p>
         <ul>
           <li><b>The whole install on a Mac, from start to end.</b> The automatic tests on macOS run the installer in design-only mode only, with the plan accepted in advance, and without the Claude Code checks. So the screens of the plan keys (6b), the end of 6c, 6d, 6e, Step 7 and Step 8 come from the code and from our Windows test, not from a Mac.</li>
-          <li><b>Intel Macs, and macOS 13.5 to 15.</b> The automatic tests run on a Mac with Apple silicon and macOS 26.</li>
-          <li><b>The screens of Apple's Command Line Tools window, the Node.js installer and the draw.io disk image</b> (2a, 2b, 2f), and macOS's question about the Downloads folder (5b). They are described in general terms.</li>
-          <li><b>Path B as a whole:</b> Node.js unpacked into your home folder with its PATH line, and draw.io in your own Applications folder with the <code class="ic">drawio</code> command.</li>
+          <li><b>macOS 13.5 to 15.</b> The automatic tests run on a Mac with macOS 26.</li>
+          <li><b>The screens of Apple's Command Line Tools window</b> (2a), and macOS's question about the Downloads folder (5b). They are described in general terms.</li>
+          <li><b>The programs in your home folder (2b, 2f, 2g):</b> the Node.js archive, and draw.io and LibreOffice copied from their disk images with <code class="ic">hdiutil</code> and <code class="ic">cp</code>. These commands ran without a password on an administrator account of the AI Architect's authors; a Standard user's run has not been recorded. macOS should ask nothing when you start draw.io or LibreOffice, because both are signed and notarised and neither was downloaded with a browser; a first start on a Mac that followed this guide has not been seen.</li>
+          <li><b>The Rosetta setting of Terminal</b> (Step 1): the place and the name of the setting are described from where macOS usually keeps it.</li>
           <li><b>Claude Code's first-run screens on macOS</b> (Step 3). They are described in general terms because they change with Claude Code's releases.</li>
           <li><b>A folder name with a space in it, a folder on a network drive, and a folder that iCloud Drive or another sync tool manages</b> (Step 4).</li>
           <li><b>What the screens say after the licence has ended</b> (Step 7). The table is the product's own list of states, not a transcript of each one.</li>
@@ -1221,7 +1185,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <button type="button" class="btn pri" data-pg="next">End ▶</button>
       </nav>
 
-      <div class="foot">Not yet tested end to end on a Mac. Written on 18 November 2026 from the AI Architect's code and from its automatic macOS tests of that day (macOS 26.7.2 on Apple silicon). It installs Git from Apple's Command Line Tools, Node.js 26.13.1, Claude Code from its official installer and draw.io 32.7.4, and the AI Architect release that Step 4 names.</div>
+      <div class="foot">Not yet tested end to end on a Mac. Written on 18 November 2026 from the AI Architect's code and from its automatic macOS tests of that day (macOS 26.7.2 on Apple silicon). It installs Git from Apple's Command Line Tools, Node.js 26.13.1, Claude Code from its official installer, draw.io 32.7.4, LibreOffice 26.8.3, and the AI Architect release that Step 4 names.</div>
 
     </main>
   </div>
@@ -1242,41 +1206,11 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
  "designMinutes": {
   "s6": 4
  },
- "choicePrompt": "Choose your path at the top of this page (and, on path B, your kind of Mac) to see the commands for your Mac.",
- "choices": {
-  "path": {
-   "default": null,
-   "options": [
-    {
-     "v": "A",
-     "t": "Path A · I can type my Mac's administrator password",
-     "hint": "The official installers: Apple's Command Line Tools for Git, the Node.js installer, and draw.io into the Mac's Applications folder. macOS may ask for the password while they install."
-    },
-    {
-     "v": "B",
-     "t": "Path B · My Mac is managed by my company; I cannot install programs myself",
-     "hint": "Node.js and draw.io go into your home folder, with no password. Apple's Command Line Tools, which bring Git, may need an administrator once: ask your IT team, or use your company's Self Service app."
-    }
-   ]
-  },
-  "chip": {
-   "default": null,
-   "path": "B",
-   "options": [
-    {
-     "v": "arm64",
-     "t": "Apple silicon",
-     "hint": "Apple menu › About This Mac shows an item labelled Chip."
-    },
-    {
-     "v": "x64",
-     "t": "Intel",
-     "hint": "Apple menu › About This Mac shows an item labelled Processor."
-    }
-   ]
-  }
- },
  "commands": [
+  {
+   "id": "s1-arch",
+   "code": "uname -m"
+  },
   {
    "id": "s1-shell",
    "code": "echo $0"
@@ -1288,62 +1222,32 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   },
   {
    "id": "s2a-clt",
-   "code": "xcode-select --install",
-   "path": "A"
+   "code": "xcode-select --install"
   },
   {
    "id": "s2a-check",
-   "code": "git --version",
-   "path": "B"
+   "code": "git --version"
   },
   {
    "id": "s2b-dir",
    "code": "mkdir -p ~/snowarch-dl"
   },
   {
-   "id": "s2b-pkg",
-   "code": "curl -fL -o ~/snowarch-dl/node.pkg https://nodejs.org/dist/v26.13.1/node-v26.13.1.pkg",
-   "path": "A"
-  },
-  {
-   "id": "s2b-pkg-open",
-   "code": "open ~/snowarch-dl/node.pkg",
-   "path": "A"
-  },
-  {
    "id": "s2b-dl-arm64",
-   "code": "curl -fL -o ~/snowarch-dl/node.tar.gz https://nodejs.org/dist/v26.13.1/node-v26.13.1-darwin-arm64.tar.gz",
-   "path": "B",
-   "chip": "arm64"
+   "code": "curl -fL -o ~/snowarch-dl/node.tar.gz https://nodejs.org/dist/v26.13.1/node-v26.13.1-darwin-arm64.tar.gz"
   },
   {
-   "id": "s2b-dl-x64",
-   "code": "curl -fL -o ~/snowarch-dl/node.tar.gz https://nodejs.org/dist/v26.13.1/node-v26.13.1-darwin-x64.tar.gz",
-   "path": "B",
-   "chip": "x64"
+   "id": "s2b-sha",
+   "code": "shasum -a 256 ~/snowarch-dl/node.tar.gz",
+   "optional": true
   },
   {
    "id": "s2b-mkdir",
-   "code": "mkdir -p ~/.local/node",
-   "path": "B"
+   "code": "mkdir -p ~/.local/node"
   },
   {
    "id": "s2b-unz",
-   "code": "tar -xzf ~/snowarch-dl/node.tar.gz -C ~/.local/node --strip-components=1",
-   "path": "B"
-  },
-  {
-   "id": "s2b-path",
-   "code": "echo 'export PATH=\"$HOME/.local/node/bin:$PATH\"' >> ~/.zshrc && source ~/.zshrc",
-   "path": "B",
-   "shell": "zsh"
-  },
-  {
-   "id": "s2b-path-bash",
-   "code": "echo 'export PATH=\"$HOME/.local/node/bin:$PATH\"' >> ~/.bash_profile && source ~/.bash_profile",
-   "path": "B",
-   "shell": "bash",
-   "altOf": "s2b-path"
+   "code": "tar -xzf ~/snowarch-dl/node.tar.gz -C ~/.local/node --strip-components=1"
   },
   {
    "id": "s2c",
@@ -1351,12 +1255,12 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   },
   {
    "id": "s2d",
-   "code": "echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc && source ~/.zshrc",
+   "code": "echo 'export PATH=\"$HOME/.local/bin:$HOME/.local/node/bin:$PATH\"' >> ~/.zshrc && source ~/.zshrc",
    "shell": "zsh"
   },
   {
    "id": "s2d-bash",
-   "code": "echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bash_profile && source ~/.bash_profile",
+   "code": "echo 'export PATH=\"$HOME/.local/bin:$HOME/.local/node/bin:$PATH\"' >> ~/.bash_profile && source ~/.bash_profile",
    "shell": "bash",
    "altOf": "s2d"
   },
@@ -1378,42 +1282,70 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   },
   {
    "id": "s2f-dl",
-   "code": "curl -fL -o ~/snowarch-dl/drawio.dmg https://github.com/jgraph/drawio-desktop/releases/download/v32.7.4/draw.io-universal-32.7.4.dmg"
+   "code": "curl -fL -o ~/snowarch-dl/drawio.dmg https://github.com/jgraph/drawio-desktop/releases/download/v32.7.4/draw.io-arm64-32.7.4.dmg"
+  },
+  {
+   "id": "s2f-sha",
+   "code": "shasum -a 256 ~/snowarch-dl/drawio.dmg",
+   "optional": true
+  },
+  {
+   "id": "s2f-mkapps",
+   "code": "mkdir -p ~/Applications"
+  },
+  {
+   "id": "s2f-attach",
+   "code": "hdiutil attach -nobrowse -mountpoint ~/snowarch-dl/mnt-drawio ~/snowarch-dl/drawio.dmg > /dev/null"
+  },
+  {
+   "id": "s2f-cp",
+   "code": "cp -R ~/snowarch-dl/mnt-drawio/draw.io.app ~/Applications/"
+  },
+  {
+   "id": "s2f-detach",
+   "code": "hdiutil detach ~/snowarch-dl/mnt-drawio > /dev/null"
+  },
+  {
+   "id": "s2f-wrapper",
+   "code": "printf '#!/bin/sh\\nexec \"$HOME/Applications/draw.io.app/Contents/MacOS/draw.io\" \"$@\"\\n' > ~/.local/bin/drawio && chmod +x ~/.local/bin/drawio"
+  },
+  {
+   "id": "s2f-ls",
+   "code": "ls ~/Applications/draw.io.app/Contents/MacOS/draw.io ~/.local/bin/drawio"
   },
   {
    "id": "s2f-open",
-   "code": "open ~/snowarch-dl/drawio.dmg",
-   "path": "A"
+   "code": "open ~/Applications/draw.io.app",
+   "optional": true
   },
   {
-   "id": "s2f-test",
-   "code": "ls /Applications/draw.io.app/Contents/MacOS/draw.io",
-   "path": "A"
+   "id": "s2g-dl",
+   "code": "curl -fL -o ~/snowarch-dl/libreoffice.dmg https://download.documentfoundation.org/libreoffice/stable/26.8.3/mac/aarch64/LibreOffice_26.8.3_MacOS_aarch64.dmg"
   },
   {
-   "id": "s2f-appdir",
-   "code": "mkdir -p ~/Applications",
-   "path": "B"
+   "id": "s2g-sha",
+   "code": "shasum -a 256 ~/snowarch-dl/libreoffice.dmg",
+   "optional": true
   },
   {
-   "id": "s2f-open-b",
-   "code": "open ~/snowarch-dl/drawio.dmg",
-   "path": "B"
+   "id": "s2g-attach",
+   "code": "hdiutil attach -nobrowse -mountpoint ~/snowarch-dl/mnt-libreoffice ~/snowarch-dl/libreoffice.dmg > /dev/null"
   },
   {
-   "id": "s2f-appdir-open",
-   "code": "open ~/Applications",
-   "path": "B"
+   "id": "s2g-cp",
+   "code": "cp -R ~/snowarch-dl/mnt-libreoffice/LibreOffice.app ~/Applications/"
   },
   {
-   "id": "s2f-test-b",
-   "code": "ls ~/Applications/draw.io.app/Contents/MacOS/draw.io",
-   "path": "B"
+   "id": "s2g-detach",
+   "code": "hdiutil detach ~/snowarch-dl/mnt-libreoffice > /dev/null"
   },
   {
-   "id": "s2f-cmd",
-   "code": "printf '#!/bin/sh\\nexec \"$HOME/Applications/draw.io.app/Contents/MacOS/draw.io\" \"$@\"\\n' > ~/.local/bin/drawio && chmod +x ~/.local/bin/drawio",
-   "path": "B"
+   "id": "s2g-wrapper",
+   "code": "printf '#!/bin/sh\\nexec \"$HOME/Applications/LibreOffice.app/Contents/MacOS/soffice\" \"$@\"\\n' > ~/.local/bin/soffice && chmod +x ~/.local/bin/soffice"
+  },
+  {
+   "id": "s2g-ver",
+   "code": "soffice --version"
   },
   {
    "id": "s3-cd",
@@ -1574,7 +1506,13 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
  ],
  "terminals": {
   "ps": "you@MacBook-Air ~ %",
+  "arch": "arm64",
+  "sha-node": "aec2514ea1ceb2ba52455e9ec65986f6749a06dd759e5db2a72e6889668c9735  /Users/you/snowarch-dl/node.tar.gz",
   "versions": "you@MacBook-Air ~ % [[claude --version]]\n2.1.322 (Claude Code)\nyou@MacBook-Air ~ % [[git --version]]\ngit version 2.39.5 (Apple Git-146)\nyou@MacBook-Air ~ % [[node --version]]\nv26.13.1",
+  "sha-drawio": "b0ba01224cdc4817ebf218d73b2a45ff3569f8c9135ad422c5157655062900b3  /Users/you/snowarch-dl/drawio.dmg",
+  "ls-drawio": "/Users/you/.local/bin/drawio\n/Users/you/Applications/draw.io.app/Contents/MacOS/draw.io",
+  "sha-libreoffice": "de943203795e5057785f65515063e2db5eb60b0bb6d8e2534fec59e5cc5fb988  /Users/you/snowarch-dl/libreoffice.dmg",
+  "soffice": "LibreOffice 26.8.3.1 861effc5289d539f15c4c18d1ba8579ffd78728b",
   "clone": "Cloning into 'AI-Arch'...\nremote: Enumerating objects: 814, done.\n~ …\nResolving deltas: 100% (255/255), done.\nyou@MacBook-Air ~ % [[cd AI-Arch]]\nyou@MacBook-Air AI-Arch %",
   "licfile": "/Users/you/Downloads/{lic}",
   "preflight": "ok B00 root: /Users/you/AI-Arch\nok B00 git: 2.39.5\nok B00 claudeCode: 2.1.322 · login: ok\nok B00 disk: 104.9 GB free\nok B00 network: github.com reachable (HTTP 200)\nok B00 node: 26.13.1 · npm 11.20.0\nok B00 platform: darwin arm64 25.6.0\n[B00/09] preflight … ok (2 s)",
@@ -1601,6 +1539,11 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "step-1",
    "cmds": [
+    [
+     "s1-arch",
+     "1 · Check your Mac's chip",
+     0.1
+    ],
     [
      "s1-shell",
      "1 · Check your shell",
@@ -1632,24 +1575,14 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
      0.1
     ],
     [
-     "s2b-pkg",
-     "2b · Download the Node.js installer",
-     0.7
-    ],
-    [
-     "s2b-pkg-open",
-     "2b · Install Node.js",
-     2
-    ],
-    [
      "s2b-dl-arm64",
-     "2b · Download Node.js (Apple silicon)",
+     "2b · Download Node.js",
      0.7
     ],
     [
-     "s2b-dl-x64",
-     "2b · Download Node.js (Intel)",
-     0.7
+     "s2b-sha",
+     "2b · Check the Node.js download (optional)",
+     0.1
     ],
     [
      "s2b-mkdir",
@@ -1662,28 +1595,18 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
      0.3
     ],
     [
-     "s2b-path",
-     "2b · Add Node.js to PATH",
-     0.2
-    ],
-    [
-     "s2b-path-bash",
-     "2b · Add Node.js to PATH (bash)",
-     0.2
-    ],
-    [
      "s2c",
      "2c · Install Claude Code",
      2
     ],
     [
      "s2d",
-     "2d · Add Claude Code to PATH",
+     "2d · Add Claude Code and Node.js to PATH",
      0.2
     ],
     [
      "s2d-bash",
-     "2d · Add Claude Code to PATH (bash)",
+     "2d · Add Claude Code and Node.js to PATH (bash)",
      0.2
     ],
     [
@@ -1709,42 +1632,82 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     [
      "s2f-dl",
      "2f · Download draw.io",
-     2
+     1
     ],
     [
-     "s2f-open",
-     "2f · Open the draw.io disk image",
-     1.5
-    ],
-    [
-     "s2f-test",
-     "2f · Check draw.io",
+     "s2f-sha",
+     "2f · Check the draw.io download (optional)",
      0.1
     ],
     [
-     "s2f-appdir",
+     "s2f-mkapps",
      "2f · Make your own Applications folder",
      0.1
     ],
     [
-     "s2f-open-b",
+     "s2f-attach",
      "2f · Open the draw.io disk image",
+     0.3
+    ],
+    [
+     "s2f-cp",
+     "2f · Copy draw.io into Applications",
      0.5
     ],
     [
-     "s2f-appdir-open",
-     "2f · Open your own Applications folder",
-     1
+     "s2f-detach",
+     "2f · Close the draw.io disk image",
+     0.1
     ],
     [
-     "s2f-test-b",
+     "s2f-wrapper",
+     "2f · Make the drawio command",
+     0.2
+    ],
+    [
+     "s2f-ls",
      "2f · Check draw.io",
      0.1
     ],
     [
-     "s2f-cmd",
-     "2f · Make the drawio command",
+     "s2f-open",
+     "2f · See draw.io once (optional)",
+     0.5
+    ],
+    [
+     "s2g-dl",
+     "2g · Download LibreOffice",
+     3
+    ],
+    [
+     "s2g-sha",
+     "2g · Check the LibreOffice download (optional)",
      0.2
+    ],
+    [
+     "s2g-attach",
+     "2g · Open the LibreOffice disk image",
+     0.3
+    ],
+    [
+     "s2g-cp",
+     "2g · Copy LibreOffice into Applications",
+     0.5
+    ],
+    [
+     "s2g-detach",
+     "2g · Close the LibreOffice disk image",
+     0.1
+    ],
+    [
+     "s2g-wrapper",
+     "2g · Make the soffice command",
+     0.2
+    ],
+    [
+     "s2g-ver",
+     "2g · Check LibreOffice",
+     0.3
     ]
    ]
   },
@@ -1953,14 +1916,19 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
  ],
  "need": [
   {
+   "id": "n-chip",
+   "t": "A Mac with Apple silicon: the M1 chip or a later one (M2, M3, M4 and so on)",
+   "hint": "Open the Apple menu and choose About This Mac: on such a Mac it shows an item labelled Chip with a name that starts with Apple M. A Mac with an Intel processor shows Processor instead, and this guide is not for it. Step 1 checks it again with a command."
+  },
+  {
    "id": "n-mac",
-   "t": "A Mac with macOS 13.5 or later, connected to the internet",
-   "hint": "Claude Code needs 13.0, Node.js 26 needs 13.5. Not sure of your version? Open the Apple menu and choose About This Mac: it shows your macOS version, and Chip (Apple silicon) or Processor (Intel). An older version? Update macOS first, through Software Update; on a company Mac, ask your IT team."
+   "t": "macOS 13.5 or later, connected to the internet",
+   "hint": "Claude Code needs 13.0, Node.js 26 needs 13.5. The same About This Mac window shows your macOS version. If it shows an older version, update macOS first, through Software Update; on a company Mac, ask your IT team."
   },
   {
    "id": "n-disk",
-   "t": "At least 2 GB of free disk space once the programs of Step 2 are installed",
-   "hint": "The installer checks for 1.5 GB in Step 6a. Apple's Command Line Tools (if your Mac does not have them yet), Node.js, Claude Code and draw.io need room of their own before that. The ServiceNow documentation that the Architect reads takes about 490 MB."
+   "t": "At least 6 GB of free disk space before you start",
+   "hint": "Apple's Command Line Tools (if your Mac does not have them yet), Node.js and Claude Code need room of their own, draw.io and LibreOffice need about 1.7 GB together with their downloads, and 2 GB must still be free once all of them are installed: the installer checks for 1.5 GB in Step 6a, and the ServiceNow documentation that the Architect reads takes about 490 MB."
   },
   {
    "id": "n-plan",
@@ -1974,15 +1942,8 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   },
   {
    "id": "n-admin",
-   "path": "A",
-   "t": "Your Mac's administrator password (path A)",
-   "hint": "macOS may ask for it while Step 2 installs the programs. No such password? Choose path B above."
-  },
-  {
-   "id": "n-it",
-   "path": "B",
-   "t": "Your IT team's help once, or your company's Self Service app (path B)",
-   "hint": "For Apple's Command Line Tools, which bring Git (2a). Everything else on path B goes into your home folder without a password."
+   "t": "For Apple's Command Line Tools (2a): your Mac's administrator password, the one macOS may ask for when you install a program.",
+   "hint": "On a company Mac, your IT team's help, once, or your company's Self Service app. Everything else in Step 2 installs into your home folder without any password."
   },
   {
    "id": "n-inst",
@@ -2003,7 +1964,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "tools-nr",
    "see": "command not found for git, node, npm or now-sdk",
-   "do": "Quit Terminal (Terminal › Quit Terminal) and open it again as in Step 1: programs installed in Step 2 are seen only by new windows. If it persists, repeat that program's part of Step 2; on path B, Node.js includes its PATH command in 2b. For git, see 2a.",
+   "do": "Quit Terminal (Terminal › Quit Terminal) and open it again as in Step 1: programs installed in Step 2 are seen only by new windows. If it persists, run the PATH command of 2d for your shell, and for node and npm repeat 2b. For git, see 2a.",
    "href": "#step-2",
    "link": "Step 2",
    "k": "git node npm now-sdk path command not found"
@@ -2011,15 +1972,15 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "bad-cpu",
    "see": "node does not start: bad CPU type in executable, or a message that it cannot run on this Mac",
-   "do": "On path B you downloaded the Node.js file for the other kind of Mac. Check Chip or Processor in About This Mac (see What you need), then run the download and the tar command of 2b for your Mac again.",
-   "href": "#need",
-   "link": "What you need",
-   "k": "bad cpu type executable arm64 x64 intel apple silicon chip wrong"
+   "do": "The Node.js file of this guide is for a Mac with Apple silicon. Run uname -m as in Step 1: if it does not answer arm64, this guide is not for this Mac; if About This Mac shows an Apple chip, see the Rosetta setting in Step 1.",
+   "href": "#step-1",
+   "link": "Step 1",
+   "k": "bad cpu type executable arm64 x86_64 intel apple silicon rosetta wrong"
   },
   {
    "id": "snowarch-node",
    "see": "snowarch: Node.js 20+ is required and was not found on PATH.",
-   "do": "This window cannot see Node.js. Quit Terminal and open it again as in Step 1, go to your folder with cd ~/AI-Arch and run the command again. If it persists, repeat 2b; on path B, including its PATH command. The line under it suggests brew: this guide does not use it.",
+   "do": "This window cannot see Node.js. Quit Terminal and open it again as in Step 1, go to your folder with cd ~/AI-Arch and run the command again. If it persists, repeat 2b and the PATH command of 2d. The line under it suggests brew: this guide does not use it.",
    "href": "#step-2",
    "link": "Step 2b",
    "k": "snowarch node.js required not found path brew"
@@ -2035,7 +1996,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "brew",
    "see": "A message suggests brew install …",
-   "do": "This guide does not use Homebrew. Install that program as in Step 2 instead: Git in 2a, Node.js in 2b, draw.io in 2f.",
+   "do": "This guide does not use Homebrew. Install that program as in Step 2 instead: Git in 2a, Node.js in 2b, draw.io in 2f, LibreOffice in 2g.",
    "href": "#step-2",
    "link": "Step 2",
    "k": "brew homebrew install node@22 cask drawio"
@@ -2043,7 +2004,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "admin-prompt",
    "see": "macOS asks for an administrator's name and password that you do not have",
-   "do": "On path B the one step that needs an administrator is Apple's Command Line Tools (2a): click Cancel and ask your IT team. Anywhere else, you are on a path A step: follow path B instead, or for draw.io drag it into your own Applications folder (2f).",
+   "do": "The one step that can need an administrator is Apple's Command Line Tools (2a): click Cancel and ask your IT team. Nothing else in this guide asks for a password: if something else does, click Cancel and ask for help (see \"Asking for help\").",
    "href": "#step-2",
    "link": "Step 2",
    "k": "admin administrator password name cancel standard user"
@@ -2059,15 +2020,23 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "drawio",
    "see": "ERROR: draw.io Desktop not found",
-   "do": "Path A: draw.io is not in /Applications. Repeat 2f and check that the ls command answers with the path. Path B: repeat 2f for path B, including its last command, which makes the drawio command.",
+   "do": "Repeat 2f from the copy, including the command that makes drawio, and check that the ls command answers with both paths.",
    "href": "#step-2",
    "link": "Step 2f",
    "k": "drawio draw.io diagram word desktop not found"
   },
   {
+   "id": "soffice",
+   "see": "ERROR: LibreOffice (soffice) not found, with a suggestion to use brew",
+   "do": "This guide does not use Homebrew. Repeat 2g from the copy, including the command that makes soffice, and check that soffice --version answers.",
+   "href": "#step-2",
+   "link": "Step 2g",
+   "k": "soffice libreoffice not found brew error"
+  },
+  {
    "id": "gatekeeper",
-   "see": "macOS says that draw.io cannot be opened, or cannot be checked",
-   "do": "Do not override it. Move draw.io to the Trash, from the Applications folder you put it in, then repeat 2f from its download command. If macOS still refuses it, ask for help (see Asking for help) and say what macOS showed.",
+   "see": "macOS says that draw.io or LibreOffice cannot be opened, or cannot be checked",
+   "do": "Do not override it. Move that program to the Trash, from the Applications folder in your home folder, then repeat 2f or 2g from its download command. If macOS still refuses it, ask for help (see \"Asking for help\") and say what macOS showed.",
    "href": "#step-2",
    "link": "Step 2f",
    "k": "cannot be opened checked unknown developer open anyway malware security"
@@ -2075,10 +2044,42 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "dl-404",
    "see": "A download in Step 2 stops with curl: (22) The requested URL returned error: 404",
-   "do": "The file is not at that address. Check that you copied the whole line and run it again. If it still fails, send what it printed and say which download it was (see Asking for help). If it is the draw.io download (2f), carry on with Step 3 meanwhile: the installer does not need draw.io.",
+   "do": "The file is not at that address. Check that you copied the whole line and run it again. If it still fails, send what it printed and say which download it was (see \"Asking for help\"). If it is the draw.io or LibreOffice download (2f, 2g), carry on with Step 3 meanwhile: the installer does not need them.",
    "href": "#help",
    "link": "Asking for help",
    "k": "curl 22 404 download requested url error"
+  },
+  {
+   "id": "hdiutil-attach",
+   "see": "hdiutil: attach failed - image not recognized",
+   "do": "The file is not the disk image: the download is incomplete, or a web page was saved in its place. Run the download command of that step again, then its attach command.",
+   "href": "#step-2",
+   "link": "Step 2f",
+   "k": "hdiutil attach failed image not recognized dmg download incomplete"
+  },
+  {
+   "id": "cp-missing",
+   "see": "cp: …/mnt-drawio/draw.io.app: No such file or directory (or …/mnt-libreoffice/LibreOffice.app)",
+   "do": "The disk image is not open: the attach command before it failed or was skipped. Run the attach command of that step again, then the copy.",
+   "href": "#step-2",
+   "link": "Step 2f",
+   "k": "cp mnt-drawio mnt-libreoffice no such file or directory disk image not open"
+  },
+  {
+   "id": "hdiutil-detach",
+   "see": "hdiutil: detach failed - No such file or directory",
+   "do": "The disk image was not open, so there is nothing to close. Go on.",
+   "href": "#step-2",
+   "link": "Step 2f",
+   "k": "hdiutil detach failed no such file or directory"
+  },
+  {
+   "id": "wrapper-nr",
+   "see": "zsh: command not found: drawio or soffice (in bash: drawio: command not found)",
+   "do": "Run the PATH command of 2d for your shell, quit Terminal and open it again. If it persists, run the ls command of 2f (for soffice, the check in 2g): a missing file means that the printf command that makes it did not run, so run it again.",
+   "href": "#step-2",
+   "link": "Step 2f",
+   "k": "drawio soffice command not found wrapper printf path"
   },
   {
    "id": "dyld",
@@ -2098,13 +2099,13 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   },
   {
    "id": "not-a-commit",
-   "see": "warning: refs/tags/… is not a commit!",
+   "see": "warning: refs/tags/... is not a commit!",
    "do": "Harmless. Continue.",
    "k": "refs tags commit warning clone"
   },
   {
    "id": "preflight-line",
-   "see": "A line in the installer's check (6a) is not ok",
+   "see": "A line in the installer's check (Step 6a) is not ok",
    "do": "A FAIL line says what to do: do it, then run ./bootstrap.sh again; it continues where it stopped. A WARN line does not stop the installer; see 6a.",
    "href": "#step-6",
    "link": "Step 6a",
@@ -2121,7 +2122,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "proxy",
    "see": "github.com or another download site cannot be reached, or you are behind a company proxy",
-   "do": "Ask your IT team for the proxy address, set it in the window with the proxy command below, then run the command that failed again. The setting lasts only for that Terminal window: set it again in each new window, before ./bootstrap.sh or claude.",
+   "do": "Ask your IT team for the proxy address, set it in the window as shown below, then run the command that failed again. The setting lasts only for that Terminal window: set it again in each new window, before ./bootstrap.sh or claude.",
    "k": "proxy network https_proxy unreachable timeout github"
   },
   {
@@ -2157,7 +2158,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "mcp-missing",
    "see": "/mcp shows no servicenow line",
-   "do": "Claude was started outside your folder. Type /exit, then follow Every day.",
+   "do": "Claude was started outside your folder. Type /exit, then follow \"Every day\".",
    "href": "#daily",
    "link": "Every day",
    "k": "mcp servicenow missing tools"
@@ -2165,7 +2166,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "licence-bad",
    "see": "The licence says expired or missing",
-   "do": "See Licence renewal. If it says missing, repeat Step 5. Then, if it did not say ok or expiring when you ran the installer, run ./bootstrap.sh again (Step 6): it runs the wizard it left out.",
+   "do": "See \"Licence renewal\". If it says missing, repeat Step 5. Then, if it did not say ok or expiring when you ran the installer, run ./bootstrap.sh again (Step 6): it runs the wizard it left out.",
    "href": "#renewal",
    "link": "Licence renewal",
    "k": "licence license expired missing invalid revoked e-31"
@@ -2185,6 +2186,10 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     "see": "Spotlight does not open, or does not find Terminal",
     "do": "Use Finder instead: open Applications, then Utilities, and double-click Terminal."
    },
+   {
+    "see": "uname -m answers x86_64",
+    "do": "Your Mac has an Intel processor, and this guide is not for it. If About This Mac shows a Chip that starts with Apple M, Terminal is set to open using Rosetta: untick Open using Rosetta as described in Step 1, quit Terminal, open it again and run the command again."
+   },
    "unexpected"
   ],
   "step-2": [
@@ -2196,7 +2201,12 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
    "zshrc-denied",
    "dl-404",
    "drawio",
+   "soffice",
    "gatekeeper",
+   "hdiutil-attach",
+   "cp-missing",
+   "hdiutil-detach",
+   "wrapper-nr",
    "dyld",
    "region",
    "proxy",
@@ -2335,11 +2345,11 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   ],
   "tips": {
    "root": "Start the installer from inside the AI-Arch folder: cd ~/AI-Arch, then ./bootstrap.sh.",
-   "git": "Install Git as in 2a (path A: the Command Line Tools; path B: ask your IT team), then quit Terminal and open it again as in Step 1.",
+   "git": "Install Git as in 2a (on a company Mac, ask your IT team), then quit Terminal and open it again as in Step 1.",
    "claudeCode": "Install Claude Code (2c, 2d). Not logged in is only a warning: carry on, and sign in when Claude asks in Step 8.",
    "disk": "Free up disk space: about 2 GB is needed.",
    "network": "Your Mac cannot reach github.com, where the installer downloads the ServiceNow documentation from. Behind a company proxy, set it as in If something goes wrong.",
-   "node": "Install Node.js as in 2b (on path B including its PATH command), then quit Terminal and open it again as in Step 1. If the line says Node.js not found, see the box at the start of 6b.",
+   "node": "Install Node.js as in 2b and run the PATH command of 2d, then quit Terminal and open it again as in Step 1. If the line says Node.js not found, see the box at the start of 6b.",
    "platform": "Shown for information."
   }
  },
@@ -2395,7 +2405,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   ],
   [
    "Administrator password",
-   "The password of an account that may install programs for the whole Mac. Path A needs yours. On path B you need none yourself: your IT team uses theirs once, for Apple's Command Line Tools (2a)."
+   "The password of an account that may install programs for the whole Mac. Only Apple's Command Line Tools (2a) can need it. On a company Mac you need none yourself: your IT team uses theirs, once, for the Command Line Tools."
   ],
   [
    "PATH",
@@ -2491,7 +2501,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   function setText(el, t) { if (el && el.textContent !== t) el.textContent = t; }
   function clear(el) { while (el.firstChild) el.removeChild(el.firstChild); }
   function toggle(el, show) { if (el) el.hidden = !show; }
-  function optionOf(g, v) { return !!v && D.choices[g].options.some(function (o) { return o.v === v; }); }
   function scrollTo(el, block) { if (el) el.scrollIntoView({ behavior: rm() ? 'auto' : 'smooth', block: block || 'start' }); }
 
   /* ── Storage: every access in try/catch; the page works without it ────────────────────────────────────────── */
@@ -2567,21 +2576,21 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     else if (nf('claude')) items.push(ocItem('Claude Code', 'bad', 'Not found. Run the PATH command in 2d for your shell, then quit Terminal and open it again as in Step 1.'));
     else items.push(ocItem('Claude Code', 'warn', 'Not in what you pasted. Run claude --version.'));
     m = T.match(/git version (\d+\.\d+(?:\.\d+)?)/i);
-    if (m) items.push(cmpVer(m[1], F.git) >= 0 ? ocItem('Git', 'ok', m[1] + ' — new enough.') : ocItem('Git', 'bad', m[1] + ' is too old: you need ' + F.git + ' or later. Apple\'s Command Line Tools on this Mac are old (2a); on path B, your IT team can install their newest version.'));
+    if (m) items.push(cmpVer(m[1], F.git) >= 0 ? ocItem('Git', 'ok', m[1] + ' — new enough.') : ocItem('Git', 'bad', m[1] + ' is too old: you need ' + F.git + ' or later. Apple\'s Command Line Tools on this Mac are old (2a); on a company Mac, your IT team can install their newest version.'));
     // A Mac without Apple's Command Line Tools opens a window and prints a line that starts with xcode-select instead of saying "command not found".
-    else if (nf('git') || /xcode-select:\s*(?:note|error)/i.test(T)) items.push(ocItem('Git', 'bad', 'Not found. Apple\'s Command Line Tools are missing: see 2a (path B: ask your IT team), then quit Terminal and open it again as in Step 1.'));
+    else if (nf('git') || /xcode-select:\s*(?:note|error)/i.test(T)) items.push(ocItem('Git', 'bad', 'Not found. Apple\'s Command Line Tools are missing: see 2a (on a company Mac, ask your IT team), then quit Terminal and open it again as in Step 1.'));
     else items.push(ocItem('Git', 'warn', 'Not in what you pasted. Run git --version.'));
     m = T.match(/(?:^|\s)v(\d+)\.(\d+)\.(\d+)\b/m);
     var nodeMajor = parseInt(F.node, 10);
     if (m) {
       items.push(+m[1] >= nodeMajor ? ocItem('Node.js', 'ok', 'v' + m[1] + '.' + m[2] + '.' + m[3] + ' — new enough.') : ocItem('Node.js', 'bad', 'v' + m[1] + ' is too old: you need v' + nodeMajor + ' or later. Repeat 2b.'));
-    } else if (nf('node')) items.push(ocItem('Node.js', 'bad', 'Not found. Quit Terminal and open it again as in Step 1; if it persists, repeat 2b (on path B including its PATH command).'));
+    } else if (nf('node')) items.push(ocItem('Node.js', 'bad', 'Not found. Quit Terminal and open it again as in Step 1; if it persists, repeat 2b and the PATH command of 2d.'));
     else items.push(ocItem('Node.js', 'warn', 'Not in what you pasted. Run node --version.'));
     // A prompt in front of a line is not part of the answer: zsh's (user@host folder %) and bash's own on a Mac (host:folder user$).
     var lines = T.split(/\r?\n/).map(function (l) { return l.replace(/^\S+@\S+\s+\S+\s*[%#$]\s*/, '').replace(/^\S+:\S+\s+\S+\$\s*/, '').trim(); });
     var npm = lines.filter(function (l) { return /^\d+\.\d+\.\d+$/.test(l); })[0];
     if (npm) items.push(ocItem('npm', 'ok', npm + ' — any version works.'));
-    else if (nf('npm')) items.push(ocItem('npm', 'bad', 'Not found. It comes with Node.js: repeat 2b (on path B including its PATH command), then quit Terminal and open it again.'));
+    else if (nf('npm')) items.push(ocItem('npm', 'bad', 'Not found. It comes with Node.js: repeat 2b and the PATH command of 2d, then quit Terminal and open it again.'));
     else items.push(ocItem('npm', 'warn', 'Not in what you pasted. Run npm --version.'));
     return { items: items, sum: ocSum(items) };
   }
@@ -2656,16 +2665,10 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     return LABEL_RULE.test(label) ? '' : 'Use up to 32 lower-case letters, digits, - or _, starting with a letter, for example acme-dev.';
   }
 
-  // ── The choices: a path, and on path B a chip. A command shows for the choices it belongs to, and Step 2 waits until they are made. ──
+  // ── Counting. The bash form of a zsh command, the bash-only check of Step 1 and the Optional commands are shown and never counted. ──
   var CBY = {};
   D.commands.forEach(function (c) { CBY[c.id] = c; });
-  function choiceReady(st) { return st.path === 'A' || (st.path === 'B' && (st.chip === 'arm64' || st.chip === 'x64')); }
-  function cmdShown(c, st) {
-    if (c.step === 'step-2' && !choiceReady(st)) return false;
-    return (!c.path || c.path === st.path) && (!c.chip || c.chip === st.chip);
-  }
-  // The bash form of a zsh command, and the bash-only check of Step 1, are shown and never counted.
-  function isCounted(c) { return c.shell !== 'bash'; }
+  function isCounted(c) { return c.shell !== 'bash' && !c.optional; }
   // Copying the bash form of a command marks the zsh command it is the form of.
   function doneKeyOf(id) { return CBY[id] && CBY[id].altOf ? CBY[id].altOf : id; }
 
@@ -2676,29 +2679,26 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   D.steps.forEach(function (s) {
     s.cmds.forEach(function (c) {
       var d = CBY[c[0]] || {};
-      var e = { cid: c[0], t: c[1], min: c[2], step: s.id, path: d.path, chip: d.chip, shell: d.shell, altOf: d.altOf };
+      var e = { cid: c[0], t: c[1], min: c[2], step: s.id, shell: d.shell, altOf: d.altOf, optional: d.optional };
       ALL_CMDS.push(e); ALL_BY_ID[e.cid] = e;
     });
   });
-  // What stands in the place of Step 2 for the Next button until the choices are made.
-  var GATE = { cid: null, t: 'Choose your path', min: 0, step: 'need', gate: true };
-  function needFor(st, live) { return D.need.filter(function (x) { return (!x.live || live) && (!x.path || x.path === st.path); }); }
-  function stepCmds(stepId, st) { return ALL_CMDS.filter(function (c) { return c.step === stepId && isCounted(c) && cmdShown(c, st); }); }
+  function needFor(live) { return D.need.filter(function (x) { return !x.live || live; }); }
+  function stepCmds(stepId) { return ALL_CMDS.filter(function (c) { return c.step === stepId && isCounted(c); }); }
   function navModel(st, live) {
     var links = D.nav.filter(function (x) { return x.id && (!x.live || live); });
     var ids = links.map(function (x) { return x.id; });
     var ai = Math.max(0, ids.indexOf(st.active));
     var ri = Math.max(ai, ids.indexOf(st.reached));
-    var needL = needFor(st, live);
+    var needL = needFor(live);
     var needDone = needL.filter(function (x) { return st.need[x.id]; }).length;
     var items = links.map(function (x, idx) {
       var on = idx === ai, count = '', complete = false;
       if (STEP_BY_ID[x.id]) {
-        var cs = stepCmds(x.id, st);
+        var cs = stepCmds(x.id);
         var n = cs.filter(function (c) { return st.done[c.cid]; }).length;
-        var waiting = x.id === 'step-2' && !choiceReady(st);
-        complete = (!waiting && n === cs.length) || st.chk[x.id] === 'yes';
-        count = waiting ? '?' : n + '/' + cs.length;
+        complete = n === cs.length || st.chk[x.id] === 'yes';
+        count = n + '/' + cs.length;
       } else if (x.id === 'need') { complete = needDone === needL.length; count = needDone + '/' + needL.length; }
       var passed = idx < ri || complete;
       return { id: x.id, on: on, passed: passed, complete: complete, count: complete ? '' : count, cls: on ? 'on' : (passed ? 'past' : ''),
@@ -2707,21 +2707,18 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     return { ids: ids, items: items, ai: ai, ri: ri, needDone: needDone, needTotal: needL.length, pct: Math.round((ri + 1) / links.length * 100) + '%' };
   }
   function nextModel(st, live) {
-    var done = 0, total = 0, left = 0, next = null, gated = false;
+    var done = 0, total = 0, left = 0, next = null;
     ALL_CMDS.forEach(function (c) {
       if (!isCounted(c)) return;
-      // Step 2 has no commands for a reader who has not chosen: the Next button names the choice, and no command of a later step is offered before it.
-      if (c.step === 'step-2' && !choiceReady(st)) { if (!gated) { gated = true; if (!next) next = GATE; } return; }
-      if (!cmdShown(c, st)) return;
       total++;
       if (st.done[c.cid]) done++;
       else { left += (c.cid === 's6' && !live) ? D.designMinutes.s6 : c.min; if (!next) next = c; }
     });
     return { done: done, total: total, left: left, next: next,
-      text: !next ? 'Install complete' : (next === GATE ? 'Next command · choose your path first' : 'Next command · ' + done + '/' + total + ' done · ~' + Math.max(1, Math.round(left)) + ' min left') };
+      text: next ? 'Next command · ' + done + '/' + total + ' done · ~' + Math.max(1, Math.round(left)) + ' min left' : 'Install complete' };
   }
   // The reset: what it leaves (the first section is the one reached and the one the reader is in), and which stored keys it drops. What the reader
-  // typed or chose (Your details, the URL, the mode, the path and the chip, the view, the theme) is not among them, and the furthest section is written back, not removed.
+  // typed or chose (Your details, the URL, the mode, the view, the theme) is not among them, and the furthest section is written back, not removed.
   function resetState(first) { return { done: {}, need: {}, chk: {}, timers: {}, reached: first, active: first, focus: first, resume: false }; }
   function resetKeys(keys) { return keys.filter(function (k) { return k.indexOf('aiarch-mac.cmd.') === 0 || k === 'aiarch-mac.need' || k === 'aiarch-mac.chk'; }); }
   // The button takes two clicks: the first arms it and clears nothing; a second inside four seconds clears. Esc, focus moving away and a click
@@ -2738,7 +2735,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
 
   /* ── State ───────────────────────────────────────────────────────────────────────────────────────────────────── */
   var S = {
-    lic: SAMPLE_LIC, label: 'pdi', url: '', mode: 'live', path: null, chip: null, done: {}, need: {}, chk: {}, timers: {}, now: Date.now(),
+    lic: SAMPLE_LIC, label: 'pdi', url: '', mode: 'live', done: {}, need: {}, chk: {}, timers: {}, now: Date.now(),
     out: { v: '', pre: '', lic: '' }, q: '', helpText: '', copiedUrl: false, helpCopied: false,
     active: 'need', reached: 'need', focus: 'need', view: 'all', theme: 'light', open: false,
     resume: false, resumeHidden: false, noReach: false, cleared: false, armedAt: 0,
@@ -2750,8 +2747,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     v = load('aiarch-mac.label'); if (v) { S.label = v; S.sim.label = v; }
     v = load('aiarch-mac.url'); if (v) S.url = v;
     if (load('aiarch-mac.mode') === 'design') S.mode = 'design';
-    v = load('aiarch-mac.path'); if (optionOf('path', v)) S.path = v;
-    v = load('aiarch-mac.chip'); if (optionOf('chip', v)) S.chip = v;
     v = load('aiarch-mac.need'); if (v) S.need = parseObj(v);
     v = load('aiarch-mac.chk'); if (v) S.chk = parseObj(v);
     v = load('aiarch-mac.reached'); if (v) S.reached = v;
@@ -2803,6 +2798,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   D.commands.forEach(function (c) { if (c.altOf) HAS_ALT[c.altOf] = true; });
   // The label over a command that has a form for the other shell: zsh by default, with the bash line under it where it differs.
   function shellLabel(c) {
+    if (c.optional) return 'Optional';
     if (c.altOf) return 'bash · only if Step 1 said bash';
     if (c.shell === 'bash') return 'bash only · run it only if Step 1 said bash';
     if (c.shell === 'zsh' && HAS_ALT[c.id]) return 'zsh';
@@ -2812,7 +2808,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     var id = slot.getAttribute('data-cmd');
     if (!CMD[id]) return;
     var c = CMD[id];
-    var b = { id: id, key: doneKeyOf(id), slot: slot };
+    var b = { id: id, key: doneKeyOf(id) };
     b.mark = h('button', { cls: 'cbox-mark', attrs: { type: 'button' } }, [h('span')]);
     b.text = h('span', { cls: 'cbox-text' });
     b.code = h('code', { cls: 'cbox-code' }, [h('span', { cls: 'cbox-ps', text: c.shell === 'bash' ? '$ ' : '% ' }), b.text]);
@@ -2838,7 +2834,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     Object.keys(boxes).forEach(function (id) {
       var b = boxes[id];
       var done = !!S.done[b.key];
-      b.slot.hidden = !cmdShown(ALL_BY_ID[id] || CMD[id], S);
       setText(b.text, cmdText(id));
       b.mark.setAttribute('aria-pressed', done ? 'true' : 'false');
       var label = done ? 'Ran it — click to unmark' : 'Mark as run';
@@ -3233,23 +3228,18 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   }
 
   /* ── Help message ────────────────────────────────────────────────────────────────────────────────────────────── */
-  // The path and, on path B, the kind of Mac: what a helper needs to know first.
-  function pathWords() {
-    if (!S.path) return 'path not chosen';
-    return 'path ' + S.path + (S.path === 'B' ? ' · ' + (S.chip === 'arm64' ? 'Apple silicon' : (S.chip === 'x64' ? 'Intel' : 'kind of Mac not chosen')) : '');
-  }
   function helpMessage(d) {
     var ls = d.links, reachedItem = ls[d.ri] || ls[0];
     var lab = function (x) { return x ? ((x.n !== '—' ? x.n + ' · ' : '') + x.t) : ''; };
     var skipped = [];
     STEPS.forEach(function (s) {
       var si = ls.map(function (x) { return x.id; }).indexOf(s.id);
-      if (si >= 0 && si < d.ri) stepCmds(s.id, S).forEach(function (c) { if (!S.done[c.cid]) skipped.push(c.t); });
+      if (si >= 0 && si < d.ri) stepCmds(s.id).forEach(function (c) { if (!S.done[c.cid]) skipped.push(c.t); });
     });
     var noSteps = Object.keys(S.chk).filter(function (k) { return S.chk[k] === 'no'; }).map(function (k) { return k.replace('step-', 'Step '); });
     var L = [];
     L.push('AI Architect install — help request');
-    L.push('Release ' + D.release + ' · macOS · ' + pathWords() + ' · mode: ' + (d.live ? 'live · instance label: ' + vars().label : 'design-only'));
+    L.push('Release ' + D.release + ' · macOS · mode: ' + (d.live ? 'live · instance label: ' + vars().label : 'design-only'));
     L.push('Reached: ' + lab(reachedItem));
     L.push('Commands run: ' + d.doneC + ' of ' + d.total + (d.nx ? ' · next: ' + d.nx.t : ''));
     if (skipped.length) L.push('Skipped on the way: ' + skipped.join(', '));
@@ -3271,7 +3261,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     var live = S.mode === 'live';
     var navL = navList(), ls = navL.filter(function (x) { return x.id; });
     var nav = navModel(S, live), nxt = nextModel(S, live);
-    var needL = needFor(S, live);
+    var needL = needFor(live);
     return { live: live, navL: navL, links: ls, ids: nav.ids, ai: nav.ai, ri: nav.ri, nav: nav, needL: needL, needDone: nav.needDone, doneC: nxt.done, total: nxt.total, left: nxt.left, nx: nxt.next, nextText: nxt.text };
   }
   var NAVEL = {};
@@ -3357,48 +3347,14 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     b.className = nx ? 'next' : 'next all';
     setText($('small', b), d.nextText);
     setText($('b', b), nx ? nx.t + ' ▸' : '✓ All commands run — see Step 8');
-    b.setAttribute('aria-label', nx ? (nx.gate ? 'Go to the choice of your path' : 'Go to the next command: ' + nx.t) : 'All commands run. Go to Step 8');
+    b.setAttribute('aria-label', nx ? 'Go to the next command: ' + nx.t : 'All commands run. Go to Step 8');
   }
   function renderResume(d) {
     var show = !!S.resume && !S.resumeHidden;
     toggle($('#resume'), show);
     if (!show) return;
     var lab = function (x) { return x ? ((x.n !== '—' ? x.n + ' · ' : '') + x.t) : ''; };
-    setText($('#resume-text'), d.nx ? (d.nx.gate ? 'Next, choose your path at the top of the page: the commands of Step 2 depend on it.' : 'Your next command is ' + d.nx.t + ' (' + d.doneC + ' of ' + d.total + ' done).') : 'Every command is run. You last reached ' + lab(d.links[d.ri] || d.links[0]) + '.');
-  }
-  var CHOICE_KEY = { path: 'aiarch-mac.path', chip: 'aiarch-mac.chip' };
-  function buildChoices() {
-    ['path', 'chip'].forEach(function (g) {
-      D.choices[g].options.forEach(function (o) {
-        var btn = $('#' + g + '-' + o.v.toLowerCase());
-        if (!btn) return;
-        // Path: "Path A · I can type …" is a small word and a title. Chip: the title is the kind of Mac, the small word its name in the download.
-        var parts = g === 'path' ? o.t.split(' · ') : [o.v, o.t];
-        setText($('small', btn), parts[0]);
-        setText($('b', btn), parts.slice(1).join(' · '));
-        setText($('span', btn), o.hint);
-        btn.addEventListener('click', function () { S[g] = o.v; save(CHOICE_KEY[g], o.v); render(); });
-      });
-    });
-  }
-  function renderChoices() {
-    ['path', 'chip'].forEach(function (g) {
-      D.choices[g].options.forEach(function (o) {
-        var btn = $('#' + g + '-' + o.v.toLowerCase());
-        if (!btn) return;
-        var on = S[g] === o.v;
-        btn.className = on ? 'on' : '';
-        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      });
-    });
-  }
-  // What a reader who has not chosen does not see, and what a choice shows: the parts of a path, the parts of a chip, and Step 2 itself.
-  function applyChoice() {
-    var ready = choiceReady(S);
-    $$('[data-path]').forEach(function (el) { toggle(el, el.getAttribute('data-path') === S.path); });
-    $$('[data-chip]').forEach(function (el) { toggle(el, el.getAttribute('data-chip') === S.chip); });
-    $$('[data-needs-choice]').forEach(function (el) { toggle(el, ready); });
-    toggle($('#choice-prompt'), !ready);
+    setText($('#resume-text'), d.nx ? 'Your next command is ' + d.nx.t + ' (' + d.doneC + ' of ' + d.total + ' done).' : 'Every command is run. You last reached ' + lab(d.links[d.ri] || d.links[0]) + '.');
   }
   function renderMisc(d) {
     document.body.setAttribute('data-mode', S.mode);
@@ -3416,7 +3372,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       if (document.activeElement !== el && el.value !== S.out[key]) el.value = S.out[key];
     });
     $$('[data-bind="release"]').forEach(function (el) { setText(el, D.release); });
-    setText($('#choice-prompt-text'), D.choicePrompt);
     var hm = helpMessage(d);
     var msg = $('#help-msg');
     if (msg.value !== hm) msg.value = hm;
@@ -3442,8 +3397,8 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     renderPb();
     renderSim();
     renderNav(d); renderNeed(d); renderPager(d); renderNext(d); renderResume(d); renderMisc(d);
-    renderChoices(); renderCmds(); renderTerms(); renderTimers(); renderChks(); renderOc(); renderUrl(); renderTrouble();
-    applyChoice(); applyView(); applyTheme();
+    renderCmds(); renderTerms(); renderTimers(); renderChks(); renderOc(); renderUrl(); renderTrouble();
+    applyView(); applyTheme();
   }
 
   /* ── Navigation: spy, focus, next command ────────────────────────────────────────────────────────────────────── */
@@ -3486,17 +3441,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       } else scrollTo(document.getElementById(step), 'start');
     };
     if (!n) return goTo('step-8');
-    if (n.gate) return goChoice();
     if (S.view === 'step' && S.focus !== n.step) { setFocus(n.step); setTimeout(function () { flash(n.cid, n.step); }, 160); } else flash(n.cid, n.step);
-  }
-  // The Next button, before the choices are made: it takes the reader to them.
-  function goChoice() {
-    var go = function () {
-      var el = document.getElementById('choice');
-      scrollTo(el, 'center');
-      if (el) { el.classList.add('flash'); clearTimeout(flashTimer); flashTimer = setTimeout(function () { el.classList.remove('flash'); }, 2000); }
-    };
-    if (S.view === 'step' && S.focus !== 'need') { setFocus('need', 'choice'); setTimeout(go, 160); } else go();
   }
   function goSearch() {
     var go = function () {
@@ -3634,7 +3579,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   $$('[data-term]').forEach(buildTerm);
   $$('[data-timer]').forEach(buildTimer);
   $$('[data-chk]').forEach(buildChk);
-  buildNav(); buildNeed(); buildChoices(); buildPb(); buildSim(); buildGlossary();
+  buildNav(); buildNeed(); buildPb(); buildSim(); buildGlossary();
   wire();
   render();
   setTimeout(spy, 300);
