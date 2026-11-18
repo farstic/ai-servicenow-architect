@@ -17,7 +17,7 @@ const INDEX = {
 };
 const NAMES = { sysrule_assignment: [PAGE.beta], sn_bom_claim: [PAGE.alpha], sn_ins_policy: [PAGE.beta] };
 const OWN = 'For a name of your own design, leave it and add no line for it.';
-const ELSEWHERE = (list) => `These names are not printed on the page you cite for them: ${list}. For each platform name, add one line that starts "Correction:" and cites a page that prints it (docs lookup finds one). ${OWN}`;
+const ELSEWHERE = (list) => `These names are not printed on the page you cite for them: ${list}. For each platform name, add one line that starts "Correction:" and cites a page you have opened that prints it (docs lookup finds one). ${OWN}`;
 const ABSENT = (list) => `No corpus page prints ${list}. For each platform name, say in a line that starts "Correction:" that the corpus does not document it. ${OWN}`;
 /** Once, after the last names clause. */
 const NOT_AGAIN = 'Do not repeat the answer.';
