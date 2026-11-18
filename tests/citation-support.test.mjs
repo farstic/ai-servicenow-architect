@@ -34,7 +34,7 @@ const pageNorm = (page) => (Object.hasOwn(TEXT, page) ? normalisePage(TEXT[page]
 function fakeIndex(names, { coverage = 'full' } = {}) {
   return { coverage, meta: { coverage }, pageCount: 5, nameCount: Object.keys(names).length, has: (n) => Object.hasOwn(names, n), count: (n) => (names[n] ?? []).length, pathsOf: (n) => names[n] ?? [], pagesOf: () => [], nameKeys: () => Object.keys(names).values() };
 }
-const INDEX = fakeIndex({ sysrule_assignment: [TABLE], sn_bom_claim: [RULES], sys_user: [OTHER], known_a: [TABLE], known_b: [TABLE], known_c: [TABLE], known_d: [TABLE], sn_ins_policy: [OTHER], sn_ins_claim_type: [OTHER] });
+const INDEX = fakeIndex({ sysrule_assignment: [TABLE], sn_bom_claim: [RULES], sys_user: [OTHER], known_a: [TABLE], known_b: [TABLE], known_c: [TABLE], known_d: [TABLE], sn_ins_policy: [OTHER], sn_ins_claim_type: [OTHER], sys_user_group: [OTHER] });
 const text = (t) => assistant([{ type: 'text', text: t }]);
 
 const check = (reply, { index = INDEX, blocking = ['unsupportedName'], pagesNamed = () => [], norm = pageNorm, rows = null, options = {} } = {}) =>
@@ -108,7 +108,7 @@ test('ARC-09-C293 — a prefix is no name: a backticked stem is never asked abou
   assert.deepEqual(ins('`sn_ins`', noKeys), [['sn_ins', 'absent', RULES]], 'an index that cannot list its names: the stem cannot be told, and the ask is as it was');
   assert.deepEqual(ins('`sn_ins_`', noKeys), [], 'but a token that ends with an underscore is a prefix by its spelling');
   // a name that another page prints is ELSEWHERE, whether or not it also starts other names
-  assert.deepEqual(ins('`sys_user`'), [['sys_user', 'elsewhere', RULES]]);
+  assert.deepEqual(ins('`sys_user`'), [['sys_user', 'elsewhere', RULES]], 'sys_user starts sys_user_group and is indexed: the stem rule is for what no page prints');
 });
 
 test('ARC-09-C291 — a bare file name that names exactly one page is a citation; one that names several, or none, is not', () => {
