@@ -73,6 +73,8 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 
 **The Stop hook also asks about a name that the cited page does not print.** On the C267 and C287 sittings a reply line cited a corpus page for a snake_case name that the page does not print in 27 to 36 % of the answers (0.35 to 0.63 such lines an answer): most of the names are printed on another page, some on none. A line of the final reply that cites a corpus page, by path or by a bare file name that names one page, and names a snake_case construct is now checked. Unless it is hedged ("not documented", "does not mention", "not opened") or an anti-pattern line, a page it cites must print the name, with escapes dropped, case ignored and spaces normalised, or print its label; names that start `snow_`, `x_` or `u_` are never asked about. A name that no cited page prints is asked about in the one ask of the turn, beside the never-opened pages: ABSENT when no page of the corpus prints it, ELSEWHERE when another page does, at most six names. The model is told to add a Correction line for a platform name and to leave a name of its own design. `grounding-classes.json` names the class beside `citedUnread`; the continuation asks nothing, and the notice to the user names no name. On the architect's sitting of 150 sessions the unsupported citation lines left uncorrected fell from 44 to 3, the ask drove 36 corrections, and every guard held: no false ask over 47 names, no right answer made wrong over 60 Correction lines, at most one ask a turn, and no verdict changed by it (ARC-09-C291).
 
+**A page cited only with back-slashes is checked.** The Stop hook's check of a page that an answer cites and the session never opened looked for `markdown/`, with a forward slash, before it read any citation. An answer that cited a page only the way a Windows tool prints it (`markdown\csm\c_Esc.md`), or a file the turn wrote that did, was never checked. The gate now takes either separator, in the answer, in a file the turn wrote and in the hook's look at the session file (ARC-09-C292).
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -158,6 +160,7 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
   verified, and with the repository reachable it fetched the manifest again and rewrote the cache (ARC-09-C268).
 - The two Windows install guides state the corpus of the current pin: 51,186 files and a 293 MB working tree on the example screen and 51,178 pages in the
   sentence under it, where they said 51,665 and 299 MB, and their example screens show the 96d3212 pin. A docs bump now checks both guides against the corpus and the install page (ARC-09-C290).
+- The Stop hook asks about a never-opened page that is cited only with back-slashes, in an answer and in a file the turn wrote (ARC-09-C292).
 
 ## 2.2.6 — 2026-11-15
 
