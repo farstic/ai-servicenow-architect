@@ -75,9 +75,11 @@ test('ARC-09-C271 — the engineering records hold exactly the ids they are coun
 test('ARC-09-C271 — the scan reads the pages it is about: a floor, and the placeholder seen where it is known to be', () => {
   const pages = files.filter(isPage);
   assert.ok(pages.length >= 400, `the scan found ${pages.length} files under docs/ and README.md, which is fewer than the tree has`);
-  for (const must of ['README.md', 'docs/INSTALL.md', 'docs/INSTALL-WINDOWS.md', 'docs/USER-GUIDE.md']) assert.ok(pages.includes(must), `${must} is not in the scan`);
+  for (const must of ['README.md', 'docs/INSTALL.md', 'docs/INSTALL-WINDOWS.md', 'docs/INSTALL-MACOS.md', 'docs/USER-GUIDE.md']) assert.ok(pages.includes(must), `${must} is not in the scan`);
   // The Windows page uses the placeholder in several steps; a pattern that saw none of them would pass a tree full of real numbers.
   assert.ok((readText('docs/INSTALL-WINDOWS.md').match(ID) ?? []).length >= 5, 'the pattern does not see the ids on the Windows page');
+  // ARC-09-C300 — the macOS page shows it five times (what you need, the sample under 5b and the sentence below it, the samples of Steps 7 and 8), and no other id.
+  assert.ok((readText('docs/INSTALL-MACOS.md').match(ID) ?? []).length >= 5, 'the pattern does not see the ids on the macOS page');
   // And the records are really where the count says: a folder that vanished would pass a count of zero only if its count were zero.
   for (const [prefix, want] of RECORDS) assert.ok(want > 0 && files.some((f) => f.startsWith(prefix)), `${prefix} has no files, or nothing is counted for it`);
 });

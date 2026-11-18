@@ -594,3 +594,83 @@ test('ARC-09-C290 — a tree with no Windows guide says it did not check, for ea
     assert.ok(lead.includes(`- [ ] ${file} figures not checked: there is no ${file} in this tree`), `no line for ${file}:\n${lead.join('\n')}`);
   }
 });
+
+/**
+ * ARC-09-C300 — and whether the macOS guides' figures hold. The macOS guide and its HTML twin show the same real run and say the same sentence as the
+ * Windows pair (`[docs] <files> files · <n> MB working tree`, "downloads all <n> pages"), and a docs bump has to say whether they follow the corpus too.
+ * What differs is the working tree: a Mac counts the bytes a Linux checkout does, so the guide is held to the corpus's own working tree, which the bump
+ * measures, and not to the install page's Windows figure.
+ */
+const macosGuide = (figures) => windowsGuide(figures);                       // the same two shapes, said by a Mac's run
+
+test('ARC-09-C300 — a bump says, for each macOS guide, whether it states the corpus\'s files, pages and working tree', () => {
+  const w = ready();
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  // The guides are stale: one says 99,999 files, and the other says nothing that is right. The install page is stale too, and stays so below.
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: 99, files: 99999, mb: 5 }));
+  writeFileSync(join(w.root, 'docs', 'INSTALL-MACOS.md'), macosGuide({ files: 99999, pages: 99990, mb: 11 }));
+  writeFileSync(join(w.root, 'docs', 'AI-Architect-macOS-Install-Guide.html'), 'a guide that states no figure\n');
+  commitAll(w, 'stale macOS guides');
+
+  const first = bump(w, '--json');
+  assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  const corpus = corpusNow(w);                                              // after the bump: the report measures the corpus it left
+  const pages = pagesNow(w);
+  assert.notEqual(pages, corpus.files, 'precondition: the fixture corpus has a file that is no page, or this proves nothing about counting pages');
+  assert.notEqual(corpus.workingTreeMb, 11, 'precondition: the stale guide must differ in its working tree');
+  assert.deepEqual(out.figures?.macos?.corpus, { files: corpus.files, pages, workingTreeMb: corpus.workingTreeMb },
+    `the report does not carry the corpus's files, pages and working tree: ${JSON.stringify(out.figures?.macos)}`);
+  const lead = out.prBody.split('```')[0].split('\n');
+  const stale = lead.find((l) => l.includes('docs/INSTALL-MACOS.md figures'));
+  assert.ok(stale?.startsWith('- [ ] docs/INSTALL-MACOS.md figures differ from the corpus: '), `no differing line for the Markdown guide:\n${lead.join('\n')}`);
+  for (const part of [`files ${commas(corpus.files)} (guide: 99,999)`, `pages ${commas(pages)} (guide: 99,990)`, `working tree ${corpus.workingTreeMb} MB (guide: 11 MB)`]) {
+    assert.ok(stale.includes(part), `${part} is not in: ${stale}`);
+  }
+  assert.ok(lead.includes('- [ ] docs/AI-Architect-macOS-Install-Guide.html figures not checked: it does not state the files, the pages and the working tree where the bump reads them'),
+    `no line for the guide that states nothing:\n${lead.join('\n')}`);
+  // The Windows lines are the ones they were: nothing of the macOS pair reaches them.
+  assert.ok(lead.includes('- [ ] docs/INSTALL-WINDOWS.md figures not checked: there is no docs/INSTALL-WINDOWS.md in this tree'), `the Windows line changed:\n${lead.join('\n')}`);
+});
+
+test('ARC-09-C300 — guides that state the corpus\'s own figures make one checked line each, whatever the install page says', () => {
+  const w = ready();
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  // The install page is stale and says 5 MB, and stays so: the macOS guides are held to the corpus's working tree, which the bump measures, and not to
+  // that page's. A first bump moves the pin, as the Windows case above does, so that the figures written next are those of the corpus a second one finds.
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: 99, files: 99999, mb: 5 }));
+  commitAll(w, 'a stale install page');
+  const first = bump(w, '--json');
+  assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
+  rmSync(join(w.root, 'bump.json'));
+  commitAll(w, 'bumped');
+  const corpus = corpusNow(w);
+  const pages = pagesNow(w);
+  writeFileSync(join(w.root, 'docs', 'INSTALL-MACOS.md'), macosGuide({ files: corpus.files, pages, mb: corpus.workingTreeMb }));
+  writeFileSync(join(w.root, 'docs', 'AI-Architect-macOS-Install-Guide.html'), macosGuide({ files: corpus.files, pages, mb: corpus.workingTreeMb }));
+  commitAll(w, 'the macOS guides follow the corpus');
+  const second = bump(w, '--json');
+  assert.equal(second.status, 0, `${second.stdout}${second.stderr}`);
+  const again = JSON.parse(read(w.root, 'bump.json'));
+  assert.equal(again.from, again.to, 'the second bump moved after all — this proves nothing');
+  const held = again.prBody.split('```')[0].split('\n');
+  for (const file of ['docs/INSTALL-MACOS.md', 'docs/AI-Architect-macOS-Install-Guide.html']) {
+    assert.ok(held.includes(`- [x] ${file} figures match the corpus: ${commas(corpus.files)} files · ${commas(pages)} pages · ${corpus.workingTreeMb} MB working tree`), `no checked line for ${file}:\n${held.join('\n')}`);
+  }
+  // ...and the same install page, still stale, is still said to differ: the macOS lines do not hide it.
+  assert.ok(held.some((l) => l.startsWith('- [ ] install page figures differ from the corpus')), `the install page's own line is gone:\n${held.join('\n')}`);
+});
+
+test('ARC-09-C300 — a tree with no macOS guide says it did not check, for each guide', () => {
+  const w = ready();
+  const corpus = corpusNow(w);
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: corpus.areas, files: corpus.files, mb: corpus.workingTreeMb }));
+  commitAll(w, 'the install page only');
+  const r = bump(w, '--json');
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  const lead = JSON.parse(read(w.root, 'bump.json')).prBody.split('```')[0].split('\n');
+  for (const file of ['docs/INSTALL-MACOS.md', 'docs/AI-Architect-macOS-Install-Guide.html']) {
+    assert.ok(lead.includes(`- [ ] ${file} figures not checked: there is no ${file} in this tree`), `no line for ${file}:\n${lead.join('\n')}`);
+  }
+});

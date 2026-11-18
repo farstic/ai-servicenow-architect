@@ -327,7 +327,8 @@ test('ARC-09-C285 — the page ships: it is covered by the signed manifest, and 
   // What `shippedFiles` keeps of a tree (the files tracked at HEAD that this decides are covered), asked of the page itself, so the answer does not wait for a commit.
   const { isCovered } = await import(href('tools/snowarch/lib/licence/manifest.mjs'));
   assert.equal(isCovered(PAGE, COVERAGE), true, 'the staged distribution tree would not hold the page');
-  assert.ok(/gh release create[\s\S]*?install-metrics\.md docs\/AI-Architect-Windows-Install-Guide\.html\n/.test(read('.github/workflows/release.yml')), 'the Release does not carry the page');
+  // The page follows install-metrics.md, and another file may follow the page: the macOS guide is the last asset since ARC-09-C300, so a space or a line end, not only the line end.
+  assert.ok(/gh release create[\s\S]*?install-metrics\.md docs\/AI-Architect-Windows-Install-Guide\.html(?=\s)/.test(read('.github/workflows/release.yml')), 'the Release does not carry the page');
 });
 
 // ── the words ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -339,7 +340,7 @@ const SENTENCES = [
   'It does this in whatever folder you choose, and the wizard says so when it saves; if that folder had let other accounts read the file, the wizard adds a line saying who could, and that the permissions were changed just now.',
   'Your user folder is private to you anyway, so it is the one this guide uses.',
   'If you prefer another folder, use its name in these commands and in Every day. A folder name with a space in it has not been tested.',
-  'v20. Step 2b installs v26.13.0, the version this guide was tested with. The AI Architect is tested with Node.js 20, 22 and 24 on Windows, macOS and Linux, and with 26 on Windows and Linux.',
+  'v20. Step 2b installs v26.13.0, the version this guide was tested with. The AI Architect is tested with Node.js 20, 22, 24 and 26 on Windows, macOS and Linux.',
   'A warn or a fail names the check it comes from. E-31 the licence warns in the last days before the licence ends. With a licence that runs for longer, this line shows no warning.',
   'draw.io is not in %LOCALAPPDATA%\\Programs\\drawio. Repeat 2f and check that the last command answers True.',
   'After the password is saved, the wizard says Its permissions could not be restricted',

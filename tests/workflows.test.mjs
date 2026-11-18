@@ -128,7 +128,7 @@ test('the workflows name the repository settings they depend on', () => {
  * `main`'s branch protection lists required contexts BY NAME. A renamed cell is not a red build —
  * it is a required check that silently stops being required, which is worse: protection keeps
  * waiting for a context nobody produces any more, or (if the name simply vanished from the list)
- * a broken install merges green. So the fourteen names are enumerated here, and changing one is a
+ * a broken install merges green. So the fifteen names are enumerated here, and changing one is a
  * two-file change with a comment pointing at the settings that have to change with it.
  */
 /**
@@ -188,6 +188,8 @@ const BOOTSTRAP_CELLS = [
   'bootstrap (macos-latest, node 20)',
   'bootstrap (macos-latest, node 22)',
   'bootstrap (macos-latest, node 24)',
+  // ARC-09-C300: the macOS guide installs Node.js 26.13.1, so macOS has the cell for it, as Windows has since ARC-09-C271.
+  'bootstrap (macos-latest, node 26)',
   'bootstrap (windows-latest, node 20)',
   'bootstrap (windows-latest, node 22)',
   'bootstrap (windows-latest, node 24)',
@@ -199,31 +201,35 @@ const BOOTSTRAP_CELLS = [
   'bootstrap (no-gitbash, windows-latest)',
 ];
 
-test('the bootstrap job has exactly the fourteen cells protection will require', () => {
+test('the bootstrap job has exactly the fifteen cells protection will require', () => {
   const ci = wf('ci.yml');
   const labels = [...ci.matchAll(/label: '([^']+)'/g)].map((m) => `bootstrap (${m[1]})`);
   assert.deepEqual(labels, BOOTSTRAP_CELLS);
-  // 10 + 3 + 1, and each variant answers a different question — Node 20, 22 and 24 across three
-  // operating systems and 26 on Windows, three launchers finishing without Node, one Windows machine
-  // with no POSIX shell at all.
-  assert.equal(labels.filter((l) => /node \d\d\)/.test(l)).length, 10);
+  // 11 + 3 + 1, and each variant answers a different question — Node 20, 22 and 24 across three
+  // operating systems and 26 on Windows and macOS, three launchers finishing without Node, one Windows
+  // machine with no POSIX shell at all.
+  assert.equal(labels.filter((l) => /node \d\d\)/.test(l)).length, 11);
   assert.equal(labels.filter((l) => l.includes('no-node')).length, 3);
   assert.equal(labels.filter((l) => l.includes('no-gitbash')).length, 1);
   assert.match(ci, /name: bootstrap \(\$\{\{ matrix\.label \}\}\)/);
 });
 
 /**
- * ARC-09-C271 — Node 26, and only where it buys a fact the docs print.
+ * ARC-09-C271 — Node 26, and only where it buys a fact the docs print. ARC-09-C300 put it on macOS too.
  *
- * The README says Node 20, 22 and 24 are tested on all three systems and 26 on Linux and Windows, and a Windows user gets 26 from
- * winget today (the first end-to-end install ran on 26.13.0). So 26 has a cell where an end user is, and not on macOS, whose queue
- * already cancels cells, and not in `contract`, which does not depend on the Node version. Four contexts: two `test` cells, the
- * Windows `bootstrap` cell, and `windows-native`. The fixture is generated from ci.yml, so this reads what a pull request produces.
+ * The README says Node 20, 22, 24 and 26 are tested on Linux, macOS and Windows. A Windows user gets 26 from winget today (the first
+ * end-to-end install ran on 26.13.0), and the macOS guide installs 26.13.1, so 26 has a cell where each of those end users is. macOS
+ * had none until ARC-09-C300, whatever its queue costs: a guide that installs Node.js 26 on a Mac has to be tested on it. It has no cell
+ * in `contract`, which does not depend on the Node version, nor a Linux `bootstrap` cell, since no guide installs Node.js on Linux. Six
+ * contexts: three `test` cells, the Windows and macOS `bootstrap` cells, and `windows-native`. The fixture is generated from ci.yml, so this
+ * reads what a pull request produces.
  */
-test('ARC-09-C271 — Node 26 has four cells: test on Linux and Windows, bootstrap and windows-native on Windows', () => {
+test('ARC-09-C300 — Node 26 has six cells: test on all three systems, bootstrap on Windows and macOS, windows-native on Windows', () => {
   const fixture = JSON.parse(readFileSync(join(root, 'tests/fixtures/required-contexts.json'), 'utf8'));
   assert.deepEqual(fixture.contexts.filter((c) => /\bnode 26\b/.test(c)), [
+    'bootstrap (macos-latest, node 26)',
     'bootstrap (windows-latest, node 26)',
+    'test (macos-latest, node 26)',
     'test (ubuntu-latest, node 26)',
     'test (windows-latest, node 26)',
     'windows-native (node 26, no Git Bash)',
@@ -559,7 +565,7 @@ test('release.yml runs on tags only, and is the one workflow that may write (ARC
     'the publish job lost a step the ordering assertion compares');
 });
 
-test('the run is cancelled when superseded, so fourteen cells are not paid for twice', () => {
+test('the run is cancelled when superseded, so fifteen cells are not paid for twice', () => {
   const ci = wf('ci.yml');
   assert.match(ci, /concurrency:\n\s+group: ci-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress: true/);
 });
@@ -930,8 +936,8 @@ test('eol adds exactly two required contexts, by the names a check run prints (A
     assert.ok(fixture.contexts.includes(name), `${name} is not in required-contexts.json`);
   }
   // 52 before this story. A generated file is not evidence on its own — the number is the claim. ARC-09-C185a's
-  // distribution job adds three more after it, and ARC-09-C271's Node 26 cells four (57 to 61).
-  assert.equal(fixture.count, 61, `${fixture.count} contexts — S09 took 52 to 54, C185a 54 to 57, and C271 57 to 61`);
+  // distribution job adds three more after it, ARC-09-C271's Node 26 cells four (57 to 61), and ARC-09-C300's macOS ones two (61 to 63).
+  assert.equal(fixture.count, 63, `${fixture.count} contexts — S09 took 52 to 54, C185a 54 to 57, C271 57 to 61, and C300 61 to 63`);
 });
 
 test('publish-npm is dispatch-only, dry by default, and the only OIDC workflow (ARC-09-S10)', () => {
@@ -984,7 +990,7 @@ test('publish-npm adds no required context, and is excluded with its reason (ARC
   assert.ok(why && why.length > 30, 'publish-npm.yml is excluded without a reason');
   assert.match(why, /dispatch/);
   // Unchanged by this story, and the number is the claim.
-  assert.equal(fixture.count, 61, `${fixture.count} contexts — S10 adds none; C185a's distribution job adds three, and C271's Node 26 cells four`);
+  assert.equal(fixture.count, 63, `${fixture.count} contexts — S10 adds none; C185a's distribution job adds three, C271's Node 26 cells four, and C300's macOS ones two`);
 });
 
 

@@ -171,7 +171,7 @@ test('ARC-07-W8 — every clone command on a user page quiets the detached-HEAD 
   // A release tag is a TAG, so a correct clone earns fourteen lines of git advice about being in a
   // state the reader did not choose and cannot act on. The option is on every clone line, and the
   // page says once what the note means for anyone who clones another way.
-  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html']) {
+  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html', 'docs/INSTALL-MACOS.md', 'docs/AI-Architect-macOS-Install-Guide.html']) {
     const clones = [...read(rel).matchAll(/git\b[^\n]*?\bclone --branch v\d/g)].map((m) => m[0]);
     assert.ok(clones.length > 0, `${rel} names no pinned clone`);
     for (const line of clones) {
@@ -322,7 +322,10 @@ test('the page stays a page, and the tail stays a tail', () => {
   // (CONTRIBUTING, Releasing, item 7). One sentence in the paragraph on what the corpus costs, where the figures are: what the index is,
   // its size, its build time and what rebuilds it. The paragraph's last line was nearly full, so the sentence takes two new lines.
   // Nothing was deleted to pay for it.
-  assert.ok(install <= 324, `${install} lines of install page (criterion: 324)`);
+  // 326 since ARC-09-C300: the macOS page (INSTALL-MACOS.md) is linked beside the Windows one, by one paragraph and the blank line before it.
+  // A Mac reader needs the same sign that a page of its own explains every step, and the paragraph is the whole of what this page takes for it.
+  // The Node.js sentence of the prerequisites table changed in place (26 is tested on macOS now), so it took no line. Nothing was deleted to pay for it.
+  assert.ok(install <= 326, `${install} lines of install page (criterion: 326)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.
@@ -460,7 +463,7 @@ test('ARC-06-C17 — Uninstall states BOTH halves: the default writes nothing, l
 // form to primary AND gives it a writer, because a version in a page that no writer owns is a
 // version that goes stale — this page is the evidence.
 
-const USER_PAGES = ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html'];
+const USER_PAGES = ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html', 'docs/INSTALL-MACOS.md', 'docs/AI-Architect-macOS-Install-Guide.html'];
 
 test('ARC-09-C60 — no user page tells a reader to clone without pinning a release', () => {
   const offenders = [];
@@ -520,7 +523,7 @@ test('ARC-09-C61 — the pinned clone names the newest release that exists', asy
     return;
   }
 
-  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html']) {
+  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md', 'docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-Install-Guide.html', 'docs/INSTALL-MACOS.md', 'docs/AI-Architect-macOS-Install-Guide.html']) {
     const named = cloneTagsIn(read(rel));
     assert.ok(named.length > 0, `${rel} names no release tag in a clone command`);
     for (const tag of named) {
