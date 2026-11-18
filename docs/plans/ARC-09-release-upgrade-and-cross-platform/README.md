@@ -403,7 +403,7 @@ cells the claim is about. No branch was ever created.
 
 ## Planned for 2.2.8
 
-Written down at the owner's request, after he approved the seven REL-227 decisions on 2026-11-18. Nothing here is built, and none of it has a date: each item gets its own row when it starts. The ids are reserved after ARC-09-C294.
+Written down at the owner's request, after the owner approved the seven REL-227 decisions on 2026-11-18. Nothing here is built, and none of it has a date: each item gets its own row when it starts. The ids are reserved after ARC-09-C294.
 
 - **ARC-09-C295** — Stage 2: corpus-reader agents always available (DESIGN-v1 §9.2), measured by their own R7, with a fresh hidden set H′ and the Agent tool in both arms. The owner moved it from 2.2.7 on 2026-11-18, which changes D-2's schedule.
 - **ARC-09-C296** — C238 `set_version` 2, a new sealed general exam. `set_version` 1 is spent, and stage 2 needs a new one. The owner moved it from before 2.2.7 on 2026-11-18, so 2.2.7 ships without the C238 gate and REL-227 is its held-out gate.
