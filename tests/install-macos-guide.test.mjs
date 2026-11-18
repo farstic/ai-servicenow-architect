@@ -829,6 +829,7 @@ test('ARC-09-C300 — the drawio command of path B is a working one: the page ma
   const made = bash(command, { home });
   assert.equal(made.status, 0, made.stderr);
   assert.equal(made.stdout + made.stderr, '', 'the page says the command prints nothing when it works');
+  // unlicensed start: the command is the wrapper of path B, which starts a stand-in draw.io this case wrote; it reads no licence and starts no product
   const started = spawnSync(join(home, '.local', 'bin', 'drawio'), ['--version'], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin', HOME: home } });
   assert.equal(started.stdout, 'started:--version', 'the command does not pass its arguments to draw.io, or does not start it');
   // E-04 looks for `drawio` on PATH first: a Mac whose PATH has the folder of 2d finds the app through the command.
