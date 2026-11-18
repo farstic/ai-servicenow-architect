@@ -273,10 +273,10 @@ test('ARC-09-C263 — the classes that block and the ubiquity threshold are data
   const coined = 'The `sn_zzz_made_up_table` holds it.';
   const common = 'The `task_sla` table holds it.';
 
-  // The committed file, as lever 2 (ARC-09-C267) leaves it: citedUnread alone blocks, 500 pages. So neither reply is asked about, and a
+  // The committed file, as lever 2 (ARC-09-C267) and the name support class (ARC-09-C291) leave it: citedUnread and unsupportedName block, 500 pages. So neither reply is asked about, and a
   // page that exists and that the session never read is; a path that is not a page is C254's, and it is sent back as C254 alone sends it.
   const committed = JSON.parse(readFileSync(classes, 'utf8'));
-  assert.deepEqual(committed.blocking, ['citedUnread']);
+  assert.deepEqual(committed.blocking, ['citedUnread', 'unsupportedName']);
   assert.equal(committed.ubiquityPages, 500);
   assert.equal(ask(coined), null, 'coined is computed and not asked');
   assert.equal(ask(common), null, 'unsourcedPrinted is computed and not asked');

@@ -597,13 +597,14 @@ test('ARC-09-C263 M5 hook — no new hook entry, and no hook imports the index b
 });
 
 // ---- the data file the measurement sets -----------------------------------------------------------------------------------------
-test('ARC-09-C263 M5 — parseClasses: the committed file is what lever 2 set (citedUnread blocks, 500 pages); unknown kinds drop; garbage means nothing blocks', () => {
+test('ARC-09-C263 M5 — parseClasses: the committed file is what lever 2 and C291 set (citedUnread and unsupportedName block, 500 pages); unknown kinds drop; garbage means nothing blocks', () => {
   const committed = parseClasses(readFileSync(join(ROOT, 'tools/snowarch/lib/docs/grounding-classes.json'), 'utf8'));
   // Phase 0 (C263, R6) judged citedUnread right 39 times in 40, 0.975 against the registered bar of 0.90, and no other class reached it.
   // The registered pilot, at the final notice text, judged it warranted on 22 of 25 flags, 0.88: under the same bar, so nothing blocked in
   // 2.2.5 and 2.2.6. Lever 2 (ARC-09-C267) asks about that one class, with the read routes of read-routes.mjs; the arm without the ask is this
-  // file with an empty list. A change to this list is a measured decision, made in the file and here together.
-  assert.deepEqual(committed, { blocking: ['citedUnread'], ubiquity: DEFAULT_UBIQUITY, source: 'file' });
+  // file with an empty list. ARC-09-C291 adds unsupportedName: a line that cites a page for a name that the page does not print (name-support.mjs). A change to this list is a
+  // measured decision, made in the file and here together.
+  assert.deepEqual(committed, { blocking: ['citedUnread', 'unsupportedName'], ubiquity: DEFAULT_UBIQUITY, source: 'file' });
   assert.equal(DEFAULT_UBIQUITY, 500);
   assert.deepEqual(parseClasses('{"blocking":["coined","nonsense","falseAbsent"],"ubiquityPages":50}'),
     { blocking: ['falseAbsent', 'coined'], ubiquity: 50, source: 'file' }, 'known kinds only, in the check\'s own order');

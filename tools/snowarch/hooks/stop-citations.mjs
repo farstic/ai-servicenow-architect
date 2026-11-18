@@ -64,6 +64,8 @@ const NEEDS_CHECK = /`|markdown\/|not documented|not in the (?:bundled )?corpus|
 
 /** A transcript over this is not read by the cheap gate below (the same limit as lib/docs/turn-sources.mjs). */
 const MAX_GATE_BYTES = 64 * MB;
+/** The largest page the name support check reads whole (ARC-09-C291); a larger one cannot be judged, and its lines are not asked about. */
+const MAX_SUPPORT_PAGE = 8 * MB;
 
 /**
  * Could the turn have cited a corpus page the answer's own words do not show? (ARC-09-C267, lever 2.) Only when the class `citedUnread` may ask (the
@@ -79,8 +81,10 @@ function writtenMayCite(input, seams, readOnce, message = '') {
       const text = Object.hasOwn(seams, 'classesText') ? seams.classesText : readFileSync(fileURLToPath(new URL('../lib/docs/grounding-classes.json', import.meta.url)), 'utf8');
       blocking = typeof text === 'string' ? JSON.parse(text)?.blocking : [];
     }
-    if (!Array.isArray(blocking) || !blocking.includes('citedUnread')) return false;
-    if (/[A-Za-z0-9_-]\.md\b/.test(message)) return true;
+    if (!Array.isArray(blocking)) return false;
+    // A bare `.md` name in the reply is a citation for either class: of a page that may be unread, and of a page that may not print a name cited for it (ARC-09-C291).
+    if ((blocking.includes('citedUnread') || blocking.includes('unsupportedName')) && /[A-Za-z0-9_-]\.md\b/.test(message)) return true;
+    if (!blocking.includes('citedUnread')) return false;
     if (statSync(input.transcript_path).size > MAX_GATE_BYTES) return false;
     return readOnce(input.transcript_path, 'utf8').includes('markdown/');
   } catch { return false; }
@@ -181,6 +185,7 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
     const { makeGlob } = await import('../lib/docs/glob-fs.mjs');
     const { CORPUS_DIR } = await import('../lib/docs/sync.mjs');
     const { loadNamesIndex } = await import('../lib/docs/names-index.mjs');
+    const { normalisePage } = await import('../lib/docs/name-support.mjs');
     const { corpusNamesDir } = await import('../lib/local-paths.mjs');
     const { loadIndex } = await import('../lib/docs/resolve.mjs');
     const facts = checkoutFacts(root);
@@ -208,6 +213,19 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
     // The sub-agents' files are read once for the run, whoever asks for them (the check, and the notice, ask more than once).
     let sub;
     const sideRows = () => { if (sub === undefined) sub = (seams.sideRows ?? (() => readSubagents(input.transcript_path, { onDebug: debug, ...(seams.subagentLimits ?? {}) })))(); return sub; };
+    // A page's text as the name support check compares it (name-support.mjs, ARC-09-C291): the whole page, read once for a Stop; null when it cannot be read or is too large.
+    const norms = new Map();
+    const pageNorm = (page) => {
+      if (!norms.has(page)) {
+        let norm = null;
+        try {
+          const file = join(root, CORPUS_DIR, ...page.split('/'));
+          if (statSync(file).size <= MAX_SUPPORT_PAGE) norm = normalisePage(readFileSync(file, 'utf8'));
+        } catch { /* the page cannot be judged */ }
+        norms.set(page, norm);
+      }
+      return norms.get(page);
+    };
     const options = { blocking: classes.blocking, ubiquity: classes.ubiquity, builders: facts.builders, rosterSkills: facts.rosterSkills,
       isToolName: facts.isToolName, named: facts.named, deadPaths: dead, shouldStop: stop, lead: LEAD, askedOnly: true, incomplete, pagesNamed, allPages,
       carryFolder: keepsFolder(seams.env ?? process.env),
@@ -215,6 +233,7 @@ async function grounding(input, message, { root, dead, started, seams = {}, debu
       glob: makeGlob({ shouldStop: stop }), pageExists: (page) => existsSync(join(root, CORPUS_DIR, ...page.split('/'))),
       // The text of a page, for the one question whether the result of a call that failed holds a line of it (read-routes.mjs, B2); the first 200,000 characters.
       pageText: (page) => { try { return readFileSync(join(root, CORPUS_DIR, ...page.split('/')), 'utf8').slice(0, 200_000); } catch { return null; } },
+      pageNorm,
       ...(seams.options ?? {}) };
     if (input.stop_hook_active) {
       const r = residualFindings({ rows: transcript?.rows ?? null, reply: message, index, coverage: index?.coverage ?? null, options });
