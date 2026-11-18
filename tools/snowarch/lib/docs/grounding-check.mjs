@@ -5,7 +5,7 @@
 // The rule (CLAUDE.md:13) has no page limit: the Architect reads until each construct is cited from a page it Read or an escape-safe
 // search did not find it. This is the machine's half, after the answer is written. It compares every identifier-shaped name and every
 // corpus citation of the answer with the session's sources (turn-sources.mjs) and the corpus's names (names-index.mjs), and says,
-// in seven classes, where the answer departs from the rule. Detection is mechanical; the remedy is the model's — one ask, never a rewrite.
+// in eight classes, where the answer departs from the rule. Detection is mechanical; the remedy is the model's — one ask, never a rewrite.
 //
 //   falseAbsent       a name called "not documented" that the corpus prints (or a Read page printed)
 //   unsourcedPrinted  a name the corpus prints, but this session got from no page, skill, request or builder
@@ -18,6 +18,8 @@
 //                     answer gives a path to (`clients/acme/incident.md`)
 //   resting           "unverified" / "not opened" / a spent budget in the final reply
 //   overclaim         `Pages read: <n>` greater than the pages Read
+//   unsupportedName   a snake_case name that a line of the final reply cites a corpus page for and that no page it cites prints (ARC-09-C291): ELSEWHERE when the names
+//                     index has it on another page, ABSENT when on none; not a hedged line, not an anti-pattern line, not a `snow_`, `x_` or `u_` name (name-support.mjs)
 //
 // ONE PURE FUNCTION: `groundingFindings({ rows, reply, index, coverage, options })` reads no file, no clock and no global. `rows` are
 // session-JSONL rows (or stream-json rows in that shape); `reply` is the final text (`last_assistant_message`); `index` is
@@ -31,11 +33,12 @@
 // stdlib only; imports leaves (name-rules, turn-sources, finding-copy) so the Stop hook stays fast.
 import { copyLines } from '../finding-copy.mjs';
 import { ABSENCE_ANYWHERE, CUSTOM, DECLARED, MARKER, PLATFORM_PREFIXES, bare, dotted, markedAbsent, nameSpans, qualifiesWhole } from './name-rules.mjs';
+import { MAX_NAMES, constructsOf, isAntiPattern, isHedged, printsConstruct } from './name-support.mjs';
 import { COVERAGE } from './names-index.mjs';
 import { isFolderless, mentionsPage, namesMoreThan, walkThread, wordNamesPage } from './read-routes.mjs';
 import { namesIn, rowText, turnSources } from './turn-sources.mjs';
 
-export const KINDS = Object.freeze(['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced', 'citedUnread', 'resting', 'overclaim']);
+export const KINDS = Object.freeze(['falseAbsent', 'unsourcedPrinted', 'coined', 'unsourced', 'citedUnread', 'resting', 'overclaim', 'unsupportedName']);
 export const LEAD = 'Before this answer stands, check these against the corpus; there is no page limit.';
 export const KEEP_OUT = ' Do not mention this notice.';
 // The notice's closing paragraph is registered text (496 bytes): a change to it is a new registration, pinned in tests/hook/stop-grounding.test.mjs.
@@ -255,7 +258,9 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
   const restingAt = live.some(([l]) => RESTING.test(l));
   const countsAt = /Pages read:/i.test(fullText);
   const bareAt = typeof options.pagesNamed === 'function' && (live.some(([l]) => HAS_MD_NAME.test(posix(l).replace(CITATION, ''))) || docs.some((w) => HAS_MD_NAME.test(posix(w.text).replace(CITATION, ''))));
-  if (!(names0 || cites || absenceAt || restingAt || countsAt || bareAt)) return result('nothing-to-check');
+  // A line that cites a page by a Windows path (`markdown\\area\\x.md`) has no `markdown/` in it: the name support check looks for any `.md` in a line (ARC-09-C291).
+  const supportAt = (allowed.has('unsupportedName') || !options.askedOnly) && live.some(([l]) => l.includes('.md'));
+  if (!(names0 || cites || absenceAt || restingAt || countsAt || bareAt || supportAt)) return result('nothing-to-check');
 
   const declared = new Set([...fullText.matchAll(DECLARED)].map((m) => m[1].toLowerCase()));
   const isTool = options.isToolName ?? null;
@@ -459,6 +464,15 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
     findings.resting.push({ kind: 'resting', line: i, excerpt: maskUnheld(l.replace(/[`*]/g, '').trim().slice(0, 70), index) });
   }
 
+  // A cited page must print the name it is cited for (ARC-09-C291): the lines of the final reply, as the resting class reads them. Computed when the class asks, or
+  // for a caller that computes every class (a replay, a grader).
+  if (allowed.has('unsupportedName') || !options.askedOnly) {
+    const support = supportFindings({ lines: live.filter(([l]) => finalLines.has(l)), index, pagesNamed: options.pagesNamed, pageNorm: options.pageNorm, shouldStop: stop });
+    notes.push(...support.notes);
+    if (support.aborted) return late();
+    findings.unsupportedName.push(...support.items);
+  }
+
   const blocking = KINDS.filter((k) => findings[k].length > 0 && allowed.has(k));
   const all = blocking.flatMap((k) => findings[k]);
   const reasonBody = all.length ? reasonOf(findings, blocking, options.maxItems ?? MAX_ITEMS) : null;
@@ -469,14 +483,70 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
   };
 }
 
+/** A cited corpus path as `supportFindings` reads it: CITATION with the path bounded, so that a line of 6,000 `markdown/` is not rescanned to its end from each of them (184 ms). */
+const CITED_PAGE = /markdown\/[A-Za-z0-9_.\-/]{1,300}?\.md/g;
+/** The corpus pages a line cites: by path, or by a bare file name that names exactly one page (the page's own path), each once, in the order they stand. */
+function citedPagesOf(flat, pagesNamed) {
+  const pages = [];
+  const add = (page) => { if (!pages.includes(page)) pages.push(page); };
+  for (const m of flat.matchAll(CITED_PAGE)) add(m[0]);
+  for (const m of flat.matchAll(BARE_NAME)) {
+    if (NOT_PAGES.has(m[0].toLowerCase())) continue;
+    const named = pagesNamed(m[0]) ?? [];
+    if (named.length === 1) add(named[0]);
+  }
+  return pages;
+}
+
+/**
+ * ARC-09-C291 — a cited page must print the name it is cited for. Pure: `lines` are `[line, index]` pairs of the final reply, `pageNorm(page)` is a page's normalised text
+ * (name-support.mjs) or null when it cannot be read, `index` is the names index. A line is checked when it cites at least one corpus page, names at least one construct
+ * and is neither hedged nor an anti-pattern; a construct is supported when any page the line cites prints it (or the index puts it on one of them). One that is not is
+ * ELSEWHERE when the index has it on another page and ABSENT when it has it on none; each name once, with the first three pages of the first line that names it. Nothing is
+ * judged that cannot be: a line one of whose pages cannot be read, a reply with no names index or no way to read a page, and, for ABSENT, an index that is not whole.
+ * `{ items, notes, aborted }`; `aborted` when `shouldStop` said stop.
+ */
+export function supportFindings({ lines, index = null, pagesNamed = null, pageNorm = null, shouldStop = null }) {
+  const out = { items: [], notes: [], aborted: false };
+  if (!index || typeof index.pathsOf !== 'function' || typeof pageNorm !== 'function') return out;
+  const whole = (index.coverage ?? null) === COVERAGE.full;
+  const named = typeof pagesNamed === 'function' ? pagesNamed : () => [];
+  const stop = shouldStop ?? (() => false);
+  const memo = new Map();
+  const normOf = (page) => { if (!memo.has(page)) memo.set(page, pageNorm(page)); return memo.get(page); };
+  const seen = new Set();
+  for (const [raw, line] of lines) {
+    if (stop()) { out.aborted = true; out.notes.push('deadline: the name support check was not finished'); return out; }
+    if (!String(raw).includes('.md')) continue;
+    const pages = citedPagesOf(posix(String(raw).replace(/\\_/g, '_')), named);
+    if (pages.length === 0 || isHedged(raw) || isAntiPattern(raw)) continue;
+    const names = constructsOf(raw);
+    if (names.length === 0) continue;
+    const texts = pages.map(normOf);
+    if (texts.some((t) => t === null || t === undefined)) continue;
+    for (const name of names) {
+      if (seen.has(name) || texts.some((t) => printsConstruct(t, name))) continue;
+      const elsewhere = index.pathsOf(name) ?? [];
+      if (elsewhere.some((p) => pages.includes(p))) continue;
+      if (elsewhere.length === 0 && !whole) continue;
+      seen.add(name);
+      out.items.push({ kind: 'unsupportedName', name, where: elsewhere.length > 0 ? 'elsewhere' : 'absent', pages: pages.slice(0, 3), line });
+    }
+  }
+  return out;
+}
+
 /** The ask, word for word, from the blocking findings: one lead, one clause per kind that has items, at most `max` items, the tail. */
 function reasonOf(findings, kinds, max) {
   let room = max;
   let extra = 0;
-  const take = (list) => { const got = list.slice(0, Math.max(room, 0)); room -= got.length; extra += list.length - got.length; return got; };
+  const take = (list, cap = Infinity) => { const got = list.slice(0, Math.max(Math.min(room, cap), 0)); room -= got.length; extra += list.length - got.length; return got; };
   const clauses = [];
   for (const kind of kinds) {
-    const got = take(findings[kind]);
+    // The names of a cited page that does not print them: at most MAX_NAMES in all, filled with those that no page prints first (R6's fabricated presence), then those that
+    // another page prints, each group in the order it appears. They are printed in the other order, the ELSEWHERE clause first.
+    const listed = kind === 'unsupportedName' ? [...findings[kind].filter((i) => i.where === 'absent'), ...findings[kind].filter((i) => i.where === 'elsewhere')] : findings[kind];
+    const got = take(listed, kind === 'unsupportedName' ? MAX_NAMES : Infinity);
     if (got.length === 0) continue;
     const pages = (i) => i.pages.join(', ');
     switch (kind) {
@@ -505,6 +575,23 @@ function reasonOf(findings, kinds, max) {
       case 'citedUnread':
         clauses.push(`You cited pages that this session never opened: ${got.map((i) => i.path).join(', ')}. Open each one now. Where a page contradicts your answer, correct the answer. Where a citation only tells the reader where to look, mark it as a pointer on its Correction line.`);
         break;
+      case 'unsupportedName': {
+        const elsewhere = got.filter((i) => i.where === 'elsewhere');
+        const absent = got.filter((i) => i.where === 'absent');
+        const OWN = 'For a name of your own design, leave it and add no line for it.';
+        const names = [];
+        if (elsewhere.length > 0) {
+          names.push(`These names are not printed on the page you cite for them: ${elsewhere.map((i) => `\`${i.name}\` (${i.pages.join(', ')})`).join('; ')}. `
+            + `For each platform name, add one line that starts "Correction:" and cites a page that prints it (docs lookup finds one). ${OWN}`);
+        }
+        if (absent.length > 0) {
+          names.push(`No corpus page prints ${absent.map((i) => `\`${i.name}\``).join(', ')}. `
+            + `For each platform name, say in a line that starts "Correction:" that the corpus does not document it. ${OWN}`);
+        }
+        if (names.length > 0) names[names.length - 1] += ' Do not repeat the answer.';
+        clauses.push(...names);
+        break;
+      }
       case 'resting':
         clauses.push(`Left as not read or not verified: ${got.map((i) => `"${i.excerpt}"`).join('; ')}. Read the page, or search escape-safe and give the marker only to what the search does not find.`);
         break;
@@ -530,6 +617,8 @@ const DESCRIBE = Object.freeze({
   resting: (i) => `a construct left as not read or not verified ("${i.excerpt}")`,
   overclaim: (i) => `a pages-read count of ${i.claimed} where ${i.read} pages were read`,
 });
+/** The kinds the notice to the user never lists: a name of the model's own design stays unsupported after the ask, so the notice would name it every turn (ARC-09-C291). */
+const forNotice = (items) => items.filter((i) => i.kind !== 'unsupportedName');
 
 /**
  * What stayed open after our one block. Pure. Called on the continuation's Stop (`stop_hook_active`), where the hook never blocks again:
@@ -597,7 +686,7 @@ export function residualFindings({ rows = null, reply = null, index = null, cove
   const unnamed = was.items.slice(max).filter((i) => !resolved(i)).length;
   const wasKeys = new Set(was.items.map(keyOf));
   const asked = norm(rowText(whole.live[first.index]));
-  for (const i of now.items) {
+  for (const i of forNotice(now.items)) {
     if (wasKeys.has(keyOf(i))) continue;
     if (i.kind === 'citedUnread' && (marked(i.path) || asked.includes(norm(i.path)))) continue;
     open.push(i);
