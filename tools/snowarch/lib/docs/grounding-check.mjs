@@ -74,6 +74,8 @@ const RESTING_EXEMPT = [/not installed on this sparse corpus/i, /not on disk in 
   /instance store NOT read|credentials NOT read/i];
 const PAGES_READ = /`?Pages read:\s*(\d+)`?/gi;
 const CITATION = /markdown\/[A-Za-z0-9_.\-/]+?\.md/g;
+/** The corpus folder in a path, with either separator: the gate in front of the citation reader (ARC-09-C292). */
+const MARKDOWN_DIR = /markdown[\\/]/;
 // What may follow a cited path, on its own line, for the citation to say the page was not read: closing markup, whitespace, one separator, an
 // opening bracket, "found by search,", was / were / is / are, then "not read", "not opened", "not yet read", "not yet opened" or "unread" as a word.
 const DECLARED_UNREAD = /^[`*_)\]>"']*\s*(?:[-,;:–—]\s*)?(?:(?:\(|\[)\s*)?(?:found by search,\s*)?(?:(?:was|were|is|are)\s+)?(?:not\s+(?:yet\s+)?(?:read|opened)|unread)\b/i;
@@ -253,7 +255,9 @@ export function groundingFindings({ rows = null, reply = null, index = null, cov
   const absenceAt = live.some(([l]) => ABSENCE_ANYWHERE.test(l));
   // A file the turn wrote and then ran is a script, and what it names is not a citation of the answer or of a document (the architect's second review of #600, item 4).
   const docs = (turn?.written ?? []).filter((w) => !w.script);
-  const cites = live.some(([l]) => l.includes('markdown/')) || docs.some((w) => w.text.includes('markdown/'));
+  // A citation written with back-slashes (`markdown\csm\c_Esc.md`, as a Windows tool prints it) is a citation: the check reads every one as posix(line), and the gate before it
+  // looked for `markdown/` alone (ARC-09-C292).
+  const cites = live.some(([l]) => MARKDOWN_DIR.test(l)) || docs.some((w) => MARKDOWN_DIR.test(w.text));
   const names0 = wantNames && live.some(([l]) => /`[^`\n]*[_.][^`\n]*`|\[[A-Za-z0-9_.\\]*[_.][A-Za-z0-9_.\\]*\]/.test(l));
   const restingAt = live.some(([l]) => RESTING.test(l));
   const countsAt = /Pages read:/i.test(fullText);

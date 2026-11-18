@@ -86,7 +86,9 @@ function writtenMayCite(input, seams, readOnce, message = '') {
     if ((blocking.includes('citedUnread') || blocking.includes('unsupportedName')) && /[A-Za-z0-9_-]\.md\b/.test(message)) return true;
     if (!blocking.includes('citedUnread')) return false;
     if (statSync(input.transcript_path).size > MAX_GATE_BYTES) return false;
-    return readOnce(input.transcript_path, 'utf8').includes('markdown/');
+    // The session file is JSON: a back-slash path in it is written `markdown\\` (two characters), and a back-slash citation is a citation (ARC-09-C292).
+    const session = readOnce(input.transcript_path, 'utf8');
+    return session.includes('markdown/') || session.includes('markdown\\\\');
   } catch { return false; }
 }
 
