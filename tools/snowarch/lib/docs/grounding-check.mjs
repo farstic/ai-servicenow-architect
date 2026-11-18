@@ -507,7 +507,8 @@ function citedPagesOf(flat, pagesNamed) {
  * (name-support.mjs) or null when it cannot be read, `index` is the names index. A line is checked when it cites at least one corpus page, names at least one construct
  * and is neither hedged nor an anti-pattern; a construct is supported when any page the line cites prints it (or the index puts it on one of them). One that is not is
  * ELSEWHERE when the index has it on another page and ABSENT when it has it on none; each name once, with the first three pages of the first line that names it. Nothing is
- * judged that cannot be: a line one of whose pages cannot be read, a reply with no names index or no way to read a page, and, for ABSENT, an index that is not whole.
+ * judged that cannot be: a line one of whose pages cannot be read, a reply with no names index or no way to read a page, and, for ABSENT, an index that is not whole
+ * or a token that starts indexed names at a name boundary (`sn_ins`, the stem of `sn_ins_policy`), which is a family's shorthand and no name (ARC-09-C293).
  * `{ items, notes, aborted }`; `aborted` when `shouldStop` said stop.
  */
 export function supportFindings({ lines, index = null, pagesNamed = null, pageNorm = null, shouldStop = null }) {
@@ -519,6 +520,16 @@ export function supportFindings({ lines, index = null, pagesNamed = null, pageNo
   const memo = new Map();
   const normOf = (page) => { if (!memo.has(page)) memo.set(page, pageNorm(page)); return memo.get(page); };
   const seen = new Set();
+  // Does an indexed name start with `<name>_`? Asked only of a name that no page prints, once for each; an index that cannot list its names says no.
+  const stems = new Map();
+  const startsNames = (name) => {
+    if (!stems.has(name)) {
+      let found = false;
+      if (typeof index.nameKeys === 'function') for (const key of index.nameKeys()) if (key.startsWith(`${name}_`)) { found = true; break; }
+      stems.set(name, found);
+    }
+    return stems.get(name);
+  };
   for (const [raw, line] of lines) {
     if (stop()) { out.aborted = true; out.notes.push('deadline: the name support check was not finished'); return out; }
     if (!String(raw).includes('.md')) continue;
@@ -532,7 +543,7 @@ export function supportFindings({ lines, index = null, pagesNamed = null, pageNo
       if (seen.has(name) || texts.some((t) => printsConstruct(t, name))) continue;
       const elsewhere = index.pathsOf(name) ?? [];
       if (elsewhere.some((p) => pages.includes(p))) continue;
-      if (elsewhere.length === 0 && !whole) continue;
+      if (elsewhere.length === 0 && (!whole || startsNames(name))) continue;
       seen.add(name);
       out.items.push({ kind: 'unsupportedName', name, where: elsewhere.length > 0 ? 'elsewhere' : 'absent', pages: pages.slice(0, 3), line });
     }
