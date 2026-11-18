@@ -34,9 +34,10 @@ jobs:
     name: test (${{ matrix.os }}, node ${{ matrix.node }})
     strategy:
       fail-fast: false
-      # Written out as rows and not as two axes, because 26 is not on every system (ARC-09-C271): 20, 22 and 24 run on all three, 26 on Linux and
-      # Windows. Node 26 is what a Windows user gets from winget today and what the first end-to-end install ran on; macOS has no cell for it because
-      # the macOS queue already cancels cells. The contexts generator reads rows or axes, never both, so this is the form it can read.
+      # Written out as rows, as ARC-09-C271 left it, and not as two axes: Node 26 came to the systems one at a time, and the contexts generator reads rows
+      # or axes, never both, so this is the form it can read. 20, 22, 24 and 26 now run on all three. Node 26 is what a Windows user gets from winget today
+      # and what the first end-to-end install ran on, and it is what the macOS guide installs on a Mac (26.13.1, ARC-09-C300): a guide that puts Node.js 26 on
+      # a Mac has to be tested on it, so macOS has the cell too, whatever its queue costs.
       matrix:
         include:
           - { os: ubuntu-latest,  node: 20 }
@@ -46,6 +47,7 @@ jobs:
           - { os: macos-latest,   node: 20 }
           - { os: macos-latest,   node: 22 }
           - { os: macos-latest,   node: 24 }
+          - { os: macos-latest,   node: 26 }
           - { os: windows-latest, node: 20 }
           - { os: windows-latest, node: 22 }
           - { os: windows-latest, node: 24 }
@@ -205,8 +207,8 @@ jobs:
     # THE INSTALL PROMISE, as a job. When this is red the install is broken, not the test: every
     # assertion is something a user hits within a minute of cloning.
     #
-    # Fourteen cells, and each variant answers a different question. `node-cli` — does the install
-    # work where Node is present, with Node 20, 22 and 24 on three operating systems and 26 on Windows? `no-node` — does
+    # Fifteen cells, and each variant answers a different question. `node-cli` — does the install
+    # work where Node is present, with Node 20, 22 and 24 on three operating systems and 26 on Windows and macOS, where a guide installs it? `no-node` — does
     # the launcher finish design-only ITSELF, in `sh` and in PowerShell, with no Node to hand over
     # to? `no-gitbash` — does the Windows path work on a machine that has no POSIX shell at all?
     #
@@ -224,6 +226,7 @@ jobs:
           - { label: 'macos-latest, node 20',   os: macos-latest,   variant: node-cli, node: '20', writer: node }
           - { label: 'macos-latest, node 22',   os: macos-latest,   variant: node-cli, node: '22', writer: node }
           - { label: 'macos-latest, node 24',   os: macos-latest,   variant: node-cli, node: '24', writer: node }
+          - { label: 'macos-latest, node 26',   os: macos-latest,   variant: node-cli, node: '26', writer: node }
           - { label: 'windows-latest, node 20', os: windows-latest, variant: node-cli, node: '20', writer: node }
           - { label: 'windows-latest, node 22', os: windows-latest, variant: node-cli, node: '22', writer: node }
           - { label: 'windows-latest, node 24', os: windows-latest, variant: node-cli, node: '24', writer: node }
