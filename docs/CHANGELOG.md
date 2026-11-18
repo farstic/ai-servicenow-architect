@@ -75,6 +75,8 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 
 **A page cited only with back-slashes is checked.** The Stop hook's check of a page that an answer cites and the session never opened looked for `markdown/`, with a forward slash, before it read any citation. An answer that cited a page only the way a Windows tool prints it (`markdown\csm\c_Esc.md`), or a file the turn wrote that did, was never checked. The gate now takes either separator, in the answer, in a file the turn wrote and in the hook's look at the session file (ARC-09-C292).
 
+**The name check no longer asks about a prefix, and a Correction cites an opened page.** On the architect's sitting the hook asked "No corpus page prints `sn_ins`" about a backticked prefix, `sn_ins_`, that the model had written as shorthand for a family of tables, and the model had to explain it. A token that ends with an underscore is now a prefix and no construct, and a name that no page prints is not asked about as ABSENT when an indexed name starts with it and an underscore. The ELSEWHERE clause also asks for a Correction that "cites a page you have opened that prints it": all 13 of the extra never-opened citations of the sitting's N were Correction lines that cited a page seen only in a lookup listing. On the architect's replay of the hook over the 75 turns of that sitting's N sessions, 74 were unchanged, and the one that changed lost its whole ask, which had named a prefix; on a sitting of its own (150 sessions) the never-opened citations on the Correction lines written after an ask fell from 11 of 69 to 8 of 67, a small measured gain (one-sided p 0.34), and every guard held (ARC-09-C293).
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -150,6 +152,7 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 - The checkout's `.claude/settings.json` lets a session run that one command without asking, as `Bash(./snowarch docs lookup *)`
   and, for the PowerShell tool on Windows, `PowerShell(.\snowarch.cmd docs lookup *)`; no other command of the launcher is
   allowed. The two entries are generated from the launcher spelling, like the rest of `permissions` (ARC-09-C268).
+- The ELSEWHERE clause of the name check asks for a Correction that cites "a page you have opened that prints it", where it said "a page that prints it". Measured on the architect's sitting: the never-opened citations on those lines 11 of 69 against 8 of 67, every guard held (ARC-09-C293).
 
 ### Fixed
 
@@ -161,6 +164,7 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 - The two Windows install guides state the corpus of the current pin: 51,186 files and a 293 MB working tree on the example screen and 51,178 pages in the
   sentence under it, where they said 51,665 and 299 MB, and their example screens show the 96d3212 pin. A docs bump now checks both guides against the corpus and the install page (ARC-09-C290).
 - The Stop hook asks about a never-opened page that is cited only with back-slashes, in an answer and in a file the turn wrote (ARC-09-C292).
+- The name check does not ask about a prefix that ends with an underscore (`sn_ins_`), nor about a token that starts indexed names at a name boundary. On the architect's replay over the sitting's 75 turns, 74 were unchanged and the one that changed lost an ask that named a prefix (ARC-09-C293).
 
 ## 2.2.6 — 2026-11-15
 

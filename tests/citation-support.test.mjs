@@ -32,9 +32,9 @@ const TEXT = {
 const pageNorm = (page) => (Object.hasOwn(TEXT, page) ? normalisePage(TEXT[page]) : null);
 /** The names index's API, for the names of `names` ({ name: [pages] }). */
 function fakeIndex(names, { coverage = 'full' } = {}) {
-  return { coverage, meta: { coverage }, pageCount: 5, nameCount: Object.keys(names).length, has: (n) => Object.hasOwn(names, n), count: (n) => (names[n] ?? []).length, pathsOf: (n) => names[n] ?? [], pagesOf: () => [] };
+  return { coverage, meta: { coverage }, pageCount: 5, nameCount: Object.keys(names).length, has: (n) => Object.hasOwn(names, n), count: (n) => (names[n] ?? []).length, pathsOf: (n) => names[n] ?? [], pagesOf: () => [], nameKeys: () => Object.keys(names).values() };
 }
-const INDEX = fakeIndex({ sysrule_assignment: [TABLE], sn_bom_claim: [RULES], sys_user: [OTHER], known_a: [TABLE], known_b: [TABLE], known_c: [TABLE], known_d: [TABLE] });
+const INDEX = fakeIndex({ sysrule_assignment: [TABLE], sn_bom_claim: [RULES], sys_user: [OTHER], known_a: [TABLE], known_b: [TABLE], known_c: [TABLE], known_d: [TABLE], sn_ins_policy: [OTHER], sn_ins_claim_type: [OTHER], sys_user_group: [OTHER] });
 const text = (t) => assistant([{ type: 'text', text: t }]);
 
 const check = (reply, { index = INDEX, blocking = ['unsupportedName'], pagesNamed = () => [], norm = pageNorm, rows = null, options = {} } = {}) =>
@@ -43,7 +43,7 @@ const items = (r) => r.findings.unsupportedName.map((i) => [i.name, i.where, ...
 const cite = (page) => `(citation: ${page})`;
 
 const OWN = 'For a name of your own design, leave it and add no line for it.';
-const ELSEWHERE = (list) => `These names are not printed on the page you cite for them: ${list}. For each platform name, add one line that starts "Correction:" and cites a page that prints it (docs lookup finds one). ${OWN}`;
+const ELSEWHERE = (list) => `These names are not printed on the page you cite for them: ${list}. For each platform name, add one line that starts "Correction:" and cites a page you have opened that prints it (docs lookup finds one). ${OWN}`;
 const ABSENT = (list) => `No corpus page prints ${list}. For each platform name, say in a line that starts "Correction:" that the corpus does not document it. ${OWN}`;
 /** Once, after the last names clause. */
 const NOT_AGAIN = 'Do not repeat the answer.';
@@ -93,6 +93,22 @@ test('ARC-09-C291 — a hedged line, an anti-pattern line and a name that is non
   // the same line without the hedge is asked about: the hedge is what silences it
   assert.equal(check(`The page prints \`sysrule_assignment\` ${cite(RULES)}.`).findings.unsupportedName.length, 1);
   assert.equal(check(`You should never use \`sysrule_assignment\` ${cite(RULES)}.`).findings.unsupportedName.length, 1, 'never, not at the start');
+});
+
+test('ARC-09-C293 — a prefix is no name: a backticked stem is never asked about, nor a token that starts indexed names at a name boundary', () => {
+  const ins = (t, index = INDEX) => items(check(`The ${t} tables hold the policies ${cite(RULES)}.`, { index }));
+  assert.deepEqual(ins('`sn_ins_`'), [], 'a backticked prefix that ends with an underscore');
+  assert.deepEqual(ins('`sn_ins_*`'), [], 'with a wildcard after it');
+  assert.deepEqual(ins('`sn_ins`'), [], 'the same stem without the underscore: indexed names start with sn_ins_');
+  assert.deepEqual(ins('`sn_ins` and `fso_claim_score`'), [['fso_claim_score', 'absent', RULES]], 'a name that starts nothing is still ABSENT, beside it');
+  assert.deepEqual(ins('`sn_in`'), [['sn_in', 'absent', RULES]], 'letters that start a name are no stem: sn_in is not at a boundary of sn_ins_policy');
+  assert.deepEqual(ins('`sn_ins_poli`'), [['sn_ins_poli', 'absent', RULES]], 'nor a truncated name');
+  assert.deepEqual(ins('`known_e`'), [['known_e', 'absent', RULES]], 'the ABSENT of a name that no indexed name starts is as before');
+  const noKeys = { ...INDEX, nameKeys: undefined };
+  assert.deepEqual(ins('`sn_ins`', noKeys), [['sn_ins', 'absent', RULES]], 'an index that cannot list its names: the stem cannot be told, and the ask is as it was');
+  assert.deepEqual(ins('`sn_ins_`', noKeys), [], 'but a token that ends with an underscore is a prefix by its spelling');
+  // a name that another page prints is ELSEWHERE, whether or not it also starts other names
+  assert.deepEqual(ins('`sys_user`'), [['sys_user', 'elsewhere', RULES]], 'sys_user starts sys_user_group and is indexed: the stem rule is for what no page prints');
 });
 
 test('ARC-09-C291 — a bare file name that names exactly one page is a citation; one that names several, or none, is not', () => {

@@ -13,11 +13,11 @@ import assert from 'node:assert/strict';
 const text = (t) => A([{ type: 'text', text: t }]);
 const INDEX = {
   coverage: 'full', meta: { coverage: 'full' }, namespaces: new Map(), pageCount: 4, nameCount: 2,
-  has: (n) => Object.hasOwn(NAMES, n), count: (n) => (NAMES[n] ?? []).length, pathsOf: (n) => NAMES[n] ?? [], pagesOf: () => [], both: () => [],
+  has: (n) => Object.hasOwn(NAMES, n), count: (n) => (NAMES[n] ?? []).length, pathsOf: (n) => NAMES[n] ?? [], pagesOf: () => [], both: () => [], nameKeys: () => Object.keys(NAMES).values(),
 };
-const NAMES = { sysrule_assignment: [PAGE.beta], sn_bom_claim: [PAGE.alpha] };
+const NAMES = { sysrule_assignment: [PAGE.beta], sn_bom_claim: [PAGE.alpha], sn_ins_policy: [PAGE.beta] };
 const OWN = 'For a name of your own design, leave it and add no line for it.';
-const ELSEWHERE = (list) => `These names are not printed on the page you cite for them: ${list}. For each platform name, add one line that starts "Correction:" and cites a page that prints it (docs lookup finds one). ${OWN}`;
+const ELSEWHERE = (list) => `These names are not printed on the page you cite for them: ${list}. For each platform name, add one line that starts "Correction:" and cites a page you have opened that prints it (docs lookup finds one). ${OWN}`;
 const ABSENT = (list) => `No corpus page prints ${list}. For each platform name, say in a line that starts "Correction:" that the corpus does not document it. ${OWN}`;
 /** Once, after the last names clause. */
 const NOT_AGAIN = 'Do not repeat the answer.';
@@ -44,6 +44,13 @@ withInstall('ARC-09-C291 hook — a name that the cited page prints is not asked
   const absent = await run(t, `The \`fso_claim_score\` field is computed ${cite(PAGE.alpha)}.`);
   asked(absent, '`fso_claim_score`');
   assert.ok(absent.reason.includes(`${ABSENT('`fso_claim_score`')} ${NOT_AGAIN}`), absent.reason);
+});
+
+withInstall('ARC-09-C293 hook — a backticked prefix is not asked about, and a name that starts nothing indexed still is', async (t, i) => {
+  pages(i);
+  silent(await run(t, `The \`sn_ins_\` tables hold the policies ${cite(PAGE.alpha)}.`), 'a backticked prefix');
+  silent(await run(t, `The \`sn_ins\` tables hold the policies ${cite(PAGE.alpha)}.`), 'the stem, which starts indexed names');
+  asked(await run(t, `The \`sn_ins\` tables and the \`fso_claim_score\` field ${cite(PAGE.alpha)}.`), '`fso_claim_score`');
 });
 
 withInstall('ARC-09-C291 hook — a hedged line, an anti-pattern line and the prefixes u_, x_ and snow_ are never asked about', async (t, i) => {

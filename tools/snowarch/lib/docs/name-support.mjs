@@ -30,13 +30,15 @@ const OWN_PREFIX = /^(?:snow|x|u)_/;
 /**
  * The constructs a line names, in order, each once: a lower-case snake_case token with an underscore, outside the cited paths and the file names, whose prefix is
  * not `snow_`, `x_` or `u_`, and which holds no `<`, `>`, `{` or `}` (a placeholder). A markdown escape (`sn\_x`) is dropped first, the edge underscores of a
- * run are markdown emphasis and not the name, and a token directly followed by a file extension (`my_script.js`) is a file.
+ * run are markdown emphasis and not the name, and a token directly followed by a file extension (`my_script.js`) is a file. A run that ends with an underscore and does not
+ * start with one is a prefix, the stem of a family of names (`sn_ins_`, `sn_ins_*`), and no construct (ARC-09-C293).
  */
 export function constructsOf(line) {
   const flat = String(line ?? '').replace(/\\_/g, '_').replace(/\\/g, '/');
   const text = flat.replace(MD_NAME, ' ');
   const names = [];
   for (const m of text.matchAll(RUN)) {
+    if (m[0].endsWith('_') && !m[0].startsWith('_')) continue;
     const name = m[0].replace(/^_+|_+$/g, '');
     if (!SNAKE.test(name) || OWN_PREFIX.test(name) || names.includes(name)) continue;
     const ext = /^\.([A-Za-z0-9]+)(?![A-Za-z0-9_])/.exec(text.slice(m.index + m[0].length));
