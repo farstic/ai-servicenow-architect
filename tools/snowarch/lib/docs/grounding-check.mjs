@@ -597,7 +597,7 @@ function reasonOf(findings, kinds, max) {
         const names = [];
         if (elsewhere.length > 0) {
           names.push(`These names are not printed on the page you cite for them: ${elsewhere.map((i) => `\`${i.name}\` (${i.pages.join(', ')})`).join('; ')}. `
-            + `For each platform name, add one line that starts "Correction:" and cites a page that prints it (docs lookup finds one). ${OWN}`);
+            + `For each platform name, add one line that starts "Correction:" and cites a page you have opened that prints it (docs lookup finds one). ${OWN}`);
         }
         if (absent.length > 0) {
           names.push(`No corpus page prints ${absent.map((i) => `\`${i.name}\``).join(', ')}. `
