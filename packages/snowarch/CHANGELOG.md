@@ -5,6 +5,15 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**A process that runs as root writes nothing (ARC-09-C303).** `ensureIntegrity` takes `euid` (this process's own when absent; nobody is root where there is no
+`geteuid`). As root it verifies and never writes, and it is never skipped: a tree whose verdict is held and whose covered files match is `verified` (a `full`
+check hashes every file and leaves the verdict alone), and wherever it would write (a first verdict, a verdict whose stamp moved, the lock and the restore of a changed
+tree with its `git checkout`, the replaced copies, the audit line) it writes nothing and answers `refused`, whose reason begins "running as root:" and whose remedy is the
+new `ELEVATED_REMEDY` (`licence/elevated.ts`, which also holds `currentEuid`, `isElevated` and `elevatedSentence`). The hook, the server session, the package CLI and
+`./snowarch` get the rule through the one function. **The MCP server does not start as root:** it prints the root sentence on stderr and exits 3 before its first write, so no
+call is made and no audit line, revocation list or restore is written by a root process. **The package CLI runs two forms as root, `instance list` and `store backups`, and
+refuses the rest** (exit 3, the root sentence), before its licence and integrity checks: a verified tree is no reason to let a root process write a store.
+
 **The shipped list names the interactive Windows install guide (ARC-09-C285).** `docs/AI-Architect-Windows-Install-Guide.html` joins the user's
 documentation in the release coverage (`licence/integrity.ts`), beside `docs/INSTALL-WINDOWS.md`, so a distribution carries it and its signed
 manifest covers it. Nothing else in the package changed.

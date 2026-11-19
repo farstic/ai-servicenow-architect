@@ -40,7 +40,10 @@ import { appendAudit } from '../audit/writer.js';
 import { cliSpelling } from '../cli/tty.js';
 import { makePrivateDir } from '../store/acl.js';
 import { verifyBody } from './core.js';
+import { currentEuid, elevatedSentence, isElevated } from './elevated.js';
 import { PRODUCT_KEYS } from './keys.js';
+/** ARC-09-C303 — the sentence a root process's refusal ends with; the package's one copy of it (a test holds it equal to the engine's, tools/snowarch/lib/root-guard.mjs). */
+export { ELEVATED_REMEDY } from './elevated.js';
 export const MANIFEST_FORMAT = 'snowarch-manifest/1';
 /**
  * What a release ships, and so what its manifest covers (ARC-11-C7; ARC-09-C185a). One definition: the signer
@@ -560,6 +563,11 @@ const reinstall = 'Reinstall from a signed release tag.';
 const refetch = (cli) => `Run ${cli} licence check --refresh to fetch it; if it says none is published, reinstall from a signed release tag.`;
 const repair = (cli) => `Fix what it names, then run ${cli} doctor --fix; or reinstall from a signed release tag.`;
 const refused = (tag, reason, remedy, hashed, status) => ({ state: 'refused', tag, reason, remedy, line: `${CANNOT_RESTORE_PREFIX}${reason} — ${remedy}`, hashed, status });
+/**
+ * ARC-09-C303 — what a root process answers where it WOULD write: the reason says it is root and what the write was, the remedy is the
+ * one sentence every root refusal ends with. The same `refused` answer, so each entrance turns it into the refusal it already has.
+ */
+const refusedAsRoot = (tag, why, hashed, status) => refused(tag, `running as root: ${why}`, elevatedSentence(), hashed, status);
 /** Why a state the restore cannot act on refuses, worded for the line; E-32 reports the same two halves. */
 export function refusalOf(s, cli) {
     const short = (sha) => sha.slice(0, 7);
@@ -675,8 +683,19 @@ function restoreTree(root, tag, manifest, modified, { local, now, run, cli, proj
  *   restored  it was not, and now is: the line names what was put back and moved;
  *   refused   it is not, and cannot be: no manifest, one that does not verify or is another release's, no tag, or a
  *             restore that failed. Callers refuse as a refused licence does.
+ *
+ * ARC-09-C303 — AS ROOT IT VERIFIES AND NEVER WRITES, AND IT IS NEVER SKIPPED (the architect's ruling, 2026-11-19). A root process
+ * leaves root-owned files behind, and this function writes the most of any: a verdict, a lock, the files restored from the tag (a
+ * `git checkout`), the replaced copies, an audit line. Skipping the check as root would make `sudo claude` a way round the integrity
+ * door, so the rule is here, in the one function the hook, the server, both CLIs and the launcher call:
+ *
+ *   - a tree whose verdict is held, and whose covered files match it, is `verified`, and nothing is written (a `full` check hashes every
+ *     file and still leaves the verdict alone);
+ *   - wherever the function WOULD write — the first verdict, a verdict whose stamp moved, the lock and the restore of a changed tree —
+ *     it writes nothing and answers `refused`, whose reason says it runs as root and whose remedy is the root sentence;
+ *   - what it refuses for another reason, and what it exempts, it refuses and exempts as for anyone.
  */
-export function ensureIntegrity(root, { local, keys = PRODUCT_KEYS, full = false, cli = cliSpelling(), now = () => new Date(), run = spawnSync, projectDir, restore = true } = {}) {
+export function ensureIntegrity(root, { local, keys = PRODUCT_KEYS, full = false, cli = cliSpelling(), now = () => new Date(), run = spawnSync, projectDir, restore = true, euid = currentEuid() } = {}) {
     if (!isEngineCheckout(root)) {
         return { state: 'exempt', why: 'not-engine', line: 'Integrity: not checked — not an engine checkout', hashed: 0 };
     }
@@ -691,6 +710,7 @@ export function ensureIntegrity(root, { local, keys = PRODUCT_KEYS, full = false
         return { state: 'exempt', why: 'no-version', line: 'Integrity: not checked — package.json names no version', hashed: 0 };
     }
     const tag = `v${version}`;
+    const elevated = isElevated(euid);
     // The stat key (the hook and the launcher): nothing moved since the last verified run, so nothing is read.
     let quick = null;
     if (!full && tag) {
@@ -700,12 +720,25 @@ export function ensureIntegrity(root, { local, keys = PRODUCT_KEYS, full = false
     }
     const status = integrityStatusFor(root, { keys, local, full, quick, run });
     if (status.s.state === 'verified') {
+        if (elevated) {
+            // Every covered file matches, which is a read. Recording that is a write, and a root process makes none: the verdict that is
+            // already on disk and holds is the same answer, and anything else is a tree nobody recorded as verified.
+            return statDifferences(root, local, tag)?.same
+                ? { state: 'verified', tag: status.s.tag, hashed: status.hashed }
+                : refusedAsRoot(tag, 'every covered file matches the signed manifest, but no verdict of that is recorded, and recording it writes a file', status.hashed, status.s);
+        }
         writeVerdict(root, local, status.s.tag, status.manifest);
         return { state: 'verified', tag: status.s.tag, hashed: status.hashed };
     }
     if (status.s.state !== 'modified') {
         const { reason, remedy } = refusalOf(status.s, cli);
         return refused(tag, reason, remedy, status.hashed, status.s);
+    }
+    if (elevated) {
+        // Restoring takes the lock, moves files aside, runs `git checkout`, writes the verdict and an audit line. A root process does none of it.
+        const n = status.s.modified.length;
+        return refusedAsRoot(tag, `${n} file${n === 1 ? ' differs' : 's differ'} from the signed manifest for ${tag}, the first ${status.s.modified[0].path}, `
+            + `and putting ${n === 1 ? 'it' : 'them'} back writes files`, status.hashed, status.s);
     }
     if (!restore) {
         return refused(status.s.tag, `${status.s.modified.length} file${status.s.modified.length === 1 ? '' : 's'} differ from the `

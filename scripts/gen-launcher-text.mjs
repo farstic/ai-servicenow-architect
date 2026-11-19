@@ -34,6 +34,8 @@ export const END = '# text-end';
 const SENTENCE = await import(pathToFileURL(join(root, 'tools/snowarch/lib/net-sentences.mjs')).href);
 // ARC-09-C270 — the sentence for a Claude Code that is installed and whose folder is not on PATH, with the path as a slot.
 const CLAUDE_INSTALL = await import(pathToFileURL(join(root, 'tools/snowarch/lib/claude-install.mjs')).href);
+// ARC-09-C303 — the sentence a root process is refused with. Not a row of remedies.json (those are the seven preflight checks); only bootstrap.sh prints it.
+const { ELEVATED_REMEDY } = await import(pathToFileURL(join(root, 'tools/snowarch/lib/root-guard.mjs')).href);
 const remedies = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/remedies.json'), 'utf8'));
 const text = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/text.json'), 'utf8'));
 const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
@@ -115,6 +117,7 @@ export function region({ shell = 'bash', remedies: r = remedies, text: t = text,
     // ARC-09-C157 — the folder slot in MSG_NEXT, filled by each launcher with its own root at the moment it prints.
     set('MSG_ROOT_SLOT', t.rootSlot),
     set('MSG_CITATIONS', 'citations: not verified until Node 20+ is installed'),
+    set('MSG_ELEVATED', ELEVATED_REMEDY),
     END,
   ];
   return lines.filter((line) => line !== null).join('\n');

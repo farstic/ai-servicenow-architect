@@ -124,6 +124,12 @@ async function integrityEvent({ root, now, keys }) {
 }
 
 /**
+ * ARC-09-C303 — is this process root? The effective user id is 0; where there is no `geteuid` (Windows) nobody is. Read here and not
+ * imported, so the fast path loads nothing for it.
+ */
+const elevated = () => typeof process.geteuid === 'function' && process.geteuid() === 0;
+
+/**
  * The doctor, in process, under a watchdog.
  *
  * `Promise.race` rather than an `AbortController` threaded through every check: the runner has no
@@ -138,7 +144,9 @@ async function reRun({ config, watchdogMs, run }) {
     return await Promise.race([
       // ARC-11-C7 — E-32 is the one quick check that reads every covered file, so the banner never runs it: `status`
       // and `doctor --quick` compute it, and the banner shows the verdict they cached. The hook never hashes.
-      doctor({ root: ROOT, config, quick: true, noNetwork: true, writeCache: true, exclude: ['E-32'] }),
+      // ARC-09-C303 — and as root the run is not cached: the cache is a file, and a root process writes none (the architect's ruling,
+      // 2026-11-19). Every start of a root session re-runs the quick doctor for it, inside the same watchdog; the hook never refuses.
+      doctor({ root: ROOT, config, quick: true, noNetwork: true, writeCache: !elevated(), exclude: ['E-32'] }),
       new Promise((_, reject) => {
         // ARC-09-C77 — REF'D: it bounds an awaited run, and `finally` clears it, so it never holds a
         // hook whose run has answered. Unref'd, a run pending on nothing ended the hook in exit 13

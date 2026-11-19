@@ -36,6 +36,7 @@ MSG_NEXT='Next: run `claude` in this folder: {root}
       Add a live instance later: run ./snowarch mode live, or /snowarch setup-instance inside Claude.'
 MSG_ROOT_SLOT='{root}'
 MSG_CITATIONS='citations: not verified until Node 20+ is installed'
+MSG_ELEVATED='run this as your own user, without sudo: as root it would leave files in this folder, or in your home folder, that only root can change'
 # text-end
 
 . "$ROOT/tools/snowarch/launcher/docs-recipe.sh"
@@ -69,6 +70,8 @@ while [ $# -gt 0 ] ; do
   shift
 done
 
+# ARC-09-C303 — started as root it would leave a root-owned tree: refuse first, before `--reset` and the hand-over. Windows (Git Bash) has no root.
+[ "$(platform)" != win32 ] && [ "$(id -u 2>/dev/null)" = 0 ] && die B00 "this was started as root" "$MSG_ELEVATED" 3
 [ "$(pwd -P)" = "$ROOT" ] || die B00 "not at the repository root" "cd \"$ROOT\" && ./bootstrap.sh" 3
 
 if [ "$RESET" = 1 ] ; then

@@ -9,11 +9,13 @@
 // home in `.claude/settings.local.json` and `.local/`. So E-07 and E-08 are never `fixable`: the
 // command is printed for a human to run after they have looked at their own diff, and S06 refuses
 // to run it for them.
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { bootstrapOf, cliOf } from '../spell.mjs';
 import { join } from 'node:path';
 import { localDir } from '../../local-paths.mjs';
 
+import { isElevated } from '../../root-guard.mjs';
 import { makeExec, samePath } from '../../steps/B00.mjs';
 import { loadStateOrReason, notHereReason, recordedHere, STATE_VERSION } from '../../state.mjs';
 import { plannedSteps } from '../../steps/index.mjs';
@@ -41,16 +43,41 @@ const MCP_JSON = '.mcp.json';
 /** `git`, run in the checkout. `ok` is exit 0; the doctor never reads git's stderr into a report. */
 const gitIn = (ctx) => {
   const exec = ctx.exec ?? makeExec({ env: ctx.env, plat: ctx.platform });
-  return (args) => exec('git', ['-C', ctx.root, ...args]);
+  return (args, extra) => exec('git', ['-C', ctx.root, ...args], extra);
 };
+
+/** Does this check run as root? The context says so when a case does; otherwise the process is asked. */
+const elevatedIn = (ctx) => ctx.elevated ?? isElevated();
 
 const readJson = (root, rel) => JSON.parse(readFileSync(join(root, rel), 'utf8'));
 
 /** Committed-and-unmodified, as git sees it. `null` when git could not answer at all. */
-export function isUnmodified(git, rel) {
-  const r = git(['diff', '--quiet', 'HEAD', '--', rel]);
-  if (!r.found) return null;
-  return r.ok;
+export function isUnmodified(git, rel, { elevated = false } = {}) {
+  if (!elevated) {
+    const r = git(['diff', '--quiet', 'HEAD', '--', rel]);
+    if (!r.found) return null;
+    return r.ok;
+  }
+  // ARC-09-C303 — `git diff` refreshes git's stat cache and WRITES .git/index when the stat data is stale (touched files, a bind-mounted
+  // checkout, a tree copied from elsewhere), and as root that file would become root's. GIT_OPTIONAL_LOCKS=0 does not stop `git diff`, and
+  // `diff.autoRefreshIndex=false` stops the write but calls a touched file modified. What does: asking against a PRIVATE COPY of the index
+  // (GIT_INDEX_FILE), which takes the refresh. Same answer, and the real index is never opened for writing. If the copy cannot be made the
+  // answer is `null`, git could not answer: never a guess and never a write.
+  const where = git(['rev-parse', '--path-format=absolute', '--git-path', 'index']);
+  if (!where.found || !where.ok) return null;
+  let dir = null;
+  try {
+    dir = mkdtempSync(join(tmpdir(), 'snowarch-index-'));
+    const copy = join(dir, 'index');
+    copyFileSync(where.stdout.trim(), copy);
+    const r = git(['diff', '--quiet', 'HEAD', '--', rel], { env: { GIT_INDEX_FILE: copy } });
+    if (!r.found) return null;
+    return r.ok;
+  } catch {
+    return null;
+  } finally {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -356,7 +383,7 @@ export function engineRepoChecks() {
       fixable: false,
       run: async (ctx) => {
         const problems = [];
-        const unmodified = isUnmodified(gitIn(ctx), MCP_JSON);
+        const unmodified = isUnmodified(gitIn(ctx), MCP_JSON, { elevated: elevatedIn(ctx) });
         // Always compared against HEAD, on every platform: the S-03 fallback never edits this file
         // (it adds a local-scope entry through `claude mcp add-json … -s local` plus
         // `env.SNOWARCH_ROOT` in settings.local.json), so a modified `.mcp.json` is never the
@@ -400,7 +427,7 @@ export function engineRepoChecks() {
       fixable: false,
       run: async (ctx) => {
         const problems = [];
-        const unmodified = isUnmodified(gitIn(ctx), SETTINGS);
+        const unmodified = isUnmodified(gitIn(ctx), SETTINGS, { elevated: elevatedIn(ctx) });
         if (unmodified === false) problems.push('differs from HEAD');
         let settings = null;
         try { settings = readJson(ctx.root, SETTINGS); } catch (e) {

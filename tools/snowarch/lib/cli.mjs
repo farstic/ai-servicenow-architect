@@ -24,6 +24,7 @@ import { localDir } from './local-paths.mjs';
 import { productDir } from './spawn-env.mjs';
 import { PRODUCT_KEYS } from './licence/keys.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
+import { elevatedRefusal, elevatedVerdict, isElevated } from './root-guard.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
 const UNIVERSAL = ['json', 'quiet', 'verbose', 'help'];
@@ -287,6 +288,28 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
   }
 
   /*
+   * ARC-09-C303 — A PROCESS THAT RUNS AS ROOT WRITES NOTHING (the architect's ruling, 2026-11-19). Decided here, once, before any command,
+   * licence read, integrity check or log: a form runs as root only when root-guard.mjs names it as one that reads and writes nothing, and
+   * everything else, unknown flags and commands included, is refused. After the help and the usage errors, which write nothing either.
+   * An allowed form that would write by default is forced not to: the doctor's cache is off (`flags`), the panel's cache is off (`run`),
+   * no log file is made, and git is told not to refresh its index as a side effect of `git status`. The integrity check below is NOT
+   * skipped: it runs, and `ensureIntegrity` itself verifies and never writes as root.
+   */
+  const elevated = isElevated();
+  let forced = {};
+  if (elevated) {
+    const cli = spellings(where).cli;
+    const verdict = elevatedVerdict(name, { positional, flags, argv: rest }, { cli });
+    if (!verdict.ok) {
+      for (const line of elevatedRefusal(name, cli, verdict.hint)) err.write(`${line}\n`);
+      return EXIT_PREREQ;
+    }
+    Object.assign(flags, verdict.flags ?? {});
+    forced = verdict.run ?? {};
+    process.env.GIT_OPTIONAL_LOCKS = '0';
+  }
+
+  /*
    * ARC-11-C1 and C6 — NO VALID LICENCE, NO COMMAND (ruling R1), on every build — except the ones that see,
    * repair, install and uninstall: licence, doctor, status, version, upgrade, bootstrap and `mode design`. Here,
    * after the help and the usage errors and before the logger, so a refused command has written nothing — not
@@ -311,7 +334,7 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
     ? command.readOnly({ positional, flags }) : Boolean(command.readOnly);
   const log = createLogger({
     command: name, quiet: Boolean(flags.quiet), verbose: Boolean(flags.verbose),
-    json: Boolean(flags.json), defer: Boolean(command.defersLog), noFile: readOnly, out, err,
+    json: Boolean(flags.json), defer: Boolean(command.defersLog), noFile: readOnly || elevated, out, err,
   });
   const note = cwdNote();
   if (note) log.note(note);
@@ -324,7 +347,7 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
   // `env` since ARC-11-C1: the licence command reports enforcement from the environment `main` was given.
   let code;
   try {
-    code = await command.run({ flags, positional, argv: rest, log, root, out, err, home, env });
+    code = await command.run({ flags, positional, argv: rest, log, root, out, err, home, env, ...forced });
   } catch (e) {
     // ARC-09-C209 — THE NET UNDER EVERY COMMAND. An error a command did not handle ended the process in Node's own
     // stack trace: unredacted, many lines, and naming our code rather than the problem. It is one line now, through

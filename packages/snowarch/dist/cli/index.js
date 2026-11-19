@@ -23,6 +23,7 @@ import { Command } from 'commander';
 import { argvCarriesSecret, ARGV_SECRET, bootstrapSpelling, cliSpelling, EXIT_USAGE } from './tty.js';
 import { remedyFor } from '../errors/codes.js';
 import { REFUSED, refusesCommand } from '../licence/gate.js';
+import { elevatedCliAllows, elevatedSentence, isElevated } from '../licence/elevated.js';
 import { ensureIntegrity } from '../licence/integrity.js';
 import { licenceStatus, projectRoot } from '../licence/state.js';
 import { spawn } from 'child_process';
@@ -68,6 +69,12 @@ program
  */
 program.hook('preAction', (_program, action) => {
     const name = action.name();
+    // ARC-09-C303 — FIRST, before the licence and the integrity check: a root process runs the two forms that read and refuses the rest. The
+    // integrity check below refuses a tree nobody recorded as verified, and a verified tree is no reason to let a root process write a store.
+    if (isElevated() && !elevatedCliAllows(name, action.args)) {
+        writeSync(2, `snowarch ${name}: refused: this process runs as root, and this command writes. ${elevatedSentence()}\n`);
+        process.exit(EXIT_LICENCE);
+    }
     const root = projectRoot();
     const s = licenceStatus(root);
     // ARC-11-C141 — the same door for this checkout's own files: put back where they can be, with the one line saying
