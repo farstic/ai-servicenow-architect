@@ -21,7 +21,7 @@ import { productEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
 import { spellings } from '../text.mjs';
-import { packageCliRefused, REMEDY } from '../licence/state.mjs';
+import { packageCliRefused, SKIP_NOTE } from '../licence/state.mjs';
 import { NO_LICENCE_IN_FORCE } from '../doctor/checks/licence.mjs';
 
 export const id = 'B06';
@@ -59,7 +59,7 @@ const applies = (ctx) => ctx.mode === 'live' || storeExists(ctx.root);
 const unlicensed = (ctx) => applies(ctx) && packageCliRefused(ctx);
 export const runsWhen = (ctx) => applies(ctx) && !unlicensed(ctx);
 export const skipReason = (ctx) => (unlicensed(ctx) ? NO_LICENCE_IN_FORCE : 'design-only');
-export const skipNote = (spell, ctx) => (unlicensed(ctx) ? REMEDY(spell.cli) : null);
+export const skipNote = (spell, ctx) => (unlicensed(ctx) ? SKIP_NOTE(spell) : null);
 
 export const MIGRATION_FAILED =
   `the store migration did not complete — run ${SPELL.cli} store migrate to see why; `
