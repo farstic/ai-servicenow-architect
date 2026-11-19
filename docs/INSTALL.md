@@ -245,8 +245,7 @@ Every preflight failure prints its own remedy. These are those sentences:
 <!-- generated:remedies -->
 | If | macOS | Linux | Windows |
 |---|---|---|---|
-| You are not at the checkout root | `cd "{root}" && ./bootstrap.sh` | `cd "{root}" && ./bootstrap.sh` | `pushd "{root}"
-.\bootstrap.cmd` |
+| You are not at the checkout root | `cd "{root}" && ./bootstrap.sh` | `cd "{root}" && ./bootstrap.sh` | `pushd "{root}"`<br>`.\bootstrap.cmd` |
 | git is missing or too old | `xcode-select --install (or: brew install git)` | `install git with your distribution's package manager (apt install git · dnf install git)` | `winget install Git.Git, or without administrator rights: Git for Windows from git-scm.com, installed for your user only (docs/INSTALL-WINDOWS.md, step 2a)` |
 | Claude Code is missing or too old | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` |
 | Claude Code is installed, but its folder is not on PATH | `add ~/.local/bin to your PATH with this line, then re-run (bash on macOS: ~/.bash_profile instead; https://code.claude.com/docs/en/troubleshoot-install): echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc` | `add ~/.local/bin to your PATH with this line, then re-run (zsh: ~/.zshrc instead; https://code.claude.com/docs/en/troubleshoot-install): echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc` | `add that folder to your PATH with this PowerShell line, then open a new PowerShell window and re-run (https://code.claude.com/docs/en/troubleshoot-install): [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:USERPROFILE\.local\bin", "User")` |

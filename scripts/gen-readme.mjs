@@ -104,7 +104,11 @@ export function remediesTable(remedies) {
   const OFF_PATH_LABEL = { claudeCode: 'Claude Code is installed, but its folder is not on PATH' };
   // ARC-09-C302 — one column for each platform, each filled from that platform's own sentence. The first column used to be headed "macOS / Linux" and
   // took the darwin sentence, so a Linux reader was told `xcode-select` and `brew`; remedies.json has had a linux sentence in every row since ARC-06-S04.
-  const cells = (r) => ['darwin', 'linux', 'win32'].map((platform) => `\`${r[platform] ?? r.default}\``).join(' | ');
+  // A cell holds ONE line of the page: a line break inside it cuts the row on GitHub, and the Windows remedy for "not at the checkout root" has two lines
+  // (`pushd "{root}"`, then `.\bootstrap.cmd`). Each line of a sentence is a code span of its own, the spans are joined with `<br>` so they read one under the
+  // other, and a blank line is dropped. The sentence itself is not changed: the launcher prints it as it is.
+  const cell = (sentence) => String(sentence).split(/\r?\n/).filter((line) => line !== '').map((line) => `\`${line}\``).join('<br>');
+  const cells = (r) => ['darwin', 'linux', 'win32'].map((platform) => cell(r[platform] ?? r.default)).join(' | ');
   const rows = Object.entries(remedies)
     .filter(([id]) => !id.startsWith('$'))
     .flatMap(([id, r]) => [
