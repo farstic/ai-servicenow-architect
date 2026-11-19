@@ -233,4 +233,3 @@ test('C303, the server — started by a user, with its stdin closed, it starts a
   const r = run(SERVER, [], root, env);
   assert.equal(r.status, 0, r.stderr);
 });
-
