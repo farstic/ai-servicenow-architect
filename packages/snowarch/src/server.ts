@@ -14,7 +14,7 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { existsSync } from 'node:fs';
+import { existsSync, writeSync } from 'node:fs';
 import dotenv from 'dotenv';
 import { instanceManager } from './servicenow/instances.js';
 import { runWithInstance } from './servicenow/context.js';
@@ -37,6 +37,7 @@ import {
   currentLicence, initIntegrity, integrityRefusalFields, licenceAuditField, licenceRefusalFields, startLicence, takeIntegrityNotice,
   takeLicenceNotice,
 } from './licence/session.js';
+import { elevatedSentence, isElevated } from './licence/elevated.js';
 import { licenceLine } from './licence/state.js';
 import type { ToolDefinition } from './tools/types.js';
 
@@ -378,7 +379,19 @@ function logStartup(): void {
   }
 }
 
+/** The exit of a server that was started as root: the same code `./snowarch` gives a refusal of a prerequisite. */
+const EXIT_ELEVATED = 3;
+
 async function main() {
+  // ARC-09-C303 — FIRST. A server that a root process started would write as root: an audit line for every call, a revocation list, a
+  // restore of the checkout's own files, the store. A server running as root is never legitimate, so it does not start: nothing has been
+  // written when this is said, no call is ever made, and no audit line is lost or written (the architect's ruling, 2026-11-19). One check
+  // covers the audit writer and every other writer in the process, where a rule per writer would have missed the next one. Claude Code
+  // then shows the server as failed and the session stays design-only. stderr, because stdout is the protocol.
+  if (isElevated()) {
+    writeSync(2, `snowarch: the MCP server does not start as root. ${elevatedSentence()}\n`);
+    process.exit(EXIT_ELEVATED);
+  }
   logStartup();
 
   // ARC-11-C1 — the licence, read once for this process. A LIVE server with a licence installed refreshes
