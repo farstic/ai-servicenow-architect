@@ -347,6 +347,11 @@ option, not a default.
 
 ## Tests
 
+**Run the test suite as your own user, never as root.** The product writes nothing as root (ARC-09-C303): `./bootstrap.sh`, `./snowarch` and the MCP server refuse, the integrity check
+verifies and does not record, and several cases that start the CLI or the launcher would fail by design. This is documented and not worked round: no case is skipped for it, because a
+skip would hide the refusal in exactly the container case the check exists for. A container that must run the suite creates a user for it. The cases that need to be root do not run
+as root: a child process believes it is (`tools/snowarch/tests/helpers/fake-root.mjs`), and its file operations run as the real user.
+
 **Before you write a test to a proposed check, test the check.** A check written from a file is a
 hypothesis about the tree: it can name a CI cell that cannot contain the number it asks for, quote
 a sentence the product never says, describe a capability neither side has, or propose a fixture

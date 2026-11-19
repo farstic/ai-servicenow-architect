@@ -77,6 +77,17 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 
 **The name check no longer asks about a prefix, and a Correction cites an opened page.** On the architect's sitting the hook asked "No corpus page prints `sn_ins`" about a backticked prefix, `sn_ins_`, that the model had written as shorthand for a family of tables, and the model had to explain it. A token that ends with an underscore is now a prefix and no construct, and a name that no page prints is not asked about as ABSENT when an indexed name starts with it and an underscore. The ELSEWHERE clause also asks for a Correction that "cites a page you have opened that prints it": all 13 of the extra never-opened citations of the sitting's N were Correction lines that cited a page seen only in a lookup listing. On the architect's replay of the hook over the 75 turns of that sitting's N sessions, 74 were unchanged, and the one that changed lost its whole ask, which had named a prefix; on a sitting of its own (150 sessions) the never-opened citations on the Correction lines written after an ask fell from 11 of 69 to 8 of 67, a small measured gain (one-sided p 0.34), and every guard held (ARC-09-C293).
 
+**A process that runs as root writes nothing.** `sudo ./bootstrap.sh`, `sudo ./snowarch upgrade` and a `claude` started as root left files in the checkout and in the user's
+home folder that only root could change, and the user's own next run failed on them with a message that did not say why. Every entrance now refuses, or reads: `./bootstrap.sh`
+asks `id -u` first and stops with exit 3, before `--reset` removes a file; `./snowarch` runs, as root, only the forms that read and write nothing (`version`, `status`,
+`doctor --quick`, `docs status|verify|lookup`, `licence show|verify|check`, a bare `mode`, `instance list`, `store backups`), with their cache and log forced off, and refuses
+everything else, an unknown flag and an unknown command included, with exit 3 and the same sentence. A plain `doctor` is refused with "as root only `doctor --quick` runs",
+because a full doctor starts Claude Code, which writes `~/.claude.json` into the home folder it is given; and the quick doctor's check of `.mcp.json` asks a private copy of git's
+index, because `git diff` rewrites `.git/index` when its stat data is stale. The integrity check is not skipped as root, so `sudo claude` is no way round it: it verifies, passes a
+tree whose verdict is held, and where it would write (a first verdict, a restore, the lock, the audit line) it writes nothing and answers `INTEGRITY_NOT_VERIFIED` with "running as
+root" and the sentence; the SessionStart hook prints that on the Integrity line and does not cache the doctor run. The MCP server does not start as root, and the package CLI
+runs only `instance list` and `store backups`. A test suite run as root is unsupported.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -153,6 +164,8 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
   and, for the PowerShell tool on Windows, `PowerShell(.\snowarch.cmd docs lookup *)`; no other command of the launcher is
   allowed. The two entries are generated from the launcher spelling, like the rest of `permissions` (ARC-09-C268).
 - The ELSEWHERE clause of the name check asks for a Correction that cites "a page you have opened that prints it", where it said "a page that prints it". Measured on the architect's sitting: the never-opened citations on those lines 11 of 69 against 8 of 67, every guard held (ARC-09-C293).
+- A process that runs as root writes nothing: `./bootstrap.sh`, `./snowarch`, the integrity check, the SessionStart hook, the MCP server and the package CLI refuse or only read when
+  they run as root, with one sentence, "run this as your own user, without sudo" (ARC-09-C303).
 
 ### Fixed
 
