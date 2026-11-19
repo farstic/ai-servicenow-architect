@@ -58,7 +58,7 @@ export const ELEVATED = Object.freeze({
   doctor: ({ positional, flags, cli }) => {
     if (!noPositional(positional) || !onlyFlags(flags, [...COMMON, 'quick', 'no-network', 'no-cache', 'section'])) return REFUSE;
     // A full doctor starts Claude Code, and Claude Code writes into the home folder it is given.
-    if (flags.quick !== true) return refuse(`As root only ${cli} doctor --quick runs: it starts nothing and writes nothing.`);
+    if (flags.quick !== true) return refuse(`As root only ${[cli, 'doctor', '--quick'].filter(Boolean).join(' ')} runs: it starts nothing and writes nothing.`);
     return { ok: true, flags: { 'no-cache': true } };
   },
   docs: ({ argv }) => (argv.length === 0 || ['status', 'verify', 'lookup'].includes(argv[0]) ? READS : REFUSE),
@@ -75,7 +75,7 @@ export const ELEVATED = Object.freeze({
  * May a root process run this form? `{ ok: true, flags?, run? }`, or `{ ok: false, hint? }`. A name that is not an own key of the table
  * (a command nobody classified, `constructor`, `__proto__`) is refused.
  */
-export function elevatedVerdict(name, { positional = [], flags = {}, argv = [] } = {}, { cli = './snowarch' } = {}) {
+export function elevatedVerdict(name, { positional = [], flags = {}, argv = [] } = {}, { cli = '' } = {}) {
   const rule = Object.hasOwn(ELEVATED, name) ? ELEVATED[name] : null;
   const v = rule ? rule({ positional, flags, argv, cli }) : null;
   return v?.ok === true ? v : { ok: false, ...(v?.hint ? { hint: v.hint } : {}) };

@@ -24,14 +24,17 @@ import { COMMANDS, main } from '../lib/cli.mjs';
 import { ELEVATED, elevatedRefusal, elevatedVerdict } from '../lib/root-guard.mjs';
 import { elevatedSentence } from '../lib/root-guard.mjs';
 import { parseArgs } from '../lib/cli.mjs';
+import { spellings } from '../lib/text.mjs';
 import { pretendRoot } from '../../../tests/helpers/elevated.mjs';
+
+const CLI = spellings().cli;
 
 /** A verdict for the words a person types, parsed the way the frame parses them. */
 function verdict(...words) {
   const [name, ...rest] = words;
   const command = COMMANDS[name];
   const parsed = command?.raw ? { flags: Object.create(null), positional: [] } : parseArgs(rest, { booleans: command?.booleans ?? [] });
-  return elevatedVerdict(name, { positional: parsed.positional, flags: parsed.flags, argv: rest });
+  return elevatedVerdict(name, { positional: parsed.positional, flags: parsed.flags, argv: rest }, { cli: CLI });
 }
 
 const ALLOWED = [
@@ -95,13 +98,15 @@ test('C303 — an allowed form that would write by default is forced not to', ()
 });
 
 test('C303 — the refusal says which command, that root only runs what reads, and the root sentence; a hint follows it', () => {
-  const lines = elevatedRefusal('upgrade', './snowarch');
+  const lines = elevatedRefusal('upgrade', CLI);
   assert.match(lines[0], /^snowarch upgrade: refused: this process runs as root/);
   assert.equal(lines[1], elevatedSentence());
   assert.equal(lines.length, 2);
-  const hinted = elevatedRefusal('doctor', './snowarch', 'As root only ./snowarch doctor --quick runs.');
+  const hint = ['As root only', [CLI, 'doctor', '--quick'].join(' '), 'runs.'].join(' ');
+  const hinted = elevatedRefusal('doctor', CLI, hint);
   assert.equal(hinted.length, 3);
-  assert.equal(hinted[2], 'As root only ./snowarch doctor --quick runs.');
+  assert.equal(hinted[2], hint);
+  assert.ok(verdict('doctor').hint.startsWith(hint.slice(0, -1)), 'the hint names the form in the spelling of the shell');
 });
 
 // ── the frame: main() asks first ──────────────────────────────────────────────────────────────────────────────────────
