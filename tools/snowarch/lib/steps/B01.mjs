@@ -91,7 +91,9 @@ export const run = async (ctx) => {
 
   // The cloud-sync warning is recorded as well as printed, so B09 can repeat it at the end — the
   // one line a user most needs to see again is the one that scrolled past ten steps ago.
-  const cloud = cloudSyncWarning(ctx.root);
+  // ARC-09-C305: the named providers from the path alone, then iCloud's "Desktop & Documents Folders" for a checkout in `~/Documents` or
+  // `~/Desktop` (one `defaults` read, and only there). `ctx.home` comes from the entry point; `ctx.icloud` is a test's own seams.
+  const cloud = cloudSyncWarning(ctx.root, { home: ctx.home, platform: plat, icloud: ctx.icloud });
   if (cloud) data.cloudSync = cloud;
 
   const files = ['.mcp.json', '.claude/settings.json'];

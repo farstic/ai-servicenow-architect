@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { bootstrapOf, cliOf } from '../spell.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 
-import { cloudSyncProvider } from '../../cloud-sync.mjs';
+import { cloudSyncProvider, icloudFoldersHit, icloudProviderLabel } from '../../cloud-sync.mjs';
 import { maskProxy } from '../../net-sentences.mjs';
 import { get as claudeGet, resolveClaude } from '../../registration-claude.mjs';
 import { loadStateOrReason } from '../../state.mjs';
@@ -155,6 +155,38 @@ export function hostChecks() {
           + 'synced tree or keep this instance read-only', {
           remedy: 'move the checkout to a local path such as ~/work/ (D-04)',
           data: { provider },
+        });
+      },
+    }),
+
+    // ARC-09-C305 — E-25's twin for the one cloud-sync folder that no path can show: iCloud Drive's "Desktop & Documents Folders". A checkout in
+    // `~/Documents` or `~/Desktop` has no vendor name in its path, and whether macOS copies those two folders is a setting of Finder's. The rule
+    // is `detectIcloudFolders` of the committed server build (the wizard and the server ask it too): the path first, the setting only on a hit,
+    // never as root. Reading the setting is one `defaults` read, and a check that starts a process is not a quick one (runner.mjs), so E-25 stays
+    // the path-only check it was and this is the full doctor's. `status` and the banner say nothing of it.
+    defineCheck({
+      id: 'E-34',
+      section: 'host',
+      title: 'iCloud Desktop & Documents',
+      severity: 'warn',
+      quick: false,
+      network: false,
+      spawns: true,
+      fixable: false,
+      run: async (ctx) => {
+        // `ctx.icloud` is the seams of the rule, for a case that is not a Mac; its platform wins, as it does inside the rule.
+        if ((ctx.icloud?.platform ?? ctx.platform ?? process.platform) !== 'darwin') {
+          // `ok`, not `skip`: the snapshots hold every platform to the same answer for the same install (tests/doctor/snapshot.test.mjs), and a system
+          // that has no such setting has nothing to warn about, as E-25 has nothing to warn about outside a synced tree.
+          return ok('only a Mac has Desktop & Documents Folders', { provider: null });
+        }
+        const hit = icloudFoldersHit(ctx.root, { home: ctx.home, platform: ctx.platform, icloud: ctx.icloud, exec: ctx.exec });
+        if (!hit) return ok('not in a folder iCloud Drive copies', { provider: null });
+        return warn(`checkout is under a cloud-sync folder (${icloudProviderLabel(hit.folder)}) — `
+          + '.local/instances.json (0600) will still be synced; move the checkout outside the '
+          + 'synced tree or keep this instance read-only', {
+          remedy: 'move the checkout to a local path such as ~/work/ (D-04)',
+          data: { provider: 'iCloud Drive', folder: hit.folder },
         });
       },
     }),
