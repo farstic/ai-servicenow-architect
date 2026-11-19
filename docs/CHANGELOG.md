@@ -77,6 +77,11 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 
 **The name check no longer asks about a prefix, and a Correction cites an opened page.** On the architect's sitting the hook asked "No corpus page prints `sn_ins`" about a backticked prefix, `sn_ins_`, that the model had written as shorthand for a family of tables, and the model had to explain it. A token that ends with an underscore is now a prefix and no construct, and a name that no page prints is not asked about as ABSENT when an indexed name starts with it and an underscore. The ELSEWHERE clause also asks for a Correction that "cites a page you have opened that prints it": all 13 of the extra never-opened citations of the sitting's N were Correction lines that cited a page seen only in a lookup listing. On the architect's replay of the hook over the 75 turns of that sitting's N sessions, 74 were unchanged, and the one that changed lost its whole ask, which had named a prefix; on a sitting of its own (150 sessions) the never-opened citations on the Correction lines written after an ask fell from 11 of 69 to 8 of 67, a small measured gain (one-sided p 0.34), and every guard held (ARC-09-C293).
 
+**The remedies table has a column for Linux.** The table under "What to do if", on the install page and in the README, was headed "macOS / Linux" and showed the macOS
+sentence, so a Linux reader who lacked git or Node.js was told to run `xcode-select` and `brew`. It now has a column each for macOS, Linux and Windows, filled from the sentence that
+`bootstrap.sh` prints on that platform. Nothing the launcher prints changes. The Windows remedy for the checkout root has two lines and cut its row on GitHub; it is one cell now,
+with a break between the lines.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -165,6 +170,8 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
   sentence under it, where they said 51,665 and 299 MB, and their example screens show the 96d3212 pin. A docs bump now checks both guides against the corpus and the install page (ARC-09-C290).
 - The Stop hook asks about a never-opened page that is cited only with back-slashes, in an answer and in a file the turn wrote (ARC-09-C292).
 - The name check does not ask about a prefix that ends with an underscore (`sn_ins_`), nor about a token that starts indexed names at a name boundary. On the architect's replay over the sitting's 75 turns, 74 were unchanged and the one that changed lost an ask that named a prefix (ARC-09-C293).
+- The table of remedies on the install page and in the README has a column of its own for Linux. It showed a Linux reader the macOS sentences, `xcode-select --install (or: brew install git)`
+  and `brew install node@22`. The Windows remedy for the checkout root has two lines and cut its row on GitHub; it is one cell now, with a break between the lines (ARC-09-C302).
 
 ## 2.2.6 — 2026-11-15
 

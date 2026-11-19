@@ -102,14 +102,20 @@ export function remediesTable(remedies) {
   // ARC-09-C270 — a second cause of the same check is a row of its own, right after the check's (`claudeCode.offPath`: installed, and
   // the folder the native installer used is not on PATH). The reader who has just run that installer looks for THEIR words here.
   const OFF_PATH_LABEL = { claudeCode: 'Claude Code is installed, but its folder is not on PATH' };
-  const cells = (r) => `\`${r.darwin ?? r.default}\` | \`${r.win32 ?? r.default}\``;
+  // ARC-09-C302 — one column for each platform, each filled from that platform's own sentence. The first column used to be headed "macOS / Linux" and
+  // took the darwin sentence, so a Linux reader was told `xcode-select` and `brew`; remedies.json has had a linux sentence in every row since ARC-06-S04.
+  // A cell holds ONE line of the page: a line break inside it cuts the row on GitHub, and the Windows remedy for "not at the checkout root" has two lines
+  // (`pushd "{root}"`, then `.\bootstrap.cmd`). Each line of a sentence is a code span of its own, the spans are joined with `<br>` so they read one under the
+  // other, and a blank line is dropped. The sentence itself is not changed: the launcher prints it as it is.
+  const cell = (sentence) => String(sentence).split(/\r?\n/).filter((line) => line !== '').map((line) => `\`${line}\``).join('<br>');
+  const cells = (r) => ['darwin', 'linux', 'win32'].map((platform) => cell(r[platform] ?? r.default)).join(' | ');
   const rows = Object.entries(remedies)
     .filter(([id]) => !id.startsWith('$'))
     .flatMap(([id, r]) => [
       `| ${LABEL[id] ?? id} | ${cells(r)} |`,
       ...(r.offPath ? [`| ${OFF_PATH_LABEL[id] ?? `${id}, second cause`} | ${cells(r.offPath)} |`] : []),
     ]);
-  return ['| If | macOS / Linux | Windows |', '|---|---|---|', ...rows].join('\n');
+  return ['| If | macOS | Linux | Windows |', '|---|---|---|---|', ...rows].join('\n');
 }
 
 /** The fragment, minus its own explanatory comment — the reader wants the block, not the note. */

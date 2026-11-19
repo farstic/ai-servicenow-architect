@@ -243,17 +243,16 @@ through the `claude mcp` CLI — this project never edits Claude Code's own conf
 Every preflight failure prints its own remedy. These are those sentences:
 
 <!-- generated:remedies -->
-| If | macOS / Linux | Windows |
-|---|---|---|
-| You are not at the checkout root | `cd "{root}" && ./bootstrap.sh` | `pushd "{root}"
-.\bootstrap.cmd` |
-| git is missing or too old | `xcode-select --install (or: brew install git)` | `winget install Git.Git, or without administrator rights: Git for Windows from git-scm.com, installed for your user only (docs/INSTALL-WINDOWS.md, step 2a)` |
-| Claude Code is missing or too old | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` |
-| Claude Code is installed, but its folder is not on PATH | `add ~/.local/bin to your PATH with this line, then re-run (bash on macOS: ~/.bash_profile instead; https://code.claude.com/docs/en/troubleshoot-install): echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc` | `add that folder to your PATH with this PowerShell line, then open a new PowerShell window and re-run (https://code.claude.com/docs/en/troubleshoot-install): [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:USERPROFILE\.local\bin", "User")` |
-| Not enough disk space | `free up {needed} on {mount}` | `free up {needed} on {mount}` |
-| github.com is unreachable | `check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run` | `check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run` |
-| Node.js is missing or too old (live mode only) | `brew install node@22` | `winget install OpenJS.NodeJS.LTS, or without administrator rights: the Node.js zip from nodejs.org, in your user folder (docs/INSTALL-WINDOWS.md, step 2b)` |
-| A 32-bit Node.js build | `a 64-bit build of Node.js is recommended` | `a 64-bit build of Node.js is recommended` |
+| If | macOS | Linux | Windows |
+|---|---|---|---|
+| You are not at the checkout root | `cd "{root}" && ./bootstrap.sh` | `cd "{root}" && ./bootstrap.sh` | `pushd "{root}"`<br>`.\bootstrap.cmd` |
+| git is missing or too old | `xcode-select --install (or: brew install git)` | `install git with your distribution's package manager (apt install git · dnf install git)` | `winget install Git.Git, or without administrator rights: Git for Windows from git-scm.com, installed for your user only (docs/INSTALL-WINDOWS.md, step 2a)` |
+| Claude Code is missing or too old | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` |
+| Claude Code is installed, but its folder is not on PATH | `add ~/.local/bin to your PATH with this line, then re-run (bash on macOS: ~/.bash_profile instead; https://code.claude.com/docs/en/troubleshoot-install): echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc` | `add ~/.local/bin to your PATH with this line, then re-run (zsh: ~/.zshrc instead; https://code.claude.com/docs/en/troubleshoot-install): echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc` | `add that folder to your PATH with this PowerShell line, then open a new PowerShell window and re-run (https://code.claude.com/docs/en/troubleshoot-install): [Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$env:USERPROFILE\.local\bin", "User")` |
+| Not enough disk space | `free up {needed} on {mount}` | `free up {needed} on {mount}` | `free up {needed} on {mount}` |
+| github.com is unreachable | `check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run` | `check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run` | `check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run` |
+| Node.js is missing or too old (live mode only) | `brew install node@22` | `install Node.js from your distribution's package manager, or use nvm` | `winget install OpenJS.NodeJS.LTS, or without administrator rights: the Node.js zip from nodejs.org, in your user folder (docs/INSTALL-WINDOWS.md, step 2b)` |
+| A 32-bit Node.js build | `a 64-bit build of Node.js is recommended` | `a 64-bit build of Node.js is recommended` | `a 64-bit build of Node.js is recommended` |
 <!-- /generated:remedies -->
 
 The full catalogue is `docs/TROUBLESHOOTING.md`. Whatever went wrong, re-run the bootstrap — it
