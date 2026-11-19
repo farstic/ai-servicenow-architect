@@ -104,6 +104,17 @@ describe('detectIcloudFolders — the fixture is the specification', () => {
       (process as { geteuid?: () => number }).geteuid = real;
     }
   });
+
+  it('with no home folder there is no answer, and a relative path is not taken to be inside "Documents"', () => {
+    // The fixture row for an empty home uses an absolute path, which the folder's name could never match. A relative one could: `Documents/work/repo` is
+    // inside a folder called `Documents` if the home folder is simply left out, and the reader would then be asked about a place nobody named.
+    const asked: string[] = [];
+    const hit = detectIcloudFolders('Documents/work/repo', {
+      platform: 'darwin', home: '', euid: 501, realpath: (p) => p, isDirectory: () => true, read: (k) => { asked.push(k); return '1\n'; },
+    });
+    expect(hit).toBeNull();
+    expect(asked).toEqual([]);
+  });
 });
 
 describe('finderKeyReader — the one place that starts a process', () => {
@@ -211,6 +222,25 @@ describe('the real file system, with the defaults of the rule: a link in place o
       expect(hit?.provider).toBe('iCloud Drive');
       expect(hit?.folder).toBe('Documents');
       expect(hit?.root).toBe(join(home, 'Documents').replace(/\\/g, '/'));
+      expect(asked).toEqual(['FXICloudDriveDocuments']);
+    } finally {
+      removeTempDir(base);
+    }
+  });
+
+  it('a path that is not there yet is resolved through its nearest ancestor that is, as the folder it is compared with is', () => {
+    // The wizard asks BEFORE it makes `.local/`, so the folder it hands over may not exist. The folder `<home>/Documents` is resolved through any link above it
+    // (a home kept on another volume; macOS's own /var for a temp folder), and a path left as written would then never be inside it.
+    const { base } = tree();
+    try {
+      const real = join(base, 'volume', 'me');
+      mkdirSync(join(real, 'Documents', 'work', 'repo'), { recursive: true });
+      const linkedHome = join(base, 'linked-home');
+      try { symlinkSync(real, linkedHome, 'dir'); } catch { return; }                          // a system that cannot make a link has nothing to check here
+      const asked: string[] = [];
+      const hit = detectIcloudFolders(join(linkedHome, 'Documents', 'work', 'repo', '.local', 'deeper'),
+        { platform: 'darwin', home: linkedHome, euid: 501, read: (key) => { asked.push(key); return '1\n'; } });
+      expect(hit?.folder).toBe('Documents');
       expect(asked).toEqual(['FXICloudDriveDocuments']);
     } finally {
       removeTempDir(base);

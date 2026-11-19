@@ -428,6 +428,20 @@ describe('AC 4b — a checkout in Documents, with iCloud\'s "Desktop & Documents
     expect(gate.warning).toContain('iCloud Drive');
   });
 
+  it('offers --global while the global store is somewhere else, and stops offering it when that store is in Documents too', async () => {
+    // The Dropbox case above sets `global: true`, which shortens the remedy by itself. Here the option is absent, so the only thing that can shorten it
+    // is that the GLOBAL store is itself in a folder iCloud copies: advice to move there would be advice that cannot be taken.
+    const { store, icloud } = inDocuments();
+    const elsewhere = await cloudSyncGate(store, { yes: true }, io([]), process.env, icloud);
+    expect(elsewhere.warning).toContain('keep credentials in the global store');
+    process.env.XDG_CONFIG_HOME = join(base, 'Documents', 'config');
+    process.env.APPDATA = join(base, 'Documents', 'AppData');
+    const inside = await cloudSyncGate(store, { yes: true }, io([]), process.env, icloud);
+    expect(inside.warning).toContain('iCloud Drive');
+    expect(inside.warning).toContain('move the checkout outside the synced folder');
+    expect(inside.warning).not.toContain('keep credentials in the global store');
+  });
+
   it('with the setting off the gate is quiet and asks nothing', async () => {
     const { store, icloud } = inDocuments(() => '0\n');
     const terminal = io([]);
