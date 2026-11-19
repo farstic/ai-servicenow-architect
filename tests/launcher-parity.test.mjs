@@ -173,13 +173,16 @@ test('the launcher is short — it is a launcher, not a second implementation', 
   // see: a Claude Code the native installer put in ~/.local/bin and PATH does not name was told to "install Claude Code", which the
   // reader had just done. The hand-written lines are two of comment, the file's name (`.exe` on Git Bash), and the `if` that looks for
   // it only when there is no `claude` on PATH at all; the generated ones are the fix for each of the three platforms and the sentence.
-  assert.ok(lines - generated <= 220,
+  //
+  // Raised 220 → 222 (total 248 → 251) by ARC-09-C303. Two hand-written lines and one generated: a launcher run as root left a root-owned tree,
+  // so it asks `id -u` first (a comment, and the one line that refuses with the sentence the engine holds, MSG_ELEVATED).
+  assert.ok(lines - generated <= 222,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
   // Raised 231 → 233 (total only; the hand-written count is unchanged) by ARC-09-C157: two GENERATED lines, the
   // folder slot MSG_ROOT_SLOT and the Next block's second line, because the line now names the folder `claude`
   // has to start in. The one hand-written line that prints it changed in place.
   // Raised 233 → 238 by ARC-09-C259: the five hand-written lines above. Raised 238 → 248 by ARC-09-C270: its six and four.
-  assert.ok(lines <= 248, `${lines} total lines`);
+  assert.ok(lines <= 251, `${lines} total lines`);
 });
 
 test('the state and the cache bash writes are the ones Node reads', async () => {
@@ -432,7 +435,8 @@ test('a launcher that names a sentence the generator does not have is an error, 
   try {
     mkdirSync(join(dir, 'tools/snowarch/lib'), { recursive: true });
     // ARC-09-C270: claude-install.mjs is the generator's fifth input, the sentence for a Claude Code whose folder is not on PATH.
-    for (const f of ['net-sentences.mjs', 'size.mjs', 'remedies.json', 'text.json', 'claude-install.mjs']) {
+    // ARC-09-C303: root-guard.mjs is the sixth, the sentence a root process is refused with.
+    for (const f of ['net-sentences.mjs', 'size.mjs', 'remedies.json', 'text.json', 'claude-install.mjs', 'root-guard.mjs']) {
       copyFileSync(join(root, 'tools/snowarch/lib', f), join(dir, 'tools/snowarch/lib', f));
     }
     copyFileSync(join(root, 'engine.config.json'), join(dir, 'engine.config.json'));

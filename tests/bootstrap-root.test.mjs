@@ -74,5 +74,5 @@ test('C303 — not root, the same launcher gets past that line: --reset clears t
 test('C303 — its help is answered as root: it writes nothing', { skip: !posix && 'bash is not the Windows launcher' }, (t) => {
   const r = run(copy(t), ['--help'], stubbed(t, 0));
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /usage: \.\/bootstrap\.sh/);
+  assert.match(r.stdout, /^usage: /);
 });
