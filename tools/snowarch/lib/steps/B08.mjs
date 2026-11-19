@@ -34,11 +34,11 @@ const applies = (ctx) => ctx.mode === 'live';
 const unlicensed = (ctx) => applies(ctx) && packageCliRefused(ctx);
 export const runsWhen = (ctx) => applies(ctx) && !unlicensed(ctx);
 import { ADD_INSTANCE } from '../text.mjs';
-import { packageCliRefused, REMEDY } from '../licence/state.mjs';
+import { packageCliRefused, SKIP_NOTE } from '../licence/state.mjs';
 import { NO_LICENCE_IN_FORCE } from '../doctor/checks/licence.mjs';
 
 export const skipReason = (ctx) => (unlicensed(ctx) ? NO_LICENCE_IN_FORCE : 'design-only');
-export const skipNote = (spell, ctx) => (unlicensed(ctx) ? REMEDY(spell.cli) : null);
+export const skipNote = (spell, ctx) => (unlicensed(ctx) ? SKIP_NOTE(spell) : null);
 
 // ARC-08-C7 — the SAME state as the doctor's Mode line and the bootstrap's Next block, so the same
 // remedy. This was a third wording of "there is no instance yet", inside the same runner.

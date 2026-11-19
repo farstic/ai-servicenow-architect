@@ -54,6 +54,14 @@ export const LIST_REFRESH_MS = 24 * 60 * 60 * 1000;
 export const REMEDY = (cli) => `Run ${cli} licence check to see why, then install a valid licence as `
   + '.local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards';
 
+/**
+ * ARC-09-C304 — what a step that was skipped for want of a licence prints: the remedy above, and the one thing that makes the step run. A skipped step is
+ * recorded as never run, so the next bootstrap after a licence is in force runs it; nothing else does, and a reader who had only the remedy installed the
+ * file, restarted Claude Code and still had no instance. NOT part of REMEDY: that sentence is the server's LICENCE_NOT_VALID remedy too, and the parity
+ * test compares the two. `spell` is the run's own spelling, so the installer is named as the reader types it.
+ */
+export const SKIP_NOTE = (spell) => `${REMEDY(spell.cli)}. Once a valid licence is in place, run ${spell.bootstrap} again: it runs this step`;
+
 /** The installed licence's text, or `null` when there is none. */
 export function readLicenceText(root) {
   const path = licencePath(root);
