@@ -50,6 +50,11 @@ brew install --cask libreoffice   # .docx -> PDF for visual QA (render-pdf.sh)
 # Python 3 and Node.js are usually already present; if not: brew install python node
 ```
 
+Without Homebrew, or without administrator rights, copy the app from its disk image into the `Applications` folder of your own home
+(`~/Applications`; draw.io and LibreOffice both come as a `.dmg`). `render-drawio.sh` and `render-pdf.sh` look for the program on PATH,
+then in `/Applications`, then in `~/Applications`, and `./snowarch doctor` (E-04) looks in the same places in the same order, so no
+command on PATH is needed (ARC-09-C301).
+
 ### One-time install of draw.io (Windows, no administrator rights)
 
 Download the file whose name ends in `-windows.zip` from <https://github.com/jgraph/drawio-desktop/releases> and unpack it so that

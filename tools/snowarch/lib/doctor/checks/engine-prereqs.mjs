@@ -13,7 +13,7 @@
 // A missing draw.io is a fact for whoever is about to author a client deliverable, not a fault in
 // the install, so it never reaches `warn` and can never fail a run.
 import { existsSync } from 'node:fs';
-import { win32 as winPath } from 'node:path';
+import { posix as posixPath, win32 as winPath } from 'node:path';
 
 import { checkClaudeCode, checkGit, makeExec } from '../../steps/B00.mjs';
 import { loadState, loadStateOrReason } from '../../state.mjs';
@@ -34,7 +34,8 @@ import { spellFor } from '../spell.mjs';
  * file is `render-diagrams.ps1`, not the `render-drawio.ps1` that `01` §13 names.
  *
  * These are the FIXED places. On Windows the renderer also tries the folders its variables name,
- * which `drawioCandidates` adds in front of the fixed ones (ARC-09-C273).
+ * which `drawioCandidates` adds in front of the fixed ones (ARC-09-C273). On a Mac it also tries the user's own Applications folder,
+ * which `drawioCandidates` adds after them (ARC-09-C301).
  */
 export const DRAWIO_CANDIDATES = Object.freeze({
   posix: [
@@ -49,13 +50,32 @@ export const DRAWIO_CANDIDATES = Object.freeze({
 });
 
 /**
- * Where draw.io Desktop is looked for on this machine. Outside Windows, the fixed places. On Windows, first the three
+ * The user's own Applications folder on a Mac: where a person without administrator rights copies an app from its disk image, so
+ * that `scripts/render-drawio.sh` and `scripts/render-pdf.sh` look there too (ARC-09-C301). Relative to HOME.
+ */
+const DRAWIO_IN_HOME = Object.freeze([
+  'Applications/draw.io.app/Contents/MacOS/draw.io',
+  'Applications/drawio.app/Contents/MacOS/drawio',
+]);
+const SOFFICE_IN_HOME = Object.freeze(['Applications/LibreOffice.app/Contents/MacOS/soffice']);
+
+/**
+ * The fixed places, and then — on a Mac that has a HOME — the user's own Applications folder. AFTER them, as in the renderers: a Mac that
+ * found an app before finds the same one, and the folder only fills a gap. A HOME that is unset or empty adds none. Spelled with POSIX
+ * separators whatever the machine running this, so a case can drive it from anywhere.
+ */
+const withHome = (fixed, inHome, { platform, env }) =>
+  (platform === 'darwin' && env.HOME ? [...fixed, ...inHome.map((relative) => posixPath.join(env.HOME, relative))] : fixed);
+
+/**
+ * Where draw.io Desktop is looked for on this machine. On a Mac, the fixed places and then the user's own Applications folder; on
+ * another platform outside Windows, the fixed places. On Windows, first the three
  * folders `scripts/render-drawio.sh` takes from the variables Windows sets — the zip and the per-user installer under
  * `%LOCALAPPDATA%\Programs`, and `%PROGRAMFILES%` — then the fixed places. A variable that is unset or empty adds none.
  * Spelled with Windows separators whatever the machine running this, so a case can drive it from anywhere (ARC-09-C273).
  */
 export function drawioCandidates({ platform, env }) {
-  if (platform !== 'win32') return DRAWIO_CANDIDATES.posix;
+  if (platform !== 'win32') return withHome(DRAWIO_CANDIDATES.posix, DRAWIO_IN_HOME, { platform, env });
   const local = env.LOCALAPPDATA;
   const files = env.PROGRAMFILES;
   return [
@@ -65,11 +85,16 @@ export function drawioCandidates({ platform, env }) {
   ];
 }
 
-/** LibreOffice, per `scripts/render-pdf.sh`. On Windows the PDF proof is Word (`render-pdf-pages.ps1`). */
+/** LibreOffice, per `scripts/render-pdf.sh`. On Windows the PDF proof is Word (`render-pdf-pages.ps1`). These are the FIXED places. */
 export const SOFFICE_CANDIDATES = Object.freeze([
   '/Applications/LibreOffice.app/Contents/MacOS/soffice',
   '/usr/bin/soffice',
 ]);
+
+/** Where LibreOffice is looked for on this machine: the fixed places and, on a Mac, after them the user's own Applications folder (ARC-09-C301). */
+export function sofficeCandidates({ platform, env }) {
+  return withHome(SOFFICE_CANDIDATES, SOFFICE_IN_HOME, { platform, env });
+}
 
 /** The first of `names` on PATH, then the first existing absolute candidate. `null` when neither. */
 function locate(names, candidates, { env, platform, exists = existsSync }) {
@@ -98,7 +123,7 @@ export function capabilityPacks({ env = process.env, platform = process.platform
     : locate(['python3'], [], { env, platform, exists });
   const pdf = win
     ? locate(['powershell', 'pwsh'], [], { env, platform, exists })
-    : locate(['soffice'], SOFFICE_CANDIDATES, { env, platform, exists });
+    : locate(['soffice'], sofficeCandidates({ platform, env }), { env, platform, exists });
   const drawio = locate(['drawio', 'draw.io'], drawioCandidates({ platform, env }), { env, platform, exists });
   const mermaid = locate(['mmdc'], [], { env, platform, exists });
   return {

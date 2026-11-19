@@ -77,6 +77,14 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 
 **The name check no longer asks about a prefix, and a Correction cites an opened page.** On the architect's sitting the hook asked "No corpus page prints `sn_ins`" about a backticked prefix, `sn_ins_`, that the model had written as shorthand for a family of tables, and the model had to explain it. A token that ends with an underscore is now a prefix and no construct, and a name that no page prints is not asked about as ABSENT when an indexed name starts with it and an underscore. The ELSEWHERE clause also asks for a Correction that "cites a page you have opened that prints it": all 13 of the extra never-opened citations of the sitting's N were Correction lines that cited a page seen only in a lookup listing. On the architect's replay of the hook over the 75 turns of that sitting's N sessions, 74 were unchanged, and the one that changed lost its whole ask, which had named a prefix; on a sitting of its own (150 sessions) the never-opened citations on the Correction lines written after an ask fell from 11 of 69 to 8 of 67, a small measured gain (one-sided p 0.34), and every guard held (ARC-09-C293).
 
+**draw.io and LibreOffice are found in a Mac user's own Applications folder.** A person without administrator rights copies the app from its disk image into
+`~/Applications`, and the renderers looked only on PATH and in `/Applications`: `scripts/render-drawio.sh` said `ERROR: draw.io Desktop not found`,
+`scripts/render-pdf.sh` said the same of LibreOffice, and the doctor's E-04 reported `draw.io no` and `PDF QA no` for programs that were installed. All three now look in
+`~/Applications` too, after the Mac's own `/Applications`, so a Mac that found an app before finds the same one: over every combination of what is installed, 80
+compared answers, none of the old ones changed. A `HOME` that is unset or empty adds no place, and the doctor reads the folder on a Mac only. The words of the not-found
+messages, which name Homebrew, are unchanged. `scripts/render-pdf.sh` gets a lookup function that only looks, as `scripts/render-drawio.sh` has had since ARC-09-C273, so that a
+test can ask where it would look without starting a LibreOffice that is installed on the machine running it.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -165,6 +173,9 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
   sentence under it, where they said 51,665 and 299 MB, and their example screens show the 96d3212 pin. A docs bump now checks both guides against the corpus and the install page (ARC-09-C290).
 - The Stop hook asks about a never-opened page that is cited only with back-slashes, in an answer and in a file the turn wrote (ARC-09-C292).
 - The name check does not ask about a prefix that ends with an underscore (`sn_ins_`), nor about a token that starts indexed names at a name boundary. On the architect's replay over the sitting's 75 turns, 74 were unchanged and the one that changed lost an ask that named a prefix (ARC-09-C293).
+- `scripts/render-drawio.sh`, `scripts/render-pdf.sh` and the doctor's E-04 find draw.io and LibreOffice in `~/Applications` on a Mac, after PATH and `/Applications`.
+  Before, a copy made there without administrator rights was reported as not found (`draw.io no`, `PDF QA no`) and the renderers stopped with `ERROR`. `scripts/README.md`
+  says where they look (ARC-09-C301).
 
 ## 2.2.6 — 2026-11-15
 
