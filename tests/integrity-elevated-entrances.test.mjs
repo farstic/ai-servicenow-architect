@@ -165,6 +165,26 @@ test('C303, the package CLI — as root, a verified tree runs a read, and an unr
   held(before, { root, home }, 'the package CLI, changed');
 });
 
+test('C303, the package CLI — as root, every form that writes is refused even on a verified tree, and the forms that only read run', (t) => {
+  const { root } = signedRelease(t, { files: { [SENTINEL]: 'read by an integrity check alone\n' } });
+  const { env, home } = childEnv(t, root);
+  assert.equal(run(PACKAGE_CLI, ['instance', 'list'], root, env).status, 0, 'the user\'s own run records the verdict');
+  const before = { root: snapshot(root), home: snapshot(home) };
+  // Integrity alone refuses nothing here: the tree is verified. These are refused because they WRITE, or because they are not known to read.
+  const writes = [['store', 'migrate', '--dry-run'], ['instance', 'remove', 'nosuch'], ['instance', 'add', 'lab'],
+    ['instance', 'list', '--bogus'], ['instance'], ['store'], ['doctor'], ['contract', '--sha'], ['start']];
+  for (const args of writes) {
+    const r = run(PACKAGE_CLI, args, root, asRoot(env));
+    assert.equal(r.status, 3, `${args.join(' ')}: ${r.stdout}${r.stderr}`);
+    assert.ok(r.stderr.includes(SENTENCE()), `${args.join(' ')}: ${r.stderr}`);
+  }
+  for (const args of [['instance', 'list'], ['instance', 'list', '--json'], ['instance', 'list', '--all'], ['store', 'backups']]) {
+    const r = run(PACKAGE_CLI, args, root, asRoot(env));
+    assert.ok(!r.stderr.includes(SENTENCE()), `${args.join(' ')} was refused as a write: ${r.stderr}`);
+  }
+  held(before, { root, home }, 'the package CLI, the forms');
+});
+
 // ── 4. ./snowarch, the first door ─────────────────────────────────────────────────────────────────────────────────────
 
 test('C303, ./snowarch — as root, a read that is allowed runs on a verified tree and is refused on an unrecorded or a changed one, and nothing is written', (t) => {

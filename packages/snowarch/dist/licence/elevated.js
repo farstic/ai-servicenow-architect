@@ -27,3 +27,16 @@ export const currentEuid = () => (typeof process.geteuid === 'function' ? proces
 export const isElevated = (euid = currentEuid()) => euid === 0;
 /** `ELEVATED_REMEDY` as a sentence: a capital, and a full stop. */
 export const elevatedSentence = () => `${ELEVATED_REMEDY[0].toUpperCase()}${ELEVATED_REMEDY.slice(1)}.`;
+/**
+ * The forms of the package CLI a root process may run: the two that read and write nothing, `instance list` (with the flags it takes)
+ * and `store backups`. Every other form, a flag it does not know, a command it does not know, is refused: a write is the default, and a
+ * form that reads must be named here to run. `name` is the command and `args` the words after it, as the CLI collected them.
+ * (The integrity check does not refuse a verified tree, so without this a root `instance add` would run and write a store only root reads.)
+ */
+export function elevatedCliAllows(name, args) {
+    if (name === 'instance')
+        return args[0] === 'list' && args.slice(1).every((a) => a === '--json' || a === '--all' || a === '--verbose');
+    if (name === 'store')
+        return args.length === 1 && args[0] === 'backups';
+    return false;
+}
