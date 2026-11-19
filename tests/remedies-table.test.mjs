@@ -7,6 +7,9 @@
  * `xcode-select --install (or: brew install git)` and `brew install node@22`: two commands that cannot work on the machine in front of them.
  * tools/snowarch/lib/remedies.json has a sentence for linux in every row (ARC-06-S04), and bootstrap.sh prints it on Linux; only the page was wrong.
  *
+ * A cell holds one line of the page. The Windows remedy for "not at the checkout root" has two lines (`pushd "{root}"`, then `.\bootstrap.cmd`), and a line
+ * break inside a cell cuts the row on GitHub, so the generator makes each line a code span of its own and joins the spans with `<br>`.
+ *
  * The table is generated (scripts/gen-readme.mjs) into docs/INSTALL.md and from there into README.md. The cases read it in three places: as the
  * generator makes it, as docs/INSTALL.md holds it and as README.md holds it, so a page that is stale, or edited by hand, fails here and not only in
  * the generators' check.
@@ -26,17 +29,18 @@ const remedies = JSON.parse(read('tools/snowarch/lib/remedies.json'));
 const PLATFORMS = [['macOS', 'darwin'], ['Linux', 'linux'], ['Windows', 'win32']];
 
 /**
- * A table as rows of cells. A line that does not start with a pipe belongs to the row before it: the Windows remedy for "not at the checkout
- * root" has two lines, and a cell holds no pipe, so splitting a row on the pipe is exact.
+ * A table as rows of cells. Every line is a row: a cell holds no pipe, so splitting a row on the pipe is exact, and a line that does not start with a pipe
+ * is a row that a line break cut, which the next case names by itself.
  */
 function cellsOf(table) {
-  const rows = [];
-  for (const line of table.split('\n')) {
-    if (line.startsWith('|')) rows.push(line);
-    else if (rows.length > 0) rows[rows.length - 1] += `\n${line}`;
-  }
-  return rows.map((row) => row.split('|').slice(1, -1).map((cell) => cell.trim()));
+  return table.split('\n').map((line, i) => {
+    assert.ok(line.startsWith('|') && line.endsWith('|'), `line ${i + 1} of the table is not a row, a row was cut by a line break: ${line.slice(0, 70)}`);
+    return line.split('|').slice(1, -1).map((cell) => cell.trim());
+  });
 }
+
+/** What a remedy sentence is in a cell: each of its lines a code span of its own, the spans joined with a break, so the cell is one line of the page. */
+const cellOf = (sentence) => String(sentence).split(/\r?\n/).map((line) => `\`${line}\``).join('<br>');
 
 /** The generated region of a page: what a reader sees under "What to do if". */
 function regionOf(rel) {
@@ -75,7 +79,7 @@ test('ARC-09-C302 — the table has a column for each platform, and each is fill
   assert.equal(body.length, expected.length, 'a row of remedies.json is missing from the table, or one is added');
   body.forEach((cells, i) => {
     assert.equal(cells.length, 4, `row ${i + 1}`);
-    assert.deepEqual(cells.slice(1), PLATFORMS.map(([, key]) => `\`${expected[i][key] ?? expected[i].default}\``), `row ${i + 1}: ${cells[0]}`);
+    assert.deepEqual(cells.slice(1), PLATFORMS.map(([, key]) => cellOf(expected[i][key] ?? expected[i].default)), `row ${i + 1}: ${cells[0]}`);
   });
 });
 
@@ -117,4 +121,32 @@ test('ARC-09-C302 — a platform with no sentence of its own in a row takes the 
   // Every row of the file has all three today, so only a made-up one can show it: a row with no linux sentence reads the default there.
   const [, , row] = cellsOf(remediesTable({ git: { darwin: 'for a Mac', win32: 'for Windows', default: 'for anything else' } }));
   assert.deepEqual(row.slice(1), ['`for a Mac`', '`for anything else`', '`for Windows`']);
+});
+
+test('ARC-09-C302 — every row of the table is one line, in the generator and on both pages', () => {
+  for (const [where, get] of TABLES) {
+    get().split('\n').forEach((line, i) => {
+      assert.ok(line.startsWith('|') && line.endsWith('|'), `${where}, line ${i + 1}: a row is cut by a line break (${line.slice(0, 50)})`);
+      // four cells and the two outer pipes: five pipes, six parts
+      assert.equal(line.split('|').length, 6, `${where}, line ${i + 1}: a row has four cells (${line.slice(0, 50)})`);
+    });
+  }
+});
+
+test('ARC-09-C302 — the Windows remedy for "not at the checkout root" shows both of its lines, one under the other', () => {
+  // `pushd "{root}"` and then `.\bootstrap.cmd` are typed one after the other, so the cell breaks the line between them.
+  const SHOWN = '`pushd "{root}"`<br>`.\\bootstrap.cmd`';
+  assert.equal(cellOf(remedies.root.win32), SHOWN, 'the Windows remedy for the checkout root is not the two lines this case reads');
+  for (const [where, get] of TABLES) {
+    const [header, , ...body] = cellsOf(get());
+    const row = body.find((cells) => cells[0] === 'You are not at the checkout root');
+    assert.ok(row, `${where}: no row for "You are not at the checkout root"`);
+    assert.equal(row[header.indexOf('Windows')], SHOWN, `${where}: the Windows cell`);
+  }
+});
+
+test('ARC-09-C302 — a remedy of several lines is one cell: a code span for each line, joined with a break, and a blank line is dropped', () => {
+  const table = remediesTable({ git: { darwin: 'one', win32: 'first\nsecond\n\nthird\n', default: 'x' } });
+  assert.equal(table.split('\n').length, 3, 'a header, a separator and one row');
+  assert.deepEqual(cellsOf(table)[2].slice(1), ['`one`', '`x`', '`first`<br>`second`<br>`third`']);
 });
