@@ -12,6 +12,7 @@
  * - `cliCheckout(t)`: a checkout the engine's CLI really runs in. The CLI takes its root from where its library sits, and a linked
  *   library is the real repository's, so here the library and the entry are COPIES, and the CLI works on the folder it is in.
  */
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
@@ -133,4 +134,15 @@ export function cliCheckout(t, { release = false, files = {} } = {}) {
   const manifest = sign(root, coverageWithout(links));
   linkInstall(root, { links });
   return { root, manifest };
+}
+
+/**
+ * Let git settle a checkout it has just been given. Entries written in the same second as the index are "racily clean": the next command
+ * that looks re-checks them and REWRITES the index, with the same bytes and a new time, whatever it is asked. A case that compares the
+ * index before and after a run must not meet that, so it waits out the second and lets git look once. (A checkout whose stat data is
+ * STALE on purpose is made after this, by touching files: that is the case the guard exists for.)
+ */
+export function settleIndex(root) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1200);
+  execFileSync('git', ['-C', root, 'status', '--porcelain'], { stdio: 'ignore' });
 }
