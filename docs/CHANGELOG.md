@@ -88,6 +88,15 @@ tree whose verdict is held, and where it would write (a first verdict, a restore
 root" and the sentence; the SessionStart hook prints that on the Integrity line and does not cache the doctor run. The MCP server does not start as root, and the package CLI
 runs only `instance list` and `store backups`. A test suite run as root is unsupported.
 
+**A checkout in Documents or Desktop is warned about while iCloud's folders are on.** On a Mac, iCloud Drive can copy `~/Documents` and `~/Desktop` ("Desktop & Documents
+Folders"), and a checkout there has no vendor name in its path, so none of the cloud-sync warnings could see it: the saved password file would have been copied at mode 0600. The
+setting is not in the path, because macOS keeps it in Finder's preferences. The new rule asks the path first and the setting second, and the setting only for a checkout whose real
+path is inside one of those two folders, where the folder is a real directory and not a link, and never as root: one `defaults read com.apple.finder FXICloudDriveDocuments` (or
+`FXICloudDriveDesktop`), about 5 ms, in which only the exact value `1` counts as on, so a key that Apple renames makes the rule quiet and never wrong. The wizard asks before it
+writes (stop is still the default, and `--yes` continues with the warning), the server logs it at start, the installer's check records it and the summary repeats it, and a new
+check, E-34 in the full doctor, names it with the remedy E-25 gives, to move the checkout to a local path such as `~/work/`. The quick doctor, `status` and the banner say nothing of
+it, because a quick check may not start a process. The keys were measured on macOS 26 with the setting on; what a Mac prints with it off, or before 26, was not measured.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -111,6 +120,9 @@ runs only `instance list` and `store backups`. A test suite run as root is unsup
   any search read as written, a folder fed to a viewer, a script the turn wrote and ran, a client file named like a page, a notice that lists what the ask listed,
   and a call that only lists. The architect's sitting measured it on 150 sessions: never-opened citations 48 against 5, blind support 82.1 % against 83.6 %, every guard held. A search verb shows a page it names only when its result holds a line of that page.
 - The grounding check has an eighth class, `unsupportedName`: a name that a reply line cites a corpus page for and that no page it cites prints (`lib/docs/name-support.mjs` has the text rules, `supportFindings` in `lib/docs/grounding-check.mjs` the check). The Stop hook asks about it in its one ask. Measured on the architect's sitting: the lines left uncorrected 44 against 3, every guard held (ARC-09-C291).
+- E-34, in the full doctor, warns about a checkout in `~/Documents` or `~/Desktop` while iCloud's "Desktop & Documents Folders" is on, with E-25's remedy. The wizard's cloud-sync
+  question, the server's start-up line and the installer's check (B01, repeated by B09) ask the same rule, which reads Finder's preferences only for a checkout inside one of the two
+  folders and never as root (ARC-09-C305).
 
 ### Changed
 

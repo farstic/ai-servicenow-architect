@@ -783,6 +783,18 @@ that reports "not found" asks through `probeClaude` and never tests `found` itse
 (`claudeCode.offPath`) and are generated into both launchers. A test hands in its own `exec` or its own `exists`, so no case depends on what the machine
 it runs on has in `~/.local/bin`.
 
+### A macOS setting is read behind a seam, and `defaults` does not obey `HOME`
+
+`defaults read com.apple.finder <key>` answers for the account that runs it, and it ignores `HOME`: measured on macOS 26.5.2, an empty `HOME`
+still printed the real answer (ARC-09-C305). So a test cannot fake a setting by faking the home folder, and it must not call the real reader
+to find out. The rule takes the reader as a seam (`read` in `IcloudSeams`, `packages/snowarch/src/store/icloud.ts`) and a case asserts which
+keys it was asked for, as the rows of `icloudFolders[]` in `packages/snowarch/tests/fixtures/cloud-sync-paths.json` do; an empty list is how a row
+says that no process was started. The one case that runs the real reader holds only its shape (a string or `null`, never a throw), because this
+machine's setting is not the runner's. The keys are Apple's and undocumented (`FXICloudDriveDesktop`, `FXICloudDriveDocuments`, `1` while
+"Desktop & Documents Folders" is on, measured on macOS 26 only), so the rule counts exactly `1` as on and anything else as off: a key that is
+renamed must degrade to the silence there was before, never to a false warning. The process is started only after the path says that the setting
+could matter, and a check that starts it is not a quick one (`runner.mjs`): the doctor's E-34 is the full doctor's, and E-25 stays the path-only check.
+
 ### A private folder is made by makePrivateDir
 
 A folder the product keeps private — `.local/`, its logs, the licence state, the doctor's cache, the store's own folder — is made with

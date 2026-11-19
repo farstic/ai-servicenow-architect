@@ -5,6 +5,14 @@ All notable changes to this project are documented here. This project adheres to
 
 ## Unreleased
 
+**A checkout in `~/Documents` or `~/Desktop` is a cloud-sync folder while iCloud's "Desktop & Documents Folders" is on (ARC-09-C305).** `store/icloud.ts` adds `detectIcloudFolders`,
+`finderKeyReader` and `findCloudSync`, exported from `store/index.ts`. `findCloudSync` is `detectCloudSync`, which is not changed, and then this rule, which asks the path first (the
+checkout's real path inside `<home>/Desktop` or `<home>/Documents` by whole segments, case ignored; that folder a real directory and not a link; darwin only; never as root) and the
+setting second, with one `/usr/bin/defaults read com.apple.finder FXICloudDrive<Folder>` for that folder only: on is exactly `1`, and an absent key, an error, a timeout or any other
+text is off. The wizard's `cloudSyncGate` takes the machine's answers as a fifth argument (`AddDeps.icloud`) and asks `findCloudSync`, so a store in either folder gets the existing
+warning, with `iCloud Drive` as the provider and `<home>/Documents` as the folder, and the same default of stop; the server's start-up line asks it too. A run whose checkout is
+anywhere else starts nothing. Measured on macOS 26.5.2 with the setting on; what a Mac prints with it off, or before 26, was not.
+
 **A process that runs as root writes nothing (ARC-09-C303).** `ensureIntegrity` takes `euid` (this process's own when absent; nobody is root where there is no
 `geteuid`). As root it verifies and never writes, and it is never skipped: a tree whose verdict is held and whose covered files match is `verified` (a `full`
 check hashes every file and leaves the verdict alone), and wherever it would write (a first verdict, a verdict whose stamp moved, the lock and the restore of a changed
