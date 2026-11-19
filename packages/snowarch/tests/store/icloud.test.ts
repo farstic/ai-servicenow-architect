@@ -1,11 +1,13 @@
 // Copyright 2026 Cvetomir Grigorov. Licensed under the Business Source License 1.1 (see LICENSE).
 // snowarch — AI ServiceNow Architect. Not affiliated with or endorsed by ServiceNow, Inc.
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { detectIcloudFolders, findCloudSync, finderKeyReader, icloudKey, type IcloudSeams } from '../../src/store/icloud.js';
+import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-09-C305 — a checkout in `~/Documents` or `~/Desktop`, with iCloud's "Desktop & Documents Folders" on.
@@ -171,6 +173,48 @@ describe('findCloudSync — the named vendors first, iCloud\'s folders after', (
     const without: IcloudSeams = { ...documents };
     delete without.realpath;
     expect(findCloudSync('/Users/me/work/arch', { env: {}, realpath: linked, icloud: without })?.provider).toBe('iCloud Drive');
+  });
+});
+
+describe('the real file system, with the defaults of the rule: a link in place of Documents is not read, a real folder is', () => {
+  /** A home folder in a temp tree, which the process removes however the case ends. The real `realpath` and `lstat` are what answer here: only the platform, the user and the reader are pretended. */
+  const tree = (): { base: string; home: string } => {
+    const base = trackTempDir(mkdtempSync(join(tmpdir(), 'icloud-folders-')));
+    const home = join(base, 'home');
+    mkdirSync(home, { recursive: true });
+    return { base, home };
+  };
+
+  it('a Documents that is a link to a directory starts nothing: the check is lstat, which does not follow it', () => {
+    const { base, home } = tree();
+    try {
+      const target = join(base, 'elsewhere', 'Documents');
+      mkdirSync(join(target, 'work', 'repo'), { recursive: true });
+      try { symlinkSync(target, join(home, 'Documents'), 'dir'); } catch { return; }       // a system that cannot make a link has nothing to check here
+      const asked: string[] = [];
+      const hit = detectIcloudFolders(join(home, 'Documents', 'work', 'repo'),
+        { platform: 'darwin', home, euid: 501, read: (key) => { asked.push(key); return '1\n'; } });
+      expect(hit).toBeNull();
+      expect(asked).toEqual([]);
+    } finally {
+      removeTempDir(base);
+    }
+  });
+
+  it('a real Documents folder with the setting on is a hit, named under the home folder as it was given', () => {
+    const { base, home } = tree();
+    try {
+      mkdirSync(join(home, 'Documents', 'work', 'repo'), { recursive: true });
+      const asked: string[] = [];
+      const hit = detectIcloudFolders(join(home, 'Documents', 'work', 'repo'),
+        { platform: 'darwin', home, euid: 501, read: (key) => { asked.push(key); return '1\n'; } });
+      expect(hit?.provider).toBe('iCloud Drive');
+      expect(hit?.folder).toBe('Documents');
+      expect(hit?.root).toBe(join(home, 'Documents').replace(/\\/g, '/'));
+      expect(asked).toEqual(['FXICloudDriveDocuments']);
+    } finally {
+      removeTempDir(base);
+    }
   });
 });
 
