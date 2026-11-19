@@ -79,7 +79,8 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 
 **The remedies table has a column for Linux.** The table under "What to do if", on the install page and in the README, was headed "macOS / Linux" and showed the macOS
 sentence, so a Linux reader who lacked git or Node.js was told to run `xcode-select` and `brew`. It now has a column each for macOS, Linux and Windows, filled from the sentence that
-`bootstrap.sh` prints on that platform. Nothing the launcher prints changes.
+`bootstrap.sh` prints on that platform. Nothing the launcher prints changes. The Windows remedy for the checkout root has two lines and cut its row on GitHub; it is one cell now,
+with a break between the lines.
 
 ### Added
 
@@ -170,7 +171,7 @@ sentence, so a Linux reader who lacked git or Node.js was told to run `xcode-sel
 - The Stop hook asks about a never-opened page that is cited only with back-slashes, in an answer and in a file the turn wrote (ARC-09-C292).
 - The name check does not ask about a prefix that ends with an underscore (`sn_ins_`), nor about a token that starts indexed names at a name boundary. On the architect's replay over the sitting's 75 turns, 74 were unchanged and the one that changed lost an ask that named a prefix (ARC-09-C293).
 - The table of remedies on the install page and in the README has a column of its own for Linux. It showed a Linux reader the macOS sentences, `xcode-select --install (or: brew install git)`
-  and `brew install node@22` (ARC-09-C302).
+  and `brew install node@22`. The Windows remedy for the checkout root has two lines and cut its row on GitHub; it is one cell now, with a break between the lines (ARC-09-C302).
 
 ## 2.2.6 — 2026-11-15
 
