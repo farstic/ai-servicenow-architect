@@ -11,8 +11,8 @@
  *
  *   - a tree whose verdict is held, and whose covered files match it, is VERIFIED, and nothing is written;
  *   - whenever the function WOULD write — a first verdict, a verdict whose stamp moved, a restore, the lock, the audit line — it writes
- *     nothing and answers `refused`, whose reason says it runs as root and whose remedy is the sentence remedies.json holds for
- *     `elevated`. Every entrance turns that answer into its own refusal (the cases for them are in tests/integrity-elevated-entrances.test.mjs);
+ *     nothing and answers `refused`, whose reason says it runs as root and whose remedy is the root sentence
+ *     (tools/snowarch/lib/root-guard.mjs). Every entrance turns that answer into its own refusal (the cases for them are in tests/integrity-elevated-entrances.test.mjs);
  *   - a development tree, a folder that is no checkout, a tree with no manifest: exactly what they were.
  *
  * The id is a seam on the options, `euid`, defaulting to the process's own; where there is no `geteuid` (Windows) nobody is root.
@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 import * as integrity from '../../../packages/snowarch/dist/licence/integrity.js';
 import { manifestFromArchive, signManifest, writeManifestCache } from '../lib/licence/manifest.mjs';
-import { TABLE } from '../lib/remedies.mjs';
+import { ELEVATED_REMEDY as ENGINE_REMEDY, elevatedSentence } from '../lib/root-guard.mjs';
 import { changes, described, pretendRoot, snapshot } from '../../../tests/helpers/elevated.mjs';
 import { keyPair, productKeys } from './helpers/licence.mjs';
 import { tempDir } from './helpers/temp.mjs';
@@ -85,12 +85,8 @@ function audited(t) {
 
 const ensure = (root, over = {}) => ensureIntegrity(root, { keys: KEYS, now: NOW, cli: '<cli>', ...over });
 
-/** The sentence as the integrity line prints it: remedies.json holds a fragment, the line a sentence. */
-const SENTENCE = () => {
-  const said = TABLE.elevated?.default;
-  assert.ok(said, 'remedies.json has no sentence for "elevated"');
-  return `${said[0].toUpperCase()}${said.slice(1)}.`;
-};
+/** The sentence as the integrity line prints it: the engine holds a fragment, the line a sentence. */
+const SENTENCE = () => elevatedSentence();
 
 /** A user's own start: it records the verdict, which is what a checkout has by the time a root process meets it. */
 function recorded(t) {
@@ -230,8 +226,8 @@ test('C303 — with no id passed, the check takes the process\'s own: root where
   assert.ok(existsSync(verdictPath(root)));
 });
 
-test('C303 — the sentence the refusal ends with is the one remedies.json holds for "elevated"', () => {
+test('C303 — the sentence the refusal ends with is the engine\'s: the package holds the same words as tools/snowarch/lib/root-guard.mjs', () => {
   assert.equal(typeof integrity.ELEVATED_REMEDY, 'string', 'the package exports the sentence');
   assert.ok(integrity.ELEVATED_REMEDY.length > 20, 'and it is a sentence');
-  assert.equal(integrity.ELEVATED_REMEDY, TABLE.elevated?.default);
+  assert.equal(integrity.ELEVATED_REMEDY, ENGINE_REMEDY);
 });

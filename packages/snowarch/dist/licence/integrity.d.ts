@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { type KeyRole, type ProductKey } from './core.js';
+/** ARC-09-C303 — the sentence a root process's refusal ends with; the package's one copy of it (a test holds it equal to the engine's, tools/snowarch/lib/root-guard.mjs). */
+export { ELEVATED_REMEDY } from './elevated.js';
 export declare const MANIFEST_FORMAT = "snowarch-manifest/1";
 export interface Coverage {
     covers: readonly string[];
@@ -205,6 +207,11 @@ export interface EnsureOptions {
     projectDir?: string;
     /** Whether to restore at all: false reports what a restore would do and changes nothing. */
     restore?: boolean;
+    /**
+     * ARC-09-C303 — the effective user id this check runs as; this process's own when absent, and `null` where the platform has none (nobody is
+     * root there). A root process VERIFIES and never writes: see `ensureIntegrity`. The cases pass an id to be root without being root.
+     */
+    euid?: number | null;
 }
 /** An engine checkout: the package can also run where there is no engine tree to check (Q2, 2026-10-14). */
 export declare const isEngineCheckout: (root: string) => boolean;
@@ -248,5 +255,16 @@ export declare function restoreBlocker(root: string, tag: string, modified: read
  *   restored  it was not, and now is: the line names what was put back and moved;
  *   refused   it is not, and cannot be: no manifest, one that does not verify or is another release's, no tag, or a
  *             restore that failed. Callers refuse as a refused licence does.
+ *
+ * ARC-09-C303 — AS ROOT IT VERIFIES AND NEVER WRITES, AND IT IS NEVER SKIPPED (the architect's ruling, 2026-11-19). A root process
+ * leaves root-owned files behind, and this function writes the most of any: a verdict, a lock, the files restored from the tag (a
+ * `git checkout`), the replaced copies, an audit line. Skipping the check as root would make `sudo claude` a way round the integrity
+ * door, so the rule is here, in the one function the hook, the server, both CLIs and the launcher call:
+ *
+ *   - a tree whose verdict is held, and whose covered files match it, is `verified`, and nothing is written (a `full` check hashes every
+ *     file and still leaves the verdict alone);
+ *   - wherever the function WOULD write — the first verdict, a verdict whose stamp moved, the lock and the restore of a changed tree —
+ *     it writes nothing and answers `refused`, whose reason says it runs as root and whose remedy is the root sentence;
+ *   - what it refuses for another reason, and what it exempts, it refuses and exempts as for anyone.
  */
-export declare function ensureIntegrity(root: string, { local, keys, full, cli, now, run, projectDir, restore }?: EnsureOptions): Ensured;
+export declare function ensureIntegrity(root: string, { local, keys, full, cli, now, run, projectDir, restore, euid }?: EnsureOptions): Ensured;

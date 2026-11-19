@@ -22,7 +22,7 @@ import { join } from 'node:path';
 
 import * as session from '../packages/snowarch/dist/licence/session.js';
 import { CANNOT_RESTORE_PREFIX } from '../packages/snowarch/dist/licence/integrity.js';
-import { TABLE } from '../tools/snowarch/lib/remedies.mjs';
+import { elevatedSentence } from '../tools/snowarch/lib/root-guard.mjs';
 import { licenceFixture, licensedEnv } from '../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { REAL_ROOT, asRoot, changes, cliCheckout, described, pretendRoot, signedRelease, snapshot } from './helpers/elevated.mjs';
@@ -33,12 +33,8 @@ const SERVER = join(REAL_ROOT, 'packages/snowarch/dist/server.js');
 const PACKAGE_CLI = join(REAL_ROOT, 'packages/snowarch/dist/cli/index.js');
 const NOW = () => new Date('2026-10-14T12:05:01.000Z');
 
-/** The sentence as a line prints it: remedies.json holds a fragment. */
-const SENTENCE = () => {
-  const said = TABLE.elevated?.default;
-  assert.ok(said, 'remedies.json has no sentence for "elevated"');
-  return `${said[0].toUpperCase()}${said.slice(1)}.`;
-};
+/** The sentence as a line prints it: the engine holds a fragment. */
+const SENTENCE = () => elevatedSentence();
 
 /** The environment of a child: its checkout and its home folder are the case's own, and it trusts the fixture key. */
 function childEnv(t, root, extra = {}) {
