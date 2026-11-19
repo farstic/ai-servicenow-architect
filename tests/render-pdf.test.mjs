@@ -11,6 +11,13 @@
  * this suite, and a case that let the script reach it would start it. So the converter a case runs is a stub that heads PATH, and a case
  * that must see "not found" is skipped on a machine that has one of the places the script falls back on.
  * The stubs are shell scripts, so the cases run on macOS and Linux; the script is for those two (Windows has render-pdf-pages.ps1).
+ *
+ * The second group is the row itself. A Mac user without administrator rights copies LibreOffice into ~/Applications, and the script looked
+ * only on PATH and in /Applications. It now looks in ~/Applications as well, LAST, so that a Mac which found LibreOffice before keeps finding
+ * the same one. The lookup is one function, find_soffice, that only looks, as find_drawio is in scripts/render-drawio.sh, and the file stops
+ * after defining it when it is sourced: a case can then ask where the script would look without starting anything. A case may source the
+ * script only once the file says it stops there, because a script that did not would run its main part, and on a Mac with LibreOffice
+ * installed that is the real one.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,6 +27,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { capabilityPacks, SOFFICE_CANDIDATES } from '../tools/snowarch/lib/doctor/checks/engine-prereqs.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const script = join(root, 'scripts', 'render-pdf.sh');
@@ -107,4 +115,137 @@ test('ARC-09-C301 — with no LibreOffice the script says so and exits 3, withou
   assert.equal(r.stdout, '');
   assert.equal(existsSync(w.out), false, 'the output folder was made before the converter was found');
   assert.deepEqual(calls(w), []);
+});
+
+// ARC-09-C301 — the lookup, and the user's own Applications folder.
+const HOME_SOFFICE = 'Applications/LibreOffice.app/Contents/MacOS/soffice';
+const SENTENCE = 'ERROR: LibreOffice (soffice) not found. Install it (brew install --cask libreoffice) to render PDFs on Mac.';
+/** The line that makes a sourced script stop after its functions: render-drawio.sh has the same one. */
+const STOPS_WHEN_SOURCED = '[[ "${BASH_SOURCE[0]:-}" != "$0" ]] && return 0';
+const errorLines = (stderr) => stderr.split('\n').filter((l) => l.startsWith('ERROR: '));
+
+/**
+ * Source the script and run `snippet` after it: only once the file says it stops after defining its functions, so that nothing is started.
+ * The snippet runs under the options the main part of the script runs under, because a sourced file sets none: an unbound HOME stops the
+ * lookup only under `set -u`, and a lookup that failed would end it only under `set -e`.
+ */
+function sourced(w, snippet, env = {}) {
+  assert.ok(readFileSync(script, 'utf8').includes(STOPS_WHEN_SOURCED), 'the script does not stop when it is sourced, so a case cannot ask it where it would look without running it');
+  return spawnSync(BASH, ['-c', `source "$1" "$2"; set -euo pipefail; ${snippet}`, 'lookup', script, join(w.docs, 'Design.docx')], { encoding: 'utf8', env: environment(w, env) });
+}
+/** The places the lookup tries, in order, and nothing found or started: `pick` is replaced by a function that prints its candidate. */
+function placesTried(w, env = {}) {
+  const r = sourced(w, 'pick() { printf "%s\\n" "$1"; }; find_soffice || true', env);
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.stderr, /unbound variable/, 'a HOME that is not set stopped the lookup');
+  return r.stdout.split('\n').filter(Boolean);
+}
+/**
+ * The lookup as it is, except that the Mac's own /Applications is empty: a LibreOffice on THIS machine cannot answer. Nothing is started.
+ * `pick` is wrapped and not replaced, so that what it tests (a file that can be run) is the script's own.
+ */
+function lookupHomeOnly(w, env = {}) {
+  const r = sourced(w, 'eval "$(declare -f pick | sed \'1s/^pick /real_pick /\')"; pick() { case "$1" in /Applications/*) return 0 ;; esac; real_pick "$1"; }; code=0; find_soffice || code=$?; printf "%s\\n" "${SOFFICE:-}"; exit "$code"', env);
+  return { code: r.status, found: r.stdout.trim(), stderr: r.stderr, errors: errorLines(r.stderr) };
+}
+
+test('ARC-09-C301 — sourcing the script defines the lookup and runs nothing', { skip }, (t) => {
+  const w = world(t);
+  // The stub heads PATH: a script that did run its main part when sourced would call it, and this case would fail, with nothing real started.
+  const stub = sofficeAt(join(w.bin, 'soffice'));
+  const r = sourced(w, 'type -t find_soffice');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, 'function\n');
+  assert.deepEqual(calls(w), [], `the stub ${stub} was called`);
+});
+
+test('ARC-09-C301 — after PATH the lookup tries the Mac\'s own /Applications, and then the user\'s own Applications folder', { skip }, (t) => {
+  const w = world(t);
+  const home = '/Users/Test User';
+  assert.deepEqual(placesTried(w, { HOME: home }), ['/Applications/LibreOffice.app/Contents/MacOS/soffice', `${home}/${HOME_SOFFICE}`]);
+});
+
+test('ARC-09-C301 — a HOME that is unset or empty adds no place, and never becomes a path at the root', { skip }, (t) => {
+  const w = world(t);
+  const fixed = ['/Applications/LibreOffice.app/Contents/MacOS/soffice'];
+  assert.deepEqual(placesTried(w, { HOME: undefined }), fixed);
+  assert.deepEqual(placesTried(w, { HOME: '' }), fixed);
+});
+
+test('ARC-09-C301 — LibreOffice in the user\'s own Applications folder is found', { skip }, (t) => {
+  const w = world(t);
+  // A space in the folder, as many user names have.
+  const home = join(w.base, 'home dir');
+  const stub = sofficeAt(join(home, ...HOME_SOFFICE.split('/')));
+  const r = lookupHomeOnly(w, { HOME: home });
+  assert.deepEqual([r.code, r.found, r.errors], [0, stub, []], r.stderr);
+});
+
+test('ARC-09-C301 — PATH wins over the user\'s own Applications folder', { skip }, (t) => {
+  const w = world(t);
+  const onPath = sofficeAt(join(w.bin, 'soffice'));
+  const home = join(w.base, 'home');
+  sofficeAt(join(home, ...HOME_SOFFICE.split('/')));
+  assert.equal(lookupHomeOnly(w, { HOME: home }).found, onPath);
+});
+
+test('ARC-09-C301 — a Mac that has LibreOffice in /Applications keeps finding that one when the user\'s folder has a copy too',
+  { skip: skip || (!existsSync(`/${SOFFICE_RELATIVE}`) && 'there is no LibreOffice in /Applications on this machine; the order case above holds the same rule') }, (t) => {
+    const w = world(t);
+    const home = join(w.base, 'home');
+    sofficeAt(join(home, ...HOME_SOFFICE.split('/')));
+    // Not emptied: the lookup as it is, with the made-up HOME holding a stub and the machine's own /Applications holding the real one.
+    const r = sourced(w, 'code=0; find_soffice || code=$?; printf "%s\\n" "${SOFFICE:-}"; exit "$code"', { HOME: home });
+    assert.deepEqual([r.status, r.stdout.trim()], [0, `/${SOFFICE_RELATIVE}`], r.stderr);
+  });
+
+test('ARC-09-C301 — with LibreOffice in none of the places the lookup says so in the sentence it always had, and returns 3', { skip }, (t) => {
+  const w = world(t);
+  const home = join(w.base, 'home');
+  mkdirSync(home, { recursive: true });
+  const r = lookupHomeOnly(w, { HOME: home });
+  assert.deepEqual([r.code, r.found, r.errors], [3, '', [SENTENCE]], r.stderr);
+});
+
+test('ARC-09-C301 — a conversion through a LibreOffice in the user\'s own Applications folder',
+  { skip: hostSkip || (onHost && `LibreOffice is on this machine (${onHost}), which the script finds first`) }, (t) => {
+    const w = world(t);
+    const home = join(w.base, 'home');
+    const stub = sofficeAt(join(home, ...HOME_SOFFICE.split('/')));
+    // The script runs for real only once its own lookup, in this environment, has said it would run the stub.
+    const asked = sourced(w, 'find_soffice || true; printf "%s\\n" "$SOFFICE"', { HOME: home });
+    assert.equal(asked.stdout.trim(), stub, 'the lookup would run something else: nothing was started');
+    const r = run(w, [join(w.docs, 'Design.docx'), w.out], { HOME: home });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(calls(w).length, 1);
+    assert.ok(calls(w)[0].startsWith(`${stub} --headless`), calls(w)[0]);
+    assert.ok(existsSync(join(w.out, 'Design.pdf')));
+  });
+
+test('ARC-09-C301 — the doctor and the script give the same answer for a LibreOffice in the user\'s own Applications folder', { skip }, (t) => {
+  const w = world(t);
+  const home = join(w.base, 'home');
+  const stub = sofficeAt(join(home, ...HOME_SOFFICE.split('/')));
+  const script = lookupHomeOnly(w, { HOME: home });
+  // The doctor looks at its own PATH and its own candidates; the Mac's own /Applications is emptied here too, as it was for the script.
+  const doctor = capabilityPacks({ env: { PATH: '', HOME: home }, platform: 'darwin', exists: (p) => !p.startsWith('/Applications/') && existsSync(p) });
+  assert.deepEqual([script.found, doctor.pdf.how], [stub, stub]);
+});
+
+test('ARC-09-C301 — a file in the user\'s own Applications folder that cannot be run is not taken', { skip }, (t) => {
+  const w = world(t);
+  const home = join(w.base, 'home');
+  const file = join(home, ...HOME_SOFFICE.split('/'));
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, SOFFICE_STUB);
+  chmodSync(file, 0o644);
+  const r = lookupHomeOnly(w, { HOME: home });
+  assert.deepEqual([r.code, r.found, r.errors], [3, '', [SENTENCE]], r.stderr);
+});
+
+test('ARC-09-C301 — the places of the doctor are the places of the script: its first is the script\'s own, and the rest is /usr/bin, which PATH finds for the script', { skip }, (t) => {
+  const w = world(t);
+  const tried = placesTried(w, { HOME: undefined });
+  assert.deepEqual(SOFFICE_CANDIDATES.slice(0, tried.length), tried, 'the doctor does not look first where the script looks');
+  assert.deepEqual(SOFFICE_CANDIDATES.slice(tried.length), ['/usr/bin/soffice']);
 });

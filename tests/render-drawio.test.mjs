@@ -22,6 +22,11 @@
  *     platform, and HOME is the real one when there is one and is never made up.
  * The stubs are shell scripts, so the cases run on macOS and Linux; the step in ci.yml runs the same script in Git Bash against a
  * compiled draw.io.exe.
+ *
+ * ARC-09-C301 adds the user's own Applications folder on macOS (~/Applications/draw.io.app and ~/Applications/drawio.app), looked in AFTER the
+ * Mac's own /Applications, so that a Mac which found draw.io before keeps finding the same one. The cases of that row say what the lookup tries,
+ * in order, by replacing `pick` with a function that prints its candidate and takes none; they find a stub in a made-up HOME with the Mac's own
+ * /Applications emptied (a draw.io on THIS machine cannot answer for them); and the doctor's E-04 is held to the same answers.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,6 +36,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { capabilityPacks, DRAWIO_CANDIDATES } from '../tools/snowarch/lib/doctor/checks/engine-prereqs.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const script = join(root, 'scripts', 'render-drawio.sh');
@@ -40,7 +46,11 @@ const skip = process.platform === 'win32'
 /** A "not found" case runs with /usr/bin and /bin on PATH, so a draw.io there on THIS machine is found whatever platform the case pretends to be. */
 const onHostPath = ['/usr/bin', '/bin'].flatMap((d) => ['drawio', 'draw.io', 'draw.io.exe'].map((n) => join(d, n))).find((p) => existsSync(p));
 const hostSkip = skip || (onHostPath && `draw.io is on this machine's PATH (${onHostPath}), which a "not found" case would find`);
-const hostApp = ['/Applications/draw.io.app/Contents/MacOS/draw.io', '/Applications/drawio.app/Contents/MacOS/drawio'].find((p) => existsSync(p));
+const SYSTEM_APPS = ['/Applications/draw.io.app/Contents/MacOS/draw.io', '/Applications/drawio.app/Contents/MacOS/drawio'];
+const HOME_APPS = process.env.HOME ? ['Applications/draw.io.app/Contents/MacOS/draw.io', 'Applications/drawio.app/Contents/MacOS/drawio'].map((p) => join(process.env.HOME, p)) : [];
+/** The Mac's own /Applications, and then the user's: either answers a macOS lookup, so a "not found" case cannot run where one is installed. */
+const systemApp = SYSTEM_APPS.find((p) => existsSync(p));
+const hostApp = systemApp ?? HOME_APPS.find((p) => existsSync(p));
 
 const GIT_BASH = 'MINGW64_NT-10.0-26200';
 const RELEASES = 'https://github.com/jgraph/drawio-desktop/releases';
@@ -238,4 +248,140 @@ test('ARC-09-C273 — a folder with no diagrams ends the way it did', { skip }, 
   assert.equal(r.status, 0);
   assert.match(r.stdout, /No \.drawio files under /);
   assert.deepEqual(calls(w), []);
+});
+
+/**
+ * ARC-09-C301 — the user's own Applications folder on macOS.
+ *
+ * What a person without administrator rights does with the disk image of draw.io is copy the app into ~/Applications, and the lookup did not
+ * look there: the renderer said "not found" and the doctor said "draw.io no" about a draw.io that was installed. The place is looked in last.
+ */
+const HOME_DRAWIO = 'Applications/draw.io.app/Contents/MacOS/draw.io';
+const HOME_DRAWIO_ALT = 'Applications/drawio.app/Contents/MacOS/drawio';
+
+/** The places the lookup tries, in order, and nothing found or started: `pick` is replaced by a function that prints its candidate. */
+function placesTried(w, env = {}) {
+  const r = spawnSync(BASH, ['-c', 'source "$1" "$2"; pick() { printf "%s\\n" "$1"; }; find_drawio; true', 'lookup', script, w.empty],
+    { encoding: 'utf8', env: environment(w, env) });
+  assert.equal(r.status, 0, r.stderr);
+  assert.doesNotMatch(r.stderr, /unbound variable/, 'a HOME that is not set stopped the lookup');
+  return r.stdout.split('\n').filter(Boolean);
+}
+
+/**
+ * The lookup as it is, except that the Mac's own /Applications is empty: a draw.io on THIS machine cannot answer. Nothing is started.
+ * `pick` is wrapped and not replaced, so that what it tests (a file that can be run) is the script's own.
+ */
+function lookupHomeOnly(w, env = {}) {
+  const r = spawnSync(BASH, ['-c',
+    'source "$1" "$2"; eval "$(declare -f pick | sed \'1s/^pick /real_pick /\')"; pick() { case "$1" in /Applications/*) return 0 ;; esac; real_pick "$1"; }; find_drawio; code=$?; printf "%s\\n" "${DRAWIO:-}"; exit "$code"',
+    'lookup', script, w.empty], { encoding: 'utf8', env: environment(w, env) });
+  return { code: r.status, found: r.stdout.trim(), stderr: r.stderr, errors: errorLines(r.stderr) };
+}
+
+test('ARC-09-C301 — macOS: after the two places in /Applications the lookup tries the two in the user\'s own Applications folder, in that order', { skip: hostSkip }, (t) => {
+  const w = world(t);
+  unameIs(w, 'Darwin');
+  const home = '/Users/Test User';
+  assert.deepEqual(placesTried(w, { HOME: home }), [
+    '/Applications/draw.io.app/Contents/MacOS/draw.io',
+    '/Applications/drawio.app/Contents/MacOS/drawio',
+    `${home}/${HOME_DRAWIO}`,
+    `${home}/${HOME_DRAWIO_ALT}`,
+  ]);
+});
+
+test('ARC-09-C301 — macOS: a HOME that is unset or empty adds no place, and never becomes a path at the root', { skip: hostSkip }, (t) => {
+  const w = world(t);
+  unameIs(w, 'Darwin');
+  const fixed = ['/Applications/draw.io.app/Contents/MacOS/draw.io', '/Applications/drawio.app/Contents/MacOS/drawio'];
+  assert.deepEqual(placesTried(w, { HOME: undefined }), fixed);
+  assert.deepEqual(placesTried(w, { HOME: '' }), fixed);
+});
+
+test('ARC-09-C301 — Linux and Windows never look in a user\'s Applications folder', { skip: hostSkip }, (t) => {
+  for (const [uname, expected] of [['Linux', ['/usr/bin/drawio']], [GIT_BASH, []]]) {
+    const w = world(t);
+    unameIs(w, uname);
+    const tried = placesTried(w, { HOME: '/home/test', LOCALAPPDATA: undefined, PROGRAMFILES: undefined });
+    assert.deepEqual(tried.filter((p) => /Applications/.test(p)), [], `${uname}: ${tried.join(' ')}`);
+    assert.deepEqual(tried, expected, uname);
+  }
+});
+
+test('ARC-09-C301 — macOS: draw.io in the user\'s own Applications folder is found, under either bundle name', { skip: hostSkip }, (t) => {
+  for (const rel of [HOME_DRAWIO, HOME_DRAWIO_ALT]) {
+    const w = world(t);
+    unameIs(w, 'Darwin');
+    // A space in the folder, as many user names have.
+    const home = join(w.base, 'home dir');
+    const stub = drawioAt(join(home, ...rel.split('/')));
+    const r = lookupHomeOnly(w, { HOME: home });
+    assert.deepEqual([r.code, r.found, r.errors], [0, stub, []], `${rel}: ${r.stderr}`);
+  }
+});
+
+test('ARC-09-C301 — macOS: PATH wins over the user\'s own Applications folder, as it does over every other place', { skip: hostSkip }, (t) => {
+  const w = world(t);
+  unameIs(w, 'Darwin');
+  const onPath = drawioAt(join(w.bin, 'drawio'));
+  const home = join(w.base, 'home');
+  drawioAt(join(home, ...HOME_DRAWIO.split('/')));
+  assert.equal(lookupHomeOnly(w, { HOME: home }).found, onPath);
+});
+
+test('ARC-09-C301 — macOS: a Mac that has draw.io in /Applications keeps finding that one when the user\'s folder has a copy too',
+  { skip: hostSkip || (!systemApp && 'there is no draw.io in /Applications on this machine; the order case above holds the same rule') }, (t) => {
+    const w = world(t);
+    unameIs(w, 'Darwin');
+    const home = join(w.base, 'home');
+    drawioAt(join(home, ...HOME_DRAWIO.split('/')));
+    // Not emptied: the lookup as it is, with the made-up HOME holding a stub and the machine's own /Applications holding the real one.
+    const r = lookup(w, { HOME: home });
+    assert.deepEqual([r.code, r.found, r.errors], [0, systemApp, []], r.stderr);
+  });
+
+test('ARC-09-C301 — macOS: a render through a draw.io in the user\'s own Applications folder',
+  { skip: hostSkip || (systemApp && `draw.io Desktop is installed here (${systemApp}), which a macOS lookup finds first`) }, (t) => {
+    const w = world(t);
+    unameIs(w, 'Darwin');
+    const home = join(w.base, 'home');
+    const stub = drawioAt(join(home, ...HOME_DRAWIO.split('/')));
+    const r = render(w, stub, { HOME: home });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /done: 1 rendered, 0 failed/);
+    assert.equal(calls(w).length, 1);
+    assert.ok(calls(w)[0].startsWith(`${stub} -x -f png`), calls(w)[0]);
+  });
+
+test('ARC-09-C301 — the doctor and the renderer give the same answer for a draw.io in the user\'s own Applications folder', { skip: hostSkip }, (t) => {
+  for (const rel of [HOME_DRAWIO, HOME_DRAWIO_ALT]) {
+    const w = world(t);
+    unameIs(w, 'Darwin');
+    const home = join(w.base, 'home');
+    const stub = drawioAt(join(home, ...rel.split('/')));
+    const script = lookupHomeOnly(w, { HOME: home });
+    // The doctor looks at its own PATH and its own candidates; the Mac's own /Applications is emptied here too, as it was for the renderer.
+    const doctor = capabilityPacks({ env: { PATH: '', HOME: home }, platform: 'darwin', exists: (p) => !p.startsWith('/Applications/') && existsSync(p) });
+    assert.deepEqual([script.found, doctor.drawio.how], [stub, stub], rel);
+  }
+});
+
+test('ARC-09-C301 — macOS: a file in the user\'s own Applications folder that cannot be run is not taken', { skip: hostSkip }, (t) => {
+  const w = world(t);
+  unameIs(w, 'Darwin');
+  const home = join(w.base, 'home');
+  const file = join(home, ...HOME_DRAWIO.split('/'));
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, DRAWIO_STUB);
+  chmodSync(file, 0o644);
+  const r = lookupHomeOnly(w, { HOME: home });
+  assert.equal(r.code, 3, r.stderr);
+  assert.equal(r.found, '');
+});
+
+test('ARC-09-C301 — the fixed places of the doctor are the places of the script, Mac first and then Linux, in the script\'s order', { skip: hostSkip }, (t) => {
+  const forMac = placesTried((() => { const w = world(t); unameIs(w, 'Darwin'); return w; })(), { HOME: undefined });
+  const forLinux = placesTried((() => { const w = world(t); unameIs(w, 'Linux'); return w; })(), { HOME: undefined });
+  assert.deepEqual([...DRAWIO_CANDIDATES.posix], [...forMac, ...forLinux]);
 });

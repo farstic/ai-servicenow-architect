@@ -205,6 +205,57 @@ test('ARC-09-C273 — E-04 finds draw.io on Windows where the renderer does: the
   assert.deepEqual(drawioCandidates({ platform: 'darwin', env }), DRAWIO_CANDIDATES.posix);
 });
 
+/**
+ * ARC-09-C301 — the user's own Applications folder on a Mac: where draw.io and LibreOffice go when the person copying them has no
+ * administrator rights, and where the renderers (scripts/render-drawio.sh, scripts/render-pdf.sh) now look. The doctor asks the same places in
+ * the same order: the Mac's own /Applications first, so that a Mac which found an app before finds the same one, and the user's folder after.
+ */
+test('ARC-09-C301 — E-04 looks in the home folder\'s Applications on a Mac, after the Mac\'s own, for draw.io and for LibreOffice', () => {
+  const home = '/Users/Test User';
+  const env = { PATH: '', HOME: home };
+  const drawio = [`${home}/Applications/draw.io.app/Contents/MacOS/draw.io`, `${home}/Applications/drawio.app/Contents/MacOS/drawio`];
+  const soffice = `${home}/Applications/LibreOffice.app/Contents/MacOS/soffice`;
+  assert.deepEqual(drawioCandidates({ platform: 'darwin', env }), [...DRAWIO_CANDIDATES.posix, ...drawio]);
+  for (const place of drawio) assert.equal(capabilityPacks({ env, platform: 'darwin', exists: (p) => p === place }).drawio.how, place, place);
+  assert.equal(capabilityPacks({ env, platform: 'darwin', exists: (p) => p === soffice }).pdf.how, soffice);
+  // The order of what is asked, seen from the probe: the fixed places, then the user's.
+  const seen = [];
+  capabilityPacks({ env, platform: 'darwin', exists: (p) => { seen.push(p); return false; } });
+  assert.deepEqual(seen.filter((p) => /soffice$/.test(p)), [...SOFFICE_CANDIDATES, soffice]);
+  assert.deepEqual(seen.filter((p) => /draw\.?io$/.test(p)), [...DRAWIO_CANDIDATES.posix, ...drawio]);
+  // Both copies present: the Mac's own one answers, as it did before this place was looked in.
+  const both = capabilityPacks({ env, platform: 'darwin', exists: () => true });
+  assert.equal(both.drawio.how, DRAWIO_CANDIDATES.posix[0]);
+  assert.equal(both.pdf.how, SOFFICE_CANDIDATES[0]);
+});
+
+test('ARC-09-C301 — E-04: a HOME that is unset or empty adds no place, and Linux and Windows never read one', () => {
+  const places = (env, platform) => {
+    const seen = [];
+    capabilityPacks({ env, platform, exists: (p) => { seen.push(p); return false; } });
+    return seen;
+  };
+  const fixed = places({ PATH: '' }, 'darwin');
+  assert.deepEqual(fixed.filter((p) => /soffice$/.test(p)), SOFFICE_CANDIDATES);
+  assert.deepEqual(places({ PATH: '', HOME: '' }, 'darwin'), fixed);
+  assert.equal(fixed.some((p) => p.includes('Applications') && !p.startsWith('/Applications/')), false, fixed.join(' '));
+  // Another platform never reads the folder, whatever its HOME.
+  assert.deepEqual(places({ PATH: '', HOME: '/home/test' }, 'linux'), fixed);
+  assert.deepEqual(drawioCandidates({ platform: 'linux', env: { PATH: '', HOME: '/home/test' } }), DRAWIO_CANDIDATES.posix);
+  assert.equal(places({ PATH: '', HOME: 'C:\\Users\\Test' }, 'win32').some((p) => /Applications/.test(p)), false);
+});
+
+test('ARC-09-C301 — E-04 reports the app it found in the home folder\'s Applications, in its line and in its data', async (t) => {
+  const root = greenTree(t);
+  const home = '/Users/Test User';
+  const place = `${home}/Applications/draw.io.app/Contents/MacOS/draw.io`;
+  const r = await runById(checks, 'E-04', ctx(root, { env: { PATH: '', HOME: home }, platform: 'darwin', exists: (p) => p === place }));
+  assert.equal(r.status, 'ok');
+  assert.match(r.detail, /drawio yes/);
+  assert.equal(r.data.packs.drawio.how, place);
+  assert.deepEqual(r.data.missing, ['docx', 'pdf', 'mermaid']);
+});
+
 test('E-04 looks for the Windows tooling when the platform is Windows', () => {
   const packs = capabilityPacks({ env: { PATH: '' }, platform: 'win32', exists: () => false });
   assert.match(packs.docx.need, /PowerShell/);
