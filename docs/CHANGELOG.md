@@ -77,6 +77,10 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 
 **The name check no longer asks about a prefix, and a Correction cites an opened page.** On the architect's sitting the hook asked "No corpus page prints `sn_ins`" about a backticked prefix, `sn_ins_`, that the model had written as shorthand for a family of tables, and the model had to explain it. A token that ends with an underscore is now a prefix and no construct, and a name that no page prints is not asked about as ABSENT when an indexed name starts with it and an underscore. The ELSEWHERE clause also asks for a Correction that "cites a page you have opened that prints it": all 13 of the extra never-opened citations of the sitting's N were Correction lines that cited a page seen only in a lookup listing. On the architect's replay of the hook over the 75 turns of that sitting's N sessions, 74 were unchanged, and the one that changed lost its whole ask, which had named a prefix; on a sitting of its own (150 sessions) the never-opened citations on the Correction lines written after an ask fell from 11 of 69 to 8 of 67, a small measured gain (one-sided p 0.34), and every guard held (ARC-09-C293).
 
+**A skipped instance step says how to get it run.** With no licence in force the bootstrap skips the instance wizard (B06) and the verify step (B08) and printed only the licence's
+remedy: install a valid licence, restart Claude Code. A reader who did that had a licence and still no instance, because only the next bootstrap runs those two steps. Their note now
+ends with "Once a valid licence is in place, run ./bootstrap.sh again: it runs this step" (`.\bootstrap.cmd` on Windows). The licence's own remedy, which E-31 and the server print, is unchanged.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -165,6 +169,8 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
   sentence under it, where they said 51,665 and 299 MB, and their example screens show the 96d3212 pin. A docs bump now checks both guides against the corpus and the install page (ARC-09-C290).
 - The Stop hook asks about a never-opened page that is cited only with back-slashes, in an answer and in a file the turn wrote (ARC-09-C292).
 - The name check does not ask about a prefix that ends with an underscore (`sn_ins_`), nor about a token that starts indexed names at a name boundary. On the architect's replay over the sitting's 75 turns, 74 were unchanged and the one that changed lost an ask that named a prefix (ARC-09-C293).
+- The note of the skipped B06 (instance) and B08 (verify) says to run the installer again once a valid licence is in place. It said only to install the licence and restart Claude Code,
+  which leaves no instance (ARC-09-C304).
 
 ## 2.2.6 — 2026-11-15
 
