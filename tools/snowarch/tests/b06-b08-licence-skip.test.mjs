@@ -8,6 +8,9 @@
  * refuses both commands with no licence in force, by the gate ./snowarch uses (step 4b), so the steps ask that
  * gate first and skip, instead of meeting the refusal and calling it a failed migration or a missing probe. A
  * skipped step is never-run, so the next bootstrap after a licence is installed runs it.
+ *
+ * ARC-09-C304 — and the note says so. It gave the licence's remedy and stopped, so a reader who followed it (installed the file, restarted Claude Code)
+ * had a licence and still no instance: only the next bootstrap runs the two steps, and nothing told them to run it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +28,9 @@ import { makeCheckout } from './helpers/workspace.mjs';
 
 const STEPS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'steps');
 const SPELL = spellings({ platform: 'linux', env: {} });
-const LINE = (id, title) => `[${id}/09] ${title} … skipped (${NO_LICENCE_IN_FORCE}) — ${REMEDY(SPELL.cli)}`;
+// The note: the licence's remedy (the server's own sentence), then the one thing that makes the step run (ARC-09-C304), in the spelling of the machine.
+const NOTE = (spell) => `${REMEDY(spell.cli)}. Once a valid licence is in place, run ${spell.bootstrap} again: it runs this step`;
+const LINE = (id, title, spell = SPELL) => `[${id}/09] ${title} … skipped (${NO_LICENCE_IN_FORCE}) — ${NOTE(spell)}`;
 const live = (root, licence) => ({ root, mode: 'live', docs: 'sparse', env: {}, platform: 'linux', licence,
   node: { present: true, version: '22.11.0', major: 22 } });
 
@@ -81,4 +86,39 @@ test('ARC-11-C6 — the run reads the licence once: stepContext carries it, for 
     node: { present: true, version: '22.11.0', major: 22 } });
   assert.equal(ctx.licence?.state, 'missing', 'a checkout with no licence');
   assert.equal(stepById('B06').runsWhen({ ...ctx, mode: 'live' }), false);
+});
+
+test('ARC-09-C304 — the note tells a reader who has installed the licence to run the installer again, in the spelling of their machine', () => {
+  for (const [platform, installer, cli] of [['linux', './bootstrap.sh', './snowarch'], ['darwin', './bootstrap.sh', './snowarch'], ['win32', '.\\bootstrap.cmd', '.\\snowarch.cmd']]) {
+    const spell = spellings({ platform, env: {} });
+    assert.deepEqual([spell.bootstrap, spell.cli], [installer, cli], platform);
+    const root = makeCheckout();
+    for (const state of ['missing', 'invalid', 'expired', 'revoked']) {
+      for (const id of ['B06', 'B08']) {
+        const note = stepById(id).skipNote(spell, { ...live(root, { state }), platform });
+        assert.equal(note, NOTE(spell), `${platform} ${id} ${state}`);
+        assert.ok(note.endsWith(`run ${installer} again: it runs this step`), note);
+        assert.ok(note.startsWith(`Run ${cli} licence check to see why`), note);
+      }
+    }
+  }
+});
+
+test('ARC-09-C304 — a step that is skipped for design-only has no note, and the licence\'s remedy itself is not changed', () => {
+  const root = makeCheckout();
+  const designOnly = { ...live(root, { state: 'missing' }), mode: 'design-only' };
+  for (const id of ['B06', 'B08']) assert.equal(stepById(id).skipNote(SPELL, designOnly), null, id);
+  // REMEDY is the server's LICENCE_NOT_VALID remedy too (licence-parity compares them): the sentence about the installer is the steps' own.
+  assert.doesNotMatch(REMEDY(SPELL.cli), /again|bootstrap/);
+});
+
+test('ARC-09-C304 — what the note promises is true: a skipped step is never-run, so it is not taken for finished when a licence is in force', async () => {
+  const root = makeCheckout();
+  const s = emptyState({ engineVersion: '2.0.0-test', platform: 'linux' });
+  await runSteps({ root, ctx: live(root, { state: 'missing' }), state: s, steps: [stepById('B06'), stepById('B08')],
+    last: 'B09', save: () => {}, onLine: () => {} });
+  for (const id of ['B06', 'B08']) {
+    assert.deepEqual([s.steps[id].status, s.steps[id].inputsHash], ['skipped', null], `${id} is recorded as never run`);
+    assert.equal(stepById(id).runsWhen(live(root, { state: 'ok' })), true, `${id} runs on the next bootstrap, once the licence is in force`);
+  }
 });
