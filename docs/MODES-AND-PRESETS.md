@@ -226,13 +226,6 @@ This folder is inside Dropbox — the saved password file would sync with it.
 Enterprise "Known Folder Move" — `Documents` redirected into OneDrive with the word OneDrive nowhere in the path — is
 caught by the `%OneDrive%` variables, the only detector that exists for it.
 
-On a Mac, iCloud Drive's own **Desktop & Documents Folders** is the other case a path cannot show: a checkout in
-`~/Documents` or `~/Desktop` says nothing, and the setting lives in Finder's preferences. The wizard reads it
-(`defaults read com.apple.finder FXICloudDriveDocuments`, or `FXICloudDriveDesktop`), only for a store that is inside
-one of those two folders, never as root, and only the exact value `1` counts as on. It then warns in the same words,
-with the provider named as iCloud Drive and the folder to move out of. The installer's check (B01), the full doctor
-(E-34) and the server's start-up line ask the same rule (ARC-09-C305).
-
 **What is never done:** credentials are never written to `~/.claude.json`, never passed in argv (§7), and never echoed
 into a transcript.
 
@@ -380,10 +373,15 @@ same import as one step of nine.
   and still refuse the tools. The screen recommends, and you decide (D-05).
 - **A macOS `~/Documents` that a sync client redirected is not detectable.** There is no environment
   variable to read and the path says nothing. Windows has `%OneDrive%`; macOS has nothing equivalent.
-  iCloud Drive's own **Desktop & Documents Folders** is the exception, and it is read from Finder's preferences
-  (§6). The keys are Apple's and undocumented, and were measured on macOS 26 only: what a Mac before that
-  prints, and what any Mac prints when the setting is off, are not known, so only the exact value `1` counts
-  as on and anything else stays silent. A `Documents` or `Desktop` that is a link to another place is not read.
+  iCloud Drive's own **Desktop & Documents Folders** is the exception (the next item).
+- **iCloud Drive's "Desktop & Documents Folders" is read from Finder's preferences, and only in part.** A checkout in
+  `~/Documents` or `~/Desktop` has no vendor name in its path, so the wizard's cloud-sync question (§6: the same warning
+  as for any provider, stop by default), the installer's check, the server's start-up line and the doctor's E-34 in the
+  full `doctor` ask one rule. It reads the setting only for a checkout inside one of those two folders and never as root:
+  one `defaults read com.apple.finder FXICloudDriveDocuments` (or `FXICloudDriveDesktop`), and only the exact value `1`
+  counts as on. The keys are Apple's and undocumented, and were measured on macOS 26 only. What a Mac before that
+  prints, and what any Mac prints when the setting is off, are not known, so anything but `1` stays silent. A
+  `Documents` or `Desktop` that is a link to another place is not read (ARC-09-C305).
 - **Team stores are a roadmap item.** `--global` is per user, not per team; a shared store is a
   different security question and is not answered here.
 - **`client_credentials` is not supported.** The wizard offers Basic and the OAuth password grant
