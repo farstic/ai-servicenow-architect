@@ -62,8 +62,8 @@ export const ELEVATED = Object.freeze({
     return { ok: true, flags: { 'no-cache': true } };
   },
   docs: ({ argv }) => (argv.length === 0 || ['status', 'verify', 'lookup'].includes(argv[0]) ? READS : REFUSE),
-  licence: ({ positional, flags }) => (['show', 'verify', 'check'].includes(positional[0]) && !('refresh' in flags) && onlyFlags(flags, COMMON)
-    ? READS : REFUSE),
+  // `check --refresh` fetches the revocation list and writes it: `refresh` is not among the flags named for reading, so it is refused.
+  licence: ({ positional, flags }) => (['show', 'verify', 'check'].includes(positional[0]) && onlyFlags(flags, COMMON) ? READS : REFUSE),
   mode: ({ positional, flags }) => (noPositional(positional) && onlyFlags(flags, COMMON) ? READS : REFUSE),
   instance: ({ argv }) => (argv[0] === 'list' && argv.slice(1).every((a) => ['--json', '--all', '--verbose'].includes(a)) ? READS : REFUSE),
   store: ({ argv }) => (argv.length === 1 && argv[0] === 'backups' ? READS : REFUSE),

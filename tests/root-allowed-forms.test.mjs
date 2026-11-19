@@ -36,11 +36,12 @@ function checkout(t) {
   return root;
 }
 
-function env(t, root) {
+function env(t, root, { asUser = false } = {}) {
   const home = tempDir('snowarch-c303-home-', t);
   const base = { ...process.env, HOME: home, USERPROFILE: home };
   for (const k of ['SNOWARCH_STATE_ROOT', 'SNOW_STORE', 'CLAUDE_PROJECT_DIR', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME']) delete base[k];
-  return { env: asRoot(licensedEnv(base, { root })), home };
+  const licensed = licensedEnv(base, { root });
+  return { env: asUser ? licensed : asRoot(licensed), home };
 }
 
 const cli = (root, args, e) => spawnSync(process.execPath, [join(root, 'tools/snowarch/bin/snowarch.mjs'), ...args], { cwd: root, encoding: 'utf8', env: e, timeout: 120000 });
@@ -101,4 +102,28 @@ test('C303 — as root the help of a writing command is still answered: it write
     assert.equal(r.status, 0, `${form}: ${r.stderr}`);
     assert.match(r.stdout, /usage/, form);
   });
+});
+
+test('C303 — as root, a form run from a subfolder leaves no log file: a user\'s run of the same form does', (t) => {
+  // The frame logs a note when it is not run from the checkout's root, and writes the log at the end. A form that makes no log file for the
+  // ordinary run (every one of them, from the root) makes one from a subfolder, which is where this is seen.
+  const root = checkout(t);
+  mkdirSync(join(root, 'clients'), { recursive: true });
+  const forms = [['docs', 'status'], ['instance', 'list'], ['status'], ['doctor', '--quick']];
+  const run = (e, args) => spawnSync(process.execPath, [join(root, 'tools/snowarch/bin/snowarch.mjs'), ...args], { cwd: join(root, 'clients'), encoding: 'utf8', env: e, timeout: 120000 });
+  const logs = (before, after) => described(changes(before, after)).filter((l) => l.includes('.local/logs/'));
+  const user = env(t, root, { asUser: true });
+  for (const args of forms) {
+    const before = snapshot(root);
+    run(user.env, args);
+    assert.equal(logs(before, snapshot(root)).length, 1, `${args.join(' ')}: a user\'s run from a subfolder makes a log (the case shows what it is looking for)`);
+  }
+  const { env: e, home } = env(t, root);
+  for (const args of forms) {
+    const before = { root: snapshot(root), home: snapshot(home) };
+    const r = run(e, args);
+    assert.ok(!r.stderr.includes(elevatedSentence()), `${args.join(' ')} was refused as a write: ${r.stderr}`);
+    assert.deepEqual(logs(before.root, snapshot(root)), [], `${args.join(' ')}: a root process made a log file`);
+    assert.deepEqual(described(changes(before.home, snapshot(home))), [], `${args.join(' ')}: wrote into the home folder`);
+  }
 });
