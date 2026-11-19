@@ -4,6 +4,7 @@ import { type Environment } from './url.js';
 import { type ReviewIo } from './preset-ui.js';
 import { type StoreLabel } from './format.js';
 import { maskUsername } from '../store/paths.js';
+import { type IcloudSeams } from '../store/icloud.js';
 import { probeReachability } from '../servicenow/reachability.js';
 import { probeAll, type LastProbe, type ProbeClient } from '../servicenow/probes.js';
 import { type AclTools } from '../store/acl.js';
@@ -388,6 +389,8 @@ export interface AddDeps {
     platform?: NodeJS.Platform;
     /** ARC-09-C272 — the lock tools; the real ones for this process when absent. A test supplies its own. */
     acl?: AclTools;
+    /** ARC-09-C305 — what the gate asks the machine about iCloud's "Desktop & Documents Folders"; the real answers when absent. A test supplies its own. */
+    icloud?: IcloudSeams;
 }
 /**
  * The probe client and its options live in `servicenow/probe-client.ts` (ARC-08-S04): the doctor
@@ -410,7 +413,7 @@ export { probeOptionsFor } from '../servicenow/probe-client.js';
 export declare function cloudSyncGate(storePath: string, options: {
     yes?: boolean;
     global?: boolean;
-}, io: AddIo, env?: NodeJS.ProcessEnv): Promise<{
+}, io: AddIo, env?: NodeJS.ProcessEnv, icloud?: IcloudSeams): Promise<{
     ok: boolean;
     warning?: string;
 }>;

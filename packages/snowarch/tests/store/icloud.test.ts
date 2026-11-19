@@ -164,4 +164,22 @@ describe('findCloudSync — the named vendors first, iCloud\'s folders after', (
     expect(findCloudSync('/Users/me/Documents/AI-Arch', { env: {}, realpath: (p) => p, icloud: documents })?.provider).toBe('iCloud Drive');
     expect(findCloudSync('/Users/me/work/AI-Arch', { env: {}, realpath: (p) => p, icloud: documents })).toBeNull();
   });
+
+  it('is given the realpath of the call when the seams bring none, so one stand-in answers for both rules', () => {
+    // A checkout that is a link into Documents: the real path is what both rules compare, and the call's `realpath` is the one that knows the link.
+    const linked = (p: string): string => (p.startsWith('/Users/me/work/arch') ? p.replace('/Users/me/work/arch', '/Users/me/Documents/arch') : p);
+    const without: IcloudSeams = { ...documents };
+    delete without.realpath;
+    expect(findCloudSync('/Users/me/work/arch', { env: {}, realpath: linked, icloud: without })?.provider).toBe('iCloud Drive');
+  });
+});
+
+describe('the server\'s start-up line asks the same question as the wizard', () => {
+  /** The source without the lines that are only comments, as the guide's test reads the product: a comment that names the call is not the call. */
+  const server = readFileSync(resolve(here, '../../src/server.ts'), 'utf8').split('\n').filter((l) => !/^\s*(?:\/\/|\/\*|\*)/.test(l)).join('\n');
+
+  it('calls findCloudSync with the store path, and no longer the named vendors alone', () => {
+    expect(server).toMatch(/\bfindCloudSync\(report\.path\)/);
+    expect(server).not.toMatch(/\bisUnderCloudSyncFolder\(/);
+  });
 });

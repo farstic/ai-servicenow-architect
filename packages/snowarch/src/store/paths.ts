@@ -270,8 +270,11 @@ function ancestor(original: string, segments: string[], upTo: number): string {
  * THE ENVIRONMENT ROOTS COME FIRST, and they are the only detector for the case that matters most:
  * enterprise "Known Folder Move" redirects `Documents` and `Desktop` into OneDrive without the word
  * OneDrive appearing anywhere in the path the user sees. `%OneDrive%` still points at it. macOS has
- * no equivalent — a redirected `~/Documents` there is undetectable, and that is a documented limit
- * rather than an oversight.
+ * no equivalent for a sync client: a `~/Documents` that a client redirected is undetectable here, and
+ * that is a documented limit rather than an oversight. iCloud Drive's own "Desktop & Documents
+ * Folders" is the exception, and it is not in the path either: `store/icloud.ts` (ARC-09-C305) reads
+ * that setting from Finder's preferences, and `findCloudSync` asks it after this function, which is
+ * left as it is.
  *
  * Symlinks are resolved first, because a link into a synced folder is a path into a synced folder.
  * A path that does not exist — every path in the unit tests, and any path being planned rather than

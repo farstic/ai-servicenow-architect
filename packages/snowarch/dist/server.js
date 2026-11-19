@@ -14,7 +14,7 @@ import dotenv from 'dotenv';
 import { instanceManager } from './servicenow/instances.js';
 import { runWithInstance } from './servicenow/context.js';
 import { CORE_TOOLS_UNCONFIGURED, setAdvertisedCount, setFullCatalogueSize, unconfiguredRefusal, setToolListChangedNotifier, } from './tools/status.js';
-import { isUnderCloudSyncFolder, maskPath } from './store/index.js';
+import { findCloudSync, maskPath } from './store/index.js';
 import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
 import { logger } from './utils/logging.js';
@@ -317,7 +317,8 @@ function logStartup() {
         logger.warn(`instance ${nl.label} not loaded — ${nl.code}: ${nl.message}`);
     if (process.platform === 'win32')
         logger.info('file modes: ACL-inherited (Windows)');
-    if (report.path && isUnderCloudSyncFolder(report.path)) {
+    // ARC-09-C305: the same question the wizard asks, so a checkout in `~/Documents` with iCloud's "Desktop & Documents Folders" on is logged too.
+    if (report.path && findCloudSync(report.path) !== null) {
         logger.warn('store is under a cloud-sync folder; 0600 does not prevent synchronisation');
     }
     const where = report.path ? `${report.source} (${report.path})` : `${report.source}`;
