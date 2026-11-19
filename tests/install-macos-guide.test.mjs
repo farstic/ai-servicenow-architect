@@ -1364,7 +1364,7 @@ test('ARC-09-C300 — "If something goes wrong" has the rows the first run on a 
   // T7: the download before it did not finish (the messages themselves are held where the tools run, in the case that opens disk images).
   const gone = row('shasum, tar or hdiutil attach answers No such file or directory');
   assert.ok(gone, 'no row for a download that did not finish');
-  assert.ok(gone[1].includes('The download before it did not finish, or did not happen. Run that step\'s download command again, wait until the table of numbers reaches 100 and the line that ends in `%` comes back, then go on from the shasum line.'));
+  assert.ok(gone[1].includes('The download before it did not finish, or did not happen. Run that step\'s download command again, wait until the table of numbers reaches 100 and the line that ends in `%` comes back, then go on from the line after the download command.'));
   // The rows are in the table once each, and none holds a pipe (a pipe in a cell cuts the row on GitHub).
   assert.equal(new Set(rows.map(([s]) => s)).size, rows.length, 'two rows share a symptom');
 });

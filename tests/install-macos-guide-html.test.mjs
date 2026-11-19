@@ -645,7 +645,7 @@ const SENTENCES = [
   'command not found: claude (or node, or npm) in a fresh window, after the PATH command of 2d',
   'If it prints a line that is not exactly the line of 2d, open the file with open -e ~/.zshrc (bash: open -e ~/.bash_profile), delete that line only and type nothing else, save the file, close it, run the PATH command of 2d, and open a fresh window as in 2e.',
   'shasum, tar or hdiutil attach answers No such file or directory',
-  'The download before it did not finish, or did not happen. Run that step\'s download command again, wait until the table of numbers reaches 100 and the line that ends in % comes back, then go on from the shasum line.',
+  'The download before it did not finish, or did not happen. Run that step\'s download command again, wait until the table of numbers reaches 100 and the line that ends in % comes back, then go on from the line after the download command.',
 ].map((s) => s.replaceAll('$CLI', CLI).replaceAll('$BOOT', BOOT));
 
 test('ARC-09-C300 — the sentences of the reviews are on the page, and they are the Markdown guide\'s', () => {
