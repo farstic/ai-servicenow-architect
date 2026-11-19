@@ -12,6 +12,9 @@
 // ARC-09-C290 — the two Windows guides state the corpus as well, and were left on the old pin: an example screen with `[docs] <files> files · <n> MB
 // working tree` (a Windows run's, so the Windows working tree) and the sentence "downloads all <n> pages". The bump compares them with the corpus's files
 // and pages, and with the Windows working tree that the install page gives, which no Linux checkout can measure.
+//
+// ARC-09-C300 — the two macOS guides state the same two things in the same two shapes. A Mac's working tree is the Linux one, so the bump holds them to the
+// working tree it measured itself, with the corpus's files and pages, and needs nothing from the install page.
 
 /** `{ areas, files, workingTreeMb }` as the page states them in "What the corpus costs", each `null` when it does not. */
 export function pageFigures(text) {
@@ -104,6 +107,46 @@ export function windowsChecklist({ corpus, windows }) {
     if (unread.length > 0) return `- [ ] ${file} figures not checked: it does not state ${joined(unread.map((f) => f.noun))} where the bump reads them`;
     const differ = WINDOWS_FIGURES.filter((f) => expected[f.key] !== figures[f.key]);
     if (differ.length === 0) return `- [x] ${file} figures match the corpus: ${WINDOWS_FIGURES.map((f) => f.plain(expected[f.key])).join(' · ')}`;
+    return `- [ ] ${file} figures differ from the corpus: ${differ.map((f) => `${f.show(expected[f.key])} (guide: ${f.guide(figures[f.key])})`).join(' · ')}`;
+  });
+}
+
+/**
+ * `{ files, pages, workingTreeMb }` as a macOS guide states them (ARC-09-C300). The macOS guide and its HTML twin show the same example screen
+ * and say the same sentence as the Windows pair (`[docs] 51,186 files · 286 MB working tree`, "downloads all 51,178 pages"), so one reader serves both
+ * and this is its name for them: a macOS guide that changed the shape would be read here and nowhere else. Each is `null` when the guide does not.
+ */
+export function macosPageFigures(text) {
+  return windowsPageFigures(text);
+}
+
+/** The figures of a macOS guide, each as the checklist words it. */
+const MACOS_FIGURES = Object.freeze([
+  { key: 'files', noun: 'the files', show: (n) => `files ${commas(n)}`, plain: (n) => `${commas(n)} files`, guide: (n) => commas(n) },
+  { key: 'pages', noun: 'the pages', show: (n) => `pages ${commas(n)}`, plain: (n) => `${commas(n)} pages`, guide: (n) => commas(n) },
+  { key: 'workingTreeMb', noun: 'the working tree', show: (n) => `working tree ${n} MB`, plain: (n) => `${n} MB working tree`, guide: (n) => `${n} MB` },
+]);
+
+/**
+ * The checklist lines for a bump's pull-request body about the macOS guides, one for each (ARC-09-C300). `corpus` is `{ files, pages, workingTreeMb }` as
+ * the fresh corpus has them, or `null` when it was not measured (then there is nothing to say); `macos` is `{ guides: [{ file, figures }] }`: each guide's
+ * `macosPageFigures`, or `null` for a guide that is not in the tree.
+ *
+ * THE WORKING TREE IS THE CORPUS'S OWN, where the Windows lines take the install page's Windows figure: a Mac counts the bytes a Linux checkout counts, so the
+ * bump measures the number the guide states, and a stale install page cannot make a matching guide differ.
+ */
+export function macosChecklist({ corpus, macos }) {
+  if (!corpus || !macos) return [];
+  const expected = { files: corpus.files ?? null, pages: corpus.pages ?? null, workingTreeMb: corpus.workingTreeMb ?? null };
+  if (MACOS_FIGURES.some((f) => expected[f.key] === null)) {
+    return ['- [ ] macOS guide figures not checked: the corpus\'s files, pages or working tree could not be read'];
+  }
+  return macos.guides.map(({ file, figures }) => {
+    if (figures === null) return `- [ ] ${file} figures not checked: there is no ${file} in this tree`;
+    const unread = MACOS_FIGURES.filter((f) => figures[f.key] === null);
+    if (unread.length > 0) return `- [ ] ${file} figures not checked: it does not state ${joined(unread.map((f) => f.noun))} where the bump reads them`;
+    const differ = MACOS_FIGURES.filter((f) => expected[f.key] !== figures[f.key]);
+    if (differ.length === 0) return `- [x] ${file} figures match the corpus: ${MACOS_FIGURES.map((f) => f.plain(expected[f.key])).join(' · ')}`;
     return `- [ ] ${file} figures differ from the corpus: ${differ.map((f) => `${f.show(expected[f.key])} (guide: ${f.guide(figures[f.key])})`).join(' · ')}`;
   });
 }

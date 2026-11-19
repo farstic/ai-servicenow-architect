@@ -77,6 +77,20 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 
 **The name check no longer asks about a prefix, and a Correction cites an opened page.** On the architect's sitting the hook asked "No corpus page prints `sn_ins`" about a backticked prefix, `sn_ins_`, that the model had written as shorthand for a family of tables, and the model had to explain it. A token that ends with an underscore is now a prefix and no construct, and a name that no page prints is not asked about as ABSENT when an indexed name starts with it and an underscore. The ELSEWHERE clause also asks for a Correction that "cites a page you have opened that prints it": all 13 of the extra never-opened citations of the sitting's N were Correction lines that cited a page seen only in a lookup listing. On the architect's replay of the hook over the 75 turns of that sitting's N sessions, 74 were unchanged, and the one that changed lost its whole ask, which had named a prefix; on a sitting of its own (150 sessions) the never-opened citations on the Correction lines written after an ask fell from 11 of 69 to 8 of 67, a small measured gain (one-sided p 0.34), and every guard held (ARC-09-C293).
 
+**The install guide for macOS, and a page that runs from disk.** `docs/INSTALL-MACOS.md` is for a Mac user with Apple silicon who has never used a terminal, and every
+step is a command to copy. One path serves every such Mac. Git comes from Apple's Command Line Tools, which can ask a company Mac for an administrator once;
+everything else goes into the home folder without a password: Node.js 26.13.1 as an archive, and draw.io and LibreOffice from their disk images into
+`~/Applications`, each with a one-line command in `~/.local/bin` so that the AI Architect finds it on PATH. No command uses `sudo` or Homebrew, and an optional
+`shasum` check tells the reader that a download is the file the project published. `docs/AI-Architect-macOS-Install-Guide.html` is its form that runs from disk,
+the Windows page's design and features: a Copy button on every command, helpers that read what a reader pastes back, and progress kept in the browser. The
+release writer moves the clone tag of both with every final, the signed manifest covers them, and each GitHub Release carries the page as its ninth asset. The
+guide installs Node.js 26.13.1, so CI now tests Node 26 on macOS, in `test` and in `bootstrap`, and the install page, the README and the Windows guide say that
+Node.js 20, 22, 24 and 26 are tested on all three systems. A person has run Step 1 and Step 2 on a Mac, as a Standard user without administrator rights, and the guide
+ends with that record. What the run found is in the guide: python3 is the fifth check of 2e, 2c shows the installer's own screen and says to skip its two suggestions,
+each download gives the size of its file and where curl's table must end, and three rows are added to the table of problems. The guide still says "Not yet tested end
+to end on a Mac": the macOS CI jobs run design-only, and Steps 3 to 8 have not run on a Mac. The Windows guide and its page now also record that a second
+end-to-end install, on a new laptop on 19 November 2026, followed every step as written, with no errors.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -85,6 +99,12 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
   address and no password, and counters for the four slow commands. `tests/install-windows-guide-html.test.mjs` holds every command to the
   Markdown guide's, in order, and the version floors, the permission presets, the licence words and the installer's check keys to the product;
   it runs the page's own checks on the lines `checkLine` and `bannerLine` print (ARC-09-C285).
+- `docs/INSTALL-MACOS.md` and `docs/AI-Architect-macOS-Install-Guide.html`: the install guide for macOS and its interactive form. Step 1 checks with `uname -m` that the Mac
+  has Apple silicon; Step 2 installs Git, Node.js, Claude Code, draw.io and LibreOffice one command at a time, with the home folder as the only place a program goes,
+  except Apple's Command Line Tools. The guide has 70 commands, one to a block; the page has Copy and "ran it" on each, and one counter of 39 commands (the
+  bash-only check, the bash form of the PATH line and the optional checks are never counted). `tests/install-macos-guide.test.mjs` holds the guide to the product (the plan
+  screen, the wizard's questions, the settings commands, the licence words, the clone tag, where the renderer and the doctor look for draw.io and LibreOffice), and
+  `tests/install-macos-guide-html.test.mjs` holds the page to the guide (ARC-09-C300).
 - `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
   word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints
   whether the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a
@@ -110,7 +130,19 @@ lookups run from inside it. On the architect's sitting the refused calls of the 
 - The release writes the interactive Windows guide (`writeGuideRelease`, beside `writeInstallTag`): its clone command, and the `release` field its
   hero and help message read. A release candidate leaves the page alone, as it leaves the other pages, and a page without the field is refused. The
   page is in the signed manifest's coverage (`packages/snowarch/src/licence/integrity.ts`), so a distribution carries it, and `release.yml` attaches
-  it to the GitHub Release, which now has eight assets (ARC-09-C285).
+  it to the GitHub Release as its eighth asset (ARC-09-C285).
+- The release writes the macOS guide and its page as it writes the Windows pair (`writeInstallTag` for the Markdown, `writeGuideRelease` for the page). Both are in
+  the signed manifest's coverage (`packages/snowarch/src/licence/integrity.ts`), and `release.yml` attaches the page to the GitHub Release after the Windows page, as
+  its ninth asset (ARC-09-C300).
+- CI runs Node 26 on macOS, as a `test` cell and a `bootstrap` cell: 63 required contexts, where there were 61. The macOS guide installs Node.js 26.13.1, so a Mac
+  gets the cells that Node 26 on Windows has had since ARC-09-C271. The README, the install page, the Windows guide and its page say that Node.js 20, 22, 24 and 26
+  are tested on Linux, macOS and Windows (ARC-09-C300).
+- A docs bump checks the macOS guides' corpus figures, `[docs] 51,186 files · 286 MB working tree` and "all 51,178 pages", against the corpus and against the working
+  tree the bump measured, which on a Mac is the Linux one; the pull request says which differ (ARC-09-C300).
+- `docs/INSTALL.md`, and the README that is composed from it, link the macOS guide beside the Windows one (ARC-09-C300).
+- `docs/INSTALL-WINDOWS.md` and `docs/AI-Architect-Windows-Install-Guide.html` record a second end-to-end install, on a new laptop on 19 November 2026, that followed
+  every step as written, with no errors. The subtitle and the hero line, the list of what has not been tested and the closing record say both days; the second install is
+  recorded with no machine, user or version, because none was recorded. `tests/install-windows-guide-html.test.mjs` holds each of those places (ARC-09-C300).
 - `.gitattributes` gains `*.html text eol=lf`: `tests/eol.test.mjs` asks every tracked extension for a rule, and the interactive guide is the first
   HTML file in the tree. A page that a Windows checkout rewrote to CRLF would no longer match the hash the signed manifest holds for it (ARC-09-C285).
 - The pinned-clone guards of `tests/install-page.test.mjs` read the interactive guide too: its clone command quiets git's detached-HEAD advice,

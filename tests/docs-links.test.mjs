@@ -36,6 +36,8 @@ const DOCS = ['docs/CONTRIBUTING.md', 'docs/INSTALL.md', 'docs/ARCHITECTURE.md',
   'docs/MIGRATION.md',
   // ARC-09-C271 — the Windows end user's page, which is linked from the README and the install page.
   'docs/INSTALL-WINDOWS.md',
+  // ARC-09-C300 — the Mac end user's page, linked from the README and the install page beside the Windows one. Its fenced `./snowarch` lines are CLI verbs.
+  'docs/INSTALL-MACOS.md',
   // ARC-09-C102. The operator's guide, the page most people read after the install page. It was
   // never on this list, and the list is hand-kept: it linked four documents that do not exist, one
   // of them pinned as deleted by `tests/no-legacy-names.test.mjs`, and `tests/install-page.test.mjs`

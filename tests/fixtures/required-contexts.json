@@ -13,12 +13,13 @@
       "why": "the two Windows shards of upgrade-e2e; `upgrade-e2e (windows-latest)` needs both and is the context main's protection names, so a red shard blocks through it and protection is unchanged by the split"
     }
   },
-  "count": 61,
+  "count": 63,
   "contexts": [
     "actionlint",
     "bootstrap (macos-latest, node 20)",
     "bootstrap (macos-latest, node 22)",
     "bootstrap (macos-latest, node 24)",
+    "bootstrap (macos-latest, node 26)",
     "bootstrap (no-gitbash, windows-latest)",
     "bootstrap (no-node, macos-latest)",
     "bootstrap (no-node, ubuntu-latest)",
@@ -60,6 +61,7 @@
     "test (macos-latest, node 20)",
     "test (macos-latest, node 22)",
     "test (macos-latest, node 24)",
+    "test (macos-latest, node 26)",
     "test (ubuntu-latest, node 20)",
     "test (ubuntu-latest, node 22)",
     "test (ubuntu-latest, node 24)",

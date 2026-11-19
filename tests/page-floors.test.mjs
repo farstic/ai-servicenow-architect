@@ -76,7 +76,8 @@ function plant(text, key, version) {
   return out;
 }
 
-const INSTALL_PAGES = ['README.md', 'docs/INSTALL.md', 'docs/INSTALL-WINDOWS.md'];
+// ARC-09-C300: the macOS guide states the three floors as table rows, as the Windows guide does (the sweep below reads it too, as a page under docs/).
+const INSTALL_PAGES = ['README.md', 'docs/INSTALL.md', 'docs/INSTALL-WINDOWS.md', 'docs/INSTALL-MACOS.md'];
 const LOGS = ['docs/CHANGELOG.md'];
 const SWEPT = ['README.md', ...readdirSync(join(root, 'docs')).filter((f) => f.endsWith('.md')).sort().map((f) => `docs/${f}`)]
   .filter((rel) => !LOGS.includes(rel));
@@ -95,7 +96,7 @@ test('ARC-09-C275 — the guard reads every floor the config holds, and B00 read
   assert.ok(ps.includes("VersionGe $GitV (Floor 'git')"), 'B00 in bootstrap.ps1 no longer compares git with floors.git');
 });
 
-test('ARC-09-C275 — the README, the install page and the Windows guide each state all three floors in a shape this test reads', () => {
+test('ARC-09-C275 — the README, the install page and the Windows and macOS guides each state all three floors in a shape this test reads', () => {
   for (const rel of INSTALL_PAGES) {
     const keys = new Set(statements(read(rel)).map((s) => s.key));
     for (const key of Object.keys(NAMES)) {

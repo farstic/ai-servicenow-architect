@@ -1521,9 +1521,10 @@ door, not so that the archive waits on an empty issue list.
 ## The release workflow, and the rehearsal
 
 `release.yml` runs on `v*` tags only. It re-runs every gate on ubuntu, macOS and Windows, verifies
-that the tag's message describes the tree it is on, and publishes a GitHub Release with eight
-assets: three `doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, and the interactive
-Windows install guide (`docs/AI-Architect-Windows-Install-Guide.html`, ARC-09-C285), which is the page as it is at the tag. Nothing
+that the tag's message describes the tree it is on, and publishes a GitHub Release with nine
+assets: three `doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, and the two interactive
+install guides (`docs/AI-Architect-Windows-Install-Guide.html`, ARC-09-C285, and `docs/AI-Architect-macOS-Install-Guide.html`,
+ARC-09-C300), each of which is the page as it is at the tag. Nothing
 is published until `assert-assets.mjs` has read every report — a doctor report attached to a public Release is permanent in a way a
 pasted one is not.
 
@@ -1534,9 +1535,10 @@ that clone and publishes the manifest; the clone's `main` and tag are pushed;
 `node scripts/release.mjs X.Y.Z --tag-only --push --distribution <clone>` pushes this repository's tag, and refuses a
 clone whose tag is not this tag staged or whose manifest is not signed from it; `release.yml` installs the staged tree on
 three OSes and compares the distribution tag's tree; and the Release with that evidence is published on
-farstic/snowarch. That Release is a hand step, and so is its eighth asset: attach the interactive Windows install guide, as it is
-at the tag, with `gh release upload vX.Y.Z docs/AI-Architect-Windows-Install-Guide.html --repo farstic/snowarch` (ARC-09-C285); the
-Release that `release.yml` makes in this repository carries it already. An rc stays in this repository and is never published there.
+farstic/snowarch. That Release is a hand step, and so are its eighth and ninth assets: attach the two interactive install guides, as they are
+at the tag, with `gh release upload vX.Y.Z docs/AI-Architect-Windows-Install-Guide.html docs/AI-Architect-macOS-Install-Guide.html --repo farstic/snowarch`
+(ARC-09-C285, ARC-09-C300), one call for both files; the Release that `release.yml` makes in this repository carries them already. An rc stays in
+this repository and is never published there.
 
 `release-dryrun` in `ci.yml` runs the same release path on every commit with `--dry-run --offline
 --no-install`, on the same three OSes. It exists because `release.yml` only ever runs on a tag, and
@@ -1573,8 +1575,8 @@ node scripts/release.mjs X.Y.Z-rc.N --tag-only --allow-prerelease --allow-branch
 git push origin vX.Y.Z-rc.N
 ```
 
-Then watch `release.yml`: green on all three OSes, eight assets on the Release (three
-`doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, the Windows install guide), and the two
+Then watch `release.yml`: green on all three OSes, nine assets on the Release (three
+`doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, the Windows and macOS install guides), and the two
 negatives refused. Afterwards delete the Release, the tag and the branch — locally and on the
 remote — and record what the run showed in the fields below.
 
@@ -1708,7 +1710,7 @@ a change needs a paragraph rather than a bullet, that is where it goes.
 
 The checklist, verbatim — paste it into the release pull request's description and tick it:
 
-> 1. **Rehearse it first** — see [The rehearsal](#the-rehearsal--a-standing-step-before-every-release). A throwaway branch, a `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three OSes with its eight assets, then the Release, tag and branch deleted. Every release, not only the first.
+> 1. **Rehearse it first** — see [The rehearsal](#the-rehearsal--a-standing-step-before-every-release). A throwaway branch, a `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three OSes with its nine assets, then the Release, tag and branch deleted. Every release, not only the first.
 > 2. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
 > 3. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
 > 3a. **From 2.1.0, the tag is signed before it is pushed** (ARC-11-C7). `./snowarch licence sign-release vX.Y.Z`, with `--key` the path of your primary key and `--list` your clone of the licences repository, writes `releases/vX.Y.Z.json` there and prints the git commands that publish it; run them. Then `node scripts/release.mjs X.Y.Z --tag-only --push` checks the published manifest against the tag's own tree before it pushes the tag, and refuses one that is missing, unverified or for another tree. A rehearsal's rc tag is signed the same way.
@@ -1738,7 +1740,7 @@ The checklist, verbatim — paste it into the release pull request's description
 >    ARC-09-C206.** The cut renames that block to the version, holding what was written, and opens the next
 >    Unreleased with its open "Known gap" paragraphs carried. A final whose `packages/snowarch/src` changed since the
 >    previous final, with nothing written there, is refused before anything is written.
-> 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md` and the Windows install guide. On farstic/snowarch attach the guide by hand, with the `gh release upload` line of the paragraph on releasing through it.
+> 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md` and the Windows and macOS install guides. On farstic/snowarch attach both guides by hand, with the `gh release upload` line of the paragraph on releasing through it.
 > 7. Update the install page's metrics link if the numbers moved; announce.
 > 8. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
 > 9. **Move `develop` to the next `-dev` version.** This step was missing, and its absence has a
@@ -2779,13 +2781,13 @@ not produce is a required check waiting for ever.
 
 | Job | Cells | Shell | What only this job can answer | Slowest cell (min) |
 |---|---|---|---|---|
-| `test` | 3 OS × node 20/22/24 | node/npm | the suites, the lint, the type-check | 10.3 |
+| `test` | 3 OS × node 20/22/24/26 | node/npm | the suites, the lint, the type-check | 10.3 |
 | `contract` | 3 OS × node 20/22/24 | node/npm | the contract gate, on every platform that ships it | 0.8 |
 | `no-build handshake` | 3 OS | node | the COMMITTED `dist/` answers, with no build step first | 0.8 |
 | `docs-check` | ubuntu | node | the corpus recipe and the citations | 0.2 |
 | `footprint` | ubuntu | node | `node_modules` stays under its limit | 0.1 |
 | `actionlint` | ubuntu | pinned binary | the workflows parse and their expressions type-check | 0.1 |
-| `bootstrap` | 13 (ARC-06-S14) | bash · cmd · powershell | the install promise, executed — including the doctor, the snapshot and the banner as STEPS (ARC-08-S11: steps, not a job, so the protection list did not grow) | 1.9 |
+| `bootstrap` | 15 (13 from ARC-06-S14, then ARC-09-C271 and ARC-09-C300) | bash · cmd · powershell | the install promise, executed — including the doctor, the snapshot and the banner as STEPS (ARC-08-S11: steps, not a job, so the protection list did not grow) | 1.9 |
 | `commitlint` | ubuntu | node | the commit convention, which nothing else enforces | 0.1 |
 | `release-dryrun` | 3 OS | bash | the release path, on every commit — `release.yml` only ever runs on a tag | 9.6 |
 | `upgrade-e2e` | 3 OS × node 22 | bash | an upgrade moves a TREE, and a tree is what a unit test cannot move | 11.1 |
@@ -2841,8 +2843,8 @@ cloning: an installer that edited a tracked file, a state file that does not say
 toggle that is not S05's target, a credential-shaped key left in a config, a corpus that is not at
 the pin, a `.local` anyone can read, a second run that redid the work of the first.
 
-Fourteen cells, three questions. Ten ask whether the install works where Node is present (three
-operating systems × Node 20/22/24, and Windows with Node 26). Three ask whether the launcher finishes design-only ITSELF,
+Fifteen cells, three questions. Eleven ask whether the install works where Node is present (three
+operating systems × Node 20/22/24, and Windows and macOS with Node 26). Three ask whether the launcher finishes design-only ITSELF,
 with no Node to hand over to — in `sh` on macOS and Linux, in PowerShell on Windows. One asks
 whether the Windows path works on a machine with no POSIX shell at all.
 

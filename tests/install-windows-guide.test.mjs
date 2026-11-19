@@ -285,14 +285,15 @@ test('ARC-09-C271 — the other commands exist: mode, doctor, licence check, upg
 test('ARC-09-C271 — what a reader is told about Node.js is what CI runs', () => {
   const node = /\| Node\.js \| ([^|]*) \|/.exec(page);
   assert.ok(node, 'the version table has no Node.js row');
-  assert.match(node[1], /tested with Node\.js 20, 22 and 24 on Windows, macOS and Linux, and with 26 on Windows and Linux/);
+  // ARC-09-C300 — 26 has a cell on macOS now, because the macOS guide installs Node.js 26 there, so all four versions are tested on all three systems.
+  assert.match(node[1], /tested with Node\.js 20, 22, 24 and 26 on Windows, macOS and Linux\.$/);
   const ci = JSON.parse(read('tests/fixtures/required-contexts.json')).contexts;
-  for (const os of ['ubuntu-latest', 'macos-latest', 'windows-latest']) for (const v of [20, 22, 24]) assert.ok(ci.includes(`test (${os}, node ${v})`));
-  assert.ok(ci.includes('test (ubuntu-latest, node 26)') && ci.includes('test (windows-latest, node 26)'));
-  assert.equal(ci.includes('test (macos-latest, node 26)'), false);
+  for (const os of ['ubuntu-latest', 'macos-latest', 'windows-latest']) {
+    for (const v of [20, 22, 24, 26]) assert.ok(ci.includes(`test (${os}, node ${v})`), `test (${os}, node ${v}) is not a context CI produces`);
+  }
   // ...and the README and the install page say the same, in the same words.
   for (const rel of ['README.md', 'docs/INSTALL.md']) {
-    assert.match(read(rel), /Node\.js ≥ \*\*20\*\* \(22 LTS recommended; 20, 22 and 24 tested on Linux, macOS and Windows, 26 on Linux and Windows\)/, rel);
+    assert.match(read(rel), /Node\.js ≥ \*\*20\*\* \(22 LTS recommended; 20, 22, 24 and 26 tested on Linux, macOS and Windows\)/, rel);
   }
 });
 

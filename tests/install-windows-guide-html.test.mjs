@@ -327,7 +327,8 @@ test('ARC-09-C285 — the page ships: it is covered by the signed manifest, and 
   // What `shippedFiles` keeps of a tree (the files tracked at HEAD that this decides are covered), asked of the page itself, so the answer does not wait for a commit.
   const { isCovered } = await import(href('tools/snowarch/lib/licence/manifest.mjs'));
   assert.equal(isCovered(PAGE, COVERAGE), true, 'the staged distribution tree would not hold the page');
-  assert.ok(/gh release create[\s\S]*?install-metrics\.md docs\/AI-Architect-Windows-Install-Guide\.html\n/.test(read('.github/workflows/release.yml')), 'the Release does not carry the page');
+  // The page follows install-metrics.md, and another file may follow the page: the macOS guide is the last asset since ARC-09-C300, so a space or a line end, not only the line end.
+  assert.ok(/gh release create[\s\S]*?install-metrics\.md docs\/AI-Architect-Windows-Install-Guide\.html(?=\s)/.test(read('.github/workflows/release.yml')), 'the Release does not carry the page');
 });
 
 // ── the words ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -339,14 +340,14 @@ const SENTENCES = [
   'It does this in whatever folder you choose, and the wizard says so when it saves; if that folder had let other accounts read the file, the wizard adds a line saying who could, and that the permissions were changed just now.',
   'Your user folder is private to you anyway, so it is the one this guide uses.',
   'If you prefer another folder, use its name in these commands and in Every day. A folder name with a space in it has not been tested.',
-  'v20. Step 2b installs v26.13.0, the version this guide was tested with. The AI Architect is tested with Node.js 20, 22 and 24 on Windows, macOS and Linux, and with 26 on Windows and Linux.',
+  'v20. Step 2b installs v26.13.0, the version this guide was tested with. The AI Architect is tested with Node.js 20, 22, 24 and 26 on Windows, macOS and Linux.',
   'A warn or a fail names the check it comes from. E-31 the licence warns in the last days before the licence ends. With a licence that runs for longer, this line shows no warning.',
   'draw.io is not in %LOCALAPPDATA%\\Programs\\drawio. Repeat 2f and check that the last command answers True.',
   'After the password is saved, the wizard says Its permissions could not be restricted',
   `Your password is saved, but Windows would not let the installer lock the file, so other accounts on this computer might be able to read it. Run ${CLI} doctor --fix. It shows what it will change and changes it when you press Enter. If it cannot lock the file either, send the output of ${CLI} doctor (see Asking for help).`,
   'The installer locks that file, and the folder .local around it, so that only your account and the system can read them (the computer\'s administrators can always take a file over).',
   `${CLI} doctor checks it (check SV-02) and names anyone else who could read the file; ${CLI} doctor --fix repairs it after showing what it will change.`,
-  'This guide was written from one end-to-end install. Four things in it rest on something other than a run:',
+  'This guide was written from one end-to-end install (12 November 2026) and confirmed by a second, on a new laptop on 19 November 2026, that followed every step as written. Four things in it rest on something other than a run:',
   'Windows 10. The test machine ran Windows 11. Windows 10 (version 1809 or later) has the same PowerShell 5.1 and takes the same commands.',
   'Claude Code\'s first-run screens on Windows (Step 3). They are described in general terms because they change with Claude Code\'s releases.',
   'A folder name with a space in it, a folder on a network drive, and a folder that OneDrive or another sync tool manages (Step 4).',
@@ -354,6 +355,7 @@ const SENTENCES = [
   `If you meet a difference, ${CLI} version and ${CLI} doctor (see Asking for help) are what to send.`,
   'Tested end to end on 12 November 2026 on a company laptop: Windows 11 Enterprise (build 26200), a standard user without administrator rights.',
   'PowerShell 7.7.0 (zip; present on the test machine, not needed by this guide)',
+  'A second end-to-end install, on a new laptop on 19 November 2026, followed every step as written, with no errors.',
 ];
 
 test('ARC-09-C285 — the sentences of the review of 2026-11-16 are on the page, and they are the Markdown guide\'s', () => {
@@ -370,6 +372,24 @@ test('ARC-09-C285 — the sentences of the review of 2026-11-16 are on the page,
     assert.equal(pageText.includes(gone) || code.includes(gone), false, `the page still says: ${gone}`);
   }
   assert.doesNotMatch(markup, /LIC-\d{4}-(?!0000)\d{4}/, 'a licence number on a page is the placeholder');
+});
+
+// ARC-09-C300: the guide was run end to end twice, on 12 November 2026 and, by a second install on a new laptop, on 19 November 2026. The second run is recorded
+// with what was confirmed and nothing else (no machine, user or version was recorded for it, so none is written), and every place that dates the tests says both days.
+const SECOND_INSTALL = 'A second end-to-end install, on a new laptop on 19 November 2026, followed every step as written, with no errors.';
+test('ARC-09-C300 — the guide and its page date the end-to-end tests alike (12 and 19 November 2026), and the second install is recorded without a detail', () => {
+  const lines = md.split('\n');
+  // The subtitle of the guide and the hero chip of the page.
+  const subtitle = lines.find((l) => l.startsWith('AI ServiceNow Architect · Windows 10')) ?? '';
+  assert.ok(subtitle, 'the guide lost its subtitle');
+  assert.ok(subtitle.includes('12 November 2026') && subtitle.includes('19 November 2026'), `the subtitle of the guide does not date both tests: ${subtitle}`);
+  const chips = [...markup.matchAll(/<span class="chip"><i><\/i>([^<]*)<\/span>/g)].map((m) => decode(m[1]));
+  assert.ok(chips.includes('Tested end to end · 12 and 19 Nov 2026'), `the hero chip of the page does not date both tests: ${JSON.stringify(chips)}`);
+  // The closing record of each ends with the second install, so no machine, user or version follows it.
+  const record = lines.find((l) => l.startsWith('Tested end to end on ')) ?? '';
+  assert.ok(record.trimEnd().endsWith(SECOND_INSTALL), 'the record of the guide does not end with the second install');
+  const foot = decode(/<div class="foot">([^<]*)<\/div>/.exec(markup)?.[1] ?? '');
+  assert.ok(foot.trimEnd().endsWith(SECOND_INSTALL), 'the record of the page does not end with the second install');
 });
 
 // The screens of the page are the guide's. What the guide has no line for is the reader's own typing, the lines that stand for others left out, and these.
