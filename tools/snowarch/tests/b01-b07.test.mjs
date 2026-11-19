@@ -16,6 +16,9 @@ import {
 import { cloudSyncProvider, cloudSyncWarning, isUnderCloudSyncFolder } from '../lib/cloud-sync.mjs';
 import { checkMcpJson, checkSettingsJson } from '../lib/registration.mjs';
 import { tempDir } from './helpers/temp.mjs';
+import { icloudMachine, icloudRows } from './helpers/icloud-machine.mjs';
+import { warningsFrom } from '../lib/steps/B09.mjs';
+import { stepContext } from '../lib/bootstrap.mjs';
 import { keyPair, listRepo, manifestDoc, productKeys } from './helpers/licence.mjs';
 import { readManifestCache } from '../lib/licence/manifest.mjs';
 import { readDefaultLabel, readDefaultSummary } from '../../../packages/snowarch/dist/store/label.js';
@@ -394,6 +397,77 @@ test('a cloud-synced checkout WARNs and carries on — it is the user\'s call, n
   const r = await runB01(ctxFor(root, { state }));
   assert.equal(r.status, 'ok', 'a quiet path must not warn');
   assert.equal(r.data.cloudSync, undefined);
+});
+
+// ARC-09-C305 — iCloud's "Desktop & Documents Folders". The cases are the rows of `icloudFolders[]` in the shared fixture, through each row's stand-in machine
+// (tools/snowarch/tests/helpers/icloud-machine.mjs); none of them reads this machine or starts `defaults`.
+const ICLOUD_WARNING = (folder) => `this checkout is inside a cloud-synced folder (iCloud Drive, which copies ${folder} while Desktop & Documents Folders is on) — `
+  + '.local/instances.json will be synced even at mode 0600; prefer a local path such as ~/work/ (D-04)';
+
+test('ARC-09-C305 — the warning names iCloud Drive and the folder for a checkout in Documents or Desktop with the setting on, and nothing else does', () => {
+  const rows = icloudRows();
+  assert.ok(rows.length > 20 && rows.filter((r) => r.folder !== null).length >= 6, 'the fixture has no iCloud rows: every loop below depends on it');
+  for (const row of rows) {
+    const { seams, asked } = icloudMachine(row);
+    const said = cloudSyncWarning(row.path, { env: {}, home: row.home, platform: row.platform, icloud: seams });
+    const say = `${row.path} — ${row.why}`;
+    assert.equal(said, row.folder === null ? null : ICLOUD_WARNING(row.folder), say);
+    assert.deepEqual(asked, row.asked, `the reader was asked for the wrong keys — ${say}`);
+    // A caller that is not told a home folder has no answer for these two folders, as the engine never had: the path alone names no vendor.
+    assert.equal(cloudSyncWarning(row.path, { env: {}, platform: row.platform, icloud: icloudMachine(row).seams }), null, `${say}: answered with no home folder`);
+  }
+  // The named providers are unchanged and answered first, and the reader is not asked for a path that a vendor's name already answers.
+  const asked = [];
+  const icloud = { platform: 'darwin', euid: 501, realpath: (p) => p, isDirectory: () => true, read: (k) => { asked.push(k); return '1\n'; } };
+  const vendor = cloudSyncWarning('/Users/me/Documents/Dropbox/repo', { env: {}, home: '/Users/me', icloud });
+  assert.match(vendor, /cloud-synced folder \(Dropbox\) — /);
+  assert.deepEqual(asked, []);
+  assert.equal(cloudSyncWarning('/Users/x/Dropbox/repo'), cloudSyncWarning('/Users/x/Dropbox/repo', { env: {}, home: '' }), 'the sentence for a named vendor changed');
+});
+
+test('ARC-09-C305 — B01 records the iCloud warning for a checkout in Documents and B09 repeats it; elsewhere, or with no home folder, B01 is quiet and starts nothing', async () => {
+  const root = makeCheckout();
+  // The checkout is real and in a temp folder; the rule's inputs are what is pretended: its real path is under /Users/me/Documents, the home folder is
+  // /Users/me, and the setting reads 1. The seams carry the platform, so a Windows runner runs the same case.
+  const asked = [];
+  const icloud = {
+    platform: 'darwin', euid: 501, isDirectory: () => true,
+    realpath: (p) => (p.startsWith(root) ? p.replace(root, '/Users/me/Documents/repo') : p),
+    read: (k) => { asked.push(k); return '1\n'; },
+  };
+  const r = await runB01(ctxFor(root, { state: { steps: {}, registration: 'project' }, home: '/Users/me', icloud }));
+  // A warning, never a failure: where the checkout is kept is the user's to decide, and the step carries on.
+  assert.equal(r.status, 'warn');
+  assert.ok(r.detail.includes(ICLOUD_WARNING('Documents')), `the step's detail does not say it: ${r.detail}`);
+  assert.equal(r.data.cloudSync, ICLOUD_WARNING('Documents'));
+  assert.deepEqual(asked, ['FXICloudDriveDocuments']);
+  // B09's summary says it again at the end, in the same words.
+  assert.deepEqual(warningsFrom({ steps: { B01: { data: r.data } } }), [ICLOUD_WARNING('Documents')]);
+
+  // Not told a home folder (a caller that is not the entry point): no answer, and the reader is not asked.
+  asked.length = 0;
+  const noHome = await runB01(ctxFor(makeCheckout(), { state: { steps: {}, registration: 'project' }, icloud }));
+  assert.equal(noHome.status, 'ok');
+  assert.equal(noHome.data.cloudSync, undefined);
+  assert.deepEqual(asked, []);
+  // A checkout that is not in Documents or Desktop: quiet, and the reader is not asked.
+  const elsewhere = makeCheckout();
+  const away = await runB01(ctxFor(elsewhere, { state: { steps: {}, registration: 'project' }, home: '/Users/me',
+    icloud: { ...icloud, realpath: (p) => (p.startsWith(elsewhere) ? p.replace(elsewhere, '/Users/me/work/repo') : p) } }));
+  assert.equal(away.status, 'ok');
+  assert.equal(away.data.cloudSync, undefined);
+  assert.deepEqual(asked, []);
+});
+
+test('ARC-09-C305 — the step context carries the home folder the entry point passes to bootstrap, and none when it is not told one', () => {
+  const root = makeCheckout();
+  const node = { present: true, version: '22.11.0' };
+  assert.equal(stepContext({ root, config: config(root), node }).home, '');
+  assert.equal(stepContext({ root, config: config(root), node, home: '/Users/me' }).home, '/Users/me');
+  // bootstrapCommand takes `home` (cli.mjs has always passed it to every command) and gives it to the context the steps read.
+  const source = readFileSync(join(repoRoot, 'tools/snowarch/lib/bootstrap.mjs'), 'utf8').split('\n').filter((l) => !/^\s*(?:\/\/|\/\*|\*)/.test(l)).join('\n');
+  assert.match(source, /home = '',\s*\n\s*cwd = process\.cwd\(\)/, 'bootstrapCommand does not take `home`');
+  assert.match(source, /stepContext\(\{ root, config, env, node, flags, state, home \}\)/, 'bootstrapCommand does not give `home` to the step context');
 });
 
 test('readDefaultLabel returns the label and NOTHING else', () => {

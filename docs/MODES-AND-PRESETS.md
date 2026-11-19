@@ -371,8 +371,17 @@ same import as one step of nine.
 
 - **The `NOW_ASSIST` probe is not a licence check.** It reads a property; an instance can answer
   and still refuse the tools. The screen recommends, and you decide (D-05).
-- **A macOS `~/Documents` redirected into a sync client is not detectable.** There is no environment
+- **A macOS `~/Documents` that a sync client redirected is not detectable.** There is no environment
   variable to read and the path says nothing. Windows has `%OneDrive%`; macOS has nothing equivalent.
+  iCloud Drive's own **Desktop & Documents Folders** is the exception (the next item).
+- **iCloud Drive's "Desktop & Documents Folders" is read from Finder's preferences, and only in part.** A checkout in
+  `~/Documents` or `~/Desktop` has no vendor name in its path, so the wizard's cloud-sync question (§6: the same warning
+  as for any provider, stop by default), the installer's check, the server's start-up line and the doctor's E-34 in the
+  full `doctor` ask one rule. It reads the setting only for a checkout inside one of those two folders and never as root:
+  one `defaults read com.apple.finder FXICloudDriveDocuments` (or `FXICloudDriveDesktop`), and only the exact value `1`
+  counts as on. The keys are Apple's and undocumented, and were measured on macOS 26 only. What a Mac before that
+  prints, and what any Mac prints when the setting is off, are not known, so anything but `1` stays silent. A
+  `Documents` or `Desktop` that is a link to another place is not read (ARC-09-C305).
 - **Team stores are a roadmap item.** `--global` is per user, not per team; a shared store is a
   different security question and is not answered here.
 - **`client_credentials` is not supported.** The wizard offers Basic and the OAuth password grant

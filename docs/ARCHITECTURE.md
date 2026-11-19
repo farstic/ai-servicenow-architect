@@ -1288,6 +1288,7 @@ about one registry rather than several:
 | `E-24` | legacy | legacy wizard store | yes | — |
 | `E-30` | legacy | MCP registrations under folders that no longer exist | — | — |
 | `E-25` | host | cloud-sync folder | yes | — |
+| `E-34` | host | iCloud Desktop & Documents | — | — |
 | `E-26` | host | proxy and CA environment | yes | — |
 | `E-27` | host | Claude Code registration status | — | — |
 | `E-28` | host | release currency | — | — |
@@ -1686,5 +1687,5 @@ of `engine.config.json` |
 | D36 | `CLAUDE.md` gates on `mcp__<key>__` | E-20 | re-targeted to the generated rule file, the protocol page and both registrations |
 | D37 | tool-name currency against the rename map | E-19 | `retired-names.json` |
 
-**New checks with no old counterpart** (18): `E-06`, `E-11`, `E-29`, `E-31`, `E-32`, `E-15`, `E-33`, `E-18`, `E-21`, `E-22`, `E-30`, `E-25`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
+**New checks with no old counterpart** (19): `E-06`, `E-11`, `E-29`, `E-31`, `E-32`, `E-15`, `E-33`, `E-18`, `E-21`, `E-22`, `E-30`, `E-25`, `E-34`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
 <!-- /generated:doctor-mapping -->

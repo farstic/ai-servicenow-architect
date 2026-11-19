@@ -100,12 +100,15 @@ const stdinAsker = (input, output) => lineReader(input, output);
  * server's ten, where there was no context to add one to.
  */
 export function stepContext({ root, config, env = process.env, platform = process.platform,
-  node, flags = {}, state = null, licence = licenceStatus(root) }) {
+  node, flags = {}, state = null, licence = licenceStatus(root), home = '' }) {
   return {
     root,
     config,
     env,
     platform,
+    // ARC-09-C305 — the reader's home folder, from the entry point (nothing under `lib/` reads it itself). B01 asks the one rule for iCloud's
+    // "Desktop & Documents Folders" with it; empty means "not told", and that rule then has no answer.
+    home,
     node,
     areaCount: countAreas(root, config),
     instanceFile: flags['instance-file'] ?? null,
@@ -126,6 +129,8 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
   // ARGUMENT is all that changes in this file: its own three launcher sites stay with the
   // e2e-trigger slice, and this edit is why slice 2 runs the five `tests/upgrade` files.
   platform = process.platform,
+  // ARC-09-C305 — the home folder `cli.mjs` has always passed to every command and this one ignored; B01 needs it for iCloud's folders.
+  home = '',
   cwd = process.cwd(), probe = undefined, exec = undefined, asker = null } = {}) {
   // With `--json`, stdout carries ONE thing: the object. The plan screen is prose, so it follows
   // every other human line to stderr — a caller piping this into `jq` must not have to strip a
@@ -192,7 +197,7 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
 
   const node = nodeInfo();
   const ctx = {
-    ...stepContext({ root, config, env, node, flags, state }),
+    ...stepContext({ root, config, env, node, flags, state, home }),
     // Filled in from the accepted plan below. Present here so a step reading `ctx.mode` before the
     // plan is accepted gets `null` rather than a silently wrong default.
     mode: null, docs: null,

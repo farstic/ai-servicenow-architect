@@ -41,8 +41,9 @@ import {
 import { appendAudit, type CliAuditEntry } from '../audit/writer.js';
 import { CORE_TOOLS_UNCONFIGURED } from '../tools/status.js';
 import {
-  detectCloudSync, globalStorePath, maskPath, maskUsername, type StoreSource,
+  globalStorePath, maskPath, maskUsername, type StoreSource,
 } from '../store/paths.js';
+import { findCloudSync, type IcloudSeams } from '../store/icloud.js';
 import { describeNetworkEnv, formatFailure, probeReachability, reachabilityMenu } from '../servicenow/reachability.js';
 import { fillMeaning, fillRemedy } from '../servicenow/net-errors.js';
 import { probeAll, PROBE_FIELDS, probeFieldText, toLastProbe, type AuthProbe, type LastProbe,
@@ -699,6 +700,8 @@ export interface AddDeps {
   platform?: NodeJS.Platform;
   /** ARC-09-C272 — the lock tools; the real ones for this process when absent. A test supplies its own. */
   acl?: AclTools;
+  /** ARC-09-C305 — what the gate asks the machine about iCloud's "Desktop & Documents Folders"; the real answers when absent. A test supplies its own. */
+  icloud?: IcloudSeams;
 }
 
 
@@ -722,13 +725,16 @@ export { probeOptionsFor } from '../servicenow/probe-client.js';
  * remedy's parenthetical would otherwise offer a place that has the same problem.
  */
 export async function cloudSyncGate(storePath: string, options: { yes?: boolean; global?: boolean },
-  io: AddIo, env: NodeJS.ProcessEnv = process.env):
+  io: AddIo, env: NodeJS.ProcessEnv = process.env, icloud?: IcloudSeams):
   Promise<{ ok: boolean; warning?: string }> {
-  const hit = detectCloudSync(dirname(storePath), { env });
+  // ARC-09-C305: the named vendors first, then a checkout in `~/Documents` or `~/Desktop` with iCloud's
+  // "Desktop & Documents Folders" on. The second reads the setting only for a store that is in one of
+  // those two folders, so a store anywhere else costs nothing.
+  const hit = findCloudSync(dirname(storePath), { env, icloud });
   if (!hit) return { ok: true };
 
   const globalPath = globalStorePath();
-  const globalSynced = detectCloudSync(dirname(globalPath), { env }) !== null;
+  const globalSynced = findCloudSync(dirname(globalPath), { env, icloud }) !== null;
   const values = { provider: hit.provider, root: hit.root, global: maskPath(dirname(globalPath)) };
   const meaning = fillMeaning('STORE_IN_CLOUD_SYNC_FOLDER', values);
   const remedy = globalSynced || options.global
@@ -812,12 +818,13 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   // ARC-07-W6. It used to run last among the questions and first among the writes, which is a
   // defensible place for a WRITE gate and the wrong place for a QUESTION: declining it cost the user
   // the password they had typed and the six permissions they had just reviewed, and on macOS —
-  // where Desktop and Documents are in iCloud by default — declining is what Enter did.
+  // where Desktop and Documents are in iCloud by default — declining is what Enter did. (ARC-09-C305
+  // is what lets the gate see that case at all: it reads the setting for a store in either folder.)
   //
   // Nothing above this line asks for anything, so the only thing a `stop` now costs is the label.
   // The warning is still printed again after the save (the `warnings` loop below), so the last thing
   // on screen for somebody who continued is still the reason they should not have.
-  const gate = await cloudSyncGate(storePath, options, io, env);
+  const gate = await cloudSyncGate(storePath, options, io, env, deps.icloud);
   if (!gate.ok) {
     io.write(`${NOTHING_SAVED}\n`);
     return { saved: false, exitCode: EXIT_POLICY, message: NOTHING_SAVED,

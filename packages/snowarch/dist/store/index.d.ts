@@ -1,6 +1,7 @@
 import { type AclTools, type Exposure } from './acl.js';
 import { type Store, type StoreError } from './schema.js';
 export * from './paths.js';
+export * from './icloud.js';
 export * from './schema.js';
 /**
  * POSIX mode check.

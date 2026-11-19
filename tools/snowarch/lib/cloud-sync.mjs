@@ -12,6 +12,9 @@
 // `paths.js` imports `node:` modules only — which matters, because B01 runs in a design-only
 // checkout that has never seen `npm ci`.
 import { isUnderCloudSyncFolder } from '../../../packages/snowarch/dist/store/paths.js';
+// ARC-09-C305 — the one rule for iCloud's "Desktop & Documents Folders", read from the same committed build. It imports `node:` modules and one
+// file that imports nothing, so it loads in a checkout that has never seen `npm ci`, as `paths.js` does.
+import { detectIcloudFolders, finderKeyReader } from '../../../packages/snowarch/dist/store/icloud.js';
 
 /**
  * Segment → provider name. Ordered, and `Mobile Documents` sits first because macOS spells iCloud
@@ -94,14 +97,42 @@ export function cloudSyncProvider(p, { env = process.env } = {}) {
 }
 
 /**
+ * ARC-09-C305 — the provider's name for a checkout in a folder that iCloud Drive copies. `~/Documents` and `~/Desktop` carry no vendor name,
+ * and the setting that makes them synced is not in the path, so this is a different question from `cloudSyncProvider`'s, asked after it.
+ * The words say what the reader can check for themselves: which folder, and which setting.
+ */
+export const icloudProviderLabel = (folder) => `iCloud Drive, which copies ${folder} while Desktop & Documents Folders is on`;
+
+/**
+ * ARC-09-C305 — is this checkout in `~/Documents` or `~/Desktop`, with iCloud's "Desktop & Documents Folders" on? The hit
+ * (`{ provider: 'iCloud Drive', root, folder }`) or null. The rule is `detectIcloudFolders` of the committed server build, so the wizard, the server,
+ * the installer and the doctor cannot disagree about it; the path is asked first and the setting (one `defaults` read) only on a hit.
+ *
+ * `home` is the reader's home folder, which the caller supplies (the engine has no ambient home of its own); without one there is no answer.
+ * `icloud` holds the seams of that rule (the platform, the user id, the reader of the setting) for a case that is not a Mac, and wins over `platform`.
+ * `exec` is the caller's way of starting a process, as the doctor's other checks take it: when it is given and `icloud` brings no reader, the one
+ * `defaults` read goes through it, so a run that stubs every process stubs this one too.
+ */
+export function icloudFoldersHit(root, { home = '', platform, icloud = {}, exec } = {}) {
+  if (!home) return null;
+  const read = icloud.read ?? (exec ? finderKeyReader(exec) : undefined);
+  return detectIcloudFolders(root, { ...(platform ? { platform } : {}), ...icloud, ...(read ? { read } : {}), home });
+}
+
+/**
  * The sentence, or null.
  *
  * A WARN and never a FAIL: the user may have a reason, and refusing to install because of where
  * they keep their code would be this tool deciding something that is theirs to decide. What it must
  * not do is stay quiet — mode 0600 is a LOCAL permission, and the sync client runs as the same user.
+ *
+ * The named providers are answered from the path alone. iCloud's own folders (ARC-09-C305) are asked after them, and only when the caller
+ * gives a `home`: the installer's B01 does, and a caller that does not is as quiet about them as it always was.
  */
-export function cloudSyncWarning(root, { env = process.env } = {}) {
-  const provider = cloudSyncProvider(root, { env });
+export function cloudSyncWarning(root, { env = process.env, home = '', platform, icloud } = {}) {
+  const named = cloudSyncProvider(root, { env });
+  const hit = named ? null : icloudFoldersHit(root, { home, platform, icloud });
+  const provider = named ?? (hit ? icloudProviderLabel(hit.folder) : null);
   if (!provider) return null;
   return `this checkout is inside a cloud-synced folder (${provider}) — `
     + '.local/instances.json will be synced even at mode 0600; prefer a local path such as '

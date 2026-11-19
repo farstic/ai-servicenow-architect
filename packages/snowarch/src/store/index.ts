@@ -16,6 +16,7 @@ import { maskPath, shellRemedy } from './paths.js';
 import { cliSpelling } from '../cli/tty.js';
 
 export * from './paths.js';
+export * from './icloud.js';
 export * from './schema.js';
 
 const isWindows = process.platform === 'win32';

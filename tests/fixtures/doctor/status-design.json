@@ -570,6 +570,20 @@
       }
     },
     {
+      "id": "E-34",
+      "section": "host",
+      "title": "iCloud Desktop & Documents",
+      "status": "skip",
+      "severity": "warn",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
       "id": "E-26",
       "section": "host",
       "title": "proxy and CA environment",
@@ -765,9 +779,9 @@
     "ok": 15,
     "warn": 0,
     "fail": 1,
-    "skip": 28,
+    "skip": 29,
     "fixable": 0,
     "notInSection": 0,
-    "notInQuick": 27
+    "notInQuick": 28
   }
 }

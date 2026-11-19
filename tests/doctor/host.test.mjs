@@ -33,6 +33,7 @@ import { which } from '../../tools/snowarch/lib/which.mjs';
 import { classifyStatus, hostChecks, inspectCa, PEM_HEADER,
   readVar } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { icloudMachine, icloudRows } from '../../tools/snowarch/tests/helpers/icloud-machine.mjs';
 import { bootstrap, contextFor, greenTree, runById } from './helpers/tree.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -240,6 +241,87 @@ test('ARC-08-C2 — the bootstrap\'s two halves agree about a redirected folder'
   // `process.env`. Asserted rather than assumed: an injected empty env overrides the ambient one.
   const row = fixture.env.find((r) => r.provider !== null);
   assert.equal(cloudSyncProvider(row.path, { env: {} }), null);
+});
+
+// ARC-09-C305 — E-34, E-25's twin for the one cloud-sync folder no path can show: iCloud Drive's "Desktop & Documents Folders". Its cases are the rows of
+// `icloudFolders[]` in the same fixture the server's rule answers to (packages/snowarch/tests/store/icloud.test.ts), through the stand-in machine of each row; none of them
+// reads this machine, and none starts `defaults`.
+const E34_DETAIL = (folder) => `checkout is under a cloud-sync folder (iCloud Drive, which copies ${folder} while Desktop & Documents Folders is on) — `
+  + '.local/instances.json (0600) will still be synced; move the checkout outside the synced tree or keep this instance read-only';
+
+test('ARC-09-C305 — E-34 is a check of the full doctor: it starts a process, so it is not quick, and E-25 stays the path-only check it was', () => {
+  const e34 = checks.find((c) => c.id === 'E-34');
+  const e25 = checks.find((c) => c.id === 'E-25');
+  assert.ok(e34, 'the host section has no E-34');
+  assert.deepEqual([e34.section, e34.severity, e34.quick, e34.network, e34.spawns, e34.fixable], ['host', 'warn', false, false, true, false]);
+  assert.equal(e34.title, 'iCloud Desktop & Documents');
+  // E-25 is unchanged: quick, and it starts nothing (a quick check may not: runner.mjs).
+  assert.deepEqual([e25.quick, e25.spawns], [true, false]);
+  // It comes right after E-25, because the registry's order is the report's.
+  const ids = checks.map((c) => c.id);
+  assert.equal(ids.indexOf('E-34'), ids.indexOf('E-25') + 1);
+});
+
+test('ARC-09-C305 — E-34 answers every row of the shared fixture, and asks the reader for exactly the keys the row names', async () => {
+  const rows = icloudRows();
+  assert.ok(rows.length > 20, 'the fixture has no iCloud rows: every loop below depends on it');
+  assert.ok(rows.filter((r) => r.folder !== null).length >= 6 && rows.filter((r) => r.folder === null).length >= 15, 'the rows lost their hits or their quiet cases');
+  for (const row of rows) {
+    const { seams, asked } = icloudMachine(row);
+    const r = await runById(checks, 'E-34', { root: row.path, platform: row.platform, env: {}, config: {}, home: row.home, icloud: seams });
+    const say = `${row.path} — ${row.why}`;
+    if (row.platform !== 'darwin') {
+      // `ok` and not `skip`: the snapshots hold every platform to one answer for the same install, and a system without the setting has nothing to warn about.
+      assert.equal(r.status, 'ok', say);
+      assert.equal(r.detail, 'only a Mac has Desktop & Documents Folders', say);
+      assert.equal(r.data.provider, null, say);
+    } else if (row.folder === null) {
+      assert.equal(r.status, 'ok', say);
+      assert.equal(r.detail, 'not in a folder iCloud Drive copies', say);
+      assert.equal(r.data.provider, null, say);
+    } else {
+      assert.equal(r.status, 'warn', say);
+      assert.equal(r.detail, E34_DETAIL(row.folder), say);
+      assert.equal(r.remedy, 'move the checkout to a local path such as ~/work/ (D-04)', say);
+      assert.deepEqual(r.data, { provider: 'iCloud Drive', folder: row.folder }, say);
+    }
+    assert.deepEqual(asked, row.asked, `the reader was asked for the wrong keys — ${say}`);
+  }
+});
+
+test('ARC-09-C305 — E-34 gives the reader the same way out as E-25, and is the iCloud rule alone: a vendor folder inside Documents is E-25\'s for the vendor and E-34\'s for iCloud', async () => {
+  const row = icloudRows().find((r) => r.folder === 'Documents');
+  const { seams } = icloudMachine(row);
+  const iCloud = await runById(checks, 'E-34', { root: row.path, platform: 'darwin', env: {}, config: {}, home: row.home, icloud: seams });
+  const vendor = await runById(checks, 'E-25', { root: '/Users/x/Dropbox/repo', platform: 'darwin', env: {}, config: {}, home: '' });
+  assert.equal(iCloud.remedy, vendor.remedy, 'the two checks give the reader two different ways out of the same problem');
+  // Both are true of a Dropbox folder inside Documents while iCloud copies Documents, so both warn: E-25 names Dropbox from the path, E-34 reads the setting.
+  const asked = [];
+  const icloud = { platform: 'darwin', euid: 501, realpath: (p) => p, isDirectory: () => true, read: (k) => { asked.push(k); return '1\n'; } };
+  const root = '/Users/me/Documents/Dropbox/repo';
+  const named = await runById(checks, 'E-25', { root, platform: 'darwin', env: {}, config: {}, home: '/Users/me' });
+  const copied = await runById(checks, 'E-34', { root, platform: 'darwin', env: {}, config: {}, home: '/Users/me', icloud });
+  assert.deepEqual([named.status, named.data.provider], ['warn', 'Dropbox']);
+  assert.deepEqual([copied.status, copied.data.provider, copied.data.folder], ['warn', 'iCloud Drive', 'Documents']);
+  assert.deepEqual(asked, ['FXICloudDriveDocuments'], 'E-25 reads no setting: only E-34 asks the reader, once');
+});
+
+test('ARC-09-C305 — E-34 starts its one process through the context\'s own exec, and only for a checkout in Documents or Desktop', async () => {
+  // A run that stubs every process stubs this one too: no `ctx.icloud.read`, and the context's `exec` is what the reader is built on.
+  const calls = [];
+  const exec = (file, args) => { calls.push([file, ...args]); return '1\n'; };
+  const base = { platform: 'darwin', euid: 501, realpath: (p) => p, isDirectory: () => true };
+  const inDocuments = await runById(checks, 'E-34', { root: '/Users/me/Documents/work/repo', platform: 'darwin', env: {}, config: {}, home: '/Users/me', exec, icloud: base });
+  assert.equal(inDocuments.status, 'warn');
+  assert.deepEqual(calls, [['/usr/bin/defaults', 'read', 'com.apple.finder', 'FXICloudDriveDocuments']]);
+  calls.length = 0;
+  const elsewhere = await runById(checks, 'E-34', { root: '/Users/me/work/repo', platform: 'darwin', env: {}, config: {}, home: '/Users/me', exec, icloud: base });
+  assert.equal(elsewhere.status, 'ok');
+  assert.deepEqual(calls, [], 'a checkout that is not in Documents or Desktop started a process');
+  // And with no home folder told (a caller that is not given one) there is no answer, and nothing is started.
+  const noHome = await runById(checks, 'E-34', { root: '/Users/me/Documents/work/repo', platform: 'darwin', env: {}, config: {}, home: '', exec, icloud: base });
+  assert.equal(noHome.status, 'ok');
+  assert.deepEqual(calls, []);
 });
 
 // AC 6.

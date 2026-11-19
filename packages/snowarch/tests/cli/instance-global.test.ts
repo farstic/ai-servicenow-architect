@@ -393,6 +393,82 @@ describe('AC 4 — a checkout inside a synced folder', () => {
   });
 });
 
+describe('AC 4b — a checkout in Documents, with iCloud\'s "Desktop & Documents Folders" on (ARC-09-C305)', () => {
+  /**
+   * Real directories, a pretended Mac: the checkout is `<base>/Documents/work/repo` and the home folder the rule compares with is `<base>`.
+   * The setting is the one thing pretended, and the seam logs what it was asked, because a gate that spawned a process for a checkout
+   * that is not in Documents or Desktop would be a gate that costs every run something.
+   */
+  const inDocuments = (answer: (key: string) => string | null = () => '1\n') => {
+    const dir = join(base, 'Documents', 'work', 'repo');
+    mkdirSync(join(dir, '.local'), { recursive: true, mode: 0o700 });
+    process.env.CLAUDE_PROJECT_DIR = dir;
+    const asked: string[] = [];
+    const icloud = { platform: 'darwin' as const, home: base, euid: 501, read: (key: string) => { asked.push(key); return answer(key); } };
+    return { store: join(dir, '.local', 'instances.json'), icloud, asked };
+  };
+
+  it('the default is STOP, exactly as for a Dropbox folder: Enter writes nothing and the reader is asked for Documents once', async () => {
+    const { store, icloud, asked } = inDocuments();
+    const terminal = io(['']);
+    const result = await runAdd(addOptions({ yes: false, noProbes: true }), terminal, { ...addDeps(), icloud });
+    expect(result.exitCode).toBe(EXIT_POLICY);
+    expect(existsSync(store), 'nothing was written').toBe(false);
+    expect(terminal.written()).toContain('WARN STORE_IN_CLOUD_SYNC_FOLDER');
+    expect(terminal.written()).toContain('iCloud Drive');
+    expect(terminal.written()).toContain(join(base, 'Documents').replace(/\\/g, '/'));
+    expect(terminal.written()).toMatch(/\[1\] stop — nothing is saved.* · Enter picks this/);
+    expect(asked).toEqual(['FXICloudDriveDocuments']);
+  });
+
+  it('--yes proceeds with the warning, as it does for every other provider', async () => {
+    const { store, icloud } = inDocuments();
+    const gate = await cloudSyncGate(store, { yes: true }, io([]), process.env, icloud);
+    expect(gate.ok).toBe(true);
+    expect(gate.warning).toContain('iCloud Drive');
+  });
+
+  it('offers --global while the global store is somewhere else, and stops offering it when that store is in Documents too', async () => {
+    // The Dropbox case above sets `global: true`, which shortens the remedy by itself. Here the option is absent, so the only thing that can shorten it
+    // is that the GLOBAL store is itself in a folder iCloud copies: advice to move there would be advice that cannot be taken.
+    const { store, icloud } = inDocuments();
+    const elsewhere = await cloudSyncGate(store, { yes: true }, io([]), process.env, icloud);
+    expect(elsewhere.warning).toContain('keep credentials in the global store');
+    process.env.XDG_CONFIG_HOME = join(base, 'Documents', 'config');
+    process.env.APPDATA = join(base, 'Documents', 'AppData');
+    const inside = await cloudSyncGate(store, { yes: true }, io([]), process.env, icloud);
+    expect(inside.warning).toContain('iCloud Drive');
+    expect(inside.warning).toContain('move the checkout outside the synced folder');
+    expect(inside.warning).not.toContain('keep credentials in the global store');
+  });
+
+  it('with the setting off the gate is quiet and asks nothing', async () => {
+    const { store, icloud } = inDocuments(() => '0\n');
+    const terminal = io([]);
+    const gate = await cloudSyncGate(store, {}, terminal, process.env, icloud);
+    expect(gate.ok).toBe(true);
+    expect(gate.warning).toBeUndefined();
+    expect(terminal.written()).toBe('');
+  });
+
+  it('a store outside Documents and Desktop never reaches the reader, however the setting reads', async () => {
+    const { icloud, asked } = inDocuments();
+    const gate = await cloudSyncGate(join(checkout, '.local', 'instances.json'), {}, io([]), process.env, icloud);
+    expect(gate.ok).toBe(true);
+    expect(asked).toEqual([]);
+  });
+
+  it('the named vendors are still answered first: Dropbox inside Documents is Dropbox, and the reader is not asked', async () => {
+    const dir = join(base, 'Documents', 'Dropbox', 'repo');
+    mkdirSync(join(dir, '.local'), { recursive: true, mode: 0o700 });
+    const asked: string[] = [];
+    const icloud = { platform: 'darwin' as const, home: base, euid: 501, read: (key: string) => { asked.push(key); return '1\n'; } };
+    const gate = await cloudSyncGate(join(dir, '.local', 'instances.json'), { yes: true }, io([]), process.env, icloud);
+    expect(gate.warning).toContain('Dropbox');
+    expect(asked).toEqual([]);
+  });
+});
+
 describe('the runner\'s own machine', () => {
   it('was never written to — the postcondition every case above depends on', () => {
     // The real path, captured at module load before any variable was redirected, and the real
