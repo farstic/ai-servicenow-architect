@@ -79,7 +79,8 @@ export function makeExec({ env = process.env, plat = process.platform,
   timeoutMs = PROBE_TIMEOUT_MS,
   // And the file system, for the native install's file (ARC-09-C270).
   exists: fileExists = existsSync } = {}) {
-  const exec = (name, args) => {
+  // ARC-09-C303 — `extra.env` is added to the child's environment, for the one caller that must tell git where its index is (engine-repo.mjs).
+  const exec = (name, args, extra = undefined) => {
     const bin = resolveBin(name, { env, platform: plat });
     if (!bin) return { found: false, ok: false, stdout: '', stderr: '' };
     try {
@@ -100,7 +101,7 @@ export function makeExec({ env = process.env, plat = process.platform,
       const useBatch = plat === 'win32' && isBatch(bin);
       const call = useBatch ? batchCommand(bin, args, { env }) : { file: bin, args, options: {} };
       const stdout = run(call.file, call.args,
-        { encoding: 'utf8', stdio: 'pipe', timeout: timeoutMs, ...call.options });
+        { encoding: 'utf8', stdio: 'pipe', timeout: timeoutMs, ...call.options, ...(extra?.env ? { env: { ...env, ...extra.env } } : {}) });
       return { found: true, ok: true, stdout, stderr: '', bin };
     } catch (e) {
       return { found: true, ok: false, stdout: String(e.stdout ?? ''),
