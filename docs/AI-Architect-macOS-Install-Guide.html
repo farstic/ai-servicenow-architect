@@ -514,9 +514,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <div class="call warn"><strong>No Homebrew, no sudo</strong><p>This guide does not use Homebrew. If a message from the AI Architect suggests <code class="ic">brew install …</code>, install that program as in this step instead: Git in 2a, Node.js in 2b, draw.io in 2f, LibreOffice in 2g. No command in this guide starts with <code class="ic">sudo</code>, and you should never put <code class="ic">sudo</code> in front of one: the command would run with the administrator's rights, and the files it makes may not be changeable from your own account later.</p></div>
 
         <h3><b>2a</b>Git (Apple's Command Line Tools)</h3>
-        <p>Git downloads the AI Architect and keeps it up to date. On a Mac, Git comes with Apple's Command Line Tools, also called the Xcode Command Line Tools.</p>
+        <p>Git downloads the AI Architect and keeps it up to date. On a Mac, Git comes with Apple's Command Line Tools, also called the Xcode Command Line Tools: Apple's free developer tools for Terminal. Besides Git, which Step 4 needs, they bring python3, which the Word documents need.</p>
         <div class="stack"><div data-cmd="s2a-clt"></div></div>
-        <p>A window from macOS offers to install the command line developer tools. In Terminal the line that ends in <code class="ic">%</code> may come back at once: the install goes on in that window, so wait for the window, not for Terminal. Click <span class="ui">Install</span> and accept the licence agreement. The download can take a while: wait until the window says that the software was installed, then click <span class="ui">Done</span>.</p>
+        <p>A window from macOS offers to install the command line developer tools. In Terminal the line that ends in <code class="ic">%</code> may come back at once: the install goes on in that window, so wait for the window, not for Terminal. Click <span class="ui">Install</span> and accept the licence agreement. The install can take a while, and you need not wait for it: do 2b, 2c, 2d, 2f and 2g meanwhile. 2e and Step 4 need it finished. When the window says that the software was installed, click <span class="ui">Done</span>.</p>
         <p>If Terminal answers instead with a line saying that the command line tools are already installed (it may start with <code class="ic">xcode-select: error:</code>, which is harmless here), they are on your Mac already. Go on.</p>
         <p>Check that Git is there. On a Mac without the tools, this command may open the same window as above: install them as described there, then run it again.</p>
         <div class="stack"><div data-cmd="s2a-check"></div></div>
@@ -528,8 +528,10 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <div class="stack"><div data-cmd="s2b-dir"></div></div>
         <p>The folder is <code class="ic">snowarch-dl</code> in your home folder. It holds only downloaded files; you can move it to the Trash once the install is done and 2g has worked.</p>
         <p>The download commands of 2b, 2f and 2g show a small table of numbers while they work. Wait until the line that ends in <code class="ic">%</code> comes back.</p>
-        <p>Node.js comes as an archive that needs no installer and no password. Download it:</p>
+        <p>Node.js comes as an archive that needs no installer and no password. It is about 60 MB. Download it:</p>
         <div class="stack"><div data-cmd="s2b-dl-arm64"></div></div>
+        <p>The file is 58,340,590 bytes. When all of it has arrived, the last line of the table starts with <code class="ic">100</code> and shows <code class="ic">55.6M</code> twice: the table counts in units of 1,048,576 bytes. Then the line that ends in <code class="ic">%</code> comes back. The speed and time columns differ from Mac to Mac; only the <code class="ic">100</code> and the size must match. If the table stops before <code class="ic">100</code>, or a message appears, the download did not finish: run the same command again.</p>
+        <div data-term="dl-node" data-label="On screen (an example; the speed and the times differ)"></div>
         <p><b>Optional.</b> Check that you have the file that the Node.js project published.</p>
         <div class="stack"><div data-cmd="s2b-sha"></div></div>
         <p>It answers with a line that starts with the same 64 letters and digits as the example; your folder name differs. If they differ, run the download again, and if they still differ, stop and ask for help (see <a href="#help">Asking for help</a>).</p>
@@ -544,7 +546,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>The AI assistant that the Architect runs in.</p>
         <div class="stack"><div data-cmd="s2c"></div></div>
         <div data-timer="s2c"></div>
-        <p>It shows no progress while it downloads. When it has finished, it prints <code class="ic">Claude Code successfully installed!</code> and the line that ends in <code class="ic">%</code> comes back. Then read the <i>Setup notes</i> it prints at the end, but do not copy the commands they show: 2d gives you the same fix as one command.</p>
+        <p>It shows no progress while it downloads. When it has finished, it prints the screen below and the line that ends in <code class="ic">%</code> comes back.</p>
+        <div data-term="claude-install" data-label="On screen (an example; your version number may differ)"></div>
+        <p><b>Skip both of the installer's suggestions.</b> Do not run the line under <i>Setup notes</i>: it adds only Claude Code's folder to PATH, and Node.js would stay off it, while the line of 2d adds both folders, Claude Code's and Node.js's. And do not run <code class="ic">claude --help</code> yet: Terminal does not know <code class="ic">claude</code> until 2d has been done. 2d comes next, then 2e.</p>
         <div class="call acc"><strong>Two folders called .local</strong><p>Claude Code has just put itself into <code class="ic">~/.local</code>, a folder in your home folder; Node.js is there too (2b), and so are the two small commands of 2f and 2g. The <code class="ic">.local</code> inside your AI-Arch folder (Step 5) is a different folder: it holds your licence and your saved password. Never delete <code class="ic">~/.local</code>: Claude Code and Node.js would go with it.</p></div>
 
         <h3><b>2d</b>Tell your Mac where Claude Code and Node.js are</h3>
@@ -557,15 +561,16 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>For bash, the check in Step 1 applies. If a command answers <code class="ic">permission denied</code>, see <a href="#trouble">If something goes wrong</a>.</p>
 
         <h3><b>2e</b>Open a fresh window and check</h3>
-        <p>Quit Terminal (in the menu bar, choose <span class="ui">Terminal › Quit Terminal</span>) and open it again as in Step 1, so that it sees the new programs. Then run these four commands, one at a time.</p>
+        <p>Quit Terminal (in the menu bar, choose <span class="ui">Terminal › Quit Terminal</span>) and open it again as in Step 1, so that it sees the new programs. Then run these five commands, one at a time.</p>
         <div class="stack">
           <div data-cmd="s2e-claude"></div>
           <div data-cmd="s2e-git"></div>
           <div data-cmd="s2e-node"></div>
           <div data-cmd="s2e-npm"></div>
+          <div data-cmd="s2e-python"></div>
         </div>
         <div data-term="versions" data-label="On screen (examples; the numbers on your Mac differ)"></div>
-        <p>The last command answers with <span class="glw"><button type="button" class="gl" aria-describedby="tip-npm">npm</button><span class="tip" id="tip-npm" role="tooltip" data-gl="npm"></span></span>'s own version number.</p>
+        <p>The screen leaves out the answer of <code class="ic">npm --version</code>, which is <span class="glw"><button type="button" class="gl" aria-describedby="tip-npm">npm</button><span class="tip" id="tip-npm" role="tooltip" data-gl="npm"></span></span>'s own version number.</p>
         <div class="tw"><table>
           <thead><tr><th>Program</th><th>You need at least</th></tr></thead>
           <tbody>
@@ -573,6 +578,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td>Git</td><td>2.34.1</td></tr>
             <tr><td>Node.js</td><td>v20. Step 2b installs v26.13.1. The AI Architect is tested with Node.js 20, 22, 24 and 26 on Windows, macOS and Linux.</td></tr>
             <tr><td>npm</td><td>Any version. It comes with Node.js.</td></tr>
+            <tr><td>python3</td><td>3.9. Apple's own python3, which comes with the Command Line Tools of 2a, is 3.9.6 and works.</td></tr>
           </tbody>
         </table></div>
 
@@ -580,12 +586,12 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <div class="tool-h"><span>Check your versions</span><span id="oc-v-sum">paste to check</span></div>
           <div class="tool-b">
             <div><label class="l" for="oc-v">Paste what Terminal printed</label>
-            <textarea id="oc-v" rows="4" spellcheck="false" placeholder="Paste the output of the four commands, e.g. 2.1.322 (Claude Code) …"></textarea></div>
+            <textarea id="oc-v" rows="4" spellcheck="false" placeholder="Paste the output of the five commands, e.g. 2.1.328 (Claude Code) …"></textarea></div>
             <div class="oclist" id="oc-v-list" hidden></div>
           </div>
         </div>
-        <p>If one of them answers <code class="ic">command not found</code>, see <a href="#trouble">If something goes wrong</a>.</p>
-        <p>If a number is lower than the table says, do not continue: ask for help, and send these four answers. For git, a number below 2.34.1 means that Apple's Command Line Tools on this Mac are old; on a company Mac, your IT team can install their newest version.</p>
+        <p>If one of them answers <code class="ic">command not found</code>, see <a href="#trouble">If something goes wrong</a>. If <code class="ic">git --version</code> or <code class="ic">python3 --version</code> opens the window of 2a instead of answering, the Command Line Tools are not installed yet: finish 2a, then run that command again.</p>
+        <p>If a number is lower than the table says, do not continue: ask for help, and send these five answers. For git or python3, a number below the table's means that Apple's Command Line Tools on this Mac are old; on a company Mac, your IT team can install their newest version.</p>
 
         <h3><b>2f</b>draw.io Desktop (for the diagrams)</h3>
         <p>The AI Architect draws its diagrams in draw.io and turns them into pictures for your Word documents. Without draw.io Desktop on this Mac it stops with <code class="ic">ERROR: draw.io Desktop not found</code> and cannot make the Word file. draw.io renders on your own Mac; nothing about your diagrams is sent anywhere.</p>
@@ -593,6 +599,8 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>If you have moved the folder <code class="ic">snowarch-dl</code> to the Trash since 2b, run the first command of 2b again first.</p>
         <p>Download the disk image. It is about 160 MB.</p>
         <div class="stack"><div data-cmd="s2f-dl"></div></div>
+        <p>The file is 158,930,055 bytes. When all of it has arrived, the last line of the table starts with <code class="ic">100</code> and shows <code class="ic">151M</code> twice: the table counts in units of 1,048,576 bytes. Then the line that ends in <code class="ic">%</code> comes back. The speed and time columns differ from Mac to Mac; only the <code class="ic">100</code> and the size must match. If the table stops before <code class="ic">100</code>, or a message appears, the download did not finish: run the same command again.</p>
+        <div data-term="dl-drawio" data-label="On screen (an example; the speed and the times differ)"></div>
         <p><b>Optional.</b> Check the download.</p>
         <div class="stack"><div data-cmd="s2f-sha"></div></div>
         <p>It must start with the same 64 letters and digits as the example; if not, run the download again.</p>
@@ -620,6 +628,8 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>If you have moved the folder <code class="ic">snowarch-dl</code> to the Trash since 2b, run the first command of 2b again first.</p>
         <p>Download the disk image. It is about 300 MB, so it takes a few minutes.</p>
         <div class="stack"><div data-cmd="s2g-dl"></div></div>
+        <p>The file is 299,927,705 bytes. When all of it has arrived, the last line of the table starts with <code class="ic">100</code> and shows <code class="ic">286M</code> twice: the table counts in units of 1,048,576 bytes. Then the line that ends in <code class="ic">%</code> comes back. The speed and time columns differ from Mac to Mac; only the <code class="ic">100</code> and the size must match. If the table stops before <code class="ic">100</code>, or a message appears, the download did not finish: run the same command again.</p>
+        <div data-term="dl-libreoffice" data-label="On screen (an example; the speed and the times differ)"></div>
         <p><b>Optional.</b> Check the download.</p>
         <div class="stack"><div data-cmd="s2g-sha"></div></div>
         <p>It must start with the same 64 letters and digits as the example; if not, run the download again.</p>
@@ -989,7 +999,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <tbody>
             <tr><td>ServiceNow SDK</td><td>The Fluent build and deploy tools, the FLUENT permission (wizard question 7).</td></tr>
             <tr><td>Microsoft Word</td><td>Opens and checks the Word documents the Architect writes. Usually installed by your company.</td></tr>
-            <tr><td>python3</td><td>Makes the Word documents on a Mac. It is usually already there; check it below.</td></tr>
+            <tr><td>python3</td><td>Makes the Word documents on a Mac. It is usually already there; its check is in 2e.</td></tr>
           </tbody>
         </table></div>
         <h3><b>■</b>ServiceNow SDK</h3>
@@ -1002,9 +1012,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>Then switch the FLUENT permission on, in your AI-Arch folder (use your own label in place of <code class="ic">pdi</code>), and restart Claude:</p>
         <div class="stack"><div data-cmd="o-fluent"></div></div>
         <h3><b>■</b>Word documents (python3)</h3>
-        <p>On a Mac the AI Architect makes its Word documents with python3. Check that this Mac has it:</p>
-        <div class="stack"><div data-cmd="o-py"></div></div>
-        <p>It must answer with a line that starts with <code class="ic">Python 3</code>. If a window offers to install the command line developer tools instead, those are the tools from 2a: install them as there (on a company Mac, as in 2a). After the install, <code class="ic">./snowarch doctor</code> says the same on its <i>Capabilities</i> line: <code class="ic">docx yes (python3)</code>.</p>
+        <p>On a Mac the AI Architect makes its Word documents with python3. Its check is the fifth command of 2e, and the table there gives the version it needs. If a window offers to install the command line developer tools instead of answering, those are the tools from 2a: install them as there (on a company Mac, as in 2a). After the install, <code class="ic">./snowarch doctor</code> says the same on its <i>Capabilities</i> line: <code class="ic">docx yes (python3)</code>.</p>
       </section>
 
       <!-- DAILY -->
@@ -1157,12 +1165,12 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       <!-- NOT TESTED -->
       <section class="sec" id="untested">
         <div class="sec-head"><div class="num ink">?</div><div class="t"><small>Read once</small><h2>What has not been tested</h2></div></div>
-        <p>This guide was written from the AI Architect's own code and from its automatic tests on macOS, not from a person's install on a Mac. These things in it rest on something other than a run:</p>
+        <p>This guide was written from the AI Architect's own code and from its automatic tests on macOS, not from a person's install on a Mac. Since then a person has run Step 1 and Step 2 on a Mac (the record is at the end of this page). These things in it rest on something other than a run:</p>
         <ul>
-          <li><b>The whole install on a Mac, from start to end.</b> The automatic tests on macOS run the installer in design-only mode only, with the plan accepted in advance, and without the Claude Code checks. So the screens of the plan keys (6b), the end of 6c, 6d, 6e, Step 7 and Step 8 come from the code and from our Windows test, not from a Mac.</li>
+          <li><b>The whole install on a Mac, from start to end.</b> Steps 3 to 8 have not yet run on a Mac. The automatic tests on macOS run the installer in design-only mode only, with the plan accepted in advance, and without the Claude Code checks. So the screens of the plan keys (6b), the end of 6c, 6d, 6e, Step 7 and Step 8 come from the code and from our Windows test, not from a Mac.</li>
           <li><b>macOS 13.5 to 15.</b> The automatic tests run on a Mac with macOS 26.</li>
           <li><b>The screens of Apple's Command Line Tools window</b> (2a), and macOS's question about the Downloads folder (5b). They are described in general terms.</li>
-          <li><b>The programs in your home folder (2b, 2f, 2g):</b> the Node.js archive, and draw.io and LibreOffice copied from their disk images with <code class="ic">hdiutil</code> and <code class="ic">cp</code>. These commands ran without a password on an administrator account of the AI Architect's authors; a Standard user's run has not been recorded. macOS should ask nothing when you start draw.io or LibreOffice, because both are signed and notarised and neither was downloaded with a browser; a first start on a Mac that followed this guide has not been seen.</li>
+          <li><b>The programs in your home folder (2b, 2f, 2g):</b> the Node.js archive, and draw.io and LibreOffice copied from their disk images with <code class="ic">hdiutil</code> and <code class="ic">cp</code>. These commands ran without a password on an administrator account of the AI Architect's authors, and again, as a Standard user without administrator rights, on a company MacBook (the record is at the end of this page). macOS should ask nothing when you start draw.io or LibreOffice, because both are signed and notarised and neither was downloaded with a browser; a first start on a Mac that followed this guide has not been seen.</li>
           <li><b>The Rosetta setting of Terminal</b> (Step 1): the place and the name of the setting are described from where macOS usually keeps it.</li>
           <li><b>Claude Code's first-run screens on macOS</b> (Step 3). They are described in general terms because they change with Claude Code's releases.</li>
           <li><b>A folder name with a space in it, a folder on a network drive, and a folder that iCloud Drive or another sync tool manages</b> (Step 4).</li>
@@ -1185,7 +1193,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <button type="button" class="btn pri" data-pg="next">End ▶</button>
       </nav>
 
-      <div class="foot">Not yet tested end to end on a Mac. Written on 18 November 2026 from the AI Architect's code and from its automatic macOS tests of that day (macOS 26.7.2 on Apple silicon). It installs Git from Apple's Command Line Tools, Node.js 26.13.1, Claude Code from its official installer, draw.io 32.7.4, LibreOffice 26.8.3, and the AI Architect release that Step 4 names.</div>
+      <div class="foot">Not yet tested end to end on a Mac. Step 1 and Step 2 were run on 19 November 2026 by a person on a company MacBook with Apple silicon, as a Standard user without administrator rights: 2b, 2c, 2d, 2f and 2g asked for no password, and the draw.io and LibreOffice checksums matched the ones in this guide. That run installed Node.js 26.13.1, Claude Code 2.1.328, draw.io 32.7.4, LibreOffice 26.8.3.1, Git 2.50.1 (Apple Git-155) and python3 3.9.6. Steps 3 to 8 have not yet run on a Mac: they were written on 18 November 2026 from the AI Architect's code and from its automatic macOS tests of that day (macOS 26.7.2 on Apple silicon). This guide installs Git from Apple's Command Line Tools, Node.js 26.13.1, Claude Code from its official installer, draw.io 32.7.4, LibreOffice 26.8.3, and the AI Architect release that Step 4 names.</div>
 
     </main>
   </div>
@@ -1203,6 +1211,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   "node": "20.0.0",
   "git": "2.34.1"
  },
+ "pythonFloor": "3.9",
  "designMinutes": {
   "s6": 4
  },
@@ -1279,6 +1288,10 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "s2e-npm",
    "code": "npm --version"
+  },
+  {
+   "id": "s2e-python",
+   "code": "python3 --version"
   },
   {
    "id": "s2f-dl",
@@ -1404,10 +1417,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
    "code": "./snowarch instance set-flags {label} FLUENT=on"
   },
   {
-   "id": "o-py",
-   "code": "python3 --version"
-  },
-  {
    "id": "d-cd",
    "code": "cd ~/AI-Arch"
   },
@@ -1508,7 +1517,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   "ps": "you@MacBook-Air ~ %",
   "arch": "arm64",
   "sha-node": "aec2514ea1ceb2ba52455e9ec65986f6749a06dd759e5db2a72e6889668c9735  /Users/you/snowarch-dl/node.tar.gz",
-  "versions": "you@MacBook-Air ~ % [[claude --version]]\n2.1.322 (Claude Code)\nyou@MacBook-Air ~ % [[git --version]]\ngit version 2.39.5 (Apple Git-146)\nyou@MacBook-Air ~ % [[node --version]]\nv26.13.1",
+  "versions": "you@MacBook-Air ~ % [[claude --version]]\n2.1.328 (Claude Code)\nyou@MacBook-Air ~ % [[git --version]]\ngit version 2.50.1 (Apple Git-155)\nyou@MacBook-Air ~ % [[node --version]]\nv26.13.1\nyou@MacBook-Air ~ % [[python3 --version]]\nPython 3.9.6",
   "sha-drawio": "b0ba01224cdc4817ebf218d73b2a45ff3569f8c9135ad422c5157655062900b3  /Users/you/snowarch-dl/drawio.dmg",
   "ls-drawio": "/Users/you/.local/bin/drawio\n/Users/you/Applications/draw.io.app/Contents/MacOS/draw.io",
   "sha-libreoffice": "de943203795e5057785f65515063e2db5eb60b0bb6d8e2534fec59e5cc5fb988  /Users/you/snowarch-dl/libreoffice.dmg",
@@ -1533,7 +1542,11 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   "end": "[B07/09] Claude settings … ok (0.3 s)\n[B08/09] verify … ok (12 s)\n[B09/09] summary … ok (4 s)\nHealth check (quick): 16 ok · 1 warn (E-31 the licence) · 0 fail · 26 more run with ./snowarch doctor\nMode: live — instance={label} (pdi) preset=custom\nNext: run `claude` in this folder: /Users/you/AI-Arch\n      You will see one workspace-trust dialog — answer Yes.\n      (If you are already inside Claude Code in this folder: exit it and start `claude` again.)\n      In Claude, /mcp should show: servicenow ✔ connected · /snowarch status quotes the Mode line above.\n~ … a short list of commands for changing settings later …\nyou@MacBook-Air AI-Arch %",
   "lic": "Licence: ok · {licId} · until 2026-12-31\n  valid until:  2026-12-31 (UTC, 43 days)\n  revocation list: none held\n  nothing is refused while the licence is in force",
   "mcp": "Project MCPs (/Users/you/AI-Arch/.mcp.json)\n✔   servicenow                  399 tools",
-  "status": "Mode: live — {label} (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v2.2.5 · 473 files\nDocs: vendor/ServiceNowDocs @ 96d32129bb43 (australia) · full"
+  "status": "Mode: live — {label} (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v2.2.5 · 473 files\nDocs: vendor/ServiceNowDocs @ 96d32129bb43 (australia) · full",
+  "dl-node": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n100 55.6M  100 55.6M    0     0  31.6M      0  0:00:01  0:00:01 --:--:-- 31.6M",
+  "dl-drawio": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\n100  151M  100  151M    0     0  14.8M      0  0:00:10  0:00:10 --:--:-- 17.2M",
+  "dl-libreoffice": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\n100  286M  100  286M    0     0  3213k      0  0:01:31  0:01:31 --:--:-- 3478k",
+  "claude-install": "Setting up Claude Code...\n\n✔ Claude Code successfully installed!\n\n  Version: 2.1.328\n\n  Location: ~/.local/bin/claude\n\n  Next: Run claude --help to get started\n\n⚠ Setup notes:\n  ● Native installation exists but ~/.local/bin is not in your PATH. Run:\n\n    echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc && source ~/.zshrc\n\n✅ Installation complete!"
  },
  "steps": [
   {
@@ -1627,6 +1640,11 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     [
      "s2e-npm",
      "2e · Check npm",
+     0.1
+    ],
+    [
+     "s2e-python",
+     "2e · Check python3",
      0.1
     ],
     [
@@ -1970,6 +1988,14 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
    "k": "git node npm now-sdk path command not found"
   },
   {
+   "id": "path-broken",
+   "see": "command not found: claude (or node, or npm) in a fresh window, after the PATH command of 2d",
+   "do": "Your file may lack the line of 2d, or hold a broken one. Run grep -n 'local/node/bin' ~/.zshrc (bash: grep -n 'local/node/bin' ~/.bash_profile). If it prints nothing, run the PATH command of 2d again. If it prints a line that is not exactly the line of 2d, open the file with open -e ~/.zshrc (bash: open -e ~/.bash_profile), delete that line only and type nothing else, save the file, close it, run the PATH command of 2d, and open a fresh window as in 2e. A broken line once left PATH unset, and claude, node and npm all said command not found.",
+   "href": "#step-2",
+   "link": "Step 2d",
+   "k": "command not found claude node npm path zshrc bash_profile grep broken line unset fresh window 2d"
+  },
+  {
    "id": "bad-cpu",
    "see": "node does not start: bad CPU type in executable, or a message that it cannot run on this Mac",
    "do": "The Node.js file of this guide is for a Mac with Apple silicon. Run uname -m as in Step 1: if it does not answer arm64, this guide is not for this Mac; if About This Mac shows an Apple chip, see the Rosetta setting in Step 1.",
@@ -2042,12 +2068,28 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
    "k": "cannot be opened checked unknown developer open anyway malware security"
   },
   {
+   "id": "paste-broke",
+   "see": "curl: (2) no URL specified, followed by a message that names the address, such as zsh: no such file or directory: https://…",
+   "do": "The command broke into two lines when it was pasted, so curl got no address, and nothing was downloaded. Copy the whole grey box again with its Copy button, which copies it as one line, and paste it once.",
+   "href": "#step-2",
+   "link": "Step 2b",
+   "k": "curl 2 no url specified no such file or directory https paste broke two lines copy button"
+  },
+  {
    "id": "dl-404",
    "see": "A download in Step 2 stops with curl: (22) The requested URL returned error: 404",
    "do": "The file is not at that address. Check that you copied the whole line and run it again. If it still fails, send what it printed and say which download it was (see \"Asking for help\"). If it is the draw.io or LibreOffice download (2f, 2g), carry on with Step 3 meanwhile: the installer does not need them.",
    "href": "#help",
    "link": "Asking for help",
    "k": "curl 22 404 download requested url error"
+  },
+  {
+   "id": "dl-unfinished",
+   "see": "shasum, tar or hdiutil attach answers No such file or directory",
+   "do": "The download before it did not finish, or did not happen. Run that step's download command again, wait until the table of numbers reaches 100 and the line that ends in % comes back, then go on from the shasum line.",
+   "href": "#step-2",
+   "link": "Step 2",
+   "k": "no such file or directory shasum tar hdiutil attach download did not finish incomplete 100 progress table"
   },
   {
    "id": "hdiutil-attach",
@@ -2195,14 +2237,17 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   "step-2": [
    "claude-nr",
    "tools-nr",
+   "path-broken",
    "bad-cpu",
    "admin-prompt",
    "brew",
    "zshrc-denied",
+   "paste-broke",
    "dl-404",
    "drawio",
    "soffice",
    "gatekeeper",
+   "dl-unfinished",
    "hdiutil-attach",
    "cp-missing",
    "hdiutil-detach",
@@ -2592,6 +2637,11 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     if (npm) items.push(ocItem('npm', 'ok', npm + ' — any version works.'));
     else if (nf('npm')) items.push(ocItem('npm', 'bad', 'Not found. It comes with Node.js: repeat 2b and the PATH command of 2d, then quit Terminal and open it again.'));
     else items.push(ocItem('npm', 'warn', 'Not in what you pasted. Run npm --version.'));
+    // python3 prints "Python 3.9.6". Without Apple's Command Line Tools it opens the same window as git and prints a line that starts with xcode-select.
+    m = T.match(/\bPython (\d+\.\d+(?:\.\d+)?)/i);
+    if (m) items.push(cmpVer(m[1], D.pythonFloor) >= 0 ? ocItem('python3', 'ok', m[1] + ' — new enough.') : ocItem('python3', 'bad', m[1] + ' is too old: you need ' + D.pythonFloor + ' or later. Apple\'s Command Line Tools on this Mac are old (2a); on a company Mac, your IT team can install their newest version.'));
+    else if (nf('python3') || /xcode-select:\s*(?:note|error)/i.test(T)) items.push(ocItem('python3', 'bad', 'Not found. Apple\'s Command Line Tools are missing: see 2a (on a company Mac, ask your IT team), then quit Terminal and open it again as in Step 1.'));
+    else items.push(ocItem('python3', 'warn', 'Not in what you pasted. Run python3 --version.'));
     return { items: items, sum: ocSum(items) };
   }
   // What the installer prints for a failing check has no key (checkLine in tools/snowarch/lib/steps/B00.mjs: "FAIL B00: <detail>"),

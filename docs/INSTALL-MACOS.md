@@ -97,7 +97,7 @@ You need three programs (Git, Node.js and Claude Code), plus two for your Word d
 
 ### 2a · Git (Apple's Command Line Tools)
 
-Git downloads the AI Architect and keeps it up to date. On a Mac, Git comes with Apple's Command Line Tools, also called the Xcode Command Line Tools.
+Git downloads the AI Architect and keeps it up to date. On a Mac, Git comes with Apple's Command Line Tools, also called the Xcode Command Line Tools: Apple's free developer tools for Terminal. Besides Git, which Step 4 needs, they bring python3, which the Word documents need.
 
 Run:
 
@@ -105,7 +105,7 @@ Run:
 xcode-select --install
 ```
 
-A window from macOS offers to install the command line developer tools. In Terminal the line that ends in `%` may come back at once: the install goes on in that window, so wait for the window, not for Terminal. Click **Install** and accept the licence agreement. The download can take a while: wait until the window says that the software was installed, then click **Done**.
+A window from macOS offers to install the command line developer tools. In Terminal the line that ends in `%` may come back at once: the install goes on in that window, so wait for the window, not for Terminal. Click **Install** and accept the licence agreement. The install can take a while, and you need not wait for it: do 2b, 2c, 2d, 2f and 2g meanwhile. 2e and Step 4 need it finished. When the window says that the software was installed, click **Done**.
 
 If Terminal answers instead with a line saying that the command line tools are already installed (it may start with `xcode-select: error:`, which is harmless here), they are on your Mac already. Go on.
 
@@ -135,12 +135,22 @@ The folder is `snowarch-dl` in your home folder. It holds only downloaded files;
 
 The download commands of 2b, 2f and 2g show a small table of numbers while they work. Wait until the line that ends in `%` comes back.
 
-Node.js comes as an archive that needs no installer and no password. Download it:
+Node.js comes as an archive that needs no installer and no password. It is about 60 MB. Download it:
 
 Run:
 
 ```
 curl -fL -o ~/snowarch-dl/node.tar.gz https://nodejs.org/dist/v26.13.1/node-v26.13.1-darwin-arm64.tar.gz
+```
+
+The file is 58,340,590 bytes. When all of it has arrived, the last line of the table starts with `100` and shows `55.6M` twice: the table counts in units of 1,048,576 bytes. Then the line that ends in `%` comes back. The speed and time columns differ from Mac to Mac; only the `100` and the size must match. If the table stops before `100`, or a message appears, the download did not finish: run the same command again.
+
+On screen (an example; the speed and the times differ):
+
+```
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 55.6M  100 55.6M    0     0  31.6M      0  0:00:01  0:00:01 --:--:-- 31.6M
 ```
 
 **Optional.** Check that you have the file that the Node.js project published. Run:
@@ -185,7 +195,30 @@ Run:
 curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-It shows no progress while it downloads. When it has finished, it prints `Claude Code successfully installed!` and the line that ends in `%` comes back. Then read the *Setup notes* it prints at the end, but do not copy the commands they show: 2d gives you the same fix as one command.
+It shows no progress while it downloads. When it has finished, it prints the screen below and the line that ends in `%` comes back.
+
+On screen (an example; your version number may differ):
+
+```
+Setting up Claude Code...
+
+✔ Claude Code successfully installed!
+
+  Version: 2.1.328
+
+  Location: ~/.local/bin/claude
+
+  Next: Run claude --help to get started
+
+⚠ Setup notes:
+  ● Native installation exists but ~/.local/bin is not in your PATH. Run:
+
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
+
+✅ Installation complete!
+```
+
+**Skip both of the installer's suggestions.** Do not run the line under *Setup notes*: it adds only Claude Code's folder to PATH, and Node.js would stay off it, while the line of 2d adds both folders, Claude Code's and Node.js's. And do not run `claude --help` yet: Terminal does not know `claude` until 2d has been done. 2d comes next, then 2e.
 
 > **Two folders called .local.** Claude Code has just put itself into `~/.local`, a folder in your home folder; Node.js is there too (2b), and so are the two small commands of 2f and 2g. The `.local` inside your AI-Arch folder (Step 5) is a different folder: it holds your licence and your saved password. Never delete `~/.local`: Claude Code and Node.js would go with it.
 
@@ -211,7 +244,7 @@ For bash, the check in Step 1 applies. If a command answers `permission denied`,
 
 ### 2e · Open a fresh window and check
 
-Quit Terminal (in the menu bar, choose **Terminal › Quit Terminal**) and open it again as in Step 1, so that it sees the new programs. Then run these four commands, one at a time.
+Quit Terminal (in the menu bar, choose **Terminal › Quit Terminal**) and open it again as in Step 1, so that it sees the new programs. Then run these five commands, one at a time.
 
 Run:
 
@@ -237,15 +270,22 @@ Run:
 npm --version
 ```
 
+Run:
+
+```
+python3 --version
+```
+
 On screen (examples; the numbers on your Mac differ):
 
 ```
-2.1.322 (Claude Code)
-git version 2.39.5 (Apple Git-146)
+2.1.328 (Claude Code)
+git version 2.50.1 (Apple Git-155)
 v26.13.1
+Python 3.9.6
 ```
 
-The last command answers with npm's own version number.
+The screen leaves out the answer of `npm --version`, which is npm's own version number.
 
 | Program | You need at least |
 |---|---|
@@ -253,10 +293,11 @@ The last command answers with npm's own version number.
 | Git | 2.34.1 |
 | Node.js | v20. Step 2b installs v26.13.1. The AI Architect is tested with Node.js 20, 22, 24 and 26 on Windows, macOS and Linux. |
 | npm | Any version. It comes with Node.js. |
+| python3 | 3.9. Apple's own python3, which comes with the Command Line Tools of 2a, is 3.9.6 and works. |
 
-If one of them answers `command not found`, see "If something goes wrong".
+If one of them answers `command not found`, see "If something goes wrong". If `git --version` or `python3 --version` opens the window of 2a instead of answering, the Command Line Tools are not installed yet: finish 2a, then run that command again.
 
-If a number is lower than the table says, do not continue: ask for help, and send these four answers. For git, a number below 2.34.1 means that Apple's Command Line Tools on this Mac are old; on a company Mac, your IT team can install their newest version.
+If a number is lower than the table says, do not continue: ask for help, and send these five answers. For git or python3, a number below the table's means that Apple's Command Line Tools on this Mac are old; on a company Mac, your IT team can install their newest version.
 
 ### 2f · draw.io Desktop (for the diagrams)
 
@@ -272,6 +313,17 @@ Run:
 
 ```
 curl -fL -o ~/snowarch-dl/drawio.dmg https://github.com/jgraph/drawio-desktop/releases/download/v32.7.4/draw.io-arm64-32.7.4.dmg
+```
+
+The file is 158,930,055 bytes. When all of it has arrived, the last line of the table starts with `100` and shows `151M` twice: the table counts in units of 1,048,576 bytes. Then the line that ends in `%` comes back. The speed and time columns differ from Mac to Mac; only the `100` and the size must match. If the table stops before `100`, or a message appears, the download did not finish: run the same command again.
+
+On screen (an example; the speed and the times differ):
+
+```
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  151M  100  151M    0     0  14.8M      0  0:00:10  0:00:10 --:--:-- 17.2M
 ```
 
 **Optional.** Check the download. Run:
@@ -365,6 +417,17 @@ Run:
 
 ```
 curl -fL -o ~/snowarch-dl/libreoffice.dmg https://download.documentfoundation.org/libreoffice/stable/26.8.3/mac/aarch64/LibreOffice_26.8.3_MacOS_aarch64.dmg
+```
+
+The file is 299,927,705 bytes. When all of it has arrived, the last line of the table starts with `100` and shows `286M` twice: the table counts in units of 1,048,576 bytes. Then the line that ends in `%` comes back. The speed and time columns differ from Mac to Mac; only the `100` and the size must match. If the table stops before `100`, or a message appears, the download did not finish: run the same command again.
+
+On screen (an example; the speed and the times differ):
+
+```
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  286M  100  286M    0     0  3213k      0  0:01:31  0:01:31 --:--:-- 3478k
 ```
 
 **Optional.** Check the download. Run:
@@ -934,7 +997,7 @@ Node.js does not update itself: it stays at the version of 2b. To move to a newe
 |---|---|
 | ServiceNow SDK | The Fluent build and deploy tools, the FLUENT permission (wizard question 7). |
 | Microsoft Word | Opens and checks the Word documents the Architect writes. Usually installed by your company. |
-| python3 | Makes the Word documents on a Mac. It is usually already there; check it below. |
+| python3 | Makes the Word documents on a Mac. It is usually already there; its check is in 2e. |
 
 ### ServiceNow SDK
 
@@ -964,15 +1027,7 @@ Run:
 
 ### Word documents (python3)
 
-On a Mac the AI Architect makes its Word documents with python3. Check that this Mac has it:
-
-Run:
-
-```
-python3 --version
-```
-
-It must answer with a line that starts with `Python 3`. If a window offers to install the command line developer tools instead, those are the tools from 2a: install them as there (on a company Mac, as in 2a). After the install, `./snowarch doctor` says the same on its *Capabilities* line: `docx yes (python3)`.
+On a Mac the AI Architect makes its Word documents with python3. Its check is the fifth command of 2e, and the table there gives the version it needs. If a window offers to install the command line developer tools instead of answering, those are the tools from 2a: install them as there (on a company Mac, as in 2a). After the install, `./snowarch doctor` says the same on its *Capabilities* line: `docx yes (python3)`.
 
 ## Every day
 
@@ -1116,6 +1171,7 @@ It shows a plan first and asks `Proceed? [Y/n]`. Press Return, or type `y` and p
 |---|---|
 | zsh: command not found: claude (in bash: claude: command not found) | Run the PATH command in Step 2d for your shell (Step 1), quit Terminal and open it again. |
 | command not found for git, node, npm or now-sdk | Quit Terminal (Terminal › Quit Terminal) and open it again as in Step 1: programs installed in Step 2 are seen only by new windows. If it persists, run the PATH command of 2d for your shell, and for node and npm repeat 2b. For git, see 2a. |
+| command not found: claude (or node, or npm) in a fresh window, after the PATH command of 2d | Your file may lack the line of 2d, or hold a broken one. Run `grep -n 'local/node/bin' ~/.zshrc` (bash: `grep -n 'local/node/bin' ~/.bash_profile`). If it prints nothing, run the PATH command of 2d again. If it prints a line that is not exactly the line of 2d, open the file with `open -e ~/.zshrc` (bash: `open -e ~/.bash_profile`), delete that line only and type nothing else, save the file, close it, run the PATH command of 2d, and open a fresh window as in 2e. A broken line once left PATH unset, and claude, node and npm all said command not found. |
 | node does not start: bad CPU type in executable, or a message that it cannot run on this Mac | The Node.js file of this guide is for a Mac with Apple silicon. Run `uname -m` as in Step 1: if it does not answer `arm64`, this guide is not for this Mac; if About This Mac shows an Apple chip, see the Rosetta setting in Step 1. |
 | snowarch: Node.js 20+ is required and was not found on PATH. | This window cannot see Node.js. Quit Terminal and open it again as in Step 1, go to your folder with `cd ~/AI-Arch` and run the command again. If it persists, repeat 2b and the PATH command of 2d. The line under it suggests brew: this guide does not use it. |
 | The plan says Plan: Mode design-only (fixed — Node.js 20+ not found) · Docs full | The installer cannot see Node.js in this window. Type `q` and press Return; nothing has been changed. Then do as in the row above, and run `./bootstrap.sh` again. |
@@ -1125,7 +1181,9 @@ It shows a plan first and asks `Proceed? [Y/n]`. Press Return, or type `y` and p
 | ERROR: draw.io Desktop not found | Repeat 2f from the copy, including the command that makes `drawio`, and check that the `ls` command answers with both paths. |
 | ERROR: LibreOffice (soffice) not found, with a suggestion to use brew | This guide does not use Homebrew. Repeat 2g from the copy, including the command that makes `soffice`, and check that `soffice --version` answers. |
 | macOS says that draw.io or LibreOffice cannot be opened, or cannot be checked | Do not override it. Move that program to the Trash, from the Applications folder in your home folder, then repeat 2f or 2g from its download command. If macOS still refuses it, ask for help (see "Asking for help") and say what macOS showed. |
+| curl: (2) no URL specified, followed by a message that names the address, such as zsh: no such file or directory: https://… | The command broke into two lines when it was pasted, so curl got no address, and nothing was downloaded. Copy the whole grey box again with its Copy button, which copies it as one line, and paste it once. |
 | A download in Step 2 stops with curl: (22) The requested URL returned error: 404 | The file is not at that address. Check that you copied the whole line and run it again. If it still fails, send what it printed and say which download it was (see "Asking for help"). If it is the draw.io or LibreOffice download (2f, 2g), carry on with Step 3 meanwhile: the installer does not need them. |
+| shasum, tar or hdiutil attach answers No such file or directory | The download before it did not finish, or did not happen. Run that step's download command again, wait until the table of numbers reaches 100 and the line that ends in `%` comes back, then go on from the shasum line. |
 | hdiutil: attach failed - image not recognized | The file is not the disk image: the download is incomplete, or a web page was saved in its place. Run the download command of that step again, then its attach command. |
 | cp: …/mnt-drawio/draw.io.app: No such file or directory (or …/mnt-libreoffice/LibreOffice.app) | The disk image is not open: the attach command before it failed or was skipped. Run the attach command of that step again, then the copy. |
 | hdiutil: detach failed - No such file or directory | The disk image was not open, so there is nothing to close. Go on. |
@@ -1207,12 +1265,12 @@ The programs from Step 2 stay on your Mac unless you remove them as in step 4. T
 
 ## What has not been tested
 
-This guide was written from the AI Architect's own code and from its automatic tests on macOS, not from a person's install on a Mac. These things in it rest on something other than a run:
+This guide was written from the AI Architect's own code and from its automatic tests on macOS, not from a person's install on a Mac. Since then a person has run Step 1 and Step 2 on a Mac (the record is at the end of this page). These things in it rest on something other than a run:
 
-- **The whole install on a Mac, from start to end.** The automatic tests on macOS run the installer in design-only mode only, with the plan accepted in advance, and without the Claude Code checks. So the screens of the plan keys (6b), the end of 6c, 6d, 6e, Step 7 and Step 8 come from the code and from our Windows test, not from a Mac.
+- **The whole install on a Mac, from start to end.** Steps 3 to 8 have not yet run on a Mac. The automatic tests on macOS run the installer in design-only mode only, with the plan accepted in advance, and without the Claude Code checks. So the screens of the plan keys (6b), the end of 6c, 6d, 6e, Step 7 and Step 8 come from the code and from our Windows test, not from a Mac.
 - **macOS 13.5 to 15.** The automatic tests run on a Mac with macOS 26.
 - **The screens of Apple's Command Line Tools window** (2a), and macOS's question about the Downloads folder (5b). They are described in general terms.
-- **The programs in your home folder (2b, 2f, 2g):** the Node.js archive, and draw.io and LibreOffice copied from their disk images with `hdiutil` and `cp`. These commands ran without a password on an administrator account of the AI Architect's authors; a Standard user's run has not been recorded. macOS should ask nothing when you start draw.io or LibreOffice, because both are signed and notarised and neither was downloaded with a browser; a first start on a Mac that followed this guide has not been seen.
+- **The programs in your home folder (2b, 2f, 2g):** the Node.js archive, and draw.io and LibreOffice copied from their disk images with `hdiutil` and `cp`. These commands ran without a password on an administrator account of the AI Architect's authors, and again, as a Standard user without administrator rights, on a company MacBook (the record is at the end of this page). macOS should ask nothing when you start draw.io or LibreOffice, because both are signed and notarised and neither was downloaded with a browser; a first start on a Mac that followed this guide has not been seen.
 - **The Rosetta setting of Terminal** (Step 1): the place and the name of the setting are described from where macOS usually keeps it.
 - **Claude Code's first-run screens on macOS** (Step 3). They are described in general terms because they change with Claude Code's releases.
 - **A folder name with a space in it, a folder on a network drive, and a folder that iCloud Drive or another sync tool manages** (Step 4).
@@ -1222,4 +1280,4 @@ If you meet a difference, `./snowarch version` and `./snowarch doctor` (see "Ask
 
 ---
 
-Not yet tested end to end on a Mac. Written on 18 November 2026 from the AI Architect's code and from its automatic macOS tests of that day (macOS 26.7.2 on Apple silicon). It installs Git from Apple's Command Line Tools, Node.js 26.13.1, Claude Code from its official installer, draw.io 32.7.4, LibreOffice 26.8.3, and the AI Architect release that Step 4 names.
+Not yet tested end to end on a Mac. Step 1 and Step 2 were run on 19 November 2026 by a person on a company MacBook with Apple silicon, as a Standard user without administrator rights: 2b, 2c, 2d, 2f and 2g asked for no password, and the draw.io and LibreOffice checksums matched the ones in this guide. That run installed Node.js 26.13.1, Claude Code 2.1.328, draw.io 32.7.4, LibreOffice 26.8.3.1, Git 2.50.1 (Apple Git-155) and python3 3.9.6. Steps 3 to 8 have not yet run on a Mac: they were written on 18 November 2026 from the AI Architect's code and from its automatic macOS tests of that day (macOS 26.7.2 on Apple silicon). This guide installs Git from Apple's Command Line Tools, Node.js 26.13.1, Claude Code from its official installer, draw.io 32.7.4, LibreOffice 26.8.3, and the AI Architect release that Step 4 names.

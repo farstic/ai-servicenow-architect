@@ -287,17 +287,28 @@ test('ARC-09-C300 — the version floors are the engine\'s, on the page and in t
     assert.match(rowOf(bad).cls, /\bbad$/, `${key} below its floor`);
   }
   assert.doesNotMatch(JSON.stringify(P.checkVersions('v20.1.0')), /recommended/);
+  // python3 has no floor in the engine: its 3.9 is the row of the Markdown guide's table (the guide's test holds the converter to Python 3.9's grammar), and the page's table and its check say the same.
+  assert.equal(data.pythonFloor, '3.9');
+  const pyRow = "python3 | 3.9. Apple's own python3, which comes with the Command Line Tools of 2a, is 3.9.6 and works.";
+  assert.ok(md.includes(`| ${pyRow} |`), 'the Markdown guide\'s table has another python3 row');
+  assert.ok(markup.includes(`<tr><td>${pyRow.replace(' | ', '</td><td>')}</td></tr>`), 'the page\'s table has another python3 row');
+  const py = (v) => P.checkVersions(`Python ${v}\n`).items.find((i) => i.k === 'python3').cls;
+  for (const v of ['3.9.0', '3.9.6', '3.10.1', '3.12.4']) assert.match(py(v), /\bok$/, `python3 ${v} is at or above its floor`);
+  for (const v of ['3.8.9', '3.8.20', '2.7.18']) assert.match(py(v), /\bbad$/, `python3 ${v} is below its floor`);
 });
 
-test('ARC-09-C300 — the versions check reads what Terminal prints: the four programs, "command not found" in zsh and in bash, and the prompt of either', () => {
-  const full = '2.1.322 (Claude Code)\ngit version 2.39.5 (Apple Git-146)\nv26.13.1\n11.20.0\n';
+test('ARC-09-C300 — the versions check reads what Terminal prints: the five programs, "command not found" in zsh and in bash, and the prompt of either', () => {
+  const full = '2.1.328 (Claude Code)\ngit version 2.50.1 (Apple Git-155)\nv26.13.1\n11.20.0\nPython 3.9.6\n';
   const rows = (t) => Object.fromEntries(P.checkVersions(t).items.map((i) => [i.k, i.cls]));
-  assert.deepEqual(rows(full), { 'Claude Code': 'oci ok', Git: 'oci ok', 'Node.js': 'oci ok', npm: 'oci ok' });
+  assert.deepEqual(rows(full), { 'Claude Code': 'oci ok', Git: 'oci ok', 'Node.js': 'oci ok', npm: 'oci ok', python3: 'oci ok' });
   assert.equal(P.checkVersions(full).sum, 'All good ✓');
+  // The example screen of 2e is a Mac's own answers, so the page's check must pass every line on it (the screen leaves out npm, whose answer is npm's own number).
+  const shown = data.terminals.versions.split('\n').filter((l) => !l.includes('[[')).join('\n');
+  assert.deepEqual(rows(shown), { 'Claude Code': 'oci ok', Git: 'oci ok', 'Node.js': 'oci ok', npm: 'oci warn', python3: 'oci ok' }, 'the example screen of 2e does not pass the check the page offers under it');
   // What zsh and what bash answer for a program that is not on PATH: one row, for that program, and the others untouched.
   const shapes = { zsh: (n) => `zsh: command not found: ${n}`, bash: (n) => `-bash: ${n}: command not found`, 'bash, no dash': (n) => `bash: ${n}: command not found` };
-  const lines = { claude: '2.1.322 (Claude Code)', git: 'git version 2.39.5 (Apple Git-146)', node: 'v26.13.1', npm: '11.20.0' };
-  const row = { claude: 'Claude Code', git: 'Git', node: 'Node.js', npm: 'npm' };
+  const lines = { claude: '2.1.328 (Claude Code)', git: 'git version 2.50.1 (Apple Git-155)', node: 'v26.13.1', npm: '11.20.0', python3: 'Python 3.9.6' };
+  const row = { claude: 'Claude Code', git: 'Git', node: 'Node.js', npm: 'npm', python3: 'python3' };
   for (const [shell, shape] of Object.entries(shapes)) {
     for (const name of Object.keys(lines)) {
       const text = Object.entries(lines).map(([n, l]) => (n === name ? shape(n) : l)).join('\n');
@@ -307,10 +318,13 @@ test('ARC-09-C300 — the versions check reads what Terminal prints: the four pr
       assert.match(P.checkVersions(text).items.find((i) => i.k === row[name]).t, /Not found/);
     }
   }
-  // A Mac without Apple's Command Line Tools does not say "command not found" for git: it opens a window and prints a line that starts with xcode-select.
-  assert.equal(rows('2.1.322 (Claude Code)\nxcode-select: note: No developer tools were found, requesting install.\nv26.13.1\n11.20.0').Git, 'oci bad');
+  // A Mac without Apple's Command Line Tools does not say "command not found" for git or for python3: it opens a window and prints a line that starts with xcode-select.
+  const noTools = 'xcode-select: note: No developer tools were found, requesting install.';
+  assert.equal(rows(`2.1.328 (Claude Code)\n${noTools}\nv26.13.1\n11.20.0`).Git, 'oci bad');
+  assert.equal(rows(`2.1.328 (Claude Code)\ngit version 2.50.1 (Apple Git-155)\nv26.13.1\n11.20.0\n${noTools}`).python3, 'oci bad');
   // What was not pasted is a warning with the command to run, never a pass.
-  assert.deepEqual(rows('2.1.322 (Claude Code)\n'), { 'Claude Code': 'oci ok', Git: 'oci warn', 'Node.js': 'oci warn', npm: 'oci warn' });
+  assert.deepEqual(rows('2.1.328 (Claude Code)\n'), { 'Claude Code': 'oci ok', Git: 'oci warn', 'Node.js': 'oci warn', npm: 'oci warn', python3: 'oci warn' });
+  assert.match(P.checkVersions('2.1.328 (Claude Code)\n').items.find((i) => i.k === 'python3').t, /Run python3 --version/);
   // The prompt in front of a line: zsh's, and bash's own on a Mac.
   assert.equal(rows('you@MacBook-Air ~ % npm --version\nyou@MacBook-Air ~ % 11.20.0').npm, 'oci ok');
   assert.equal(rows('MacBook-Air:~ you$ 11.20.0').npm, 'oci ok');
@@ -555,8 +569,22 @@ const SENTENCES = [
   'Apple\'s Command Line Tools (2a) are the only part that can need an administrator. Everything else goes into your own home folder and needs no password.',
   'No command in this guide starts with sudo, and you should never put sudo in front of one',
   'It is the only step of this guide that needs an administrator. While you wait, you can already do 2b, 2c, 2d, 2f and 2g; do 2e and the steps after it once git --version answers with a version.',
+  'Apple\'s free developer tools for Terminal. Besides Git, which Step 4 needs, they bring python3, which the Word documents need.',
+  'The install can take a while, and you need not wait for it: do 2b, 2c, 2d, 2f and 2g meanwhile. 2e and Step 4 need it finished. When the window says that the software was installed, click Done.',
   'The folder is snowarch-dl in your home folder. It holds only downloaded files; you can move it to the Trash once the install is done and 2g has worked.',
-  'Node.js comes as an archive that needs no installer and no password. Download it:',
+  'Node.js comes as an archive that needs no installer and no password. It is about 60 MB. Download it:',
+  // The size of each download, what the last line of curl\'s table must show, and what to do when it does not (the first run on a Mac: 19 November 2026).
+  'The file is 58,340,590 bytes. When all of it has arrived, the last line of the table starts with 100 and shows 55.6M twice: the table counts in units of 1,048,576 bytes.',
+  'The file is 158,930,055 bytes. When all of it has arrived, the last line of the table starts with 100 and shows 151M twice: the table counts in units of 1,048,576 bytes.',
+  'The file is 299,927,705 bytes. When all of it has arrived, the last line of the table starts with 100 and shows 286M twice: the table counts in units of 1,048,576 bytes.',
+  'The speed and time columns differ from Mac to Mac; only the 100 and the size must match. If the table stops before 100, or a message appears, the download did not finish: run the same command again.',
+  // 2c: the installer\'s own suggestions are skipped, and 2d then 2e come next.
+  'Skip both of the installer\'s suggestions. Do not run the line under Setup notes: it adds only Claude Code\'s folder to PATH, and Node.js would stay off it, while the line of 2d adds both folders, Claude Code\'s and Node.js\'s. And do not run claude --help yet: Terminal does not know claude until 2d has been done. 2d comes next, then 2e.',
+  // 2e: five checks.
+  'Then run these five commands, one at a time.',
+  'The screen leaves out the answer of npm --version, which is npm\'s own version number.',
+  'If git --version or python3 --version opens the window of 2a instead of answering, the Command Line Tools are not installed yet: finish 2a, then run that command again.',
+  'If a number is lower than the table says, do not continue: ask for help, and send these five answers. For git or python3, a number below the table\'s means that Apple\'s Command Line Tools on this Mac are old; on a company Mac, your IT team can install their newest version.',
   'It answers with a line that starts with the same 64 letters and digits as the example; your folder name differs. If they differ, run the download again, and if they still differ, stop and ask for help (see "Asking for help").',
   'There is no PATH command here: 2d tells your Mac where Node.js is, together with Claude Code.',
   'This command adds both folders for your account only, and applies the change to this window.',
@@ -603,8 +631,21 @@ const SENTENCES = [
   'The programs in your home folder (2b, 2f, 2g): the Node.js archive, and draw.io and LibreOffice copied from their disk images with hdiutil and cp.',
   'The Rosetta setting of Terminal (Step 1): the place and the name of the setting are described from where macOS usually keeps it.',
   'If you meet a difference, $CLI version and $CLI doctor (see "Asking for help") are what to send.',
+  'Since then a person has run Step 1 and Step 2 on a Mac (the record is at the end of this page).',
+  'Steps 3 to 8 have not yet run on a Mac.',
+  'and again, as a Standard user without administrator rights, on a company MacBook (the record is at the end of this page).',
   'Not yet tested end to end on a Mac.',
-  'It installs Git from Apple\'s Command Line Tools, Node.js 26.13.1, Claude Code from its official installer, draw.io 32.7.4, LibreOffice 26.8.3, and the AI Architect release that Step 4 names.',
+  'Step 1 and Step 2 were run on 19 November 2026 by a person on a company MacBook with Apple silicon, as a Standard user without administrator rights: 2b, 2c, 2d, 2f and 2g asked for no password, and the draw.io and LibreOffice checksums matched the ones in this guide.',
+  'That run installed Node.js 26.13.1, Claude Code 2.1.328, draw.io 32.7.4, LibreOffice 26.8.3.1, Git 2.50.1 (Apple Git-155) and python3 3.9.6.',
+  'Steps 3 to 8 have not yet run on a Mac: they were written on 18 November 2026 from the AI Architect\'s code and from its automatic macOS tests of that day (macOS 26.7.2 on Apple silicon).',
+  'This guide installs Git from Apple\'s Command Line Tools, Node.js 26.13.1, Claude Code from its official installer, draw.io 32.7.4, LibreOffice 26.8.3, and the AI Architect release that Step 4 names.',
+  // The three rows of "If something goes wrong" that the first run on a Mac added: a download broken at a paste, a PATH line that was not written, a download that did not finish.
+  'curl: (2) no URL specified, followed by a message that names the address, such as zsh: no such file or directory: https://…',
+  'The command broke into two lines when it was pasted, so curl got no address, and nothing was downloaded. Copy the whole grey box again with its Copy button, which copies it as one line, and paste it once.',
+  'command not found: claude (or node, or npm) in a fresh window, after the PATH command of 2d',
+  'If it prints a line that is not exactly the line of 2d, open the file with open -e ~/.zshrc (bash: open -e ~/.bash_profile), delete that line only and type nothing else, save the file, close it, run the PATH command of 2d, and open a fresh window as in 2e.',
+  'shasum, tar or hdiutil attach answers No such file or directory',
+  'The download before it did not finish, or did not happen. Run that step\'s download command again, wait until the table of numbers reaches 100 and the line that ends in % comes back, then go on from the shasum line.',
 ].map((s) => s.replaceAll('$CLI', CLI).replaceAll('$BOOT', BOOT));
 
 test('ARC-09-C300 — the sentences of the reviews are on the page, and they are the Markdown guide\'s', () => {
@@ -639,6 +680,20 @@ test('ARC-09-C300 — the sentences of the reviews are on the page, and they are
   assert.deepEqual(filled, { licfile: 'lic', lic: 'licId', status: 'licId' }, 'the sample screens that take the name typed in Your details: 5b (the file), Step 7 and Step 8 (the number)');
   for (const [id, t] of Object.entries(data.terminals)) assert.doesNotMatch(t, /LIC-\d{4}-\d{4}/, `${id}: a licence number typed into a screen, which the field of Your details cannot change`);
   assert.ok(pageText.includes('It changes the licence file name and number in the sample screens of 5b, Step 7 and Step 8'), 'the help of the field does not say which screens change');
+});
+
+test('ARC-09-C300 — the problems the page lists are the Markdown guide\'s table, row by row in the same order, and Step 2 lists the three rows the first run on a Mac added', () => {
+  const start = md.indexOf('## If something goes wrong');
+  const rows = md.slice(start, md.indexOf('\n## ', start + 5)).split('\n').filter((l) => /^\| .+ \| .+ \|$/.test(l))
+    .map((l) => /^\| (.+?) \| (.+) \|$/.exec(l).slice(1)).filter(([symptom]) => symptom !== 'What you see');
+  assert.ok(rows.length >= 30, `only ${rows.length} rows found in the Markdown guide's table: the reading is broken`);
+  assert.equal(data.trouble.length, rows.length, 'the page and the Markdown guide list a different number of problems');
+  rows.forEach(([see, doIt], i) => {
+    assert.equal(plain(data.trouble[i].see), plain(see), `problem ${i + 1} (${data.trouble[i].id}): what you see`);
+    assert.equal(plain(data.trouble[i].do), plain(doIt), `problem ${i + 1} (${data.trouble[i].id}): what to do`);
+  });
+  // A download broken at a paste, a PATH line that was not written, a download that did not finish: all three are met in Step 2, and Step 2 lists them.
+  for (const id of ['path-broken', 'paste-broke', 'dl-unfinished']) assert.ok(data.stepTrouble['step-2'].includes(id), `Step 2 does not list the problem ${id}`);
 });
 
 test('ARC-09-C300 — nothing of the Windows page is left: no PowerShell, no .cmd launcher, no Ctrl, no Windows folder, and Enter is Return', () => {

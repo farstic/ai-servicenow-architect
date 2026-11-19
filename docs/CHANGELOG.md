@@ -85,8 +85,10 @@ everything else goes into the home folder without a password: Node.js 26.13.1 as
 the Windows page's design and features: a Copy button on every command, helpers that read what a reader pastes back, and progress kept in the browser. The
 release writer moves the clone tag of both with every final, the signed manifest covers them, and each GitHub Release carries the page as its ninth asset. The
 guide installs Node.js 26.13.1, so CI now tests Node 26 on macOS, in `test` and in `bootstrap`, and the install page, the README and the Windows guide say that
-Node.js 20, 22, 24 and 26 are tested on all three systems. The guide still says "Not yet tested end to end on a Mac": the macOS CI jobs run design-only, and no
-live install on a Mac has been recorded until the owner runs it on a MacBook.
+Node.js 20, 22, 24 and 26 are tested on all three systems. A person has run Step 1 and Step 2 on a Mac, as a Standard user without administrator rights, and the guide
+ends with that record. What the run found is in the guide: python3 is the fifth check of 2e, 2c shows the installer's own screen and says to skip its two suggestions,
+each download gives the size of its file and where curl's table must end, and three rows are added to the table of problems. The guide still says "Not yet tested end
+to end on a Mac": the macOS CI jobs run design-only, and Steps 3 to 8 have not run on a Mac.
 
 ### Added
 
@@ -98,7 +100,7 @@ live install on a Mac has been recorded until the owner runs it on a MacBook.
   it runs the page's own checks on the lines `checkLine` and `bannerLine` print (ARC-09-C285).
 - `docs/INSTALL-MACOS.md` and `docs/AI-Architect-macOS-Install-Guide.html`: the install guide for macOS and its interactive form. Step 1 checks with `uname -m` that the Mac
   has Apple silicon; Step 2 installs Git, Node.js, Claude Code, draw.io and LibreOffice one command at a time, with the home folder as the only place a program goes,
-  except Apple's Command Line Tools. The guide has 70 commands, one to a block; the page has Copy and "ran it" on each, and one counter of 38 commands (the
+  except Apple's Command Line Tools. The guide has 70 commands, one to a block; the page has Copy and "ran it" on each, and one counter of 39 commands (the
   bash-only check, the bash form of the PATH line and the optional checks are never counted). `tests/install-macos-guide.test.mjs` holds the guide to the product (the plan
   screen, the wizard's questions, the settings commands, the licence words, the clone tag, where the renderer and the doctor look for draw.io and LibreOffice), and
   `tests/install-macos-guide-html.test.mjs` holds the page to the guide (ARC-09-C300).

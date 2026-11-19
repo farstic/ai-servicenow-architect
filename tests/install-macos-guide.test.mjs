@@ -23,8 +23,9 @@
  * `whoami /groups`); the four outcomes of the permission lock on a Windows store and the F9 repair that applies them (a Mac has one store line, one
  * check, SV-02, and one repair, F5); the wizard line about a lock that failed; the PowerShell lines that change the user's PATH, and `%APPDATA%\npm`
  * for the SDK (where `npm i -g` puts a tool on a Mac is on the Mac test list, not known yet); the three messages of an install without administrator
- * rights and their reload command; the PowerShell form of the Word converter; and the record of the end-to-end run, which does not exist for a Mac yet:
- * the page ends "Not yet tested end to end on a Mac.", and that line is held here until the Mac run turns it into a record.
+ * rights and their reload command; the PowerShell form of the Word converter; and the record of an end-to-end run, which a Mac has only in part: the first
+ * run (19 November 2026) went through Step 1 and Step 2, so the page ends with the record of those two steps and "Not yet tested end to end on a Mac.", and
+ * the record of a whole run takes the Windows twin's place when Steps 3 to 8 have run.
  *
  * AND WHAT IS NOT HERE YET, deliberately: the twin of the remedies check (the product's darwin remedies for git and Node.js still name Homebrew, and
  * name no step of this page; rewriting them, and TROUBLESHOOTING's Mac paragraph, are rows of 2.2.8) and the twin of the check that both pages hold
@@ -39,7 +40,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, truncateSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -652,6 +653,8 @@ const MACOS_FLOOR_OF_NODE = { '26.13.1': '13.5' };
  *   node         SHASUMS256.txt of Node.js v26.13.1 (nodejs.org/dist/v26.13.1/), the line for node-v26.13.1-darwin-arm64.tar.gz
  *   drawio       the asset list of the draw.io 32.7.4 release on GitHub (jgraph/drawio-desktop, the API's `digest`), draw.io-arm64-32.7.4.dmg, 158,930,055 bytes
  *   libreoffice  the listing of The Document Foundation for 26.8.3 (download.documentfoundation.org/libreoffice/stable/26.8.3/mac/aarch64/), 299,927,705 bytes
+ *   node         the Content-Length that nodejs.org answers to a HEAD of node-v26.13.1-darwin-arm64.tar.gz, 58,340,590 bytes (read on 2026-11-19; the first run on a Mac
+ *                saw curl end its table at 55.6M, which is this size in curl's units)
  * The size the page rounds to the nearest 10 MB (decimal, as the page and the product count them).
  */
 const SHA256 = {
@@ -659,7 +662,7 @@ const SHA256 = {
   drawio: { '32.7.4': 'b0ba01224cdc4817ebf218d73b2a45ff3569f8c9135ad422c5157655062900b3' },
   libreoffice: { '26.8.3': 'de943203795e5057785f65515063e2db5eb60b0bb6d8e2534fec59e5cc5fb988' },
 };
-const BYTES = { drawio: { '32.7.4': 158930055 }, libreoffice: { '26.8.3': 299927705 } };
+const BYTES = { node: { '26.13.1': 58340590 }, drawio: { '32.7.4': 158930055 }, libreoffice: { '26.8.3': 299927705 } };
 /** The word of the architecture that Step 1 asks `uname -m` to answer, and what The Document Foundation calls the same chip in the name of its file. */
 const ARCH = 'arm64';
 const ARCH_OF_LIBREOFFICE = 'aarch64';
@@ -735,7 +738,7 @@ test('ARC-09-C300 — each program the page downloads is one version and a file 
   for (const m of prose.matchAll(/macOS (\d+(?:\.\d+)?) or later/g)) assert.ok([floor, '10.15'].includes(m[1]), `the page states a macOS floor of ${m[1]}: only ${floor} and the zsh default of 10.15 belong to it`);
 
   // The size of each image, as the page says it: the nearest ten megabytes of what the publisher lists.
-  for (const name of ['drawio', 'libreoffice']) {
+  for (const name of ['node', 'drawio', 'libreoffice']) {
     assert.ok(release[name] in BYTES[name], `read the size of the ${name} ${release[name]} download in the publisher's listing and add it to BYTES`);
     assert.ok(prose.includes(`It is about ${Math.round(BYTES[name][release[name]] / 1e7) * 10} MB`), `the page does not give the size of the ${name} download as about ${Math.round(BYTES[name][release[name]] / 1e7) * 10} MB`);
   }
@@ -768,14 +771,43 @@ test('ARC-09-C300 — the three optional checksums are the publishers\' own: eac
   assert.match(ran.stdout.replace(home, '/Users/you'), /^[0-9a-f]{64}  \/Users\/you\/snowarch-dl\/node\.tar\.gz\n$/, 'shasum does not answer in the shape the page shows');
 });
 
-test('ARC-09-C300 — the page ends as long as no Mac has run it: "Not yet tested end to end on a Mac."', () => {
-  // The Windows page ends with a record of the run it was written from (the version of each program, the machine, the release). This one has none to
-  // give. When the Mac run is made the closing line becomes that record, and the Windows twin's record check (each version in the download is the
-  // version in the record) takes the place of this case.
-  assert.ok(closing.startsWith('Not yet tested end to end on a Mac. '), `the closing line is not the statement that no Mac has run the page: ${closing}`);
-  assert.ok(page.split('\n')[2].includes('not yet tested end to end on a Mac (see "What has not been tested")'), 'the title line no longer says that no Mac has run the page');
-  assert.doesNotMatch(page, /^Tested end to end on /m, 'a record of a run is on the page: the closing line and this case change together');
+/** True when version `a` is the same as or later than `b`, compared number by number (`3.10.1` is later than `3.9`). */
+function atLeast(a, b) {
+  const [x, y] = [a, b].map((v) => v.split('.').map(Number));
+  for (let i = 0; i < Math.max(x.length, y.length); i += 1) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return true;
+}
+
+test('ARC-09-C300 — the page ends with the record of the run it has had on a Mac (Step 1 and Step 2), and still says that no Mac has run all of it', () => {
+  // The Windows page ends with a record of the one end-to-end run it was written from (tests/install-windows-guide.test.mjs, ARC-09-C271): the machine, the user,
+  // the version of each program. The first run on a Mac (19 November 2026) went through Step 1 and Step 2 only, so this page's closing paragraph is that record and
+  // the statement that Steps 3 to 8 have not yet run on a Mac. When they have, "Not yet tested end to end on a Mac." becomes "Tested end to end on …", and this
+  // case becomes the Windows twin's record check for the whole run.
+  assert.ok(closing.startsWith('Not yet tested end to end on a Mac. '), `the closing line no longer says that no Mac has run all of the page: ${closing}`);
+  assert.ok(page.split('\n')[2].includes('not yet tested end to end on a Mac (see "What has not been tested")'), 'the title line no longer says that no Mac has run all of the page');
+  assert.doesNotMatch(page, /^Tested end to end on /m, 'a record of a whole run is on the page: the closing line and this case change together');
   assert.ok(titles.includes('What has not been tested'));
+  for (const s of ['were run on 19 November 2026 by a person on a company MacBook with Apple silicon', 'as a Standard user without administrator rights',
+    '2b, 2c, 2d, 2f and 2g asked for no password', 'the draw.io and LibreOffice checksums matched the ones in this guide', 'Steps 3 to 8 have not yet run on a Mac']) {
+    assert.ok(closing.includes(s), `the record lacks: ${s}`);
+  }
+  // What the run installed, in the words of the record. Each program the page downloads is the version the record names (the Windows twin's rule), and the three
+  // the reader checks in 2e are at or above the floors the page states.
+  const ran = /That run installed (.+?)\. Steps 3 to 8/.exec(closing)?.[1] ?? '';
+  const installed = Object.fromEntries([...ran.matchAll(/(Node\.js|Claude Code|draw\.io|LibreOffice|Git|python3) (\d+(?:\.\d+)+)/g)].map((m) => [m[1], m[2]]));
+  assert.deepEqual(Object.keys(installed), ['Node.js', 'Claude Code', 'draw.io', 'LibreOffice', 'Git', 'python3'], `the record does not name the six programs of the run: ${ran}`);
+  assert.equal(installed['Node.js'], versionOf('node'));
+  assert.equal(installed['draw.io'], versionOf('drawio'));
+  // LibreOffice writes a build number after the release (`26.8.3.1`): the release the page downloads is the start of it.
+  assert.ok(installed.LibreOffice.startsWith(`${versionOf('libreoffice')}.`), `the record names LibreOffice ${installed.LibreOffice}, not a build of the release the page downloads`);
+  assert.ok(ran.includes('Git 2.50.1 (Apple Git-155)'), 'the record does not say which build of Git it was');
+  const { floors } = JSON.parse(read('engine.config.json'));
+  assert.ok(atLeast(installed['Claude Code'], floors.claudeCode) && atLeast(installed.Git, floors.git) && atLeast(installed.python3, '3.9'), 'a program of the record is below the floor the page states for it');
+  // The record names no person, no host and no address.
+  assert.doesNotMatch(closing, /@|https?:|\.service-now\.com/);
 });
 
 test('ARC-09-C300 — the page is linked from where a Mac reader starts, and carries a release tag the release writes', () => {
@@ -932,6 +964,11 @@ test('ARC-09-C300 — the Word converter on a Mac is python3, and the doctor say
   assert.match(read('scripts/README.md'), /python3 scripts\/md-to-docx\.py/);
   assert.ok(lines.includes('python3 --version'), 'the page no longer lets the reader check python3');
   assert.ok(prose.includes('On a Mac the AI Architect makes its Word documents with python3.'));
+  // The check is the fifth of 2e, once. Optional tools keeps python3's row and the sentence, and says where the check is: it has no box of its own.
+  assert.equal(commands.filter((c) => c.line === 'python3 --version').length, 1, 'python3 is checked in more than one box');
+  assert.ok(commands.find((c) => c.line === 'python3 --version').heading.startsWith('2e · '), 'the check of python3 is not in 2e');
+  assert.ok(prose.includes('| python3 | Makes the Word documents on a Mac. It is usually already there; its check is in 2e. |'), 'the row of python3 in Optional tools does not say that its check is in 2e');
+  assert.ok(prose.includes('Its check is the fifth command of 2e, and the table there gives the version it needs.'), 'the Word documents section does not say where the check of python3 is');
   // E-04 finds the converter by looking for a command called python3 on PATH; a folder holding an executable of that name is a Mac that has it.
   const dir = tempDir('install-macos-guide-', t);
   writeFileSync(join(dir, 'python3'), '#!/bin/sh\n', { mode: 0o755 });
@@ -1121,4 +1158,208 @@ test('ARC-09-C300 — on a Mac the disk-image steps do what the page says, and t
   const noImage = bash(steps[0].copy, { home });
   assert.ok(noImage.status !== 0 && noImage.stderr.replace(`${home}/snowarch-dl`, '…').includes('cp: …/mnt-drawio/draw.io.app: No such file or directory'), `cp does not answer a copy from an image that is not open as the table says: ${noImage.stderr}`);
   assert.ok(prose.includes('| cp: …/mnt-drawio/draw.io.app: No such file or directory (or …/mnt-libreoffice/LibreOffice.app) |'), 'the table has no row for a copy from an image that is not open');
+  // The row for a download that did not finish: the three commands that use the file say "No such file or directory" when it is not there (the first run on a Mac met it with draw.io).
+  const gone = [['shasum -a 256 ~/snowarch-dl/nothing.dmg', 'No such file or directory'],
+    ['tar -xzf ~/snowarch-dl/nothing.tar.gz -C ~/snowarch-dl --strip-components=1', 'No such file or directory'],
+    ['hdiutil attach -nobrowse -mountpoint ~/snowarch-dl/mnt-nothing ~/snowarch-dl/nothing.dmg > /dev/null', 'hdiutil: attach failed - No such file or directory']];
+  for (const [command, words] of gone) {
+    const ran = bash(command, { home });
+    assert.ok(ran.status !== 0 && ran.stderr.includes(words), `${command.split(' ')[0]} does not answer a download that is not there with "${words}": ${ran.stderr}`);
+  }
+  assert.ok(prose.includes('| shasum, tar or hdiutil attach answers No such file or directory |'), 'the table has no row for a download that did not finish');
+});
+
+// ───────────────────────────── the first run on a Mac (19 November 2026): Step 1 and Step 2 ─────────────────────────────
+// A person ran Step 1 and Step 2 on a company MacBook with Apple silicon, as a Standard user. What that run found is held below: a long command that broke in two at a
+// paste, the installer's own screen and its two suggestions, five checks in 2e (python3 joins them), the size of each download and the end of curl's table, and
+// the rows of "If something goes wrong" that follow. The record itself is the closing paragraph, held above.
+
+test('ARC-09-C300 — every box is one complete command on its own: none sets a variable, a value or a part for another box', () => {
+  // The first run on a Mac pasted a long download line and it broke in two. The repair is to copy the whole box again, which only works if the box is the whole
+  // command. A first answer, the address in a variable that the next box used, was withdrawn: a reader merged the two boxes into one line, and a broken line went
+  // into ~/.zshrc and left PATH unset.
+  const sets = commands.filter((c) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(c.line));
+  assert.deepEqual(sets.map((c) => `${c.heading}: ${c.line}`), [], 'a box sets a variable that another box would have to use');
+  // The one value that outlives its box is the company proxy of "If something goes wrong", and the page says that it lasts for that window only.
+  assert.deepEqual(commands.filter((c) => /^export\b/.test(c.line)).map((c) => c.line.split('=')[0]), ['export HTTPS_PROXY']);
+  assert.ok(prose.includes('This lasts only as long as this window'), 'the page does not say that the proxy lasts for one window');
+  // Every download carries its whole address in its own box.
+  for (const c of commands.filter((x) => /^curl\b/.test(x.line))) assert.match(c.line, / https:\/\/[^\s$"'`]+( \| bash)?$/, `${c.heading}: a download whose address is not in the box: ${c.line}`);
+});
+
+test('ARC-09-C300 — 2a says what Apple\'s Command Line Tools are for and that the reader need not wait for them: 2b to 2d, 2f and 2g meanwhile, 2e and Step 4 after', () => {
+  const part = fold(sectionOf('2a · Git (Apple\'s Command Line Tools)'));
+  for (const s of ['Apple\'s free developer tools for Terminal. Besides Git, which Step 4 needs, they bring python3, which the Word documents need.',
+    'The install can take a while, and you need not wait for it: do 2b, 2c, 2d, 2f and 2g meanwhile. 2e and Step 4 need it finished. When the window says that the software was installed, click **Done**.',
+    'It is the only step of this guide that needs an administrator.']) {
+    assert.ok(part.includes(s), `2a lacks: ${s}`);
+  }
+  // What it says is true of the page: the programs that come with the tools are used in 2e (checked) and Step 4 (git), and in none of the steps it says to do meanwhile.
+  const used = (heading) => commands.filter((c) => c.heading.startsWith(heading)).map((c) => c.line);
+  for (const h of ['2b · ', '2c · ', '2d · ', '2f · ', '2g · ']) {
+    for (const line of used(h)) assert.doesNotMatch(line, /^(?:git|python3|xcode-select)\b/, `${h}: ${line} needs the Command Line Tools, and 2a says that the reader need not wait for them`);
+  }
+  assert.ok(used('2e · ').includes('git --version') && used('2e · ').includes('python3 --version'), '2e is where git and python3 are checked');
+  assert.ok(used('Step 4 · ').some((l) => l.startsWith('git ')), 'Step 4 is where git is used');
+});
+
+test('ARC-09-C300 — 2c shows the installer\'s own screen, with its setup note, and says to skip both of its suggestions because 2d comes next', () => {
+  const install = 'curl -fsSL https://claude.ai/install.sh | bash';
+  const shown = screenAfter(install);
+  assert.ok(shown?.heading.startsWith('2c · '), 'the install of Claude Code has no screen under 2c');
+  const screen = shown.lines.map((l) => l.trim());
+  assert.ok(shown.label.startsWith('On screen (an example; your version number may differ)'), `the label of the screen of 2c: ${shown.label}`);
+  // The installer's note and its line are the ones the product knows for Claude Code off PATH (B00, ARC-09-C270): one folder, Claude Code's.
+  const fix = JSON.parse(read('tools/snowarch/lib/remedies.json')).claudeCode.offPath.darwin;
+  const installerLine = fix.slice(fix.indexOf('echo \''));
+  assert.ok(screen.includes(installerLine), `the screen of 2c does not show the installer's line: ${installerLine}`);
+  assert.ok(screen.some((l) => l.includes('Native installation exists but ~/.local/bin is not in your PATH. Run:')), 'the screen of 2c lacks the installer\'s note');
+  assert.ok(screen.includes('⚠ Setup notes:') && screen.includes('✅ Installation complete!') && screen.includes('✔ Claude Code successfully installed!'), 'the screen of 2c lacks a line of the installer\'s');
+  // ...and 2d's line is not that one: it has the second folder, which is why the installer's line must not be run.
+  const second = commands.filter((c) => PATH_LINE.test(c.line) && c.line.includes('~/.zshrc'));
+  assert.equal(second.length, 1);
+  assert.notEqual(second[0].line, installerLine);
+  assert.ok(second[0].line.includes('$HOME/.local/node/bin') && !installerLine.includes('$HOME/.local/node/bin'), 'the installer\'s line adds as many folders as 2d\'s does');
+  // The version on the screen is a Claude Code at or above the floor, and the number of 2e is the same release.
+  const { floors } = JSON.parse(read('engine.config.json'));
+  const version = /^Version: (\d+\.\d+\.\d+)$/.exec(screen.find((l) => l.startsWith('Version: ')) ?? '')?.[1];
+  assert.ok(version && atLeast(version, floors.claudeCode), `the version on the screen of 2c is below the floor of ${floors.claudeCode}: ${version}`);
+  assert.ok(screens.some((b) => b.lines.includes(`${version} (Claude Code)`)), `the check of 2e does not show Claude Code ${version}, the version 2c shows`);
+  // The words: both suggestions are skipped, and what comes next.
+  const part = fold(sectionOf('2c · Claude Code'));
+  for (const s of ['**Skip both of the installer\'s suggestions.**',
+    'Do not run the line under *Setup notes*: it adds only Claude Code\'s folder to PATH, and Node.js would stay off it, while the line of 2d adds both folders, Claude Code\'s and Node.js\'s.',
+    'And do not run `claude --help` yet: Terminal does not know `claude` until 2d has been done. 2d comes next, then 2e.']) {
+    assert.ok(part.includes(s), `2c lacks: ${s}`);
+  }
+  // The first command that uses `claude` comes after 2d's line, not before it.
+  assert.ok(at((c) => c.line === 'claude --version') > at((c) => PATH_LINE.test(c.line)), 'Claude Code is run before 2d has put it on PATH');
+});
+
+test('ARC-09-C300 — 2e checks five programs, one box each, and the table, the example screen and the floors agree: the engine\'s three, and python3\'s 3.9', () => {
+  const part = sectionOf('2e · Open a fresh window and check');
+  assert.deepEqual(commands.filter((c) => c.heading.startsWith('2e · ')).map((c) => c.line),
+    ['claude --version', 'git --version', 'node --version', 'npm --version', 'python3 --version'], 'the five checks of 2e, in the order of the table');
+  assert.ok(fold(part).includes('Then run these five commands, one at a time.'));
+  const { floors } = JSON.parse(read('engine.config.json'));
+  const rows = [...part.matchAll(/^\| (.+?) \| (.+) \|$/gm)].map((m) => [m[1], m[2]]).filter(([k]) => k !== 'Program');
+  assert.deepEqual(rows.map(([k]) => k), ['Claude Code', 'Git', 'Node.js', 'npm', 'python3'], 'the table has a row for each of the five programs, in the order of the checks');
+  const cell = Object.fromEntries(rows);
+  assert.equal(cell['Claude Code'], floors.claudeCode);
+  assert.equal(cell.Git, floors.git);
+  assert.ok(cell['Node.js'].startsWith(`v${parseInt(floors.node, 10)}. `), 'the Node.js row does not state the engine\'s major version');
+  assert.ok(cell.python3.startsWith('3.9. Apple\'s own python3, which comes with the Command Line Tools of 2a, is 3.9.6 and works.'), `the python3 row: ${cell.python3}`);
+  // The example screen: today's answers of a Mac (the first run), each at or above the floor of its row; npm's answer is left out and the page says so.
+  const shown = screenAfter('python3 --version');
+  assert.ok(shown?.heading.startsWith('2e · '), 'the checks of 2e have no screen');
+  assert.deepEqual(shown.lines.filter((l) => l.trim() !== ''), ['2.1.328 (Claude Code)', 'git version 2.50.1 (Apple Git-155)', 'v26.13.1', 'Python 3.9.6']);
+  const answer = (re) => re.exec(shown.lines.join('\n'))?.[1] ?? '0';
+  assert.ok(atLeast(answer(/^(\d+\.\d+\.\d+) \(Claude Code\)$/m), floors.claudeCode), 'the Claude Code on the screen is below its floor');
+  assert.ok(atLeast(answer(/^git version (\d+\.\d+\.\d+)/m), floors.git), 'the Git on the screen is below its floor');
+  assert.ok(parseInt(answer(/^v(\d+)\./m), 10) >= parseInt(floors.node, 10), 'the Node.js on the screen is below its floor');
+  assert.ok(atLeast(answer(/^Python (\d+\.\d+\.\d+)$/m), '3.9'), 'the python3 on the screen is below its floor');
+  assert.ok(fold(part).includes('The screen leaves out the answer of `npm --version`, which is npm\'s own version number.'));
+  // Without Apple's tools git and python3 open one window instead of answering: the page says what to do, and that a number below the table means old tools.
+  assert.ok(fold(part).includes('If `git --version` or `python3 --version` opens the window of 2a instead of answering, the Command Line Tools are not installed yet: finish 2a, then run that command again.'));
+  assert.ok(fold(part).includes('do not continue: ask for help, and send these five answers. For git or python3, a number below the table\'s means that Apple\'s Command Line Tools on this Mac are old;'));
+});
+
+test('ARC-09-C300 — the 3.9 of the python3 row holds: the Word converter is valid for Python 3.9\'s grammar, and the check can tell a newer grammar', (t) => {
+  // `ast.parse(..., feature_version=(3, 9))` refuses what Python 3.9 does not know (a `match` statement, 3.10). It is not a run on 3.9, and a Python older than 3.9 is no
+  // reader of this page; it is the part of the claim a test can hold: nobody adds newer syntax to scripts/md-to-docx.py without changing the floor in 2e.
+  const parse = (source) => spawnSync('python3', ['-I', '-c', 'import ast, sys; ast.parse(sys.stdin.read(), feature_version=(3, 9))'], { input: source, encoding: 'utf8' });
+  const probe = spawnSync('python3', ['-I', '-c', 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)'], { encoding: 'utf8' });
+  if (probe.error || probe.status !== 0) return t.skip('a python3 that knows feature_version (3.8 or later) is needed to read the converter\'s grammar');
+  const converter = parse(read('scripts/md-to-docx.py'));
+  assert.equal(converter.status, 0, `scripts/md-to-docx.py is not valid for Python 3.9's grammar, and 2e says 3.9 is enough: ${converter.stderr}`);
+  const newer = parse('match 1:\n    case 1:\n        pass\n');
+  assert.notEqual(newer.status, 0, 'the check accepts a match statement, which Python 3.9 does not know: it proves nothing about the converter');
+  assert.match(newer.stderr, /SyntaxError/);
+});
+
+/** How curl's progress table writes a size: in units of 1,048,576 bytes, cut and not rounded. `55.6M` below 100 MiB, `151M` from there on (curl's max5data). */
+function curlSize(bytes) {
+  const KiB = 1024;
+  const MiB = 1024 * KiB;
+  if (bytes < 100000) return String(bytes);
+  if (bytes < 10000 * KiB) return `${Math.floor(bytes / KiB)}k`;
+  if (bytes < 100 * MiB) return `${Math.floor(bytes / MiB)}.${Math.floor(((bytes % MiB) * 10) / MiB)}M`;
+  return `${Math.floor(bytes / MiB)}M`;
+}
+
+test('ARC-09-C300 — each download says how many bytes the file has and where curl\'s table must end, in words and on the screen: the 100 and the size curl writes for that many bytes', () => {
+  for (const name of ['node', 'drawio', 'libreoffice']) {
+    const bytes = BYTES[name][versionOf(name)];
+    assert.ok(Number.isInteger(bytes), `${name}: add the size of the download to BYTES`);
+    const command = commands.find((c) => DOWNLOADS[name].re.test(c.line));
+    const size = curlSize(bytes);
+    const part = fold(sectionOf(command.heading));
+    assert.ok(part.includes(`The file is ${bytes.toLocaleString('en-US')} bytes. When all of it has arrived, the last line of the table starts with \`100\` and shows \`${size}\` twice: the table counts in units of 1,048,576 bytes.`),
+      `${name}: the words do not give ${bytes.toLocaleString('en-US')} bytes and ${size}`);
+    assert.ok(part.includes('The speed and time columns differ from Mac to Mac; only the `100` and the size must match. If the table stops before `100`, or a message appears, the download did not finish: run the same command again.'),
+      `${name}: the words do not say that only the 100 and the size must match, and what to do otherwise`);
+    // The screen is the one straight after the download (before its checksum), the table's header is two lines, and its last line is the end of the table for this size.
+    const shown = screenAfter(command.line);
+    assert.ok(shown?.label.startsWith('On screen (an example; the speed and the times differ)'), `${name}: the label of the screen of the download: ${shown?.label}`);
+    assert.ok(blocks.indexOf(shown) < blocks.findIndex((b) => b.kind === 'run' && b.lines.some((l) => l.startsWith('shasum') && l.includes(DOWNLOADS[name].file))), `${name}: the screen of the download comes after its checksum`);
+    const rows = shown.lines.filter((l) => l.trim() !== '');
+    assert.match(rows[0], /^ {2}% Total {4}% Received % Xferd {2}Average Speed {3}Time {4}Time {5}Time {2}Current$/);
+    assert.match(rows[1], /^ {33}Dload {2}Upload {3}Total {3}Spent {4}Left {2}Speed$/);
+    assert.match(rows.at(-1), new RegExp(`^100 +${size} +100 +${size} +0 +0 `), `${name}: the last line of the table does not end at ${size}`);
+  }
+  // curl cuts a size, it does not round it: 158,930,055 bytes are 151.57 MiB, and its table writes 151M, not 152M.
+  assert.equal(curlSize(158930055), '151M');
+  assert.doesNotMatch(page, /\b152M\b/, 'a size that curl does not write');
+});
+
+test('ARC-09-C300 — the table on each download screen is the real curl\'s: its two header lines, and the size it writes for a file of exactly that many bytes', BASH, (t) => {
+  const dir = tempDir('install-macos-guide-', t);
+  for (const name of ['node', 'drawio', 'libreoffice']) {
+    const bytes = BYTES[name][versionOf(name)];
+    const file = join(dir, `${name}.bin`);
+    writeFileSync(file, '');
+    truncateSync(file, bytes);                                        // a sparse file of exactly that many bytes: nothing is written, nothing is downloaded
+    const ran = spawnSync('curl', ['-fL', '-o', '/dev/null', `file://${file}`], { encoding: 'utf8' });
+    if (ran.error?.code === 'ENOENT') return t.skip('curl is needed to read its table');
+    assert.equal(ran.status, 0, ran.stderr);
+    const rows = ran.stderr.split(/[\r\n]+/).filter((l) => l.trim() !== '');
+    const screen = screenAfter(commands.find((c) => DOWNLOADS[name].re.test(c.line)).line).lines.filter((l) => l.trim() !== '');
+    assert.deepEqual(screen.slice(0, 2), rows.slice(0, 2), `${name}: the header of the table on the screen is not the one curl prints`);
+    const real = (/^100 +(\S+) +100 +(\S+) /.exec(rows.at(-1)) ?? []).slice(1);
+    assert.deepEqual(real, [curlSize(bytes), curlSize(bytes)], `${name}: curl does not write ${bytes} bytes as the formula of this test does: ${rows.at(-1)}`);
+    assert.deepEqual((/^100 +(\S+) +100 +(\S+) /.exec(screen.at(-1)) ?? []).slice(1), real, `${name}: the last line of the table on the screen does not end where curl's does`);
+  }
+});
+
+test('ARC-09-C300 — "If something goes wrong" has the rows the first run on a Mac added: a download broken at a paste, a PATH line that was not written, a download that did not finish', (t) => {
+  const rows = sectionOf('If something goes wrong').split('\n').filter((l) => /^\| .+ \| .+ \|$/.test(l)).map((l) => /^\| (.+?) \| (.+) \|$/.exec(l).slice(1));
+  const row = (start) => rows.find(([symptom]) => symptom.startsWith(start));
+  // T1: the command broke into two lines at a paste; copy the whole box again and paste it once.
+  const pasted = row('curl: (2) no URL specified');
+  assert.ok(pasted, 'no row for a download command that broke at a paste');
+  assert.ok(pasted[0].includes('zsh: no such file or directory: https://…'));
+  assert.ok(pasted[1].includes('The command broke into two lines when it was pasted, so curl got no address, and nothing was downloaded. Copy the whole grey box again with its Copy button, which copies it as one line, and paste it once.'));
+  // T4: a fresh window after 2d still says command not found: the check reads the file, and the repair deletes only the broken line.
+  const unset = row('command not found: claude (or node, or npm) in a fresh window');
+  assert.ok(unset, 'no row for a PATH that stayed unset after 2d');
+  for (const s of ['grep -n \'local/node/bin\' ~/.zshrc', 'If it prints nothing, run the PATH command of 2d again.', 'open -e ~/.zshrc', 'delete that line only and type nothing else, save the file, close it, run the PATH command of 2d, and open a fresh window as in 2e.']) {
+    assert.ok(unset[1].includes(s), `the row of the unset PATH lacks: ${s}`);
+  }
+  // ...and the check does what the row says: it prints the line of 2d where 2d wrote it, and nothing where it did not.
+  if (process.platform !== 'win32') {
+    const home = tempDir('install-macos-guide-', t);
+    const other = tempDir('install-macos-guide-', t);
+    const line = commands.find((c) => PATH_LINE.test(c.line) && c.line.includes('~/.zshrc')).line;
+    assert.equal(bash(line, { home }).status, 0);
+    const check = 'grep -n \'local/node/bin\' ~/.zshrc';
+    assert.equal(bash(check, { home }).stdout, '1:export PATH="$HOME/.local/bin:$HOME/.local/node/bin:$PATH"\n', 'the check does not print the line of 2d');
+    writeFileSync(join(other, '.zshrc'), '');
+    assert.equal(bash(check, { home: other }).stdout, '', 'the check prints something where 2d wrote nothing');
+  }
+  // T7: the download before it did not finish (the messages themselves are held where the tools run, in the case that opens disk images).
+  const gone = row('shasum, tar or hdiutil attach answers No such file or directory');
+  assert.ok(gone, 'no row for a download that did not finish');
+  assert.ok(gone[1].includes('The download before it did not finish, or did not happen. Run that step\'s download command again, wait until the table of numbers reaches 100 and the line that ends in `%` comes back, then go on from the shasum line.'));
+  // The rows are in the table once each, and none holds a pipe (a pipe in a cell cuts the row on GitHub).
+  assert.equal(new Set(rows.map(([s]) => s)).size, rows.length, 'two rows share a symptom');
 });
