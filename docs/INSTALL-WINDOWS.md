@@ -1,6 +1,6 @@
 # Install the AI Architect on Windows
 
-AI ServiceNow Architect · Windows 10 (version 1809 or later) and Windows 11 · no administrator rights needed · the steps were tested end to end on a Windows 11 computer on 12 November 2026
+AI ServiceNow Architect · Windows 10 (version 1809 or later) and Windows 11 · no administrator rights needed · the steps were tested end to end on a Windows 11 computer on 12 November 2026, and again on a new laptop on 19 November 2026
 
 This guide takes you from a Windows computer with nothing installed to a working AI Architect connected to your ServiceNow instance. Follow it from top to bottom. Plan about 30 minutes; most of it is waiting.
 
@@ -879,7 +879,7 @@ Run:
 
 ## What has not been tested
 
-This guide was written from one end-to-end install. Four things in it rest on something other than a run:
+This guide was written from one end-to-end install (12 November 2026) and confirmed by a second, on a new laptop on 19 November 2026, that followed every step as written. Four things in it rest on something other than a run:
 
 - **Windows 10.** The test machine ran Windows 11. Windows 10 (version 1809 or later) has the same PowerShell 5.1 and takes the same commands.
 - **Claude Code's first-run screens on Windows** (Step 3). They are described in general terms because they change with Claude Code's releases.
@@ -890,4 +890,4 @@ If you meet a difference, `.\snowarch.cmd version` and `.\snowarch.cmd doctor` (
 
 ---
 
-Tested end to end on 12 November 2026 on a company laptop: Windows 11 Enterprise (build 26200), a standard user without administrator rights. Git 2.56.1 (per user), Node.js 26.13.0 and npm 11.20.0 (zip), Claude Code 2.1.322, ServiceNow SDK 4.14.0, PowerShell 7.7.0 (zip; present on the test machine, not needed by this guide), draw.io 32.6.10 (zip), Word 16.0.20527; the AI Architect release of that day, in live mode, on a ServiceNow instance.
+Tested end to end on 12 November 2026 on a company laptop: Windows 11 Enterprise (build 26200), a standard user without administrator rights. Git 2.56.1 (per user), Node.js 26.13.0 and npm 11.20.0 (zip), Claude Code 2.1.322, ServiceNow SDK 4.14.0, PowerShell 7.7.0 (zip; present on the test machine, not needed by this guide), draw.io 32.6.10 (zip), Word 16.0.20527; the AI Architect release of that day, in live mode, on a ServiceNow instance. A second end-to-end install, on a new laptop on 19 November 2026, followed every step as written, with no errors.

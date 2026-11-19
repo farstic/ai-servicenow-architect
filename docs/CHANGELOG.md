@@ -88,7 +88,8 @@ guide installs Node.js 26.13.1, so CI now tests Node 26 on macOS, in `test` and 
 Node.js 20, 22, 24 and 26 are tested on all three systems. A person has run Step 1 and Step 2 on a Mac, as a Standard user without administrator rights, and the guide
 ends with that record. What the run found is in the guide: python3 is the fifth check of 2e, 2c shows the installer's own screen and says to skip its two suggestions,
 each download gives the size of its file and where curl's table must end, and three rows are added to the table of problems. The guide still says "Not yet tested end
-to end on a Mac": the macOS CI jobs run design-only, and Steps 3 to 8 have not run on a Mac.
+to end on a Mac": the macOS CI jobs run design-only, and Steps 3 to 8 have not run on a Mac. The Windows guide and its page now also record that a second
+end-to-end install, on a new laptop on 19 November 2026, followed every step as written, with no errors.
 
 ### Added
 
@@ -139,6 +140,9 @@ to end on a Mac": the macOS CI jobs run design-only, and Steps 3 to 8 have not r
 - A docs bump checks the macOS guides' corpus figures, `[docs] 51,186 files · 286 MB working tree` and "all 51,178 pages", against the corpus and against the working
   tree the bump measured, which on a Mac is the Linux one; the pull request says which differ (ARC-09-C300).
 - `docs/INSTALL.md`, and the README that is composed from it, link the macOS guide beside the Windows one (ARC-09-C300).
+- `docs/INSTALL-WINDOWS.md` and `docs/AI-Architect-Windows-Install-Guide.html` record a second end-to-end install, on a new laptop on 19 November 2026, that followed
+  every step as written, with no errors. The subtitle and the hero line, the list of what has not been tested and the closing record say both days; the second install is
+  recorded with no machine, user or version, because none was recorded. `tests/install-windows-guide-html.test.mjs` holds each of those places (ARC-09-C300).
 - `.gitattributes` gains `*.html text eol=lf`: `tests/eol.test.mjs` asks every tracked extension for a rule, and the interactive guide is the first
   HTML file in the tree. A page that a Windows checkout rewrote to CRLF would no longer match the hash the signed manifest holds for it (ARC-09-C285).
 - The pinned-clone guards of `tests/install-page.test.mjs` read the interactive guide too: its clone command quiets git's detached-HEAD advice,
