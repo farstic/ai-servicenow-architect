@@ -1312,19 +1312,24 @@ test('ARC-09-C300 — each download says how many bytes the file has and where c
   assert.doesNotMatch(page, /\b152M\b/, 'a size that curl does not write');
 });
 
-test('ARC-09-C300 — the table on each download screen is the real curl\'s: its two header lines, and the size it writes for a file of exactly that many bytes', BASH, (t) => {
+test('ARC-09-C300 — on a Mac the table on each download screen is the real curl\'s: its two header lines, and the size it writes for a file of exactly that many bytes', DARWIN, (t) => {
+  // The system curl of the Mac (/usr/bin/curl) is the one a reader without Homebrew runs, and the one the screens show. A Linux runner's curl is newer and writes the table's
+  // header with narrower columns, so the case is a Mac's: asking another curl would test that curl, not the guide.
   const dir = tempDir('install-macos-guide-', t);
   for (const name of ['node', 'drawio', 'libreoffice']) {
     const bytes = BYTES[name][versionOf(name)];
     const file = join(dir, `${name}.bin`);
     writeFileSync(file, '');
     truncateSync(file, bytes);                                        // a sparse file of exactly that many bytes: nothing is written, nothing is downloaded
-    const ran = spawnSync('curl', ['-fL', '-o', '/dev/null', `file://${file}`], { encoding: 'utf8' });
+    const ran = spawnSync('/usr/bin/curl', ['-fL', '-o', '/dev/null', `file://${file}`], { encoding: 'utf8' });
     if (ran.error?.code === 'ENOENT') return t.skip('curl is needed to read its table');
     assert.equal(ran.status, 0, ran.stderr);
     const rows = ran.stderr.split(/[\r\n]+/).filter((l) => l.trim() !== '');
     const screen = screenAfter(commands.find((c) => DOWNLOADS[name].re.test(c.line)).line).lines.filter((l) => l.trim() !== '');
-    assert.deepEqual(screen.slice(0, 2), rows.slice(0, 2), `${name}: the header of the table on the screen is not the one curl prints`);
+    // The header's WORDS and their order are every curl's; the width of its columns is not (the curl of a newer Ubuntu spaces them closer than macOS's 8.7.1, which the
+    // screen shows exactly: the guide's own test holds that spacing). So the real curl is asked for the words, and for the size, which is the point.
+    const words = (lines) => lines.map((l) => l.trim().replace(/\s+/g, ' '));
+    assert.deepEqual(words(screen.slice(0, 2)), words(rows.slice(0, 2)), `${name}: the header of the table on the screen does not say what curl's says`);
     const real = (/^100 +(\S+) +100 +(\S+) /.exec(rows.at(-1)) ?? []).slice(1);
     assert.deepEqual(real, [curlSize(bytes), curlSize(bytes)], `${name}: curl does not write ${bytes} bytes as the formula of this test does: ${rows.at(-1)}`);
     assert.deepEqual((/^100 +(\S+) +100 +(\S+) /.exec(screen.at(-1)) ?? []).slice(1), real, `${name}: the last line of the table on the screen does not end where curl's does`);
