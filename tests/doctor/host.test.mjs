@@ -244,7 +244,7 @@ test('ARC-08-C2 — the bootstrap\'s two halves agree about a redirected folder'
 });
 
 // ARC-09-C305 — E-34, E-25's twin for the one cloud-sync folder no path can show: iCloud Drive's "Desktop & Documents Folders". Its cases are the rows of
-// `icloudFolders[]` in the same fixture the server's rule answers to (tests/store/icloud.test.ts), through the stand-in machine of each row; none of them
+// `icloudFolders[]` in the same fixture the server's rule answers to (packages/snowarch/tests/store/icloud.test.ts), through the stand-in machine of each row; none of them
 // reads this machine, and none starts `defaults`.
 const E34_DETAIL = (folder) => `checkout is under a cloud-sync folder (iCloud Drive, which copies ${folder} while Desktop & Documents Folders is on) — `
   + '.local/instances.json (0600) will still be synced; move the checkout outside the synced tree or keep this instance read-only';

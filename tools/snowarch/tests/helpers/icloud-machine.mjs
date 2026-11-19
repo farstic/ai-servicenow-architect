@@ -4,7 +4,7 @@
  * ARC-09-C305 — the rows of `icloudFolders[]` in the shared cloud-sync fixture, and the machine each row describes.
  *
  * The rule for iCloud's "Desktop & Documents Folders" is `packages/snowarch/src/store/icloud.ts`, and the cases are NOT written in any test: they are the
- * rows of `packages/snowarch/tests/fixtures/cloud-sync-paths.json`, which the server's test (`tests/store/icloud.test.ts`), the doctor's E-34
+ * rows of `packages/snowarch/tests/fixtures/cloud-sync-paths.json`, which the server's test (`packages/snowarch/tests/store/icloud.test.ts`), the doctor's E-34
  * (`tests/doctor/host.test.mjs`) and the installer's B01 (`tools/snowarch/tests/b01-b07.test.mjs`) all read. This is the JS twin of the stand-in machine
  * the server's test builds from a row, so the three answer to one list and not to three that look alike.
  *
