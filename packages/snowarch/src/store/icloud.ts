@@ -28,6 +28,7 @@
 import { execFileSync } from 'node:child_process';
 import { lstatSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { basename, dirname, join } from 'node:path';
 import { isElevated } from '../licence/elevated.js';
 import { detectCloudSync, type CloudSyncHit } from './paths.js';
 
@@ -96,11 +97,26 @@ function folderRoot(home: string, folder: IcloudFolder): string {
 const within = (inner: string[], outer: string[]): boolean => outer.length > 0
   && outer.every((s, i) => (inner[i] ?? '').toLowerCase() === s.toLowerCase());
 
+/**
+ * The real path of `p`, even when `p` is not there yet: through its nearest ancestor that is, with what is missing put back after it.
+ * The wizard asks BEFORE it makes `.local/`, so the folder it hands over may not exist, and the folder it is compared with
+ * (`<home>/Documents`) is resolved through any link above it (a home kept on another volume; macOS's own /var for a temp folder). A path
+ * left as written would then never be inside it. `detectCloudSync` does not need this, because it matches the NAMES in a path and not
+ * the folder they lead to. With nothing above it that exists, the path is matched as written.
+ */
 function safeRealpath(p: string): string {
-  try {
-    return realpathSync.native(p);
-  } catch {
-    return p;                     // a path that is not there yet is matched as written
+  const missing: string[] = [];
+  let at = p;
+  for (;;) {
+    try {
+      const real = realpathSync.native(at);
+      return missing.length === 0 ? real : join(real, ...missing.reverse());
+    } catch {
+      const parent = dirname(at);
+      if (parent === at) return p;
+      missing.push(basename(at));
+      at = parent;
+    }
   }
 }
 
