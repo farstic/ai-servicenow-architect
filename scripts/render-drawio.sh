@@ -20,6 +20,7 @@
 #
 # Install the renderer once:
 #   macOS    brew install --cask drawio
+#            (or copy the app from its disk image into /Applications or, without administrator rights, into ~/Applications)
 #   Windows  the zip whose name ends in -windows.zip, from https://github.com/jgraph/drawio-desktop/releases,
 #            unpacked into %LOCALAPPDATA%\Programs\drawio (no administrator rights; the installer needs them)
 #   Linux    the .deb, .rpm or AppImage from the same page
@@ -55,7 +56,13 @@ find_drawio() {
   case "$os" in
     mac)
       pick "/Applications/draw.io.app/Contents/MacOS/draw.io"
-      pick "/Applications/drawio.app/Contents/MacOS/drawio" ;;
+      pick "/Applications/drawio.app/Contents/MacOS/drawio"
+      # The user's own Applications folder is where a person without administrator rights copies the app from its disk image (ARC-09-C301). It
+      # comes after the Mac's own, so that a Mac which found draw.io before keeps finding the same one: the place only fills a gap.
+      if [[ -n "${HOME:-}" ]]; then
+        pick "$HOME/Applications/draw.io.app/Contents/MacOS/draw.io"
+        pick "$HOME/Applications/drawio.app/Contents/MacOS/drawio"
+      fi ;;
     windows)
       if [[ -n "${LOCALAPPDATA:-}" ]]; then
         pick "$(unixpath "$LOCALAPPDATA")/Programs/drawio/draw.io.exe"      # the zip
