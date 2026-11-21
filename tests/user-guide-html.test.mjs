@@ -421,7 +421,7 @@ test('ARC-09-C306 — the release tag is one: every clone on the page and the re
   assert.equal(writeGuideRelease(html.replaceAll(/--branch v[\d.]+/g, '--branch main'), '9.9.9', PAGE).ok, false);
 });
 
-test('ARC-09-C306 — the page ships: it is covered by the signed manifest, as the two install guides are', async () => {
+test('ARC-09-C306 — the page ships: it is covered by the signed manifest, and the Release carries it as its last asset, as it does the two install guides', async () => {
   const { COVERAGE } = await import(href('packages/snowarch/dist/licence/integrity.js'));
   assert.ok(COVERAGE.covers.includes(PAGE), 'the page is not in COVERAGE (packages/snowarch/src/licence/integrity.ts, and dist)');
   assert.match(read('packages/snowarch/src/licence/integrity.ts'), /'docs\/AI-Architect-User-Guide\.html'/);
@@ -430,6 +430,17 @@ test('ARC-09-C306 — the page ships: it is covered by the signed manifest, as t
   assert.equal(isCovered(PAGE, COVERAGE), true, 'the staged distribution tree would not hold the page');
   // The install guides and the operator's guide it sits beside are covered too, so the three pages a reader opens after the install are one set.
   for (const beside of ['docs/AI-Architect-Windows-Install-Guide.html', 'docs/AI-Architect-macOS-Install-Guide.html', 'docs/USER-GUIDE.md']) assert.ok(COVERAGE.covers.includes(beside), beside);
+  // The Release that `release.yml` makes carries the page after the two install guides, as its last asset.
+  assert.ok(/gh release create[\s\S]*?install-metrics\.md docs\/AI-Architect-Windows-Install-Guide\.html docs\/AI-Architect-macOS-Install-Guide\.html docs\/AI-Architect-User-Guide\.html\n/.test(read('.github/workflows/release.yml')),
+    'the Release does not carry the page as its last asset');
+  // The release steps of CONTRIBUTING.md say so: the number of assets, and the hand step for the Release of farstic/snowarch, which attaches the three pages in one call.
+  const steps = read('docs/CONTRIBUTING.md').replace(/\s+/g, ' ');
+  assert.ok(steps.includes('publishes a GitHub Release with ten assets'), 'CONTRIBUTING.md does not say that the Release has ten assets');
+  assert.ok(steps.includes('its eighth, ninth and tenth assets'), 'CONTRIBUTING.md does not say that the three pages are the eighth to the tenth assets');
+  assert.ok(steps.includes('gh release upload vX.Y.Z docs/AI-Architect-Windows-Install-Guide.html docs/AI-Architect-macOS-Install-Guide.html docs/AI-Architect-User-Guide.html --repo farstic/snowarch'),
+    'the hand step for farstic/snowarch does not attach the three pages');
+  assert.ok(steps.includes('ten assets on the Release') && steps.includes('the Windows and macOS install guides and the user guide\'s page'), 'the rehearsal checklist does not name the three pages');
+  assert.ok(steps.includes('attach the three pages by hand'), 'step 6 of the release list does not attach the three pages');
 });
 
 test('ARC-09-C306 — the files the page names are in the tree', () => {

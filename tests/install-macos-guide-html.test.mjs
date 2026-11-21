@@ -535,14 +535,14 @@ test('ARC-09-C300 — the release tag is one: the clone, the page\'s release and
   assert.equal(writeGuideRelease(html.replace(/--branch v[\d.]+/, '--branch main'), '9.9.9', PAGE).ok, false);
 });
 
-test('ARC-09-C300 — the page ships: it is covered by the signed manifest, and the Release carries it as its last asset', async () => {
+test('ARC-09-C300 — the page ships: it is covered by the signed manifest, and the Release carries it after the Windows guide', async () => {
   const { COVERAGE } = await import(href('packages/snowarch/dist/licence/integrity.js'));
   assert.ok(COVERAGE.covers.includes(PAGE), 'the page is not in COVERAGE (packages/snowarch/src/licence/integrity.ts, and dist)');
   assert.match(read('packages/snowarch/src/licence/integrity.ts'), /'docs\/AI-Architect-macOS-Install-Guide\.html'/);
   // What `shippedFiles` keeps of a tree (the files tracked at HEAD that this decides are covered), asked of the page itself, so the answer does not wait for a commit.
   const { isCovered } = await import(href('tools/snowarch/lib/licence/manifest.mjs'));
   assert.equal(isCovered(PAGE, COVERAGE), true, 'the staged distribution tree would not hold the page');
-  assert.ok(/gh release create[\s\S]*?install-metrics\.md docs\/AI-Architect-Windows-Install-Guide\.html docs\/AI-Architect-macOS-Install-Guide\.html\n/.test(read('.github/workflows/release.yml')), 'the Release does not carry the page as its last asset');
+  assert.ok(/gh release create[\s\S]*?install-metrics\.md docs\/AI-Architect-Windows-Install-Guide\.html docs\/AI-Architect-macOS-Install-Guide\.html(?=\s)/.test(read('.github/workflows/release.yml')), 'the Release does not carry the page after the Windows guide');
 });
 
 // ── the words ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -646,8 +646,9 @@ const SENTENCES = [
   'If it prints a line that is not exactly the line of 2d, open the file with open -e ~/.zshrc (bash: open -e ~/.bash_profile), delete that line only and type nothing else, save the file, close it, run the PATH command of 2d, and open a fresh window as in 2e.',
   'shasum, tar or hdiutil attach answers No such file or directory',
   'The download before it did not finish, or did not happen. Run that step\'s download command again, wait until the table of numbers reaches 100 and the line that ends in % comes back, then go on from the line after the download command.',
-  // The closing line of Step 8 names the user guide's page beside the operator's guide (ARC-09-C306).
-  'The User Guide in your folder, docs/USER-GUIDE.md, and its page docs/AI-Architect-User-Guide.html, which you open in your browser, show how to work with it, with examples for analysts, architects and developers.',
+  // The closing line of Step 8 sends the reader to the user guide's page, which holds every command and setting (ARC-09-C306).
+  'The User Guide in your folder, docs/USER-GUIDE.md, shows how to work with it, with examples for analysts, architects and developers.',
+  'Every command and setting is in docs/AI-Architect-User-Guide.html, which you open in your browser.',
 ].map((s) => s.replaceAll('$CLI', CLI).replaceAll('$BOOT', BOOT));
 
 test('ARC-09-C300 — the sentences of the reviews are on the page, and they are the Markdown guide\'s', () => {
