@@ -93,8 +93,8 @@ end-to-end install, on a new laptop on 19 November 2026, followed every step as 
 
 **The user guide is a page that runs from disk, the third after the two install guides.** `docs/AI-Architect-User-Guide.html` is one file in the design of the install
 guides, with a switch between macOS and Windows and a Copy button on each of its commands. The release writer moves the clone tags and the release it names with every
-final, the signed manifest covers it, and the last step of both install guides, and of their pages, now names it beside `docs/USER-GUIDE.md`. The README lists it among the
-files of the repository. `tests/user-guide-html.test.mjs` holds every `snowarch` command on the page to the product's help tables and to the parser that takes it, requires
+final, the signed manifest covers it, each GitHub Release carries it as its tenth asset, and the last step of both install guides, and of their pages, now says that every
+command and setting is in it. The README lists it among the files of the repository. `tests/user-guide-html.test.mjs` holds every `snowarch` command on the page to the product's help tables and to the parser that takes it, requires
 the same commands for both computers, and fails on an owner's command or on a licence number other than the placeholder.
 
 ### Added
@@ -154,9 +154,10 @@ the same commands for both computers, and fails on an owner's command or on a li
 - `docs/INSTALL-WINDOWS.md` and `docs/AI-Architect-Windows-Install-Guide.html` record a second end-to-end install, on a new laptop on 19 November 2026, that followed
   every step as written, with no errors. The subtitle and the hero line, the list of what has not been tested and the closing record say both days; the second install is
   recorded with no machine, user or version, because none was recorded. `tests/install-windows-guide-html.test.mjs` holds each of those places (ARC-09-C300).
-- The release writer rewrites the clone tags and the release of the user guide page with every final, as for the two install pages, and the signed manifest covers it.
-  The last step of both install guides, in Markdown and in HTML, names it beside `docs/USER-GUIDE.md`, and the README lists it among the files of the repository. The
-  pinned-clone guards of `tests/install-page.test.mjs` read the page too (ARC-09-C306).
+- The release writer rewrites the clone tags and the release of the user guide page with every final, as for the two install pages, the signed manifest covers it, and each
+  GitHub Release carries it as its tenth asset (`release.yml`, and the release steps of `docs/CONTRIBUTING.md`, which also attach it by hand to the Release of
+  farstic/snowarch). The last step of both install guides, in Markdown and in HTML, says that every command and setting is in it, and the README lists it among the files of
+  the repository. The pinned-clone guards of `tests/install-page.test.mjs` read the page too (ARC-09-C306).
 - `.gitattributes` gains `*.html text eol=lf`: `tests/eol.test.mjs` asks every tracked extension for a rule, and the interactive guide is the first
   HTML file in the tree. A page that a Windows checkout rewrote to CRLF would no longer match the hash the signed manifest holds for it (ARC-09-C285).
 - The pinned-clone guards of `tests/install-page.test.mjs` read the interactive guide too: its clone command quiets git's detached-HEAD advice,
