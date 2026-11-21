@@ -85,7 +85,8 @@ test('ARC-09-C306 — one self-contained file: one data block, one script, one f
   assert.match(html, /<html lang="en" data-theme="light">/);
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1">/);
   assert.match(html, /<title>AI Architect — user guide<\/title>/);
-  assert.match(markup, /<noscript>[\s\S]*?\S[\s\S]*?<\/noscript>/, 'the page without a script says so, and what it still shows');
+  // The note of the page itself, the first thing in the body: every command box carries a <noscript> of its own, so a pattern that asks for any one of them is satisfied by the boxes.
+  assert.match(markup, /<body[^>]*>\s*<noscript><p[^>]*>[^<]*\S[^<]*<\/p><\/noscript>/, 'the page without a script says so, and what it still shows');
   // Every link of the markup stays on the page, except the font sheet: the page is read from a disk, with nothing to follow to.
   const hrefs = idsOf(/\shref="([^"]*)"/g);
   assert.ok(hrefs.length >= 100, `${hrefs.length} links: the page lost its contents`);
@@ -439,7 +440,8 @@ test('ARC-09-C306 — the page ships: it is covered by the signed manifest, and 
   assert.ok(steps.includes('its eighth, ninth and tenth assets'), 'CONTRIBUTING.md does not say that the three pages are the eighth to the tenth assets');
   assert.ok(steps.includes('gh release upload vX.Y.Z docs/AI-Architect-Windows-Install-Guide.html docs/AI-Architect-macOS-Install-Guide.html docs/AI-Architect-User-Guide.html --repo farstic/snowarch'),
     'the hand step for farstic/snowarch does not attach the three pages');
-  assert.ok(steps.includes('ten assets on the Release') && steps.includes('the Windows and macOS install guides and the user guide\'s page'), 'the rehearsal checklist does not name the three pages');
+  assert.ok(steps.includes('ten assets on the Release (three `doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, the Windows and macOS install guides and the user guide\'s page)'),
+    'the rehearsal checklist does not name the three pages');
   assert.ok(steps.includes('attach the three pages by hand'), 'step 6 of the release list does not attach the three pages');
 });
 
