@@ -392,7 +392,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     <h1>Use the <em>AI Architect</em></h1>
     <p class="lead">Everything you can do with the AI Architect after the install: work with it every day, connect and manage your ServiceNow instances, change its settings, keep it healthy and up to date, and fix what goes wrong. Every command has a Copy button, for macOS and for Windows.</p>
     <div class="chips">
-      <span class="chip"><i></i>Release v2.2.6</span>
+      <span class="chip"><i></i><span>Release <span data-bind="release"></span></span></span>
       <span class="chip"><i></i>macOS and Windows</span>
       <span class="chip"><i></i>No administrator rights needed</span>
       <span class="chip warn"><i></i>Not yet tested end to end</span>
@@ -440,7 +440,8 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       <section class="sec" id="need" style="border-top:0;padding-top:0">
         <div class="sec-head"><div class="num">1</div><div class="t"><small>Before you begin</small><h2>About this guide</h2></div></div>
         <p>This guide is for ServiceNow consultants — business analysts, architects and developers — who have installed the AI Architect with the install guide for their computer. It shows everything you can do with it afterwards: work with it every day, connect and look after your ServiceNow instances, keep it healthy and up to date, and recover when something goes wrong.</p>
-        <p>It describes release v2.2.6. A few things exist only in the next release: they are marked <b>New in 2.2.7</b>.</p>
+        <p>It describes release <span data-bind="release"></span>.</p>
+        <p>Your install guide is in your folder: <code class="ic os-mac">docs/INSTALL-MACOS.md</code><span class="os-or"> or </span><code class="ic os-win">docs/INSTALL-WINDOWS.md</code>. It also comes as a page that opens in your browser straight from the folder, with a Copy button on every command: <code class="ic os-mac">docs/AI-Architect-macOS-Install-Guide.html</code><span class="os-or"> or </span><code class="ic os-win">docs/AI-Architect-Windows-Install-Guide.html</code>. Each release also offers both pages as downloads, for a computer that has nothing installed yet.</p>
 
         <div data-os-switch hidden>
           <h3><b>■</b>Which computer do you use?</h3>
@@ -542,7 +543,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">Mode:</code></td><td>Live or design-only, with an instance, its preset and the last health check. The instance named is the first one in your saved list when the session started: not necessarily the default, and never one you switch to later. See the table below.</td></tr>
             <tr><td><code class="ic">Licence:</code></td><td>The licence state: <code class="ic">ok</code> or <code class="ic">expiring</code> with the licence's id and end date. A design-only licence shows <code class="ic">· design-only</code> before the date; a licence with no end date shows <code class="ic">perpetual</code>. See <a href="#licence">Your licence</a>.</td></tr>
             <tr><td><code class="ic">Integrity:</code></td><td>Only when the AI Architect's own files had been changed and were put back, or cannot be put back. When it ends with <code class="ic">— restart claude</code>, restart Claude. See <a href="#signed-files">Files you never edit</a>.</td></tr>
-            <tr><td><code class="ic">Docs on disk:</code></td><td>How much of the ServiceNow documentation this folder has, for example <code class="ic">australia · full · 56/56 areas</code>.</td></tr>
+            <tr><td><code class="ic">Docs on disk:</code></td><td>How much of the ServiceNow documentation this folder has, for example <code class="ic">australia · full · &lt;n&gt;/&lt;n&gt; areas</code>, with the same number twice when every area is there.</td></tr>
             <tr><td>No instance</td><td><code class="ic">No ServiceNow instance configured — /snowarch setup-instance adds one (design-only works without it).</code> Can appear in a design-only folder that has no instance.</td></tr>
             <tr><td>Newer release</td><td><code class="ic">A newer release is available (&lt;tag&gt;) — run ./snowarch upgrade.</code> Only after a check for new releases that you started in the last 7 days — <code class="ic">upgrade --check</code>, an upgrade, or the full health check (at most once a day): the banner never checks the internet. See <a href="#upgrading">Upgrading</a>.</td></tr>
             <tr><td>Old registrations</td><td><code class="ic">Stale MCP registrations from the old setup found in ~/.claude.json — run ./snowarch doctor --section legacy for the removal commands.</code></td></tr>
@@ -559,7 +560,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <li>The <code class="ic">Doctor:</code> line counts the quick health check. A warning is named only by its id, for example <code class="ic">1 warn (E-23)</code>; a failure gets its own line with its remedy. See <a href="#health">Health checks</a>.</li>
           <li class="live-only"><code class="ic">Instances:</code> lists the instances saved in this folder, with <code class="ic">default</code> on the one new sessions start on. It reads the saved list; it does not connect to them.</li>
           <li class="live-only">On this quick run, the Mode line names the first instance in the saved list. That is not always the default, nor the one this session works on. To know where the session works now, ask: <i>Which instance is this session on?</i></li>
-          <li>At v2.2.6 Claude may ask your permission before it runs the status command for the plain word <code class="ic">Status</code>: allow it, or type <code class="ic">/snowarch status</code>. <b>New in 2.2.7:</b> no permission question.</li>
+          <li>Claude runs the status command for the plain word <code class="ic">Status</code> without asking your permission.</li>
         </ul>
         <div class="tw trouble"><table>
           <thead><tr><th>The Mode line says</th><th>Meaning and what to do</th></tr></thead>
@@ -919,7 +920,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
 
         <h3><b>■</b>Check a Word document as a PDF</h3>
         <p><b>Optional.</b> To look at the layout — banner, tables, diagrams — before a document goes to a client.</p>
-        <p class="os-mac"><b>On a Mac</b> this needs LibreOffice. Replace <code class="ic">&lt;Doc&gt;</code> as above:</p>
+        <p class="os-mac"><b>On a Mac</b> this needs LibreOffice; the install guide for macOS installs it without a password (its step 2g). Replace <code class="ic">&lt;Doc&gt;</code> as above:</p>
         <p class="os-win"><b>On Windows</b> open the <code class="ic">.docx</code> in Word and save it as PDF in the same folder. Then this makes a picture of the first page. Replace <code class="ic">&lt;Doc&gt;</code> as above:</p>
         <div class="stack os-mac"><div data-cmd="x-pdf-mac"><noscript><div class="shell-lab">macOS · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>scripts/render-pdf.sh clients/&lt;name&gt;/designs/&lt;Doc&gt;.docx</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="x-pdf-win"><noscript><div class="shell-lab">Windows · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>powershell -NoProfile -ExecutionPolicy Bypass -File scripts\render-pdf-pages.ps1 -Pdf clients\&lt;name&gt;\designs\&lt;Doc&gt;.pdf -OutDir clients\&lt;name&gt;\designs</code></div></noscript></div></div>
@@ -939,7 +940,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <div class="stack os-mac"><div data-cmd="x-drawio-mac"><noscript><div class="shell-lab">macOS · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>scripts/render-drawio.sh clients/&lt;name&gt;/designs/diagrams png 3</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="x-drawio-win"><noscript><div class="shell-lab">Windows · Git Bash · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">$ </span>scripts/render-drawio.sh clients/&lt;name&gt;/designs/diagrams png 3</code></div></noscript></div></div>
         <p>It prints <code class="ic">rendering &lt;name&gt;.drawio -&gt; &lt;name&gt;.png</code> for each file, then <code class="ic">done: &lt;n&gt; rendered, &lt;n&gt; failed</code>. The last word can be <code class="ic">svg</code> or <code class="ic">pdf</code> instead of <code class="ic">png</code>; the number is the PNG's scale for sharp text. Without draw.io Desktop it says <code class="ic">ERROR: draw.io Desktop not found.</code> and how to install it.</p>
-        <p class="os-mac"><b>On a Mac</b> it looks for <code class="ic">drawio</code> or <code class="ic">draw.io</code> on PATH, and in <code class="ic">/Applications</code>. A draw.io in <code class="ic">~/Applications</code> is found only through a <code class="ic">drawio</code> command on PATH. At v2.2.6 the documented install is Homebrew (<code class="ic">brew install --cask drawio</code>), which can need administrator rights on a company Mac. <b>New in 2.2.7:</b> the macOS install guide installs draw.io and LibreOffice without a password (its steps 2f and 2g), including that command.</p>
+        <p class="os-mac"><b>On a Mac</b> it looks for <code class="ic">drawio</code> or <code class="ic">draw.io</code> on PATH, and in <code class="ic">/Applications</code>. A draw.io in <code class="ic">~/Applications</code> is found only through a <code class="ic">drawio</code> command on PATH. The install guide for macOS installs draw.io (its step 2f) and LibreOffice (step 2g) into the Applications folder of your home folder without a password, each with a small command, <code class="ic">drawio</code> and <code class="ic">soffice</code>, in <code class="ic">~/.local/bin</code>, so the AI Architect finds them. It uses no Homebrew: on a Mac installed with that guide, if a message suggests <code class="ic">brew install …</code>, install the program as in its Step 2 instead.</p>
         <p class="os-win"><b>On Windows</b> it finds <code class="ic">draw.io.exe</code> on PATH, in <code class="ic">%LOCALAPPDATA%\Programs\drawio</code> (the zip of the install guide's step 2f, no administrator rights), <code class="ic">%LOCALAPPDATA%\Programs\draw.io</code> or <code class="ic">%PROGRAMFILES%\draw.io</code> (the installers).</p>
 
         <h3><b>■</b>Mermaid previews</h3>
@@ -949,7 +950,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>It writes one picture beside each <code class="ic">.mmd</code> file. These are previews only, never for a client's document.</p>
 
         <h3><b>■</b>What this computer can produce</h3>
-        <p>The full health check reports, in its check E-04, which document tools it finds, for example <code class="ic">docx yes · pdf no · drawio yes · mermaid no</code>. It is information only, never a warning. The quick status panel leaves it out. See <a href="#health">Health checks</a>.</p>
+        <p>The full health check reports, in its check E-04, which document tools it finds, for example <code class="ic">docx yes · pdf no · drawio yes · mermaid no</code>. It is information only, never a warning. The full health check also prints, above its summary, a <code class="ic">Capabilities:</code> line that names the program it found for each, for example <code class="ic os-mac">docx yes (python3)</code><span class="os-or"> or </span><code class="ic os-win">docx yes (powershell)</code>. The quick status panel leaves both out. See <a href="#health">Health checks</a>.</p>
         <div class="tw trouble"><table>
           <thead><tr><th>Tool</th><th>macOS</th><th>Windows</th></tr></thead>
           <tbody>
@@ -965,53 +966,57 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       <!-- 07 SERVICENOW DOCUMENTATION -->
       <section class="sec" id="docs">
         <div class="sec-head"><div class="num">7</div><div class="t"><small>Your work</small><h2>ServiceNow documentation</h2></div></div>
-        <p>Your folder holds ServiceNow's product documentation, in <code class="ic">vendor/ServiceNowDocs</code>, fixed at one commit (the <i>pin</i>) of the <code class="ic">australia</code> release family. Every answer about ServiceNow is grounded in it; in design-only mode it is the only source. The install takes the whole of it: 56 areas, 51,665 files, about 490 MB on disk. An index of which pages print which names (about 9 MB, in <code class="ic">.local/corpus-names</code>) helps the AI Architect find them.</p>
-        <p class="muted"><b>New in 2.2.7:</b> the pin moves to 96d3212: 54 areas, 51,186 files, about 476–484 MB, and an index of about 12 MB. The documentation is ServiceNow's, under its own licence (Apache-2.0), whose text is in the folder. The AI Architect is not affiliated with or endorsed by ServiceNow.</p>
+        <p>Your folder holds ServiceNow's product documentation, in <code class="ic">vendor/ServiceNowDocs</code>, fixed at one commit (the <i>pin</i>) of the <code class="ic">australia</code> release family. Every answer about ServiceNow is grounded in it; in design-only mode it is the only source. The install takes the whole of it: all 54 areas and 51,186 files. What it costs on disk, and the time it takes to fetch, are in <i>What the corpus costs</i> in <code class="ic">docs/INSTALL.md</code>. An index of which pages print which names, with the labels and page titles that the lookup command reads, helps the AI Architect find them; it is kept in <code class="ic">.local/corpus-names</code>.</p>
+        <p class="muted">The documentation is ServiceNow's, under its own licence (Apache-2.0), whose text is in the folder. The AI Architect is not affiliated with or endorsed by ServiceNow.</p>
 
         <h3><b>■</b>How answers cite it</h3>
         <ul>
           <li>A statement about ServiceNow names the page it rests on. In an Envelope every baseline claim carries <code class="ic">(citation: markdown/&lt;area&gt;/&lt;page&gt;.md)</code>: a file you can open under <code class="ic">vendor/ServiceNowDocs</code>. <code class="ic">vendor/docs-map.md</code> is the map of the areas.</li>
-          <li>Something a search of the documentation did not find is marked <code class="ic">not documented in the bundled corpus — verify on the instance</code>, with no citation. What the documentation does not settle becomes an open question.</li>
+          <li>Something the documentation does not print is marked <code class="ic">not documented in the bundled corpus — verify on the instance</code>, with no citation, and only after the lookup command (<a href="#lookup">Look a name up in the documentation</a>) found the name <code class="ic">ABSENT</code>; a page the lookup lists is opened first. What the documentation does not settle becomes an open question.</li>
           <li class="live-only">A fact read from your instance is cited <code class="ic">measured on instance &lt;label&gt;, &lt;date&gt;</code>.</li>
-          <li>The documentation is the <code class="ic">australia</code> family. On another release, say so in your request: the AI Architect then confirms before a version-sensitive answer.</li>
+          <li>The documentation is the <code class="ic">australia</code> family, as its own <code class="ic">vendor/ServiceNowDocs/README.md</code> and each page's <code class="ic">release:</code> field say. The release notes and the titles of some areas can name a newer family and then describe that one, so a patch they list is not an Australia patch. On another release, say so in your request: the AI Architect then confirms before a version-sensitive answer.</li>
           <li>Claude's web tools are switched off in this folder, so the AI Architect cannot look anything up on the internet. Paste the material you want it to use.</li>
         </ul>
-        <p class="muted"><b>New in 2.2.7:</b> the AI Architect calls something <i>not documented</i> only after the lookup command below finds the name absent, and it names the release family from the documentation itself, not from a release-notes page that may describe a newer family.</p>
 
         <h3><b>■</b>Citation checks while you work</h3>
-        <p>Three automatic checks keep the page names right. When the AI Architect writes a file under <code class="ic">clients</code>, the documentation paths in it are checked, and a wrong one goes back to it before you see the file. When a reply names a page that does not exist and the right one is known, the reply ends with one line that starts <code class="ic">Correction:</code> — it replaces the wrong path above it. The third check helps it open the right page after a failed attempt, out of your sight.</p>
-        <p class="muted"><b>New in 2.2.7:</b> the end-of-reply check also asks once about pages the answer cites but never opened, and about names a cited page does not print. What stays open is shown to you as <code class="ic">Grounding check: &lt;n&gt; item(s) in this answer were not corrected after one request — … Check them before relying on this answer.</code></p>
+        <p>Three automatic checks keep the citations right. When the AI Architect writes a file under <code class="ic">clients</code>, the documentation paths in it are checked, and a wrong one goes back to it before you see the file. When it fails to open a page, it is told which page was meant, out of your sight. At the end of a reply, the third check asks it once, and never twice in a reply, about a cited page that does not exist when the right one is known, a page that the answer, or a file written in that reply, cites but that it never opened, and a ServiceNow name written with underscores (a table or a field, for example) that the cited page does not print.</p>
+        <p>You may then see the AI Architect open a few pages after its answer and add, below it, one line that starts <code class="ic">Correction:</code> for each: the right path, the page it read and whether its claim stands, or that the documentation does not print a name. A name of its own design gets no line. When the answer holds an Envelope, the last line starts <code class="ic">Part 3:</code> and gives the verdict letter again. Read these lines as part of the answer: a <code class="ic">Correction:</code> line replaces what it names above it.</p>
+        <p>If a cited page was still not opened after that one request, you see <code class="ic">Grounding check: &lt;n&gt; item(s) in this answer were not corrected after one request — … Check them before relying on this answer.</code> It lists the pages; names are never listed there.</p>
 
         <h3><b>■</b>Check the documentation</h3>
         <p>This compares the documentation with your release. It changes nothing.</p>
         <div class="stack os-mac"><div data-cmd="k-dstatus-mac"><noscript><div class="shell-lab">macOS</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>./snowarch docs status</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="k-dstatus-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>.\snowarch.cmd docs status</code></div></noscript></div></div>
         <div class="stack"><div data-term="docs-status" data-label="On screen (example)"></div></div>
-        <p>Each row ends in <code class="ic">ok</code>, or in <code class="ic">MISMATCH</code> with the remedy under it. A remedy may read <code class="ic">run node scripts/docs.mjs sync</code> or <code class="ic">… verify</code>: run the AI Architect's own <code class="ic">docs sync</code> or <code class="ic">docs verify</code> below instead. With no documentation at all it says <code class="ic">docs corpus: MISSING — …</code>. Like every <code class="ic">docs</code> command, it needs a licence in force.</p>
+        <p>Each row ends in <code class="ic">ok</code>, or in <code class="ic">MISMATCH</code> with the remedy under it. The <code class="ic">checkout</code> row counts the areas the specialists cite, not every area of the documentation; its files and size are those of the whole documentation folder. A remedy may read <code class="ic">run node scripts/docs.mjs sync</code> or <code class="ic">… verify</code>: run the AI Architect's own <code class="ic">docs sync</code> or <code class="ic">docs verify</code> below instead. With no documentation at all it says <code class="ic">docs corpus: MISSING — …</code>. Like every <code class="ic">docs</code> command, it needs a licence in force.</p>
 
         <h3><b>■</b>Put it back on its pin</h3>
-        <p>When Status says <code class="ic">corpus is on &lt;sha&gt;, NOT the pin — ./snowarch docs sync</code>, or the health check reports the documentation missing, off its pin or with dead citations, run this in your folder. It fetches what is missing from ServiceNow's documentation repository on GitHub (behind a proxy, set the proxy first: <a href="#network">Corporate networks</a>), then rebuilds the names index. A folder already in order changes nothing.</p>
+        <p>When Status says <code class="ic">corpus is on &lt;sha&gt;, NOT the pin — ./snowarch docs sync</code>, or the health check reports the documentation missing, off its pin or with dead citations, run this in your folder. It fetches what is missing from ServiceNow's documentation repository on GitHub (behind a proxy, set the proxy first: <a href="#network">Corporate networks</a>), then builds the names index when it is missing or out of date. A folder already in order changes nothing.</p>
         <div class="stack os-mac"><div data-cmd="k-dsync-mac"><noscript><div class="shell-lab">macOS</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>./snowarch docs sync</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="k-dsync-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>.\snowarch.cmd docs sync</code></div></noscript></div></div>
         <div class="stack"><div data-term="docs-sync" data-label="On screen (when it is already in order)"></div></div>
-        <p>If you changed files inside <code class="ic">vendor/ServiceNowDocs</code>, it stops and changes nothing: <code class="ic">vendor/ServiceNowDocs has local changes — …</code>. A line <code class="ic">[docs] note: the names index was not built (…) — run ./snowarch doctor --fix</code> means the documentation is fine and only the index is missing.</p>
+        <p>If you changed files inside <code class="ic">vendor/ServiceNowDocs</code>, it stops and changes nothing: <code class="ic">vendor/ServiceNowDocs has local changes — …</code>. When it had to build the names index, a line <code class="ic">[docs] names index … &lt;s&gt; s · &lt;n&gt; names · &lt;n&gt; pages · coverage full</code> comes before <code class="ic">docs sync: complete</code>. A line <code class="ic">[docs] note: the names index was not built (…) — run ./snowarch doctor --fix</code> means the documentation is fine and only the index is missing.</p>
+        <p>The names index is built once for each documentation pin, in about 20 seconds, by the installer, an upgrade, <code class="ic">docs sync</code> or <code class="ic">doctor --fix</code>. If the health check's E-33 says <code class="ic">not built</code> or <code class="ic">built for another docs pin</code>, run <code class="ic os-mac">./snowarch doctor --fix</code><span class="os-or"> or </span><code class="ic os-win">.\snowarch.cmd doctor --fix</code>: it builds the index.</p>
         <p><b>Optional.</b> If your folder holds only the cited areas (a <i>sparse</i> install, which exists for automated tests and leaves the AI Architect blind to the rest), this fetches the whole documentation now:</p>
         <div class="stack os-mac"><div data-cmd="k-dsync-full-mac"><noscript><div class="shell-lab">macOS · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>./snowarch docs sync --mode full</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="k-dsync-full-win"><noscript><div class="shell-lab">Windows · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>.\snowarch.cmd docs sync --mode full</code></div></noscript></div></div>
         <p>It ends like the command above, with the whole set of areas. A later installer run or upgrade uses the mode the install recorded; to record the whole documentation for good, run the installer again with <code class="ic">--docs full</code> (see <a href="#rerun">Re-run the installer</a>).</p>
 
         <h3><b>■</b>Check the product's own citations</h3>
-        <p><b>Optional.</b> This checks that every documentation page the specialists cite exists in your documentation, and that the names they use are grounded. It reads every page of the documentation; the health check's E-16 already checks the citations. It changes nothing.</p>
+        <p><b>Optional.</b> This checks that every documentation page the specialists cite exists in your documentation, and that the names they use are grounded. A page named by its file name alone, in a list after a full path, is looked for in that path's folder. It reads every page of the documentation; the health check's E-16 already checks the citations. It changes nothing.</p>
         <div class="stack os-mac"><div data-cmd="k-dverify-mac"><noscript><div class="shell-lab">macOS · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>./snowarch docs verify</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="k-dverify-win"><noscript><div class="shell-lab">Windows · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>.\snowarch.cmd docs verify</code></div></noscript></div></div>
         <p>It ends with <code class="ic">checked: &lt;n&gt; | dead: &lt;n&gt;</code>, after any <code class="ic">DEAD &lt;file&gt;:&lt;line&gt; &lt;path&gt;</code> lines, then the results of the name and table checks. A dead citation is the product's to fix; your remedy is <code class="ic">docs sync</code>. It does not check your own files under <code class="ic">clients</code>: the automatic check does that when a file is written.</p>
 
-        <h3><b>■</b>Look a name up in the documentation</h3>
-        <p class="muted"><b>New in 2.2.7 — not in v2.2.6</b>, where this command only prints the docs usage. It shows which pages print a table name, a field, a word or a phrase, or print it under another word (a table's label, for example). It works on this computer only and changes nothing. You can give several terms.</p>
+        <h3 id="lookup"><b>■</b>Look a name up in the documentation</h3>
+        <p><b>Optional.</b> It shows which pages print a table name, a field, a word or a phrase, or print it under another word (a table's label, for example). It works on this computer only, changes nothing and, like every <code class="ic">docs</code> command, needs a licence in force. You can give up to 40 terms; put a phrase in quotes.</p>
         <div class="stack os-mac"><div data-cmd="k-lookup-mac"><noscript><div class="shell-lab">macOS · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>./snowarch docs lookup sc_req_item "requested item"</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="k-lookup-win"><noscript><div class="shell-lab">Windows · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>.\snowarch.cmd docs lookup sc_req_item "requested item"</code></div></noscript></div></div>
-        <div class="stack"><div data-term="docs-lookup" data-label="On screen in 2.2.7 (example)"></div></div>
-        <p>Each term gets one answer: <code class="ic">PRINTED</code>; <code class="ic">NEAR</code> (printed under another spelling); <code class="ic">ABSENT</code>; <code class="ic">UNKNOWN</code> (a sparse folder cannot tell); or <code class="ic">NO MATCH</code> for a phrase. Then one <code class="ic">path:line: text</code> line per page. It exits with 1 when a term is not printed. In 2.2.7 the AI Architect may run it without asking your permission.</p>
+        <div class="stack"><div data-term="docs-lookup" data-label="On screen (example)"></div></div>
+        <p>Under its first line it names the documentation folder (<code class="ic">corpus:</code>): the paths below are inside it. Each term then gets one answer: <code class="ic">PRINTED</code>; <code class="ic">NOT PRINTED as typed; the corpus prints: &lt;names&gt;</code>, for a name the documentation prints under another spelling or label; <code class="ic">ABSENT</code>, when no page of the whole documentation prints the name, so <i>not documented</i> is grounded; <code class="ic">UNKNOWN</code>, when a folder with only part of the documentation cannot tell; or <code class="ic">NO MATCH</code>, for a word or phrase that is no label, synonym or page title, which does not show that the documentation lacks it. After <code class="ic">PRINTED</code> it can add <code class="ic">; see also &lt;names&gt;</code>: other names that the documentation prints beside the same words on many more pages.</p>
+        <p>Under each answer comes a line for each name it found, <code class="ic">&lt;name&gt;: &lt;n&gt; pages (&lt;how it was found&gt;)</code>, then a <code class="ic">path:line: text</code> line for each page it shows: by default at most three names per term and five pages per name; <code class="ic">--names</code> and <code class="ic">--limit</code> change those two numbers (<a href="#more-options">More options</a>). A name it reached only through a label shows <code class="ic">at least &lt;n&gt; pages</code>. The names after <code class="ic">see also</code> get <code class="ic">also &lt;name&gt;: &lt;n&gt; pages (label "&lt;words&gt;")</code> lines, at most two, with up to three pages each. A phrase, or a single plain word, can also list <code class="ic">titles: &lt;n&gt; pages</code>: the pages whose title holds all its words, one <code class="ic">path: title</code> line each. For a term that starts with <code class="ic">u_</code> or <code class="ic">x_</code> it adds <code class="ic">note: a custom name (u_ or x_): a page that prints it is an example, not baseline</code>.</p>
+        <p>It ends with 0 when every term is printed and 1 when one is not. When the documentation is not in your folder it says <code class="ic">docs lookup: the documentation corpus is not on disk (./snowarch docs sync fetches it, and ./snowarch doctor --fix builds its names index)</code>: run <code class="ic">docs sync</code>, which also builds the index. When only the names index is missing it says <code class="ic">docs lookup: the names index for the docs pin &lt;12 characters&gt; is not built, or does not load (./snowarch doctor --fix builds it)</code>: run <code class="ic">doctor --fix</code>. Both end with 3; run the lookup again afterwards. No term, more than 40 terms, an option it does not know (<code class="ic">--quiet</code> and <code class="ic">--verbose</code> included), or <code class="ic">--limit</code> or <code class="ic">--names</code> without a whole number from 1 to 50 prints its usage and ends with 2.</p>
+        <p>The AI Architect runs this command itself before it calls something not documented, and the folder's settings let it do so without asking your permission: you may see the call among its steps.</p>
       </section>
 
       <!-- 08 DESIGN-ONLY AND LIVE MODE -->
@@ -1161,7 +1166,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td>[1/7] Label</td><td>A new label. Pressing <span class="os-mac">Return</span><span class="os-or"> or </span><span class="os-win">Enter</span> alone means <code class="ic">pdi</code>; if <code class="ic">pdi</code> exists, the run ends with <code class="ic">LABEL_EXISTS</code>.</td></tr>
             <tr><td>[2/7] Instance URL</td><td>The address, up to <code class="ic">.service-now.com</code>. A bare name is offered as <code class="ic">https://&lt;name&gt;.service-now.com</code> for you to confirm.</td></tr>
             <tr><td>[3/7] Environment</td><td>The number: 1 pdi, 2 dev, 3 test, 4 prod. Pressing the key alone works only for a <code class="ic">devNNNNNN.service-now.com</code> address. Choose 4 for production: production is declared, never detected.</td></tr>
-            <tr><td>network: …</td><td>Nothing: it only reports your proxy settings; <code class="ic">unset</code> is normal. If the address cannot be reached it offers [1] re-enter the address, [2] retry, [3] abort, at most three times.</td></tr>
+            <tr><td>network: …</td><td>Nothing: it only reports your proxy settings; <code class="ic">unset</code> is normal. If the address cannot be reached it offers [1] re-enter the URL, [2] retry, [3] abort, at most three times.</td></tr>
             <tr><td>[4/7] Authentication</td><td>The key alone for basic. Choose 2 only with an OAuth client ID and secret from your ServiceNow administrator.</td></tr>
             <tr><td>[5/7] Credentials</td><td>The user name, then the password; nothing appears while you type it.</td></tr>
             <tr><td>[6/7] Login check</td><td>Nothing: it signs in and reads, a few seconds. If the password is refused it offers [1] re-enter it, [2] change the account, [3] abort, three attempts in all.</td></tr>
@@ -1484,7 +1489,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">F9</code></td><td>On Windows, locks the <code class="ic">.local</code> folder to you and the system.</td></tr>
             <tr><td><code class="ic">F6</code></td><td>Rewrites the mode switch and the AI Architect's hooks in <code class="ic">.claude/settings.local.json</code>, keeping everything else in it. Restart Claude afterwards.</td></tr>
             <tr><td><code class="ic">F8</code></td><td>Puts the AI Architect's own signed files back; the replaced copies go to <code class="ic">.local/integrity-removed/</code>. Restart Claude when it put back <code class="ic">CLAUDE.md</code> or something under <code class="ic">.claude</code>.</td></tr>
-            <tr><td><code class="ic">F10</code></td><td>Builds the documentation's names index (about 15 seconds, once per pin).</td></tr>
+            <tr><td><code class="ic">F10</code></td><td>Builds the documentation's names index (about 20 seconds, once per pin).</td></tr>
             <tr><td><code class="ic">F7</code></td><td>Clears a stale saved result of the health check.</td></tr>
           </tbody>
         </table></div>
@@ -1496,9 +1501,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <div class="tw trouble"><table>
           <thead><tr><th>Check</th><th>What it checks</th><th>Repaired by --fix</th></tr></thead>
           <tbody>
-            <tr><td><code class="ic">E-00</code></td><td>Claude Code is installed, on PATH, version 2.1.214 or later, and logged in (not logged in is a warning: run <code class="ic">claude</code>). Full run.</td><td>No</td></tr>
-            <tr><td><code class="ic">E-01</code></td><td>git is version 2.34.1 or later.</td><td>No</td></tr>
-            <tr><td><code class="ic">E-02</code></td><td>Node.js is version 20 or later. Below that, the check stops before any other with <code class="ic">DOCTOR: Node &lt;version&gt; is below the floor 20.0.0 — install it …</code>.</td><td>No</td></tr>
+            <tr><td><code class="ic">E-00</code></td><td>Claude Code 2.1.214 or later, installed, on PATH and logged in (not logged in is a warning: run <code class="ic">claude</code>). Full run.</td><td>No</td></tr>
+            <tr><td><code class="ic">E-01</code></td><td>git 2.34.1 or later.</td><td>No</td></tr>
+            <tr><td><code class="ic">E-02</code></td><td>Node.js 20 or later. Below that, the check stops before any other with <code class="ic">DOCTOR: Node &lt;version&gt; is below the floor 20.0.0 — install it …</code>.</td><td>No</td></tr>
             <tr><td><code class="ic">E-03</code></td><td>npm answers (a failure in live mode, a warning in design-only). Full run.</td><td>No</td></tr>
             <tr><td><code class="ic">E-04</code></td><td>Which document tools are here: docx, pdf, drawio, mermaid. Information only. Full run.</td><td>No</td></tr>
             <tr><td><code class="ic">E-05</code></td><td>The folder is a complete AI Architect folder.</td><td>No</td></tr>
@@ -1539,7 +1544,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">SV-06</code></td><td>What the running connection sees matches the store. Skips without a licence in force.</td><td>No: restart Claude</td></tr>
             <tr><td><code class="ic">SV-07</code></td><td>The audit trail can be written; warns when it is switched off.</td><td>No</td></tr>
             <tr><td><code class="ic">SV-08</code></td><td>A <code class="ic">.claude/skills</code> folder in a folder above yours, whose skills Claude also loads.</td><td>No: switch them off with <code class="ic">/skills</code>, or move your folder</td></tr>
-            <tr><td><code class="ic">SV-09</code></td><td>The store's format version (v1 at v2.2.6).</td><td>No: <a href="#upgrading">upgrade</a>, or <a href="#migrate">migrate the store</a></td></tr>
+            <tr><td><code class="ic">SV-09</code></td><td>The store's format version (v1 in this release).</td><td>No: <a href="#upgrading">upgrade</a>, or <a href="#migrate">migrate the store</a></td></tr>
           </tbody>
         </table></div>
         <p class="muted">Check SV-03's remedy for an address with a path names a command <code class="ic">instance set-url</code>, which does not exist: use <a href="#replace">Fix a wrong address</a> instead.</p>
@@ -1601,6 +1606,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <div class="stack os-win"><div data-cmd="l-verify-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>.\snowarch.cmd licence verify "$HOME\Downloads\&lt;licence file&gt;"</code></div></noscript></div></div>
         <p class="muted" data-sample-note hidden>This is the sample name. Type your file's name in <a href="#details">Your details</a> at the top, or replace <code class="ic">LIC-2026-0000.json</code> with it.</p>
         <p>It prints the Licence line and the licence's fields for that file. It ends with 0 when the licence would be in force, and says <code class="ic">cannot read &lt;file&gt;</code> when the file is not there.</p>
+        <p class="os-mac"><b>On a Mac</b>, <code class="ic">cannot read …</code> although the file is in Downloads means that macOS is not letting Terminal into that folder. Choose Apple menu › System Settings › Privacy &amp; Security › Files &amp; Folders and turn on Terminal's access to the Downloads folder; if the switch is missing or locked, your company sets it: ask your IT team. Then quit Terminal, open it again, go to your folder and run the command again.</p>
 
         <h3 id="renew"><b>■</b>Renew your licence</h3>
         <p>When <code class="ic">licence check</code> says <code class="ic">expiring</code>, ask your licence provider for a renewal. You receive a new file. Save it in Downloads, type its name in <a href="#details">Your details</a>, and check it as above. Copy it over the old one only when the check's first line says <code class="ic">Licence: ok</code> or <code class="ic">Licence: expiring</code>, because the copy replaces the licence you have. Run these in your folder:</p>
@@ -1645,8 +1651,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <ul>
           <li><b>What it keeps.</b> The <code class="ic">.local</code> folder (your instances, passwords, licence, audit trail, logs), <code class="ic">clients</code>, <code class="ic">.claude/settings.local.json</code>, and any <code class="ic">deliverables</code>, <code class="ic">memory</code> or <code class="ic">reports</code> folder are outside the release's files, so it does not touch them. No instance, password or permission changes; only each instance's last check is updated, plus a change of the store's format when a release needs one — announced in the plan, after a private backup. In <code class="ic">.claude/settings.local.json</code> only the AI Architect's own entries are rewritten.</li>
           <li><b>What it does not keep.</b> A file of your own inside one of the AI Architect's folders — a skill of your own, for example — is moved to <code class="ic">.local/integrity-removed/</code>. Keep your own material under <code class="ic">clients/&lt;name&gt;/</code>.</li>
-          <li><b>The version floors.</b> At v2.2.6 the AI Architect needs Claude Code 2.1.214 or later, Node.js 20 or later for live mode, and git 2.34.1 or later; <code class="ic">version</code> prints them. The plan checks the new release's floors: below one, it refuses, for example <code class="ic">claude-floor &lt;version&gt; (installed &lt;version&gt; — BELOW the floor; upgrade Claude Code first)</code>. Update that program first, then run the upgrade again.</li>
+          <li><b>The version floors.</b> The AI Architect needs Claude Code 2.1.214 or later, Node.js 20 or later for live mode, and git 2.34.1 or later; <code class="ic">version</code> prints them. Node.js 20, 22, 24 and 26 are tested on macOS, Windows and Linux. The plan checks the new release's floors: below one, it refuses, for example <code class="ic">claude-floor &lt;version&gt; (installed &lt;version&gt; — BELOW the floor; upgrade Claude Code first)</code>. Update that program first, then run the upgrade again.</li>
         </ul>
+        <p class="os-mac"><b>On a Mac</b> installed with the install guide for macOS, Node.js does not update itself: it stays at the version of that guide's step 2b. To move to a newer one, follow step 2b in the newest copy of that guide, <code class="ic">docs/INSTALL-MACOS.md</code> in your folder after an upgrade; do not repeat its step 2d, whose PATH line is already there.</p>
 
         <h3><b>■</b>When an upgrade stops</h3>
         <div class="tw trouble"><table>
@@ -1663,7 +1670,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>The installer can be run again at any time in your folder, outside Claude: it shows its plan, then runs only the steps that are not done; a finished step says <code class="ic">ok (cached)</code>. Run it when an install or upgrade step stopped, when the health check's E-29 says the install is incomplete, or after you installed a licence that was not in force at install time. It is not a way to add or fix an instance: a folder with a default instance keeps it, and the wizard does not run.<span class="live-only"> A store it cannot read counts as none, and the wizard would then save only a new instance: in a live folder, run <a href="#inst-list">See your instances</a> first, and if it prints an error instead of the table, stop and get help.</span></p>
         <div class="stack os-mac"><div data-cmd="u-boot-mac"><noscript><div class="shell-lab">macOS</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>./bootstrap.sh</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="u-boot-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>.\bootstrap.cmd</code></div></noscript></div></div>
-        <p>Its first line is <code class="ic">[B00/09] preflight … ok</code>, then the plan: <code class="ic">Plan — Enter runs it as shown · type a number to choose that line's value · "?" explains · q quits</code>. Press <span class="os-mac">Return</span><span class="os-or"> or </span><span class="os-win">Enter</span> to run it; <code class="ic">q</code> leaves without changing anything. Each step prints one line, <code class="ic">[B01/09]</code> to <code class="ic">[B09/09]</code>. It ends with the health check's summary, the Mode line, and <code class="ic">Next: run `claude` in this folder: …</code>. If Claude was open in this folder, exit it and start it again. Pressing <span class="os-mac"><span class="key">Control</span>+<span class="key">C</span></span><span class="os-or"> or </span><span class="os-win"><span class="key">Ctrl</span>+<span class="key">C</span></span> during a run is safe: the next run continues where it stopped.</p>
+        <p>Its first line is <code class="ic">[B00/09] preflight … ok</code>, then the plan: <code class="ic">Plan — Enter runs it as shown · type a number to choose that line's value · "?" explains · q quits</code>. Press <span class="os-mac">Return</span><span class="os-or"> or </span><span class="os-win">Enter</span> to run it; <code class="ic">q</code> leaves without changing anything. Each step prints one line, <code class="ic">[B01/09]</code> to <code class="ic">[B09/09]</code>. A re-run fetches the release's signed file list only when the folder does not already hold it. It ends with the health check's summary, the Mode line, and <code class="ic">Next: run `claude` in this folder: …</code>. If Claude was open in this folder, exit it and start it again. Pressing <span class="os-mac"><span class="key">Control</span>+<span class="key">C</span></span><span class="os-or"> or </span><span class="os-win"><span class="key">Ctrl</span>+<span class="key">C</span></span> during a run is safe: the next run continues where it stopped.</p>
         <p><b>Optional.</b> To keep the whole documentation for good (after a sparse install), add <code class="ic">--docs full</code> to the command. Only when the health check's E-11 says the install record is unreadable: <code class="ic os-mac">./snowarch bootstrap --reset</code><span class="os-or"> or </span><code class="ic os-win">.\snowarch.cmd bootstrap --reset</code> clears that record, and only that — not your instances or licence; it prints <code class="ic">reset: bootstrap state cleared …</code>, and you then run the installer again.</p>
         <div data-chk="upgrading"></div>
       </section>
@@ -1693,15 +1700,15 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <p>Press <span class="os-mac">Return</span><span class="os-or"> or </span><span class="os-win">Enter</span> at <code class="ic">Proceed? [Y/n]</code> to restore; <code class="ic">n</code> prints <code class="ic">store: nothing changed</code>. If it also says <code class="ic">store: schema v&lt;n&gt; is not this build's v1 — run ./snowarch store migrate</code>, migrate the store (below). A file that is not there prints <code class="ic">store restore: &lt;file&gt; is not there</code>. Then, in an open Claude session, type <code class="ic">/snowarch setup-instance --resume</code> to load the restored store, or restart Claude.</p>
 
         <h3 id="migrate"><b>■</b>Migrate the store</h3>
-        <p>When a tool or the health check says <code class="ic">STORE_SCHEMA_OUTDATED</code>, or after restoring an older backup. At v2.2.6 the store's format is v1 and no migration exists, so it answers:</p>
+        <p>When a tool or the health check says <code class="ic">STORE_SCHEMA_OUTDATED</code>, or after restoring an older backup. In this release the store's format is v1 and no migration exists, so it answers:</p>
         <div class="stack os-mac"><div data-cmd="b-migrate-mac"><noscript><div class="shell-lab">macOS</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>./snowarch store migrate</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="b-migrate-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>.\snowarch.cmd store migrate</code></div></noscript></div></div>
-        <div class="stack"><div data-term="store-migrate" data-label="On screen at v2.2.6"></div></div>
+        <div class="stack"><div data-term="store-migrate" data-label="On screen"></div></div>
         <p>When a release changes the format, it first shows the plan — from which version to which, a private backup beside the store, <code class="ic">credentials: untouched</code> — and asks <code class="ic">Proceed? [Y/n]</code>; it then says <code class="ic">store: migrated schema v&lt;a&gt; → v&lt;b&gt; (backup &lt;path&gt;)</code>. Restart Claude afterwards. An installer run or an upgrade whose plan announces such a change does it for you, with the same backup. <code class="ic">STORE_SCHEMA_NEWER</code> means a newer release wrote the store: <a href="#upgrading">upgrade</a> instead.</p>
         <p><b>Optional.</b> The plan alone, writing nothing:</p>
         <div class="stack os-mac"><div data-cmd="b-migrate-dry-mac"><noscript><div class="shell-lab">macOS · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>./snowarch store migrate --dry-run</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="b-migrate-dry-win"><noscript><div class="shell-lab">Windows · Optional</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>.\snowarch.cmd store migrate --dry-run</code></div></noscript></div></div>
-        <p>It prints the plan and <code class="ic">store: --dry-run, nothing was written</code> — or, at v2.2.6, that the format is current.</p>
+        <p>It prints the plan and <code class="ic">store: --dry-run, nothing was written</code> — or, in this release, that the format is current.</p>
       </section>
 
       <!-- 16 CORPORATE NETWORKS -->
@@ -1768,13 +1775,13 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">revocations.json</code></td><td>The last list of withdrawn licences.</td></tr>
             <tr><td><code class="ic">release-manifest.json</code></td><td>The release's signed list of its files; if the health check says it is missing, run <code class="ic">licence check --refresh</code>.</td></tr>
             <tr><td><code class="ic">integrity-removed/</code></td><td>Copies of the AI Architect's files that were changed and put back, and files that were moved out of its folders. Look here if an edit of yours was put back and you want its text.</td></tr>
-            <tr><td><code class="ic">corpus-names/</code></td><td>The documentation's names index, one per pin (about 9 MB).</td></tr>
+            <tr><td><code class="ic">corpus-names/</code></td><td>The documentation's names index, one per pin, which <code class="ic">docs lookup</code> reads.</td></tr>
           </tbody>
         </table></div>
         <p>Outside <code class="ic">.local</code>, these are yours too, and never part of the release: <code class="ic">clients</code> (your engagements), <code class="ic">.claude/settings.local.json</code> (your Claude settings), and any <code class="ic">deliverables</code>, <code class="ic">memory</code> or <code class="ic">reports</code> folder you made.</p>
 
         <h3 id="signed-files"><b>■</b>Files you never edit</h3>
-        <p>The AI Architect's own files are signed with the release. Among them: <code class="ic">CLAUDE.md</code>; the <code class="ic">.claude/rules</code>, <code class="ic">.claude/skills</code> and <code class="ic">.claude/agents</code> folders and <code class="ic">.claude/settings.json</code>; <code class="ic">.mcp.json</code> and <code class="ic">engine.config.json</code>; the <code class="ic">governance</code>, <code class="ic">templates</code> and <code class="ic">tools/snowarch</code> folders; the launchers and installers; the document and diagram scripts; and the user documentation such as <code class="ic">README.md</code> and the <code class="ic">docs</code> guides. Before every command, at every session start and when the connection starts, they are checked against the release's signed list. A changed file is put back, a file of yours inside one of these folders is moved out, and the copies go to <code class="ic">.local/integrity-removed/</code>. One line says so:</p>
+        <p>The AI Architect's own files are signed with the release. Among them: <code class="ic">CLAUDE.md</code>; the <code class="ic">.claude/rules</code>, <code class="ic">.claude/skills</code> and <code class="ic">.claude/agents</code> folders and <code class="ic">.claude/settings.json</code>; <code class="ic">.mcp.json</code> and <code class="ic">engine.config.json</code>; the <code class="ic">governance</code>, <code class="ic">templates</code> and <code class="ic">tools/snowarch</code> folders; the launchers and installers; the document and diagram scripts; and the user documentation such as <code class="ic">README.md</code>, the <code class="ic">docs</code> guides and the install guide pages. Before every command, at every session start and when the connection starts, they are checked against the release's signed list. A changed file is put back, a file of yours inside one of these folders is moved out, and the copies go to <code class="ic">.local/integrity-removed/</code>. One line says so:</p>
         <div class="stack"><div data-term="integrity" data-label="On screen (example)"></div></div>
         <p>When <code class="ic">CLAUDE.md</code> or something under <code class="ic">.claude</code> was put back, the banner's line ends with <code class="ic">— restart claude</code>: restart. Keep your own material under <code class="ic">clients/&lt;name&gt;/</code>, and your own Claude settings in <code class="ic">.claude/settings.local.json</code>, which are never checked.</p>
         <p>The files cannot be put back when the signed list is missing or does not verify, or when the folder no longer holds its release tag. Then every command outside the licence-free ones, and every ServiceNow tool, is refused with <code class="ic">Integrity: cannot restore — &lt;reason&gt; — &lt;remedy&gt;</code> (inside Claude: <code class="ic">INTEGRITY_NOT_VERIFIED</code>). Run the health check: its E-32 line names the reason. A missing list comes back with <code class="ic">licence check --refresh</code>; otherwise <a href="#reinstall">reinstall in place</a>. Restart Claude afterwards.</p>
@@ -1786,7 +1793,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <li>Never put a password in it: the health check's E-09 fails.</li>
           <li>Do not set <code class="ic">disableAllHooks</code> (see below).</li>
         </ul>
-        <p>The product's own settings are read-only for you. <code class="ic">.claude/settings.json</code> lets the 236 reading tools run without a question, asks before each of the 163 tools that change an instance, switches off the web tools, and gives the connection 120 seconds to start. <code class="ic">.mcp.json</code> registers the one connection, <code class="ic">servicenow</code>, with no password in it; <code class="ic">/mcp</code> shows it under <i>Project MCPs</i>. <code class="ic">engine.config.json</code> holds the release's constants — version floors, documentation family and pin, the number of specialists — which <code class="ic">version</code> prints.</p>
+        <p>The product's own settings are read-only for you. <code class="ic">.claude/settings.json</code> lets the 236 reading tools, and two read-only commands of the AI Architect, <code class="ic">status</code> and <code class="ic">docs lookup</code>, run without a question; asks before each of the 163 tools that change an instance; switches off the web tools; and gives the connection 120 seconds to start. <code class="ic">.mcp.json</code> registers the one connection, <code class="ic">servicenow</code>, with no password in it; <code class="ic">/mcp</code> shows it under <i>Project MCPs</i>. <code class="ic">engine.config.json</code> holds the release's constants — version floors, documentation family and pin, the number of specialists — which <code class="ic">version</code> prints.</p>
 
         <h3 id="hooks"><b>■</b>Hooks</h3>
         <p>With Node.js 20 or later the installer adds four hooks to your Claude settings; without Node.js it adds none, and removes them if Node.js goes away:</p>
@@ -1794,7 +1801,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <li><b>Session start</b> prints the <a href="#banner">session banner</a> and puts changed files back.</li>
           <li><b>After a write</b> checks the documentation paths in a file the AI Architect wrote under <code class="ic">clients</code>.</li>
           <li><b>After a failed read</b> tells it which documentation page was meant.</li>
-          <li><b>At the end of a reply</b> adds a <code class="ic">Correction:</code> line for a wrong page name.</li>
+          <li><b>At the end of a reply</b> adds a <code class="ic">Correction:</code> line for a wrong page name, and, once per reply, asks the AI Architect to open a documentation page that the answer, or a file it wrote, cites but that it never opened, or to correct a name that the cited page does not print. A page still not opened after that one request is shown to you as a <code class="ic">Grounding check:</code> line; a name is never listed there.</li>
         </ul>
         <p>A hook's own failure is silent and never blocks a tool. The AI Architect installs no status line: the mode is in the banner and in Status. If <code class="ic">disableAllHooks</code> is set in <code class="ic">.claude/settings.local.json</code> — by you or by Claude — none of them runs, and the health check's E-10 fails. Remove <code class="ic">"disableAllHooks"</code> from that file, then restart Claude. The installer neither sets it nor removes it.</p>
 
@@ -1806,7 +1813,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">HTTPS_PROXY</code>, <code class="ic">HTTP_PROXY</code>, <code class="ic">NO_PROXY</code></td><td>The company proxy, and the hosts to reach without it. See <a href="#proxy">The proxy</a>.</td></tr>
             <tr><td><code class="ic">NODE_EXTRA_CA_CERTS</code></td><td>The company's root certificate. See <a href="#certificate">The company certificate</a>.</td></tr>
             <tr><td><code class="ic">SNOWARCH_MASK=asterisk</code></td><td>A hidden password prompt shows one <code class="ic">*</code> per character. Off by default. See <a href="#add-instance">Add an instance</a>.</td></tr>
-            <tr><td><code class="ic">NO_COLOR</code></td><td>Set to anything: the health check prints without colours.</td></tr>
+            <tr><td><code class="ic">NO_COLOR</code></td><td>Set to any value that is not empty, such as <code class="ic">1</code>: the health check prints without colours.</td></tr>
             <tr><td><code class="ic">SNOW_STORE</code></td><td>A store file at another place, read instead of the folder's own. Rarely needed. It must be the same in the window you run the instance commands in and in the window Claude starts from, or the wizard writes one file and Claude reads another; a missing file is <code class="ic">STORE_NOT_FOUND</code>. The health check's connection checks do not follow it. The audit trail moves next to that file. Restart Claude after a change.</td></tr>
             <tr><td><code class="ic">SNOW_AUDIT_FILE</code></td><td>Moves the <a href="#audit">audit trail</a> to another file, or, set to <code class="ic">off</code>, switches it off: then no evidence of your approvals is kept, and the health check's SV-07 warns.</td></tr>
             <tr><td><code class="ic">SNOW_LOG_LEVEL</code></td><td>How much the connection logs: <code class="ic">error</code>, <code class="ic">warn</code>, <code class="ic">info</code> (the default) or <code class="ic">debug</code>. When support asks for more.</td></tr>
@@ -1894,7 +1901,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <h3 id="new-computer"><b>■</b>Move to a new computer</h3>
         <p>Each AI Architect folder keeps its own state, so a new computer gets a fresh install. What is yours to carry over: your licence file, your <code class="ic">clients</code> folder (and any <code class="ic">deliverables</code>, <code class="ic">memory</code> or <code class="ic">reports</code> folder you made), the audit trail if you want to continue it, and your own entries in <code class="ic">.claude/settings.local.json</code>. Do not copy the rest of <code class="ic">.local</code>: it describes the old folder, and a copied install record makes the new install skip steps it needs.</p>
         <ol>
-          <li>On the new computer, install the AI Architect with the install guide for that computer, at the same release.</li>
+          <li>On the new computer, install the AI Architect with the install guide for that computer, at the same release: on a Mac with Apple silicon the install guide for macOS, on Windows the Windows guide. Each release also offers both guides as pages to download, so you can open one before anything is installed.</li>
           <li>Put your licence in place (<a href="#renew">Renew your licence</a> shows the copy command) and copy your <code class="ic">clients</code> folder into the new AI-Arch folder.</li>
           <li class="live-only">Add each instance again with the wizard (<a href="#add-instance">Add an instance</a>), typing the passwords again. That is this guide's advice. The product's own reinstall procedure (below) copies the store instead; if you copy it, the file holds your passwords in plain text: make it private again (<span class="os-mac"><code class="ic">chmod 600 .local/instances.json</code></span><span class="os-or">, or </span><span class="os-win"><code class="ic">.\snowarch.cmd doctor --fix</code></span>), and delete it from wherever it travelled.</li>
           <li>Run the full health check, and Status inside Claude: they should read as on the old computer.</li>
@@ -1908,8 +1915,8 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <div class="stack os-win"><div data-cmd="x-home-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>cd $HOME</code></div></noscript></div></div>
         <div class="stack os-mac"><div data-cmd="x-mv-mac"><noscript><div class="shell-lab">macOS</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>mv AI-Arch AI-Arch-old</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="x-mv-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>Rename-Item AI-Arch AI-Arch-old</code></div></noscript></div></div>
-        <div class="stack os-mac"><div data-cmd="x-clone-mac"><noscript><div class="shell-lab">macOS</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>git -c advice.detachedHead=false clone --branch v2.2.6 &lt;release address from your install guide&gt; AI-Arch</code></div></noscript></div></div>
-        <div class="stack os-win"><div data-cmd="x-clone-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>git -c advice.detachedHead=false clone --branch v2.2.6 &lt;release address from your install guide&gt; AI-Arch</code></div></noscript></div></div>
+        <div class="stack os-mac"><div data-cmd="x-clone-mac"><noscript><div class="shell-lab">macOS</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git AI-Arch</code></div></noscript></div></div>
+        <div class="stack os-win"><div data-cmd="x-clone-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git AI-Arch</code></div></noscript></div></div>
         <div class="stack os-mac"><div data-cmd="x-cd-mac"><noscript><div class="shell-lab">macOS</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>cd AI-Arch</code></div></noscript></div></div>
         <div class="stack os-win"><div data-cmd="x-cd-win"><noscript><div class="shell-lab">Windows</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">PS&gt; </span>cd AI-Arch</code></div></noscript></div></div>
         <div class="stack os-mac"><div data-cmd="x-mk-mac"><noscript><div class="shell-lab">macOS</div><div class="cbox"><code class="cbox-code"><span class="cbox-ps">% </span>mkdir -p .local .claude</code></div></noscript></div></div>
@@ -1943,6 +1950,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           <li>If you used the per-user store and no other AI Architect folder on this computer uses it, delete its folder too: <code class="ic os-mac">~/.config/snowarch</code><span class="os-or"> or </span><code class="ic os-win">%APPDATA%\snowarch</code>. Every folder without a store of its own reads it.</li>
         </ol>
         <p>Claude keeps a record that you trusted the folder; it is harmless. The programs that the install guide installed stay on your computer; they do not need the AI Architect.</p>
+        <p class="os-mac"><b>On a Mac</b> installed with the install guide for macOS, step 4 of its Uninstall section says how to remove them by hand, if you want them gone: draw.io and LibreOffice from the Applications folder of your home folder, the two small files <code class="ic">drawio</code> and <code class="ic">soffice</code> from <code class="ic">~/.local/bin</code>, Node.js (the folder <code class="ic">node</code> in <code class="ic">~/.local</code>) and the download folder <code class="ic">snowarch-dl</code> in your home folder. The PATH line it added to <code class="ic">.zshrc</code> or <code class="ic">.bash_profile</code> can stay. Claude Code and Git have their own uninstall instructions.</p>
 
         <h3 id="gone-folder"><b>■</b>A registration whose folder is gone</h3>
         <p>If you registered the connection for one folder (<a href="#register">--register local</a>) and deleted the folder without switching it off first, Claude keeps trying to start a connection from a folder that is gone. The full health check then reports E-30, with the folder and the name of each entry. Such an entry is removed from inside its folder: create the folder again for one command, remove the entry, delete the folder again. Replace <code class="ic">&lt;folder&gt;</code> with the folder E-30 names, and <code class="ic">&lt;name&gt;</code> with the name it gives.</p>
@@ -2002,13 +2010,13 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic os-mac">./snowarch docs status</code><span class="os-or"> · </span><code class="ic os-win">.\snowarch.cmd docs status</code></td><td>Compares the documentation with the release. <a href="#docs">Documentation</a>.</td><td>No</td></tr>
             <tr><td><code class="ic os-mac">./snowarch docs sync</code><span class="os-or"> · </span><code class="ic os-win">.\snowarch.cmd docs sync</code></td><td>Puts the documentation back on its pin; <code class="ic">--mode full</code> fetches all of it.</td><td>No</td></tr>
             <tr><td><code class="ic os-mac">./snowarch docs verify</code><span class="os-or"> · </span><code class="ic os-win">.\snowarch.cmd docs verify</code></td><td>Checks the specialists' citations against the documentation.</td><td>No</td></tr>
-            <tr><td><code class="ic os-mac">./snowarch docs lookup &lt;term&gt; …</code><span class="os-or"> · </span><code class="ic os-win">.\snowarch.cmd docs lookup &lt;term&gt; …</code></td><td><b>New in 2.2.7.</b> Which documentation pages print a name.</td><td>No</td></tr>
+            <tr><td><code class="ic os-mac">./snowarch docs lookup &lt;term&gt; …</code><span class="os-or"> · </span><code class="ic os-win">.\snowarch.cmd docs lookup &lt;term&gt; …</code></td><td>Which documentation pages print a name. <a href="#lookup">Look a name up</a>.</td><td>No</td></tr>
             <tr><td><code class="ic os-mac">./snowarch upgrade --check</code><span class="os-or"> · </span><code class="ic os-win">.\snowarch.cmd upgrade --check</code></td><td>Is a newer release out? <a href="#upgrading">Upgrading</a>.</td><td>Yes</td></tr>
             <tr><td><code class="ic os-mac">./snowarch upgrade</code><span class="os-or"> · </span><code class="ic os-win">.\snowarch.cmd upgrade</code></td><td>Moves to the newest release, after a plan you accept.</td><td>Yes</td></tr>
             <tr><td><code class="ic os-mac">./bootstrap.sh</code><span class="os-or"> · </span><code class="ic os-win">.\bootstrap.cmd</code></td><td>The installer, run again; <code class="ic os-mac">./snowarch bootstrap</code><span class="os-or"> or </span><code class="ic os-win">.\snowarch.cmd bootstrap</code> is the same command. <a href="#rerun">Re-run the installer</a>.</td><td>Yes (it skips the instance steps)</td></tr>
           </tbody>
         </table></div>
-        <p>Every command understands four options: <code class="ic">--json</code> (output for a script, where the command has one), <code class="ic">--verbose</code> (more detail, and the cause of an unexpected error), <code class="ic">--quiet</code> (no lines from the command's own log; the health check, status and the docs commands still print their report) and <code class="ic">--help</code>. There are only long options. The <code class="ic">instance</code> commands take only their own options: there <code class="ic">--quiet</code> is refused with <code class="ic">unknown option --quiet</code>. An unexpected error ends in one line, <code class="ic">error: &lt;command&gt;: &lt;message&gt; — run again with --verbose for the details</code>.</p>
+        <p>Every command understands four options: <code class="ic">--json</code> (output for a script, where the command has one), <code class="ic">--verbose</code> (more detail, and the cause of an unexpected error), <code class="ic">--quiet</code> (no lines from the command's own log; the health check, status and the docs commands still print their report) and <code class="ic">--help</code>. There are only long options. The <code class="ic">instance</code> commands take only their own options: there <code class="ic">--quiet</code> is refused with <code class="ic">unknown option --quiet</code>. <code class="ic">docs lookup</code> takes only its own options too (<code class="ic">--json</code>, <code class="ic">--limit</code> and <code class="ic">--names</code>): <code class="ic">--quiet</code> or <code class="ic">--verbose</code> prints its usage and ends with 2. An unexpected error ends in one line, <code class="ic">error: &lt;command&gt;: &lt;message&gt; — run again with --verbose for the details</code>.</p>
         <div class="tw"><table>
           <thead><tr><th>Exit code</th><th>Meaning</th></tr></thead>
           <tbody>
@@ -2020,7 +2028,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">130</code></td><td>Interrupted with <span class="os-mac"><span class="key">Control</span>+<span class="key">C</span></span><span class="os-or"> or </span><span class="os-win"><span class="key">Ctrl</span>+<span class="key">C</span></span>.</td></tr>
           </tbody>
         </table></div>
-        <p class="muted">The <code class="ic">docs</code> commands have codes of their own: there, 3 means the documentation is missing, 4 that files in its folder were changed, 5 that git failed.</p>
+        <p class="muted">The <code class="ic">docs</code> commands have codes of their own: there, 3 means the documentation is missing (for <code class="ic">docs lookup</code>, also its names index), 4 that files in its folder were changed, 5 that git failed; <code class="ic">docs lookup</code> ends with 1 when a term is not printed.</p>
 
         <h3 id="more-options"><b>■</b>More options</h3>
         <p>The sections above use the options you need day to day. These are the others you may meet; each works only with the commands named.</p>
@@ -2035,7 +2043,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">--path &lt;file&gt;</code></td><td><code class="ic">instance import --from-legacy</code></td><td>The old 1.x store, when it is somewhere else.</td></tr>
             <tr><td><code class="ic">--only &lt;a,b&gt;</code></td><td><code class="ic">instance import --from-legacy</code></td><td>Imports only these labels or old names.</td></tr>
             <tr><td><code class="ic">--yes</code></td><td><code class="ic">instance set-preset</code>, <code class="ic">set-flags</code>, <code class="ic">remove</code>, <code class="ic">import</code>; <code class="ic">store migrate</code>, <code class="ic">store restore</code>; <code class="ic">upgrade</code></td><td>Asks nothing: no review screen, no dependency question, no <code class="ic">Proceed?</code>. With <code class="ic">set-flags</code>, a permission whose dependency is off is then refused. This guide does not use it: those screens show what is about to change.</td></tr>
-            <tr><td><code class="ic">--limit &lt;n&gt;</code> · <code class="ic">--names &lt;n&gt;</code></td><td><code class="ic">docs lookup</code></td><td><b>New in 2.2.7.</b> How many pages to show per name (1 to 50, default 5), and how many names per term (1 to 50, default 3).</td></tr>
+            <tr><td><code class="ic">--limit &lt;n&gt;</code> · <code class="ic">--names &lt;n&gt;</code></td><td><code class="ic">docs lookup</code></td><td>How many pages to show per name (1 to 50, default 5), and how many names per term (1 to 50, default 3).</td></tr>
           </tbody>
         </table></div>
         <p class="muted">Options meant for automated set-ups, for tests and for the product's maintainers are not described in this guide.</p>
@@ -2069,7 +2077,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <button type="button" class="btn pri" data-pg="next">End ▶</button>
       </nav>
 
-      <div class="foot">Not yet tested end to end. This guide was written on 21 November 2026 from the AI Architect's code and documentation at release v2.2.6, and from the development line of the next release for the items marked <i>New in 2.2.7</i>. Nothing in it was run while it was written: the screens are quoted from the product's code, its documentation and its tested Windows install, and are marked as examples where details vary.</div>
+      <div class="foot">Not yet tested end to end. This guide was written on 21 November 2026 from the AI Architect's code and documentation for release <span data-bind="release"></span>. Nothing in it was run while it was written: the screens are quoted from the product's code, its documentation and its tested Windows install, and are marked as examples where details vary.</div>
 
     </main>
   </div>
@@ -2868,12 +2876,12 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "x-clone-mac",
    "os": "mac",
-   "code": "git -c advice.detachedHead=false clone --branch v2.2.6 <release address from your install guide> AI-Arch"
+   "code": "git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git AI-Arch"
   },
   {
    "id": "x-clone-win",
    "os": "win",
-   "code": "git -c advice.detachedHead=false clone --branch v2.2.6 <release address from your install guide> AI-Arch"
+   "code": "git -c advice.detachedHead=false clone --branch v2.2.6 https://github.com/farstic/snowarch.git AI-Arch"
   },
   {
    "id": "x-cd-mac",
@@ -3036,20 +3044,20 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   }
  ],
  "terminals": {
-  "banner": "Mode: live — instance={label} (pdi) preset=pdi-developer — doctor <date> <n> ok\nLicence: ok · {licId} · until 2026-12-31\nDocs on disk: australia · full · 56/56 areas",
-  "banner-design": "Mode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude\nLicence: ok · {licId} · until 2026-12-31\nDocs on disk: australia · full · 56/56 areas",
+  "banner": "Mode: live — instance={label} (pdi) preset=pdi-developer — doctor <date> <n> ok\nLicence: ok · {licId} · until 2026-12-31\nDocs on disk: australia · full · <n>/<n> areas",
+  "banner-design": "Mode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude\nLicence: ok · {licId} · until 2026-12-31\nDocs on disk: australia · full · <n>/<n> areas",
   "mcp-mac": "Project MCPs (/Users/you/AI-Arch/.mcp.json)\n✔   servicenow                  399 tools",
   "mcp-win": "Project MCPs (C:\\Users\\you\\AI-Arch\\.mcp.json)\n√   servicenow                  399 tools",
-  "status-claude": "❯ [[Status]]\nMode: live — {label} (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 399 tools (contract)\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v2.2.6 · <n> files\nEngine: snowarch 2.2.6 · tag v2.2.6 · contract <12 characters>\nDocs: vendor/ServiceNowDocs @ c10276e95345 (australia) · full\nRoster: 29 skills / 9 agents\nInstances: {label} (pdi, pdi-developer, default)\nDoctor: <n> ok, 0 warn, 0 fail — quick run <date> <time> UTC · full report: ./snowarch doctor\nCapability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.\nInstances are the store's own records; nothing was probed.",
-  "status-claude-design": "❯ [[Status]]\nMode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v2.2.6 · <n> files\nEngine: snowarch 2.2.6 · tag v2.2.6 · contract <12 characters>\nDocs: vendor/ServiceNowDocs @ c10276e95345 (australia) · full\nRoster: 29 skills / 9 agents\nDoctor: <n> ok, 0 warn, 0 fail — quick run <date> <time> UTC · full report: ./snowarch doctor\nCapability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.",
-  "status-term": "Mode: live — {label} (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 399 tools (contract)\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v2.2.6 · <n> files\nEngine: snowarch 2.2.6 · tag v2.2.6 · contract <12 characters>\nDocs: vendor/ServiceNowDocs @ c10276e95345 (australia) · full\nRoster: 29 skills / 9 agents\nInstances: {label} (pdi, pdi-developer, default)\nDoctor: <n> ok, 0 warn, 0 fail — quick run <date> <time> UTC · full report: {cli} doctor\nCapability packs, citation counts and the corpus branch are not probed on a quick run — {cli} doctor reports them.\nInstances are the store's own records; nothing was probed.",
-  "status-term-design": "Mode: design-only — no ServiceNow instance configured; run {cli} mode live, or /snowarch setup-instance inside Claude\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v2.2.6 · <n> files\nEngine: snowarch 2.2.6 · tag v2.2.6 · contract <12 characters>\nDocs: vendor/ServiceNowDocs @ c10276e95345 (australia) · full\nRoster: 29 skills / 9 agents\nDoctor: <n> ok, 0 warn, 0 fail — quick run <date> <time> UTC · full report: {cli} doctor\nCapability packs, citation counts and the corpus branch are not probed on a quick run — {cli} doctor reports them.",
+  "status-claude": "❯ [[Status]]\nMode: live — {label} (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 399 tools (contract)\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v{ver} · <n> files\nEngine: snowarch {ver} · tag v{ver} · contract <12 characters>\nDocs: vendor/ServiceNowDocs @ <pin> (australia) · full\nRoster: 29 skills / 9 agents\nInstances: {label} (pdi, pdi-developer, default)\nDoctor: <n> ok, 0 warn, 0 fail — quick run <date> <time> UTC · full report: ./snowarch doctor\nCapability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.\nInstances are the store's own records; nothing was probed.",
+  "status-claude-design": "❯ [[Status]]\nMode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v{ver} · <n> files\nEngine: snowarch {ver} · tag v{ver} · contract <12 characters>\nDocs: vendor/ServiceNowDocs @ <pin> (australia) · full\nRoster: 29 skills / 9 agents\nDoctor: <n> ok, 0 warn, 0 fail — quick run <date> <time> UTC · full report: ./snowarch doctor\nCapability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.",
+  "status-term": "Mode: live — {label} (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 399 tools (contract)\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v{ver} · <n> files\nEngine: snowarch {ver} · tag v{ver} · contract <12 characters>\nDocs: vendor/ServiceNowDocs @ <pin> (australia) · full\nRoster: 29 skills / 9 agents\nInstances: {label} (pdi, pdi-developer, default)\nDoctor: <n> ok, 0 warn, 0 fail — quick run <date> <time> UTC · full report: {cli} doctor\nCapability packs, citation counts and the corpus branch are not probed on a quick run — {cli} doctor reports them.\nInstances are the store's own records; nothing was probed.",
+  "status-term-design": "Mode: design-only — no ServiceNow instance configured; run {cli} mode live, or /snowarch setup-instance inside Claude\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v{ver} · <n> files\nEngine: snowarch {ver} · tag v{ver} · contract <12 characters>\nDocs: vendor/ServiceNowDocs @ <pin> (australia) · full\nRoster: 29 skills / 9 agents\nDoctor: <n> ok, 0 warn, 0 fail — quick run <date> <time> UTC · full report: {cli} doctor\nCapability packs, citation counts and the corpus branch are not probed on a quick run — {cli} doctor reports them.",
   "work-ask": "❯ [[Design the integration that sends resolved P1 and P2 incidents from]]\n  [[ServiceNow to our Azure DevOps tenant. Volume: approximately 100 P1/P2]]\n  [[resolves per day. Authentication: OAuth2 against Azure DevOps.]]\n  [[Module: ITSM. Australia release.]]\n~ the task, restated in one sentence\n~ assumptions, and OPEN QUESTION blocks, each with a proposed default\n~ the ITSM Specialist's 5-Part Constraint Envelope (Phase 1 Step 5), with its verdict\n~ Proposal: the specialists in order, the consults, and why\n~ … then it waits for your approval",
   "work-pp04": "❯ [[Two-step task. Step 1: Discovery Specialist extracts requirements from]]\n  [[the transcript below — produce a structured requirements list with]]\n  [[personas, processes, gaps, and open questions. Step 2: Story Writer]]\n  [[converts the requirements into Gherkin Feature files following]]\n  [[ServiceNow conventions, with explicit OPEN QUESTIONS blocks.]]\n  [[Module: <module>]]\n  [[Workspace / portal: <workspace or portal>]]\n  [[Roles in scope: <roles>]]\n  [[Transcript:]]\n  [[<paste the transcript>]]",
   "pp03": "❯ [[The previous message contained client-specific content in the wrong]]\n  [[place. Confirm the confidentiality firewall: name the clients/<name>/]]\n  [[folder this content belongs to, say whether anything was written]]\n  [[outside it, and stop work on the current engagement until I confirm]]\n  [[which one this session is for. Do not echo the content back.]]",
-  "docs-status": "docs corpus: vendor/ServiceNowDocs\n  pin   <sha>  gitlink <sha>  HEAD <sha>   ok\n  family australia  branch australia  ok\n  checkout full, 56/56 areas, <n> files, <n> MB  ok\n  citations checked: <n> | dead: 0  ok",
-  "docs-sync": "[docs] up to date (pin c10276e, full, 56 areas)\ndocs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE\n~ … a line about the names index …\ndocs sync: complete",
-  "docs-lookup": "lookup pin=<12 characters> coverage=<coverage> pages=<n> names=<n>\ncorpus: <the documentation folder> (open a page with the Read tool at this folder plus its path below; offset and limit select lines)\nsc_req_item: PRINTED\n~ … one path:line: text line per page …\n~ … then the answer for \"requested item\" …",
+  "docs-status": "docs corpus: vendor/ServiceNowDocs\n  pin   <sha>  gitlink <sha>  HEAD <sha>   ok\n  family australia  branch australia  ok\n  checkout full, <n>/<n> areas, <n> files, <n> MB  ok\n  citations checked: <n> | dead: 0  ok",
+  "docs-sync": "[docs] up to date (pin <pin>, full, <n> areas)\ndocs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE\ndocs sync: complete",
+  "docs-lookup": "lookup pin=<12 characters> coverage=full pages=<n> names=<n>\ncorpus: <the documentation folder in your AI-Arch folder, as a full path> (open a page with the Read tool at this folder plus its path below; offset and limit select lines)\nsc_req_item: PRINTED\n  sc_req_item: <n> pages (name)\n~ … one path:line: text line per page …\n~ … then the answer for \"requested item\": the names printed beside that label, and the pages whose title holds its words …",
   "mode-report": "Mode: live — instance={label} (pdi) preset=pdi-developer\nregistration: project (.mcp.json)",
   "mode-report-design": "Mode: design-only\nregistration: project (.mcp.json)",
   "mode-live-out": "[B00/09] preflight … ok (<time>)\n~ … one line per step: ok, ok (cached), warn or skipped …\n~ … a folder that kept its instance says: kept instance \"{label}\"; the store already has one, so the wizard did not run\n~ … the summary …\nRestart claude (or /mcp → servicenow → reconnect) to load the server.",
@@ -3068,19 +3076,19 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   "preflight": "Pre-flight on \"{label}\": preset=read-only · <flags read>. <tool> needs gate `<gate>` = <flags needed>; <flag> is off — not calling it, and not asking for write approval.",
   "deploy": "❯ [[Deploy Script Include named <ArtefactName> to the instance.]]\n  [[Update Set: <name> — create if it does not exist.]]\n  [[§1.1 status: confirmed Verdict A — baseline only.]]\n  [[Code Reviewer: passed.]]\n  [[Write approved.]]\nWhich engagement is this for?\n~ … then the write question, and Claude's own permission question …",
   "audit": "{\"ts\":\"<time>\",\"instance\":\"{label}\",\"environment\":\"pdi\",\"tool\":\"snow_core_record_add\",\"gate\":\"write\",\"table\":\"incident\",\"sysId\":\"<sys_id>\",\"query\":null,\"result\":\"ok\",\"ms\":312,\"source\":\"mcp\"}",
-  "doctor": "snowarch doctor 2.2.6 — <date> <time> UTC (quick: no · network: yes · section: all)\n~ … a block per section — prereqs, repo, docs, roster, contract, legacy, host, server — one line per check …\nDOCTOR: <n> ok, 1 warn (E-23), 0 fail\nMode: live — {label} (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 399 tools",
-  "doctor-design": "snowarch doctor 2.2.6 — <date> <time> UTC (quick: no · network: yes · section: all)\n~ … a block per section — prereqs, repo, docs, roster, contract, legacy, host, server — one line per check …\nDOCTOR: <n> ok, 0 warn, 0 fail\nMode: design-only — no ServiceNow instance configured; run {cli} mode live, or /snowarch setup-instance inside Claude",
+  "doctor": "snowarch doctor {ver} — <date> <time> UTC (quick: no · network: yes · section: all)\n~ … a block per section — prereqs, repo, docs, roster, contract, legacy, host, server — one line per check …\nCapabilities: docx yes (<program>) · PDF QA no · draw.io yes (<program>) · Mermaid no\nDOCTOR: <n> ok, 1 warn (E-23), 0 fail\nMode: live — {label} (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 399 tools",
+  "doctor-design": "snowarch doctor {ver} — <date> <time> UTC (quick: no · network: yes · section: all)\n~ … a block per section — prereqs, repo, docs, roster, contract, legacy, host, server — one line per check …\nCapabilities: docx yes (<program>) · PDF QA no · draw.io yes (<program>) · Mermaid no\nDOCTOR: <n> ok, 0 warn, 0 fail\nMode: design-only — no ServiceNow instance configured; run {cli} mode live, or /snowarch setup-instance inside Claude",
   "fixplan": "FIX PLAN (1 action)\n  F6  E-10  rewrite the mode toggles: <detail>   (.claude/settings.local.json)\n~ it waits: the key alone applies the plan\n  F6  applied — mode live\n~ … then the health check runs again and prints its report …",
   "lic-check": "Licence: ok · {licId} · until 2026-12-31\n  valid until:  2026-12-31 (UTC, <n> days)\n  revocation list: version <n>, checked <time>\n  nothing is refused while the licence is in force",
   "lic-show": "Licence: ok · {licId} · until 2026-12-31\n  id:           {licId}\n  licensee:     <your name>\n  org:          <your organisation>\n  scope:        live\n  issued:       <date>\n  valid until:  2026-12-31 (UTC, <n> days)\n  signature:    valid — primary key\n~ … the revocation list, what is refused, and the product's keys …",
   "lic-refused": "snowarch instance: licence expired ({licId}) — this command does not run without a valid licence\nRun {cli} licence check to see why, then install a valid licence as .local/licence.json. A running Claude Code session keeps what it read at start, so restart it afterwards",
-  "upgrade-check": "[U1/7] preflight\n[U2/7] fetch tags from origin\n[U3/7] resolve target\n~ revocation list: …\nup to date (v2.2.6)",
-  "upgrade-plan": "Upgrade plan: v2.2.6 → <new release> (<n> commits, <date>)\n  tag verified: contract <sha>… · docs-pin <sha> · claude-floor <version> (installed <version> ok)\n  steps that will re-run: …\n  store: schema v1 → v1 (no migration)\n  credentials: no instance, credential or flag in .local/instances.json is changed; …\n  after the upgrade: restart claude (the MCP server binary changed) — or run /mcp → servicenow → reconnect\nProceed? [Y/n] [[y]]\n~ … [U5/7] to [U7/7], then the health check's summary …",
+  "upgrade-check": "[U1/7] preflight\n[U2/7] fetch tags from origin\n[U3/7] resolve target\n~ revocation list: …\nup to date (v{ver})",
+  "upgrade-plan": "Upgrade plan: v{ver} → <new release> (<n> commits, <date>)\n  tag verified: contract <sha>… · docs-pin <sha> · claude-floor <version> (installed <version> ok)\n  steps that will re-run: …\n  store: schema v1 → v1 (no migration)\n  credentials: no instance, credential or flag in .local/instances.json is changed; …\n  after the upgrade: restart claude (the MCP server binary changed) — or run /mcp → servicenow → reconnect\nProceed? [Y/n] [[y]]\n~ … [U5/7] to [U7/7], then the health check's summary …",
   "store-restore": "Restore <file> (<n> B) over <store path>.\n  the current store is REPLACED; take a copy first if you want one\nProceed? [Y/n]\nstore: restored schema v1 from <file>",
   "store-migrate": "store: schema v1 is current — nothing to do",
   "ca-json": "\"env\": {\n  \"NODE_EXTRA_CA_CERTS\": \"<path to the PEM>\"\n}",
-  "integrity": "Integrity: restored — The AI Architect's own files are not yours to change under this licence: <n> file(s) restored from v2.2.6, <m> moved to .local/integrity-removed/<time>/ (<first file>). Your own material belongs under clients/<name>/.",
-  "version": "snowarch 2.2.6 · contract <12 characters> · docs pin c10276e (australia) · floors: Claude Code ≥ 2.1.214, node ≥ 20.0.0, git ≥ 2.34.1\ntag:        v2.2.6 (exact)\ncommit:     <sha> (detached, clean)\n~ … the contract, docs-pin and floors lines …",
+  "integrity": "Integrity: restored — The AI Architect's own files are not yours to change under this licence: <n> file(s) restored from v{ver}, <m> moved to .local/integrity-removed/<time>/ (<first file>). Your own material belongs under clients/<name>/.",
+  "version": "snowarch {ver} · contract <12 characters> · docs pin <pin> (australia) · floors: Claude Code ≥ 2.1.214, node ≥ 20.0.0, git ≥ 2.34.1\ntag:        v{ver} (exact)\ncommit:     <sha> (detached, clean)\n~ … the contract, docs-pin and floors lines …",
   "help": "usage: {cli} <command> [options]\ncommands:\n~ … ten rows: version, docs, bootstrap, mode, doctor, instance, store, status, upgrade, licence …\nevery command understands: --json --quiet --verbose --help\nexit: 0 ok · 1 failed · 2 usage · 3 prerequisite missing · 130 interrupted",
   "handoff-mac": "[2/7] Instance URL\n[3/7] Environment\nnetwork: HTTPS_PROXY=unset · NO_PROXY=unset · NODE_EXTRA_CA_CERTS=unset\n[4/7] Authentication\n~ basic, from the command line\n[5/7] Credentials\nUsername (a ServiceNow user on this instance — admin on a PDI) [[admin]]\nPassword (nothing is shown while you type):\n[6/7] Checking the login and what this account may do (read-only, a few seconds) …\n[7/7] Permissions\nPermissions for instance \"{label}\" (environment pdi) — what Claude's tools may do there.\n~ … the six permissions, each with its probe result …\nEnter = apply as shown · a number opens that flag · \"preset <name>\" switches · \"?\" explains\n~ the key alone applies it\nApplying: preset pdi-developer — WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off\nSaved instance \"{label}\" (pdi · basic · preset pdi-developer · default).\nProbes: auth: ok · write: ok · …\nSaved to .local/instances.json in this folder — readable only by you (0600).\nNext: in Claude Code run  /snowarch setup-instance --resume  (or restart claude).",
   "handoff-win": "[2/7] Instance URL\n[3/7] Environment\nnetwork: HTTPS_PROXY=unset · NO_PROXY=unset · NODE_EXTRA_CA_CERTS=unset\n[4/7] Authentication\n~ basic, from the command line\n[5/7] Credentials\nUsername (a ServiceNow user on this instance — admin on a PDI) [[admin]]\nPassword (nothing is shown while you type):\n[6/7] Checking the login and what this account may do (read-only, a few seconds) …\n[7/7] Permissions\nPermissions for instance \"{label}\" (environment pdi) — what Claude's tools may do there.\n~ … the six permissions, each with its probe result …\nEnter = apply as shown · a number opens that flag · \"preset <name>\" switches · \"?\" explains\n~ the key alone applies it\nApplying: preset pdi-developer — WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off\nSaved instance \"{label}\" (pdi · basic · preset pdi-developer · default).\nProbes: auth: ok · write: ok · …\nSaved to .local\\instances.json in this folder — readable only by you.\nNext: in Claude Code run  /snowarch setup-instance --resume  (or restart claude)."
@@ -3347,6 +3355,14 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
    "k": "licence found another name rename licence.json license.json"
   },
   {
+   "id": "downloads-mac",
+   "see": "cannot read …/Downloads/<licence file> from licence verify, or Operation not permitted (or No such file or directory) from cp, although the licence file is in Downloads (Mac)",
+   "do": "macOS is not letting Terminal into Downloads. Choose Apple menu › System Settings › Privacy & Security › Files & Folders and turn on Terminal's access to the Downloads folder; if the switch is missing or locked, your company sets it: ask your IT team. Then quit Terminal, open it again, go to your folder and run the command again.",
+   "href": "#renew",
+   "link": "Renew your licence",
+   "k": "downloads operation not permitted cannot read no such file licence verify cp mac privacy files folders terminal"
+  },
+  {
    "id": "integrity-restored",
    "see": "Integrity: restored — The AI Architect's own files are not yours to change …",
    "do": "Files of the AI Architect had been changed and were put back; the replaced copies are in .local/integrity-removed/. If the banner line ends with restart claude, restart. Keep your own material under clients/<name>/.",
@@ -3368,7 +3384,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
    "do": "The hooks need Node.js 20 or later and must stay switched on. Run doctor and follow what it prints; doctor --fix puts missing hooks back.",
    "href": "#hooks",
    "link": "Hooks",
-   "k": "banner session start licence line hooks disableallhooks e-10"
+   "k": "banner session start licence line hooks e-10"
   },
   {
    "id": "mode-unknown",
@@ -3389,10 +3405,10 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "permission-status",
    "see": "Claude asks your permission to run ./snowarch status when you type Status",
-   "do": "At v2.2.6 that is expected: allow it, or type /snowarch status. New in 2.2.7: no question.",
+   "do": "The release lets Claude run ./snowarch status (in PowerShell .\\snowarch.cmd status) without asking. If Claude still asks, it typed the command in another form (with a folder in front of it, for example), or a setting of your own or of your organisation asks for it: allow it, or type /snowarch status.",
    "href": "#status",
    "link": "Status",
-   "k": "permission prompt status allow bash"
+   "k": "permission prompt status allow bash powershell"
   },
   {
    "id": "no-gitbash",
@@ -3617,6 +3633,46 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
    "href": "#docs",
    "link": "ServiceNow documentation",
    "k": "docs local changes vendor servicenowdocs sync exit 4"
+  },
+  {
+   "id": "lookup-no-corpus",
+   "see": "docs lookup: the documentation corpus is not on disk",
+   "do": "Run docs sync in your folder: it fetches the documentation and builds its names index. Run doctor --fix only if docs sync ends with a note that the names index was not built.",
+   "href": "#lookup",
+   "link": "Look a name up in the documentation",
+   "k": "docs lookup corpus not on disk documentation missing sync exit 3"
+  },
+  {
+   "id": "lookup-index",
+   "see": "docs lookup: the names index for the docs pin … is not built, or does not load",
+   "do": "The documentation is there; only its names index is missing, for example after a step that stopped. Run doctor --fix in your folder and accept its plan (F10, about 20 seconds), then the lookup again.",
+   "href": "#fix",
+   "link": "Repair what it marks fixable",
+   "k": "docs lookup names index not built does not load exit 3 e-33 f10 corpus-names"
+  },
+  {
+   "id": "brew-mac",
+   "see": "A message suggests brew install … (Mac)",
+   "do": "On a Mac installed with the install guide for macOS, which uses no Homebrew, install that program as in its Step 2 instead: Git in 2a, Node.js in 2b, draw.io in 2f, LibreOffice in 2g.",
+   "href": "#diagrams",
+   "link": "Diagrams",
+   "k": "brew homebrew install cask mac drawio libreoffice node git"
+  },
+  {
+   "id": "renderer-missing-mac",
+   "see": "ERROR: draw.io Desktop not found, or ERROR: LibreOffice (soffice) not found (Mac)",
+   "do": "On a Mac installed with the install guide for macOS, repeat its step 2f (draw.io) or 2g (LibreOffice), including the command that makes drawio or soffice; 2f's ls command must answer with both paths, and soffice --version must answer. Then ask the AI Architect again.",
+   "href": "#diagrams",
+   "link": "Diagrams",
+   "k": "drawio draw.io libreoffice soffice not found error render pdf diagram mac"
+  },
+  {
+   "id": "renderer-command-mac",
+   "see": "zsh: command not found: drawio, or soffice (Mac)",
+   "do": "Run the PATH line of step 2d of the install guide for macOS, for your shell, then quit Terminal and open it again. If it persists, run 2f's ls command (for soffice, the check in 2g): a missing file means that the printf command that makes it did not run, so run it again.",
+   "href": "#path-reload",
+   "link": "Reload PATH",
+   "k": "command not found drawio soffice path zsh bash mac"
   },
   {
    "id": "legacy-reg",
@@ -3973,12 +4029,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
 }
 </script>
 <script>
-/* The user guide's script. It is derived from the macOS install guide's script (docs/AI-Architect-macOS-Install-Guide.html@origin/develop)
-   with the adaptation points of design-spec.md §10 applied: its own storage prefix (A1); the prompt, the copy fallback and the launcher of the
-   computer chosen (A2, A3, A15); a help message for this guide (A4); counting only the chosen computer's commands (A5); ticks kept for every
-   command (A6); this guide's words and targets (A7, A8, A9); only the licence check among the paste checks (A10); optional tools (A11);
-   no install grouping (A13); and the sample licence note (A16). Like the install guides' script, it builds every element with
-   createElement and textContent, and has no string timer and no inline handler. */
 (function () {
   'use strict';
 
@@ -4183,7 +4233,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     pb: { env: 'pdi', flags: presetFlags('full') },
     sim: { step: 1, label: 'pdi', url: '', env: 'pdi', auth: 'basic', user: 'admin', flags: presetFlags('full'), applied: false }
   };
-  // The first choice of computer comes from the browser; the reader's own choice is kept in this browser (design-spec.md §5.3).
   function osFromAgent() {
     var p = '';
     try { p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || ''; } catch (e) { p = ''; }
@@ -4219,12 +4268,12 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   }
   function vars() {
     var lic = (S.lic || '').trim() || SAMPLE_LIC;
-    return { lic: lic, licId: lic.replace(/\.json$/i, ''), label: (S.label || '').trim() || 'pdi', client: (S.client || '').trim() || SAMPLE_CLIENT, cli: cli(), boot: boot() };
+    return { lic: lic, licId: lic.replace(/\.json$/i, ''), label: (S.label || '').trim() || 'pdi', client: (S.client || '').trim() || SAMPLE_CLIENT, cli: cli(), boot: boot(), ver: String(D.release || '').replace(/^v/, '') };
   }
   var BASE_SAMPLE = 'https://<your-instance>.service-now.com';
   function fill(tpl, base) {
     var v = vars();
-    return String(tpl).replace(/\{(lic|licId|label|client|cli|boot|base)\}/g, function (m, k) { return k === 'base' ? (base || BASE_SAMPLE) : v[k]; });
+    return String(tpl).replace(/\{(lic|licId|label|client|cli|boot|base|ver)\}/g, function (m, k) { return k === 'base' ? (base || BASE_SAMPLE) : v[k]; });
   }
   function navList() { var live = S.mode === 'live'; return D.nav.filter(function (x) { return !x.live || live; }); }
   function links() { return navList().filter(function (x) { return x.id; }); }
@@ -4986,7 +5035,6 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       var sel = function () { var m = $('#help-msg'); m.focus(); m.select(); };
       try { navigator.clipboard.writeText(text).then(function () { S.helpCopied = true; render(); setTimeout(function () { S.helpCopied = false; render(); }, 1800); }, sel); } catch (e) { sel(); }
     });
-    // The computer switch: both forms show once the script runs; a choice is kept and the page re-measures its sections (design-spec.md §5.3).
     $$('[data-os-switch]').forEach(function (el) { el.hidden = false; });
     $$('[data-os-pick]').forEach(function (b) {
       b.addEventListener('click', function () {
