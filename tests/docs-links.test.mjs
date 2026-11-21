@@ -165,6 +165,73 @@ test('every internal link resolves to a heading that exists (ARC-09-S11)', () =>
   assert.deepEqual(deadLinks(DOCS), []);
 });
 
+// ARC-09-C306 — the interactive pages. They are HTML, so no fence and no `](` for the scan above to read, and a reader of one follows its links the same way: the contents
+// list, the "see" of a troubleshooting row, the footnote that points back. Each is an `href`, and a link that stays on the page names an `id` of its own markup. The
+// script and the style are taken out first: a script holds the text of links it builds, which are not the page's markup, and the data block holds the commands.
+const HTML_PAGES = ['docs/AI-Architect-Windows-Install-Guide.html', 'docs/AI-Architect-macOS-Install-Guide.html', 'docs/AI-Architect-User-Guide.html'];
+const markupOf = (text) => text.replace(/<script\b[\s\S]*?<\/script>/g, '').replace(/<style>[\s\S]*?<\/style>/g, '');
+const idsOfMarkup = (text) => new Set([...markupOf(text).matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+
+/** Every `href` of the pages' markup that leads nowhere, and how many links were read. A web address and a `mailto:` are not this file's to check. */
+function deadHtmlLinks(pages, { readDoc = read, exists = (f) => existsSync(join(root, f)) } = {}) {
+  const dead = [];
+  let checked = 0;
+  for (const page of pages) {
+    for (const [, target] of markupOf(readDoc(page)).matchAll(/\shref="([^"]*)"/g)) {
+      if (/^(https?:|mailto:)/.test(target)) continue;
+      checked += 1;
+      const [path, anchor] = target.split('#');
+      const file = path === '' ? page : posix.join(posix.dirname(page), path);
+      if (!exists(file)) { dead.push(`${page} → ${target} (no such file)`); continue; }
+      if (!anchor) continue;
+      const has = file.endsWith('.md') ? anchorsIn(readDoc(file)).has(anchor.toLowerCase()) : idsOfMarkup(readDoc(file)).has(anchor);
+      if (!has) dead.push(`${page} → ${target} (no such ${file.endsWith('.md') ? 'heading' : 'id'})`);
+    }
+  }
+  return { dead, checked };
+}
+
+test('ARC-09-C306 — every link of the interactive pages, the two install guides and the user guide, leads to an id or a file that exists', () => {
+  const { dead, checked } = deadHtmlLinks(HTML_PAGES);
+  assert.deepEqual(dead, []);
+  // The tripwire on the extraction itself: the user guide alone has more than a hundred links, so a pattern that stopped matching would check nothing and pass.
+  assert.ok(checked >= 150, `only ${checked} links read: the scan is broken, not the pages`);
+  for (const page of HTML_PAGES) assert.ok(existsSync(join(root, page)), `${page} is not in the tree`);
+});
+
+test('ARC-09-C306 — control: the check sees a dead id, a missing file and a dead heading, and skips a web address, the font sheet and what a script builds', () => {
+  const tree = {
+    'docs/page.html': [
+      '<link rel="stylesheet" href="https://fonts.example.invalid/css">',
+      '<a href="#there">ok</a> <a href="#gone">dead id</a> <a href="#">top</a>',
+      '<a href="other.md#a-heading">ok</a> <a href="other.md#no-heading">dead heading</a> <a href="missing.html">missing file</a>',
+      '<a href="sibling.html#cell">ok</a> <a href="sibling.html#nope">dead id elsewhere</a>',
+      '<h2 id="there">There</h2>',
+      '<script>var a = \'<a href="#built-by-script">x</a>\';</script>',
+    ].join('\n'),
+    'docs/other.md': '# Other\n\n## A heading\n',
+    'docs/sibling.html': '<p id="cell">x</p><script>"id=\\"nope\\""</script>',
+  };
+  const { dead, checked } = deadHtmlLinks(['docs/page.html'], { readDoc: (f) => tree[f], exists: (f) => f in tree });
+  assert.deepEqual(dead, [
+    'docs/page.html → #gone (no such id)',
+    'docs/page.html → other.md#no-heading (no such heading)',
+    'docs/page.html → missing.html (no such file)',
+    'docs/page.html → sibling.html#nope (no such id)',
+  ]);
+  assert.equal(checked, 8, 'the web address and the script\'s link are not read, the other eight are');
+});
+
+// ARC-09-C306 — the page the install guides send a reader to, after the install: it is a file of the checkout they have just made, beside the operator's guide.
+test('ARC-09-C306 — the user guide page is where the install guides say it is, beside docs/USER-GUIDE.md', () => {
+  const page = 'docs/AI-Architect-User-Guide.html';
+  assert.ok(existsSync(join(root, page)) && existsSync(join(root, 'docs/USER-GUIDE.md')));
+  for (const guide of ['docs/INSTALL-MACOS.md', 'docs/INSTALL-WINDOWS.md']) {
+    const flat = read(guide).replace(/\s+/g, ' ');
+    assert.ok(flat.includes(`\`${page}\``) || flat.includes(`\`${page.replaceAll('/', '\\')}\``), `${guide} does not name ${page} in its last step`);
+  }
+});
+
 // ARC-09-C107. The decision records and the spike write-ups are pages a reader follows - an ADR names
 // the spike that settled it, a spike names the ADR it led to - and they were outside the list above,
 // so three links written at the wrong depth (`../../spikes/…` from `docs/decisions/`, which is one

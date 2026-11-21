@@ -46,8 +46,8 @@ const write = (root, p, text) => {
   writeFileSync(join(root, p), text);
 };
 
-/** The interactive install guides, Windows and then macOS: each is a page whose data block names the clone tag and carries the release (ARC-09-C285, ARC-09-C300). */
-const GUIDE_HTML = ['docs/AI-Architect-Windows-Install-Guide.html', 'docs/AI-Architect-macOS-Install-Guide.html'];
+/** The interactive guides, the Windows and the macOS install guide and then the user guide: each is a page whose data block names the clone tag and carries the release (ARC-09-C285, ARC-09-C300, ARC-09-C306). */
+const GUIDE_HTML = ['docs/AI-Architect-Windows-Install-Guide.html', 'docs/AI-Architect-macOS-Install-Guide.html', 'docs/AI-Architect-User-Guide.html'];
 
 /** The contract `build-dist` would produce for a version — the fixture's whole point (C12b). */
 const contractFor = (version) => `${JSON.stringify({ schema: 1, version, tools: [] }, null, 2)}\n`;
@@ -78,7 +78,7 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
     write(root, page, `# Fixture page\n\n\`\`\`sh\ngit clone --branch v${version} `
       + `https://github.com/farstic/ai-servicenow-architect.git\n\`\`\`\n`);
   }
-  // ARC-09-C285, ARC-09-C300 — the interactive Windows and macOS guides: the same clone line, and the release field of the data block.
+  // ARC-09-C285, ARC-09-C300, ARC-09-C306 — the interactive guides, the two install guides and the user guide: the same clone line, and the release field of the data block.
   for (const page of GUIDE_HTML) {
     write(root, page, `<!DOCTYPE html>\n<script type="application/json" id="guide-data">\n{\n "release": "v${version}",\n `
       + `"clone": "git clone --branch v${version} https://github.com/farstic/ai-servicenow-architect.git"\n}\n</script>\n`);

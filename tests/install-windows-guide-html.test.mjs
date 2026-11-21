@@ -356,6 +356,8 @@ const SENTENCES = [
   'Tested end to end on 12 November 2026 on a company laptop: Windows 11 Enterprise (build 26200), a standard user without administrator rights.',
   'PowerShell 7.7.0 (zip; present on the test machine, not needed by this guide)',
   'A second end-to-end install, on a new laptop on 19 November 2026, followed every step as written, with no errors.',
+  // The closing line of the last step names the user guide's page beside the operator's guide (ARC-09-C306).
+  'The User Guide in your folder, docs\\USER-GUIDE.md, and its page docs\\AI-Architect-User-Guide.html, which you open in your browser, show how to work with it, with examples for analysts, architects and developers.',
 ];
 
 test('ARC-09-C285 — the sentences of the review of 2026-11-16 are on the page, and they are the Markdown guide\'s', () => {

@@ -80,6 +80,10 @@ test('ARC-09-C271 — the scan reads the pages it is about: a floor, and the pla
   assert.ok((readText('docs/INSTALL-WINDOWS.md').match(ID) ?? []).length >= 5, 'the pattern does not see the ids on the Windows page');
   // ARC-09-C300 — the macOS page shows it five times (what you need, the sample under 5b and the sentence below it, the samples of Steps 7 and 8), and no other id.
   assert.ok((readText('docs/INSTALL-MACOS.md').match(ID) ?? []).length >= 5, 'the pattern does not see the ids on the macOS page');
+  // ARC-09-C306 — the user guide page is a page under docs/ like the two install guides' pages, so the scan reads it: it shows the placeholder in the copy commands and in
+  // the sample screens (the file name of a licence, the licence line of a status), and no other id.
+  assert.ok(pages.includes('docs/AI-Architect-User-Guide.html'), 'the user guide page is not in the scan');
+  assert.ok((readText('docs/AI-Architect-User-Guide.html').match(ID) ?? []).length >= 5, 'the pattern does not see the ids on the user guide page');
   // And the records are really where the count says: a folder that vanished would pass a count of zero only if its count were zero.
   for (const [prefix, want] of RECORDS) assert.ok(want > 0 && files.some((f) => f.startsWith(prefix)), `${prefix} has no files, or nothing is counted for it`);
 });
