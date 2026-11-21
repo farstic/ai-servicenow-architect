@@ -13,6 +13,9 @@ manifest covers it. Nothing else in the package changed.
 `docs/AI-Architect-macOS-Install-Guide.html` join the user's documentation in the release coverage (`licence/integrity.ts`), beside the Windows pair, so a
 distribution carries them and its signed manifest covers them. Nothing else in the package changed.
 
+**The shipped list names the user guide's interactive page (ARC-09-C306).** `docs/AI-Architect-User-Guide.html` joins the user's documentation in the release
+coverage (`licence/integrity.ts`), beside `docs/USER-GUIDE.md`, so a distribution carries it and its signed manifest covers it. Nothing else in the package changed.
+
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.

@@ -91,6 +91,12 @@ each download gives the size of its file and where curl's table must end, and th
 to end on a Mac": the macOS CI jobs run design-only, and Steps 3 to 8 have not run on a Mac. The Windows guide and its page now also record that a second
 end-to-end install, on a new laptop on 19 November 2026, followed every step as written, with no errors.
 
+**The user guide is a page that runs from disk, the third after the two install guides.** `docs/AI-Architect-User-Guide.html` is one file in the design of the install
+guides, with a switch between macOS and Windows and a Copy button on each of its commands. The release writer moves the clone tags and the release it names with every
+final, the signed manifest covers it, and the last step of both install guides, and of their pages, now names it beside `docs/USER-GUIDE.md`. The README lists it among the
+files of the repository. `tests/user-guide-html.test.mjs` holds every `snowarch` command on the page to the product's help tables and to the parser that takes it, requires
+the same commands for both computers, and fails on an owner's command or on a licence number other than the placeholder.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -105,6 +111,11 @@ end-to-end install, on a new laptop on 19 November 2026, followed every step as 
   bash-only check, the bash form of the PATH line and the optional checks are never counted). `tests/install-macos-guide.test.mjs` holds the guide to the product (the plan
   screen, the wizard's questions, the settings commands, the licence words, the clone tag, where the renderer and the doctor look for draw.io and LibreOffice), and
   `tests/install-macos-guide-html.test.mjs` holds the page to the guide (ARC-09-C300).
+- `docs/AI-Architect-User-Guide.html`: the user guide as an interactive page, the third after the two install guides. One file of plain HTML, CSS and JavaScript, with
+  nothing fetched but its fonts and its saved state under the prefix `aiarch-guide.`. A switch shows its commands for macOS or for Windows, and each has a Copy button.
+  `tests/user-guide-html.test.mjs` holds the page to the product: every `snowarch` command is in the help tables with arguments its own parser takes, the two computers
+  show the same commands, no command is the owner's, no licence number is any but `LIC-2026-0000`, and the permission flags, the presets and the licence words are the
+  product's. `tests/docs-links.test.mjs` follows every link of the three interactive pages (ARC-09-C306).
 - `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
   word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints
   whether the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a
@@ -143,6 +154,9 @@ end-to-end install, on a new laptop on 19 November 2026, followed every step as 
 - `docs/INSTALL-WINDOWS.md` and `docs/AI-Architect-Windows-Install-Guide.html` record a second end-to-end install, on a new laptop on 19 November 2026, that followed
   every step as written, with no errors. The subtitle and the hero line, the list of what has not been tested and the closing record say both days; the second install is
   recorded with no machine, user or version, because none was recorded. `tests/install-windows-guide-html.test.mjs` holds each of those places (ARC-09-C300).
+- The release writer rewrites the clone tags and the release of the user guide page with every final, as for the two install pages, and the signed manifest covers it.
+  The last step of both install guides, in Markdown and in HTML, names it beside `docs/USER-GUIDE.md`, and the README lists it among the files of the repository. The
+  pinned-clone guards of `tests/install-page.test.mjs` read the page too (ARC-09-C306).
 - `.gitattributes` gains `*.html text eol=lf`: `tests/eol.test.mjs` asks every tracked extension for a rule, and the interactive guide is the first
   HTML file in the tree. A page that a Windows checkout rewrote to CRLF would no longer match the hash the signed manifest holds for it (ARC-09-C285).
 - The pinned-clone guards of `tests/install-page.test.mjs` read the interactive guide too: its clone command quiets git's detached-HEAD advice,
