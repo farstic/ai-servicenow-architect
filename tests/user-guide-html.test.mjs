@@ -439,3 +439,22 @@ test('ARC-09-C306 — the files the page names are in the tree', () => {
   assert.ok(named.size >= 4, `${named.size} paths read: the pattern found too few`);
   assert.deepEqual([...named].filter((rel) => !existsSync(join(root, rel))), [], 'the page names a file that is not in the tree');
 });
+
+// ── the checks the page lists are this tree's ────────────────────────────────────────────────────────────────────────────────────────────────────
+const checkIdsIn = (text) => [...new Set(text.match(/\b(?:E|SV)-\d{2}\b/g) ?? [])];
+
+test('ARC-09-C306 — the doctor checks and the installer steps the page names are this tree\'s, and it names every doctor check', async () => {
+  const { engineChecks } = await import(href('tools/snowarch/lib/doctor/checks/index.mjs'));
+  const doctor = engineChecks().map((c) => c.id);
+  assert.ok(doctor.length >= 44 && doctor.includes('E-00') && doctor.includes('SV-09'), `the doctor lists ${doctor.length} checks: the list is not the one this test was written against`);
+  const named = checkIdsIn(pageText);
+  assert.deepEqual(named.filter((id) => !doctor.includes(id)), [], 'the page names a doctor check this tree does not have');
+  assert.deepEqual(doctor.filter((id) => !named.includes(id)), [], 'the doctor has a check the page does not name');
+  // The steps of the installer that the page names (B00, B01, B09) are steps of its own.
+  const steps = [...new Set(pageText.match(/\bB\d{2}\b/g) ?? [])];
+  assert.ok(steps.length >= 3, 'the page names no installer step');
+  for (const step of steps) assert.ok(existsSync(join(root, `tools/snowarch/lib/steps/${step}.mjs`)), `the page names ${step}, which is no step of the installer`);
+  // The instrument: an id the doctor does not have, in either family, is found among the ones it has.
+  assert.deepEqual(checkIdsIn('see E-99, SV-77 and E-00').filter((id) => !doctor.includes(id)), ['E-99', 'SV-77']);
+  assert.deepEqual(checkIdsIn('E-0 and E-000 and SV-1 are not ids'), []);
+});
