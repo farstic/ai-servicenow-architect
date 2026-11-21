@@ -1521,10 +1521,10 @@ door, not so that the archive waits on an empty issue list.
 ## The release workflow, and the rehearsal
 
 `release.yml` runs on `v*` tags only. It re-runs every gate on ubuntu, macOS and Windows, verifies
-that the tag's message describes the tree it is on, and publishes a GitHub Release with nine
-assets: three `doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, and the two interactive
+that the tag's message describes the tree it is on, and publishes a GitHub Release with ten
+assets: three `doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, the two interactive
 install guides (`docs/AI-Architect-Windows-Install-Guide.html`, ARC-09-C285, and `docs/AI-Architect-macOS-Install-Guide.html`,
-ARC-09-C300), each of which is the page as it is at the tag. Nothing
+ARC-09-C300) and the interactive user guide (`docs/AI-Architect-User-Guide.html`, ARC-09-C306), each of which is the page as it is at the tag. Nothing
 is published until `assert-assets.mjs` has read every report — a doctor report attached to a public Release is permanent in a way a
 pasted one is not.
 
@@ -1535,9 +1535,9 @@ that clone and publishes the manifest; the clone's `main` and tag are pushed;
 `node scripts/release.mjs X.Y.Z --tag-only --push --distribution <clone>` pushes this repository's tag, and refuses a
 clone whose tag is not this tag staged or whose manifest is not signed from it; `release.yml` installs the staged tree on
 three OSes and compares the distribution tag's tree; and the Release with that evidence is published on
-farstic/snowarch. That Release is a hand step, and so are its eighth and ninth assets: attach the two interactive install guides, as they are
-at the tag, with `gh release upload vX.Y.Z docs/AI-Architect-Windows-Install-Guide.html docs/AI-Architect-macOS-Install-Guide.html --repo farstic/snowarch`
-(ARC-09-C285, ARC-09-C300), one call for both files; the Release that `release.yml` makes in this repository carries them already. An rc stays in
+farstic/snowarch. That Release is a hand step, and so are its eighth, ninth and tenth assets: attach the two interactive install guides and the user guide's page, as they are
+at the tag, with `gh release upload vX.Y.Z docs/AI-Architect-Windows-Install-Guide.html docs/AI-Architect-macOS-Install-Guide.html docs/AI-Architect-User-Guide.html --repo farstic/snowarch`
+(ARC-09-C285, ARC-09-C300, ARC-09-C306), one call for the three files; the Release that `release.yml` makes in this repository carries them already. An rc stays in
 this repository and is never published there.
 
 `release-dryrun` in `ci.yml` runs the same release path on every commit with `--dry-run --offline
@@ -1575,8 +1575,8 @@ node scripts/release.mjs X.Y.Z-rc.N --tag-only --allow-prerelease --allow-branch
 git push origin vX.Y.Z-rc.N
 ```
 
-Then watch `release.yml`: green on all three OSes, nine assets on the Release (three
-`doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, the Windows and macOS install guides), and the two
+Then watch `release.yml`: green on all three OSes, ten assets on the Release (three
+`doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, the Windows and macOS install guides and the user guide's page), and the two
 negatives refused. Afterwards delete the Release, the tag and the branch — locally and on the
 remote — and record what the run showed in the fields below.
 
@@ -1710,7 +1710,7 @@ a change needs a paragraph rather than a bullet, that is where it goes.
 
 The checklist, verbatim — paste it into the release pull request's description and tick it:
 
-> 1. **Rehearse it first** — see [The rehearsal](#the-rehearsal--a-standing-step-before-every-release). A throwaway branch, a `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three OSes with its nine assets, then the Release, tag and branch deleted. Every release, not only the first.
+> 1. **Rehearse it first** — see [The rehearsal](#the-rehearsal--a-standing-step-before-every-release). A throwaway branch, a `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three OSes with its ten assets, then the Release, tag and branch deleted. Every release, not only the first.
 > 2. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
 > 3. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
 > 3a. **From 2.1.0, the tag is signed before it is pushed** (ARC-11-C7). `./snowarch licence sign-release vX.Y.Z`, with `--key` the path of your primary key and `--list` your clone of the licences repository, writes `releases/vX.Y.Z.json` there and prints the git commands that publish it; run them. Then `node scripts/release.mjs X.Y.Z --tag-only --push` checks the published manifest against the tag's own tree before it pushes the tag, and refuses one that is missing, unverified or for another tree. A rehearsal's rc tag is signed the same way.
@@ -1740,7 +1740,12 @@ The checklist, verbatim — paste it into the release pull request's description
 >    ARC-09-C206.** The cut renames that block to the version, holding what was written, and opens the next
 >    Unreleased with its open "Known gap" paragraphs carried. A final whose `packages/snowarch/src` changed since the
 >    previous final, with nothing written there, is refused before anything is written.
-> 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md` and the Windows and macOS install guides. On farstic/snowarch attach both guides by hand, with the `gh release upload` line of the paragraph on releasing through it.
+> 5c. **Re-read the user guide's page before a final — ARC-09-C306.** `docs/AI-Architect-User-Guide.html` is stamped with the release at the cut
+>    (`writeGuideRelease`), so the cut makes the page say that what it states holds at that release. `tests/user-guide-html.test.mjs` holds its commands, doctor checks,
+>    tool counts, flags, presets and licence words to the tree, and `tests/page-floors.test.mjs` holds its floors; neither can read its prose. Before each final, read the
+>    page against the changes since the previous release (`git log vX.Y.Z..HEAD`, with the previous tag) and correct what no longer holds: a release that was not
+>    re-read says things nobody checked.
+> 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md` and the Windows and macOS install guides and the user guide's page. On farstic/snowarch attach the three pages by hand, with the `gh release upload` line of the paragraph on releasing through it.
 > 7. Update the install page's metrics link if the numbers moved; announce.
 > 8. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
 > 9. **Move `develop` to the next `-dev` version.** This step was missing, and its absence has a

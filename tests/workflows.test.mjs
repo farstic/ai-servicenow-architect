@@ -556,6 +556,9 @@ test('release.yml runs on tags only, and is the one workflow that may write (ARC
     'install-metrics.md']) {
     assert.ok(create.includes(asset), `the release does not attach ${asset}`);
   }
+  // ARC-09-C285, ARC-09-C300, ARC-09-C306 — and the last assets are the three interactive guides, from disk, in this order: the Windows install guide, the macOS install guide, the user guide.
+  const guides = ['docs/AI-Architect-Windows-Install-Guide.html', 'docs/AI-Architect-macOS-Install-Guide.html', 'docs/AI-Architect-User-Guide.html'];
+  assert.ok(create.includes(`install-metrics.md ${guides.join(' ')}\n`), `the release does not attach the three guides after install-metrics.md, in this order: ${guides.join(' ')}`);
   // ...and nothing is published without being read first.
   assert.ok(publish.indexOf('assert-assets.mjs') < publish.indexOf('gh release create'),
     'the assets are published before they are checked');

@@ -91,6 +91,14 @@ each download gives the size of its file and where curl's table must end, and th
 to end on a Mac": the macOS CI jobs run design-only, and Steps 3 to 8 have not run on a Mac. The Windows guide and its page now also record that a second
 end-to-end install, on a new laptop on 19 November 2026, followed every step as written, with no errors.
 
+**A user guide that runs from disk.** `docs/AI-Architect-User-Guide.html` is everything a user can do after the install, in one file that opens in a browser without a server, for
+macOS and for Windows: working with the AI Architect every day, connecting and managing instances, changing its settings, keeping it healthy and up to date, and fixing what goes
+wrong. It has the install guides' design: a Copy button on every command in the spelling of the reader's computer, example screens, and progress kept in the browser; nothing leaves
+the page. The release writer moves its clone tag and its release with every final, the signed manifest covers it, and each GitHub Release carries it as its tenth asset. The last
+step of both install guides, and of their pages, says that every command and setting is in it, and the README lists it among the files of the repository. Its tests hold what a
+test can read: every `snowarch` command to the product's help tables and parsers, its floors to `engine.config.json`, the numbers it states about the build to the build, and its
+one figure of the corpus to the corpus. What no test can read, its prose, is read by a person before each final (step 5c of the release list in `docs/CONTRIBUTING.md`).
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -105,6 +113,13 @@ end-to-end install, on a new laptop on 19 November 2026, followed every step as 
   bash-only check, the bash form of the PATH line and the optional checks are never counted). `tests/install-macos-guide.test.mjs` holds the guide to the product (the plan
   screen, the wizard's questions, the settings commands, the licence words, the clone tag, where the renderer and the doctor look for draw.io and LibreOffice), and
   `tests/install-macos-guide-html.test.mjs` holds the page to the guide (ARC-09-C300).
+- `docs/AI-Architect-User-Guide.html`: the interactive user guide, the third page after the two install guides. One file of plain HTML, CSS and JavaScript with nothing fetched
+  but its fonts, a switch between macOS and Windows, and its saved state under the prefix `aiarch-guide.`. `tests/user-guide-html.test.mjs` holds every command on it to the
+  CLI's own tables, both computers to the same commands, its permission flags, presets and licence words, the numbers it states about the build (the tools, the roster, the
+  store format) and its `version` screen to the product's, its doctor checks to the doctor's, its release to the writer, and fails on an owner's command, a licence number other
+  than `LIC-2026-0000`, a pin or a size of the corpus, or a block that names `disableAllHooks` together with the Licence line. `tests/page-floors.test.mjs` reads its floors,
+  in prose and on its `version` screen, and holds them to `engine.config.json`; the Mermaid preview's own Node.js 18 is the one statement it excuses, with its reason.
+  `tests/docs-links.test.mjs` follows every link of the three interactive pages (ARC-09-C306).
 - `./snowarch docs lookup <name or phrase>…` says which pages of the documentation corpus print a name, or print it under another
   word: a table's label ("requested item" for `sc_req_item`), a synonym the corpus lists, a page title. For each term it prints
   whether the corpus prints it, and one `path:line: text` line per page; it takes several terms in one call, runs in well under a
@@ -143,6 +158,15 @@ end-to-end install, on a new laptop on 19 November 2026, followed every step as 
 - `docs/INSTALL-WINDOWS.md` and `docs/AI-Architect-Windows-Install-Guide.html` record a second end-to-end install, on a new laptop on 19 November 2026, that followed
   every step as written, with no errors. The subtitle and the hero line, the list of what has not been tested and the closing record say both days; the second install is
   recorded with no machine, user or version, because none was recorded. `tests/install-windows-guide-html.test.mjs` holds each of those places (ARC-09-C300).
+- The release writes the user guide as it writes the install guides' pages (`writeGuideRelease`): its four clone lines and the `release` field its hero and its example screens read.
+  It is in the signed manifest's coverage (`packages/snowarch/src/licence/integrity.ts`), and `release.yml` attaches it to the GitHub Release after the macOS page, as its tenth asset
+  (the release steps of `docs/CONTRIBUTING.md` say so, and attach it by hand to the Release of farstic/snowarch). Step 5c of that list asks for the page to be read before each final,
+  against the changes since the previous release (ARC-09-C306).
+- A docs bump checks the user guide's corpus figure, "all 54 areas and 51,186 files", against the corpus, as it does the install page's: the pull request says which of the two numbers
+  differ, or that the page does not state them where the bump reads them (ARC-09-C306).
+- The last step of both install guides, in Markdown and in HTML, says that every command and setting is in `docs/AI-Architect-User-Guide.html`, and the README lists the page among the
+  files of the repository. The pinned-clone guards of `tests/install-page.test.mjs` read the page too: its clone commands quiet git's detached-HEAD advice, name a release, and name the
+  newest one that exists (ARC-09-C306).
 - `.gitattributes` gains `*.html text eol=lf`: `tests/eol.test.mjs` asks every tracked extension for a rule, and the interactive guide is the first
   HTML file in the tree. A page that a Windows checkout rewrote to CRLF would no longer match the hash the signed manifest holds for it (ARC-09-C285).
 - The pinned-clone guards of `tests/install-page.test.mjs` read the interactive guide too: its clone command quiets git's detached-HEAD advice,
