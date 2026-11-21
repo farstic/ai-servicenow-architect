@@ -18,7 +18,7 @@ import { CORPUS_DIR, EXIT, SyncError } from '../tools/snowarch/lib/docs/sync.mjs
 import { syncUpstream, formatUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
 import { follow } from './lib/pin-followers.mjs';
-import { figuresChecklist, installWindowsMb, macosChecklist, macosPageFigures, pageFigures, windowsChecklist, windowsPageFigures } from './lib/page-figures.mjs';
+import { figuresChecklist, installWindowsMb, macosChecklist, macosPageFigures, pageFigures, userGuideChecklist, userGuidePageFigures, windowsChecklist, windowsPageFigures } from './lib/page-figures.mjs';
 import { diskPages } from '../tools/snowarch/lib/docs/resolve.mjs';
 import { docsStatus } from '../tools/snowarch/lib/docs/status.mjs';
 import { megabytes } from '../tools/snowarch/lib/size.mjs';
@@ -67,7 +67,12 @@ function figuresOf(root) {
     corpus: corpus ? { files: corpus.files, pages, workingTreeMb: corpus.workingTreeMb } : null,
     guides: MACOS_GUIDES.map((file) => { const text = read(file); return { file, figures: text === null ? null : macosPageFigures(text) }; }),
   };
-  return { corpus, page: install === null ? null : pageFigures(install), windows, macos };
+  // ARC-09-C306 — the user guide's page states the corpus once, in the install page's words: the same files, and the areas, as the corpus has them.
+  const userGuide = {
+    corpus: corpus ? { files: corpus.files, areas: corpus.areas } : null,
+    guides: USER_GUIDES.map((file) => { const text = read(file); return { file, figures: text === null ? null : userGuidePageFigures(text) }; }),
+  };
+  return { corpus, page: install === null ? null : pageFigures(install), windows, macos, userGuide };
 }
 
 /** The two guides that show the corpus's figures on an example screen (ARC-09-C290). */
@@ -75,6 +80,9 @@ const WINDOWS_GUIDES = ['docs/INSTALL-WINDOWS.md', 'docs/AI-Architect-Windows-In
 
 /** And the two macOS guides that say the same (ARC-09-C300). */
 const MACOS_GUIDES = ['docs/INSTALL-MACOS.md', 'docs/AI-Architect-macOS-Install-Guide.html'];
+
+/** And the user guide's page, which states the corpus as the install page does (ARC-09-C306). */
+const USER_GUIDES = ['docs/AI-Architect-User-Guide.html'];
 
 /**
  * The lines for what did not follow the pin: a file that quotes neither pin (reworded since, so there is nothing to
@@ -115,6 +123,8 @@ export function prBody(report) {
     ...windowsChecklist({ corpus: report.figures?.windows?.corpus ?? null, windows: report.figures?.windows ?? null }),
     // ARC-09-C300 — and the macOS guides': the same corpus, and the working tree this bump measured.
     ...macosChecklist({ corpus: report.figures?.macos?.corpus ?? null, macos: report.figures?.macos ?? null }),
+    // ARC-09-C306 — and the user guide's page: the corpus's files and areas, which it states once.
+    ...userGuideChecklist({ corpus: report.figures?.userGuide?.corpus ?? null, guides: report.figures?.userGuide?.guides ?? [] }),
     '',
     '```',
     shown.join('\n'),
