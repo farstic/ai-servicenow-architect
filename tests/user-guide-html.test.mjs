@@ -430,7 +430,7 @@ test('ARC-09-C306 — the release is shown only through what the writer owns, th
   assert.equal(rest.includes(data.release.slice(1)), false, 'the page spells its release outside the shapes the writer owns');
   assert.doesNotMatch(rest, /\bNew in \d+\.\d+|\bAt v\d+\.\d+|(?<![\w.])v\d+\.\d+\.\d+\b/, 'the page spells a release or marks something as new in one');
   // The binding: the hero, the first section and the foot show it, and ten screens carry {ver}, filled from the same field.
-  assert.ok([...markup.matchAll(/<span data-bind="release"><\/span>/g)].length >= 3, 'the release is not shown through the binding in the hero, the first section and the foot');
+  assert.ok([...markup.matchAll(/<span data-bind="release"><\/span>/g)].length >= 4, 'the release is not shown through the binding in the hero line, the hero chip, the first section and the foot');
   assert.match(code, /\$\$\('\[data-bind="release"\]'\)\.forEach\(function \(el\) \{ setText\(el, D\.release\); \}\);/, 'the script does not bind the release');
   assert.match(code, /ver: String\(D\.release \|\| ''\)\.replace\(\/\^v\/, ''\)/, '{ver} is not filled from the release of the data');
   assert.match(code, /\\\{\(lic\|licId\|label\|client\|cli\|boot\|base\|ver\)\\\}/, 'the fill does not know {ver}');
@@ -482,7 +482,7 @@ test('ARC-09-C306 — the page ships: it is covered by the signed manifest, and 
   assert.ok(step5c, 'the release list has no step 5c, the re-reading of the user guide before a final');
   const step = fold(`${step5c[1]} ${step5c[2].replace(/\n> /g, ' ')}`);
   assert.ok(step.includes('docs/AI-Architect-User-Guide.html') && /since the previous release/.test(step) && /ARC-09-C306/.test(step), `step 5c does not say what to re-read and against what: ${step}`);
-  assert.ok(/commands|checks|floors/.test(step) && /prose|words|text/.test(step), 'step 5c does not say what the test covers and what a person has to read');
+  assert.ok(/commands|checks|floors/.test(step) && /\bprose\b/.test(step), 'step 5c does not say what the test covers and what a person has to read: its prose');
 });
 
 test('ARC-09-C306 — the files the page names are in the tree', () => {
