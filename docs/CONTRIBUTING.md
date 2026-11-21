@@ -1710,7 +1710,7 @@ a change needs a paragraph rather than a bullet, that is where it goes.
 
 The checklist, verbatim — paste it into the release pull request's description and tick it:
 
-> 1. **Rehearse it first** — see [The rehearsal](#the-rehearsal--a-standing-step-before-every-release). A throwaway branch, a `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three OSes with its nine assets, then the Release, tag and branch deleted. Every release, not only the first.
+> 1. **Rehearse it first** — see [The rehearsal](#the-rehearsal--a-standing-step-before-every-release). A throwaway branch, a `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three OSes with its ten assets, then the Release, tag and branch deleted. Every release, not only the first.
 > 2. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
 > 3. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
 > 3a. **From 2.1.0, the tag is signed before it is pushed** (ARC-11-C7). `./snowarch licence sign-release vX.Y.Z`, with `--key` the path of your primary key and `--list` your clone of the licences repository, writes `releases/vX.Y.Z.json` there and prints the git commands that publish it; run them. Then `node scripts/release.mjs X.Y.Z --tag-only --push` checks the published manifest against the tag's own tree before it pushes the tag, and refuses one that is missing, unverified or for another tree. A rehearsal's rc tag is signed the same way.
@@ -1740,6 +1740,11 @@ The checklist, verbatim — paste it into the release pull request's description
 >    ARC-09-C206.** The cut renames that block to the version, holding what was written, and opens the next
 >    Unreleased with its open "Known gap" paragraphs carried. A final whose `packages/snowarch/src` changed since the
 >    previous final, with nothing written there, is refused before anything is written.
+> 5c. **Re-read the user guide's page before a final — ARC-09-C306.** `docs/AI-Architect-User-Guide.html` is stamped with the release at the cut
+>    (`writeGuideRelease`), so the cut makes the page say that what it states holds at that release. `tests/user-guide-html.test.mjs` holds its commands, doctor checks,
+>    tool counts, flags, presets and licence words to the tree, and `tests/page-floors.test.mjs` holds its floors; neither can read its prose. Before each final, read the
+>    page against the changes since the previous release (`git log vX.Y.Z..HEAD`, with the previous tag) and correct what no longer holds: a release that was not
+>    re-read says things nobody checked.
 > 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md` and the Windows and macOS install guides and the user guide's page. On farstic/snowarch attach the three pages by hand, with the `gh release upload` line of the paragraph on releasing through it.
 > 7. Update the install page's metrics link if the numbers moved; announce.
 > 8. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
