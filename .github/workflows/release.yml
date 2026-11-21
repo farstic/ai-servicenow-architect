@@ -262,11 +262,11 @@ jobs:
       # documented guarantee, and the rehearsal run is what proves it; if it is ever absent, this
       # step becomes `actions/github-script` calling `repos.createRelease` with the same assets.
       #
-      # ARC-09-C285 — THE LAST TWO ASSETS ARE THE INTERACTIVE INSTALL GUIDES, the Windows one and then the macOS one (ARC-09-C300), each as it
-      # is at this tag: a reader who has nothing installed yet cannot open a page inside a clone they have not made, so the Release carries
-      # the one page they need first. Neither is a doctor report, so `assert-assets.mjs` above does not read them; the release writer moves
-      # their clone tag with the release (`writeGuideRelease`), and tests/install-windows-guide-html.test.mjs and
-      # tests/install-macos-guide-html.test.mjs hold each tag to its Markdown guide's.
+      # ARC-09-C285 — THE LAST THREE ASSETS ARE THE INTERACTIVE GUIDES, the Windows install guide, then the macOS install guide (ARC-09-C300) and then
+      # the user guide (ARC-09-C306), each as it is at this tag: a reader who has nothing installed yet cannot open a page inside a clone they have
+      # not made, so the Release carries the page they need first, and the page they need after it. None is a doctor report, so `assert-assets.mjs`
+      # above does not read them; the release writer moves their clone tags with the release (`writeGuideRelease`), and
+      # tests/install-windows-guide-html.test.mjs, tests/install-macos-guide-html.test.mjs and tests/user-guide-html.test.mjs hold each tag to its guide's.
       - name: Publish
         shell: bash
         env:
@@ -278,4 +278,4 @@ jobs:
           --notes-file release-notes.md
           doctor-ubuntu-latest.json doctor-macos-latest.json doctor-windows-latest.json
           install-metrics-ubuntu-latest.json install-metrics-macos-latest.json
-          install-metrics-windows-latest.json install-metrics.md docs/AI-Architect-Windows-Install-Guide.html docs/AI-Architect-macOS-Install-Guide.html
+          install-metrics-windows-latest.json install-metrics.md docs/AI-Architect-Windows-Install-Guide.html docs/AI-Architect-macOS-Install-Guide.html docs/AI-Architect-User-Guide.html

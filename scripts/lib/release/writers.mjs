@@ -121,7 +121,7 @@ export function writeInstallTag(text, version, file = 'the install page') {
 }
 
 /**
- * An interactive install guide's release (ARC-09-C285, the Windows guide; ARC-09-C300, the macOS guide): its clone command and the release it names.
+ * An interactive guide's release (ARC-09-C285, the Windows install guide; ARC-09-C300, the macOS install guide; ARC-09-C306, the user guide): its clone commands and the release it names.
  *
  * ONE PAGE, TWO SPELLINGS, BOTH THE WRITER'S. The page is one HTML file whose data is one JSON block. The clone command there is the line
  * `writeInstallTag` already rewrites (`--branch v<x.y.z>`), and the page's hero and its help message take the release from a field of the same
@@ -213,6 +213,8 @@ const WRITTEN_HERE = Object.freeze([
   // ARC-09-C300 — the macOS guide and its interactive form, written the same two ways. The Markdown guide names the tag once, in its clone command.
   'docs/INSTALL-MACOS.md',
   'docs/AI-Architect-macOS-Install-Guide.html',
+  // ARC-09-C306 — the user guide's page, the third of its kind: the clone commands of its "move to a new computer" section and its release, written by `writeGuideRelease`.
+  'docs/AI-Architect-User-Guide.html',
 ]);
 
 export const STAGED = Object.freeze([...new Set([
@@ -279,6 +281,7 @@ export function applyWrites({ root, version, date, run, from = null, tag = {}, g
     ['docs/AI-Architect-Windows-Install-Guide.html', (t) => writeGuideRelease(t, version, 'docs/AI-Architect-Windows-Install-Guide.html')],
     ['docs/INSTALL-MACOS.md', (t) => writeInstallTag(t, version, 'docs/INSTALL-MACOS.md')],
     ['docs/AI-Architect-macOS-Install-Guide.html', (t) => writeGuideRelease(t, version, 'docs/AI-Architect-macOS-Install-Guide.html')],
+    ['docs/AI-Architect-User-Guide.html', (t) => writeGuideRelease(t, version, 'docs/AI-Architect-User-Guide.html')],
   ]) {
     const result = fn(read(file));
     if (!result.ok) return { ok: false, message: result.message, touched };

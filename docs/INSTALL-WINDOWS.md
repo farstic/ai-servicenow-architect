@@ -643,7 +643,7 @@ Integrity: verified · v2.2.5 · 473 files
 Docs: vendor/ServiceNowDocs @ 96d32129bb43 (australia) · full
 ```
 
-> **You are done.** The AI Architect is installed, licensed and connected. The User Guide in your folder, `docs\USER-GUIDE.md`, shows how to work with it, with examples for analysts, architects and developers.
+> **You are done.** The AI Architect is installed, licensed and connected. The User Guide in your folder, `docs\USER-GUIDE.md`, shows how to work with it, with examples for analysts, architects and developers. Every command and setting is in `docs\AI-Architect-User-Guide.html`, which you open in your browser.
 
 ---
 

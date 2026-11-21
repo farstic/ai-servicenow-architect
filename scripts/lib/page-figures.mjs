@@ -15,6 +15,9 @@
 //
 // ARC-09-C300 — the two macOS guides state the same two things in the same two shapes. A Mac's working tree is the Linux one, so the bump holds them to the
 // working tree it measured itself, with the corpus's files and pages, and needs nothing from the install page.
+//
+// ARC-09-C306 — the user guide's page states the corpus once, in the install page's words ("all 54 areas and 51,186 files"), and states no size and no pin. A bump holds
+// those two numbers to the corpus's files and areas, which it has measured.
 
 /** `{ areas, files, workingTreeMb }` as the page states them in "What the corpus costs", each `null` when it does not. */
 export function pageFigures(text) {
@@ -147,6 +150,43 @@ export function macosChecklist({ corpus, macos }) {
     if (unread.length > 0) return `- [ ] ${file} figures not checked: it does not state ${joined(unread.map((f) => f.noun))} where the bump reads them`;
     const differ = MACOS_FIGURES.filter((f) => expected[f.key] !== figures[f.key]);
     if (differ.length === 0) return `- [x] ${file} figures match the corpus: ${MACOS_FIGURES.map((f) => f.plain(expected[f.key])).join(' · ')}`;
+    return `- [ ] ${file} figures differ from the corpus: ${differ.map((f) => `${f.show(expected[f.key])} (guide: ${f.guide(figures[f.key])})`).join(' · ')}`;
+  });
+}
+
+/**
+ * `{ areas, files }` as the user guide's page states them (ARC-09-C306), each `null` when it does not. The page says "all <areas> areas and <files> files" in a paragraph, the
+ * install page's own words, so `pageFigures` reads them; the page states no working tree, and this answer has none. The text is read as the file is: a tag inside the phrase
+ * hides it, and the page's test holds the phrase to plain text.
+ */
+export function userGuidePageFigures(text) {
+  const { areas, files } = pageFigures(text);
+  return { areas, files };
+}
+
+/** The figures of the user guide's page, each as the checklist words it. */
+const USER_GUIDE_FIGURES = Object.freeze([
+  { key: 'files', noun: 'the files', show: (n) => `files ${commas(n)}`, plain: (n) => `${commas(n)} files`, guide: (n) => commas(n) },
+  { key: 'areas', noun: 'the areas', show: (n) => `areas ${n}`, plain: (n) => `${n} areas`, guide: (n) => String(n) },
+]);
+
+/**
+ * The checklist lines for a bump's pull-request body about the user guide's page (ARC-09-C306). `corpus` is `{ files, areas }` (more keys are not read) as the fresh corpus has
+ * them, or `null` when it was not measured (then there is nothing to say); `guides` is `[{ file, figures }]`: each page's `userGuidePageFigures`, or `null` for a page that is not
+ * in the tree.
+ */
+export function userGuideChecklist({ corpus, guides }) {
+  if (!corpus || !guides) return [];
+  const expected = { files: corpus.files ?? null, areas: corpus.areas ?? null };
+  if (USER_GUIDE_FIGURES.some((f) => expected[f.key] === null)) {
+    return ['- [ ] user guide figures not checked: the corpus\'s files or areas could not be read'];
+  }
+  return guides.map(({ file, figures }) => {
+    if (figures === null) return `- [ ] ${file} figures not checked: there is no ${file} in this tree`;
+    const unread = USER_GUIDE_FIGURES.filter((f) => figures[f.key] === null);
+    if (unread.length > 0) return `- [ ] ${file} figures not checked: it does not state ${joined(unread.map((f) => f.noun))} where the bump reads them`;
+    const differ = USER_GUIDE_FIGURES.filter((f) => expected[f.key] !== figures[f.key]);
+    if (differ.length === 0) return `- [x] ${file} figures match the corpus: ${USER_GUIDE_FIGURES.map((f) => f.plain(expected[f.key])).join(' · ')}`;
     return `- [ ] ${file} figures differ from the corpus: ${differ.map((f) => `${f.show(expected[f.key])} (guide: ${f.guide(figures[f.key])})`).join(' · ')}`;
   });
 }

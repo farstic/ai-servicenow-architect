@@ -11,6 +11,7 @@
 | `.claude/skills/`, `.claude/agents/` | the specialists — one skill each, nine of them also sub-agents |
 | `governance/` | the rules the architect reads at routing time |
 | `packages/snowarch/` | the MCP server that talks to a ServiceNow instance |
+| `docs/AI-Architect-User-Guide.html` | how to work with the AI Architect, as one page to open in your browser |
 | `docs/ARCHITECTURE.md` | how the repository is laid out and how the engine works |
 | `docs/PLATFORM-NOTES.md` | platform behaviour learned on real instances, and the Windows notes |
 
