@@ -674,3 +674,74 @@ test('ARC-09-C300 — a tree with no macOS guide says it did not check, for each
     assert.ok(lead.includes(`- [ ] ${file} figures not checked: there is no ${file} in this tree`), `no line for ${file}:\n${lead.join('\n')}`);
   }
 });
+
+/**
+ * ARC-09-C306 — and whether the user guide's page follows the corpus. The page states the corpus once, in the install page's words ("all <areas> areas and <files> files"),
+ * and nothing else of it, so the bump holds it to the corpus's files and areas and says so in the checklist, as it does for the install page and the guides.
+ */
+const userGuide = ({ areas, files }) => `<!DOCTYPE html>\n<p>The install takes the whole of it: all ${areas} areas and ${commas(files)} files. What it costs is on the install page.</p>\n`;
+
+test('ARC-09-C306 — a bump says whether the user guide\'s page states the corpus\'s files and areas, and which of them differ', () => {
+  const w = ready();
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: 99, files: 99999, mb: 5 }));
+  writeFileSync(join(w.root, 'docs', 'AI-Architect-User-Guide.html'), userGuide({ areas: 99, files: 99999 }));
+  commitAll(w, 'a stale user guide');
+
+  const first = bump(w, '--json');
+  assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
+  const out = JSON.parse(read(w.root, 'bump.json'));
+  const corpus = corpusNow(w);
+  assert.notEqual(corpus.areas, 99, 'precondition: the stale page must differ in its areas');
+  assert.deepEqual(out.figures?.userGuide?.corpus, { files: corpus.files, areas: corpus.areas }, `the report does not carry the corpus's files and areas: ${JSON.stringify(out.figures?.userGuide)}`);
+  assert.deepEqual(out.figures?.userGuide?.guides, [{ file: 'docs/AI-Architect-User-Guide.html', figures: { areas: 99, files: 99999 } }]);
+  const lead = out.prBody.split('```')[0].split('\n');
+  const stale = lead.find((l) => l.includes('docs/AI-Architect-User-Guide.html figures'));
+  assert.ok(stale?.startsWith('- [ ] docs/AI-Architect-User-Guide.html figures differ from the corpus: '), `no differing line for the user guide:\n${lead.join('\n')}`);
+  for (const part of [`files ${commas(corpus.files)} (guide: 99,999)`, `areas ${corpus.areas} (guide: 99)`]) assert.ok(stale.includes(part), `${part} is not in: ${stale}`);
+  // The other pages' lines are the ones they were.
+  assert.ok(lead.includes('- [ ] docs/INSTALL-MACOS.md figures not checked: there is no docs/INSTALL-MACOS.md in this tree'), `a macOS line changed:\n${lead.join('\n')}`);
+});
+
+test('ARC-09-C306 — a user guide that states the corpus\'s own figures makes one checked line, whatever the install page says', () => {
+  const w = ready();
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  // The install page is stale and stays so: the user guide is held to the corpus, not to that page. A first bump moves the pin, so that the figures written next are those of the
+  // corpus a second one finds.
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: 99, files: 99999, mb: 5 }));
+  commitAll(w, 'a stale install page');
+  const first = bump(w, '--json');
+  assert.equal(first.status, 0, `${first.stdout}${first.stderr}`);
+  rmSync(join(w.root, 'bump.json'));
+  commitAll(w, 'bumped');
+  const corpus = corpusNow(w);
+  writeFileSync(join(w.root, 'docs', 'AI-Architect-User-Guide.html'), userGuide({ areas: corpus.areas, files: corpus.files }));
+  commitAll(w, 'the user guide follows the corpus');
+  const second = bump(w, '--json');
+  assert.equal(second.status, 0, `${second.stdout}${second.stderr}`);
+  const again = JSON.parse(read(w.root, 'bump.json'));
+  assert.equal(again.from, again.to, 'the second bump moved after all — this proves nothing');
+  const held = again.prBody.split('```')[0].split('\n');
+  assert.ok(held.includes(`- [x] docs/AI-Architect-User-Guide.html figures match the corpus: ${commas(corpus.files)} files · ${corpus.areas} areas`), `no checked line for the user guide:\n${held.join('\n')}`);
+  // ...and the same install page, still stale, is still said to differ: the user guide's line does not hide it.
+  assert.ok(held.some((l) => l.startsWith('- [ ] install page figures differ from the corpus')), `the install page's own line is gone:\n${held.join('\n')}`);
+});
+
+test('ARC-09-C306 — a tree with no user guide says it did not check, and a page that states nothing in those words says so', () => {
+  const w = ready();
+  const corpus = corpusNow(w);
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  writeFileSync(join(w.root, 'docs', 'INSTALL.md'), installPage({ areas: corpus.areas, files: corpus.files, mb: corpus.workingTreeMb }));
+  commitAll(w, 'the install page only');
+  const none = bump(w, '--json');
+  assert.equal(none.status, 0, `${none.stdout}${none.stderr}`);
+  const lead = JSON.parse(read(w.root, 'bump.json')).prBody.split('```')[0].split('\n');
+  assert.ok(lead.includes('- [ ] docs/AI-Architect-User-Guide.html figures not checked: there is no docs/AI-Architect-User-Guide.html in this tree'), `no line for the missing page:\n${lead.join('\n')}`);
+  rmSync(join(w.root, 'bump.json'));
+  writeFileSync(join(w.root, 'docs', 'AI-Architect-User-Guide.html'), '<!DOCTYPE html>\n<p>a page that says the corpus is big</p>\n');
+  commitAll(w, 'a page that states no figure');
+  const silent = bump(w, '--json');
+  assert.equal(silent.status, 0, `${silent.stdout}${silent.stderr}`);
+  const lead2 = JSON.parse(read(w.root, 'bump.json')).prBody.split('```')[0].split('\n');
+  assert.ok(lead2.includes('- [ ] docs/AI-Architect-User-Guide.html figures not checked: it does not state the files and the areas where the bump reads them'), `no line for the page that states nothing:\n${lead2.join('\n')}`);
+});

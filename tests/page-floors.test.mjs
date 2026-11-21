@@ -26,6 +26,10 @@ import { fileURLToPath } from 'node:url';
  * floors are checked for the statements themselves (the third test), so a page cannot slide into prose this reading cannot see. A number is
  * compared as bootstrap.sh's `ge` reads it — three numeric fields, a missing one 0 — so `20` is the floor `20.0.0` and `2.34` is not `2.34.1`.
  *
+ * ARC-09-C306 — THE USER GUIDE'S PAGE is HTML and says its floors in running prose ("Node.js 20 or later", "Node.js 20+"), where the Markdown pages state theirs in
+ * tables and comparisons. It is read as the reader reads it (its markup without the tags, and every string of its data block) with two more shapes, and the one
+ * statement on it that is not the engine's floor (the Mermaid preview's own Node.js) is named below with its reason.
+ *
  * WHICH PAGES. README.md and the pages directly under docs/, except the changelog, which is a log: each entry says what was true on its
  * day. Plans, decisions, spikes and validation records are not swept either; they are records of what was decided or measured when, and
  * ADR-0001's "git ≥ 2.25" is one of them, kept on purpose. README.md is composed from docs/INSTALL.md (`scripts/gen-readme.mjs`).
@@ -36,7 +40,8 @@ const read = (rel) => readFileSync(join(root, rel), 'utf8').replace(/^﻿/, '').
 const FLOORS = JSON.parse(read('engine.config.json')).floors;
 
 /** How a page names the tool each floor belongs to. A floor in the config that is not listed here fails the first test, so none goes unread. */
-const NAMES = { claudeCode: ['Claude Code'], node: ['Node.js', 'Node'], git: ['Git', 'git'] };
+// ARC-09-C306: `node ≥ 20.0.0` is how the product's own `version` screen spells the tool, and the user guide shows that screen.
+const NAMES = { claudeCode: ['Claude Code'], node: ['Node.js', 'Node', 'node'], git: ['Git', 'git'] };
 const KEY = new Map(Object.entries(NAMES).flatMap(([key, names]) => names.map((name) => [name, key])));
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const NAME = [...KEY.keys()].sort((a, b) => b.length - a.length).map(escape).join('|'); // `Node.js` before `Node`
@@ -49,9 +54,9 @@ const SHAPES = [
 ];
 
 /** Every floor a text states: the tool, the number as written, where the number starts, and the line. */
-function statements(text) {
+function statements(text, shapes = SHAPES) {
   const found = [];
-  for (const { shape, re } of SHAPES) {
+  for (const { shape, re } of shapes) {
     for (const m of text.matchAll(re)) {
       found.push({
         shape, tool: m[1], key: KEY.get(m[1]), stated: m[2],
@@ -67,7 +72,7 @@ const fields = (v) => { const p = v.split('.').map(Number); while (p.length < 3)
 const same = (stated, floor) => floor !== undefined && fields(stated) === fields(floor);
 
 /** The statements of a text that are not the config's floor for their tool. */
-const wrong = (text, floors = FLOORS) => statements(text).filter((s) => !same(s.stated, floors[s.key]));
+const wrong = (text, floors = FLOORS, shapes = SHAPES) => statements(text, shapes).filter((s) => !same(s.stated, floors[s.key]));
 
 /** `version` written over every statement of one floor, so a real page can be shown to fail the way it once did. */
 function plant(text, key, version) {
@@ -158,3 +163,105 @@ test('ARC-09-C275 — the reading can fail: each shape, each tool, a number that
   }
   assert.ok(rewritten >= INSTALL_PAGES.length, `only ${rewritten} git statements were rewritten across the pages`);
 });
+
+// ── ARC-09-C306 — the user guide's page ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+const ENTITIES = { '&lt;': '<', '&gt;': '>', '&amp;': '&', '&quot;': '"', '&#39;': "'", '&nbsp;': ' ' };
+const decode = (t) => t.replace(/&(?:lt|gt|amp|quot|#39|nbsp);/g, (e) => ENTITIES[e]);
+const strings = (v) => (typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : []);
+const HTML_PAGES = ['docs/AI-Architect-User-Guide.html'];
+
+/** A page as its reader reads it: the markup without its tags, and every string of its data block (the example screens, the troubleshooting rows, the checks). */
+function pageText(html) {
+  const data = JSON.parse(/<script type="application\/json" id="guide-data">([\s\S]*?)<\/script>/.exec(html)[1]);
+  const markup = html.replace(/<script\b[\s\S]*?<\/script>/g, '').replace(/<style>[\s\S]*?<\/style>/g, '');
+  return `${decode(markup.replace(/<[^>]+>/g, ' '))}\n${strings(data).join('\n')}`;
+}
+
+/** Running prose: "Node.js 20 or later", "git 2.34.1 or later", "Claude Code is installed, on PATH, version 2.1.214 or later", "Node.js 20+", and "below the floor 20.0.0". */
+const PROSE = [
+  { shape: 'a prose floor', re: new RegExp(String.raw`(?<![\w.])(${NAME})\b[^.|\n]{0,40}?\b(?:version )?${NUMBER}(?:\+(?![\w.])| or later)`, 'g') },
+  { shape: 'a floor in prose', re: new RegExp(String.raw`(?<![\w.])(${NAME})\b[^.|\n]{0,60}?\bfloor (?:of |is )?\**${NUMBER}`, 'g') },
+];
+const HTML_SHAPES = [...SHAPES, ...PROSE];
+
+/**
+ * What reads as a floor on a page and is not the engine's, each with its reason. A statement is excused on the page named, for the tool and the number named, and
+ * only where the words after the number contain `near`. An excuse that nothing needs fails below, so this table cannot outlive the sentence it is for.
+ */
+const NOT_THE_ENGINES = [
+  { page: 'docs/AI-Architect-User-Guide.html', key: 'node', stated: '18', near: /Mermaid/,
+    reason: 'the Mermaid preview of scripts/render-diagrams.sh needs Node.js 18 (scripts/README.md): that tool\'s own need, said once where the page shows how to preview a draft diagram, and not the engine\'s floor' },
+];
+const excusedBy = (rel, text, st) => NOT_THE_ENGINES.filter((x) => x.page === rel && x.key === st.key && x.stated === st.stated && x.near.test(text.slice(st.at, st.at + 160)));
+const wrongIn = (rel, text, floors = FLOORS) => wrong(text, floors, HTML_SHAPES).filter((st) => excusedBy(rel, text, st).length === 0);
+
+test('ARC-09-C306 — the user guide\'s page states all three floors in a shape this test reads, as many times as the page needs them', () => {
+  for (const rel of HTML_PAGES) {
+    const found = statements(pageText(read(rel)), HTML_SHAPES);
+    const keys = new Set(found.map((st) => st.key));
+    for (const key of Object.keys(NAMES)) assert.ok(keys.has(key), `${rel} states no floor for ${NAMES[key][0]} in a shape this test reads: either the page lost the floor, or it moved into words the guard cannot see`);
+    // The page says them in the doctor's table (E-00 to E-02, SV-00), in the sentence of the version floors, in the hooks, in the troubleshooting and on the version screen.
+    assert.ok(found.length >= 12, `${rel}: only ${found.length} floor statements read; the page states its floors in more places than that`);
+    // The shapes the page does not use are not what keeps it read: the screen's three comparisons and the prose both appear.
+    assert.ok(found.some((st) => st.shape === 'a comparison') && found.some((st) => st.shape === 'a prose floor'), `${rel}: a shape is no longer read`);
+  }
+});
+
+test('ARC-09-C306 — no statement of a floor on the user guide\'s page is other than the one in engine.config.json, but the Mermaid preview\'s own', () => {
+  const problems = [];
+  for (const rel of HTML_PAGES) {
+    const text = pageText(read(rel));
+    for (const st of wrongIn(rel, text)) problems.push(`${rel}  ${st.tool} ${st.stated} (${st.shape}) — engine.config.json says floors.${st.key} is ${FLOORS[st.key]}`);
+  }
+  assert.deepEqual(problems, [], 'a page states a floor B00 does not enforce; if it is another tool\'s, add it to NOT_THE_ENGINES with its reason');
+});
+
+test('ARC-09-C306 — the reading of a page can fail: each tool and each prose shape, a number that is lower, higher or a prefix, and the one excuse, used and not for another page or another sentence', () => {
+  const bump = (floor, at, by) => { const p = fields(floor).split('.').map(Number); p[at] += by; return p.join('.'); };
+  const PLANTED = {
+    'a prose floor': (tool, v) => `<p>It needs ${tool} ${v} or later for live mode.</p>`,
+    'a floor in prose': (tool, v) => `<p>${tool} is below the floor ${v}, install it.</p>`,
+    'a comparison': (tool, v) => `<p>floors: ${tool} ≥ ${v}</p>`,
+  };
+  let planted = 0;
+  for (const [key, names] of Object.entries(NAMES)) {
+    const floor = FLOORS[key];
+    const lower = bump(floor, 0, -1);
+    const higher = bump(floor, 2, 1);
+    const prefix = fields(floor).split('.').slice(0, 2).join('.');
+    const right = [floor, fields(floor).replace(/(\.0)+$/, '')];
+    for (const tool of names) {
+      for (const [shape, write] of Object.entries(PLANTED)) {
+        for (const v of right) assert.deepEqual(wrongIn('x.html', pageText(wrapped(write(tool, v)))), [], `${shape}, ${tool} ${v}: the floor itself was reported`);
+        for (const v of [lower, higher, ...(same(prefix, floor) ? [] : [prefix])]) {
+          const found = wrongIn('x.html', pageText(wrapped(write(tool, v))));
+          assert.equal(found.length, 1, `${shape}, ${tool} ${v}: expected the one statement to be found, got ${found.length}`);
+          assert.deepEqual([found[0].shape, found[0].key, found[0].stated], [shape, key, v], `${shape}, ${tool} ${v}`);
+          planted += 1;
+        }
+      }
+    }
+  }
+  assert.ok(planted >= 30, `the planted cases ran ${planted} times`);
+  // "20+" is a floor too, and "20.19+" is not the floor 20.0.0.
+  assert.deepEqual(wrongIn('x.html', pageText(wrapped('<p>Node.js 20+ is required.</p>'))), []);
+  assert.equal(wrongIn('x.html', pageText(wrapped('<p>Node.js 19+ is required.</p>'))).length, 1);
+  // The excuse: the Mermaid sentence is excused on the user guide's page and nowhere else, and the same number in another sentence is a floor that is wrong.
+  const mermaid = '<p>It needs Node.js 18 or later. The Mermaid tool is downloaded the first time.</p>';
+  assert.deepEqual(wrongIn('docs/AI-Architect-User-Guide.html', pageText(wrapped(mermaid))), []);
+  assert.equal(wrongIn('docs/other.html', pageText(wrapped(mermaid))).length, 1, 'the excuse holds on another page');
+  assert.equal(wrongIn('docs/AI-Architect-User-Guide.html', pageText(wrapped('<p>It needs Node.js 18 or later. The engine runs on it.</p>'))).length, 1, 'the excuse holds for another sentence');
+  assert.equal(wrongIn('docs/AI-Architect-User-Guide.html', pageText(wrapped('<p>It needs Node.js 17 or later. The Mermaid tool is downloaded the first time.</p>'))).length, 1, 'the excuse holds for another number');
+  // ...and it is used: every excuse is needed by the page it is for, or it is a stale line.
+  for (const x of NOT_THE_ENGINES) {
+    const text = pageText(read(x.page));
+    const used = wrong(text, FLOORS, HTML_SHAPES).filter((st) => excusedBy(x.page, text, st).includes(x));
+    assert.ok(used.length >= 1, `the excuse for ${x.page} (${x.reason}) is used by nothing: remove it`);
+    assert.ok(x.reason.length > 40, 'an excuse without a reason');
+  }
+});
+
+/** A page of the shape `pageText` reads, around a fragment. */
+function wrapped(fragment) {
+  return `<html><body>${fragment}<script type="application/json" id="guide-data">{}</script></body></html>`;
+}

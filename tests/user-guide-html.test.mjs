@@ -14,7 +14,10 @@
  *     Both computers show the same commands. No command is the owner's (the licence issuer's), and no licence number is any but the placeholder.
  *   - THE PRODUCT'S WORDS: the permission flags, their dependencies and the presets, and the licence words, are the product's, and the page's own reading of a licence line
  *     agrees with the line the product prints.
- *   - THE RELEASE: the clone tag and the release the page names are one, the release writer owns them, and the page ships with the product.
+ *   - THE RELEASE: the clone tag and the release the page names are one, the release writer owns them, nothing else on the page spells a release, and the page ships with the product.
+ *   - THE FACTS: the numbers it states about the build (the tools, the roster, the store format), the one figure it states about the corpus, and the version screen are read from the
+ *     tree. Its floors are held to engine.config.json by tests/page-floors.test.mjs, and its corpus figure is the one a docs bump reads (tests/page-figures-user-guide.test.mjs).
+ *   - THE PAGE'S WORDS are the architect's. What no test can read is read by a person before each final (the release steps of docs/CONTRIBUTING.md).
  *
  * The behaviour a browser decides (the scroll, the clipboard, the layout) is checked in one, not here.
  */
@@ -33,6 +36,10 @@ const fold = (s) => s.replace(/\s+/g, ' ').trim();
 
 // The launchers the page types are the product's own spelling of them, never a copy kept here.
 const { cliSpelling } = await import(href('packages/snowarch/dist/cli/tty.js'));
+const { renderVersion } = await import(href('tools/snowarch/lib/version-info.mjs'));
+const { collectRoster, REFERENCE_SKILLS } = await import(href('tools/snowarch/lib/roster.mjs'));
+const { namesEngineering } = await import(href('scripts/lib/distribution.mjs'));
+const figures = await import(href('scripts/lib/page-figures.mjs'));
 const { spellings } = await import(href('tools/snowarch/lib/launcher-spelling.mjs'));
 const WHERE = { mac: { platform: 'darwin', env: { SHELL: '/bin/zsh' } }, win: { platform: 'win32', env: {} } };
 const CLI = { mac: cliSpelling('darwin', { SHELL: '/bin/zsh' }), win: cliSpelling('win32', {}) };
@@ -233,7 +240,8 @@ function refused(os, c) {
       for (const f of tail.filter((w) => w.startsWith('--'))) if (!flagsIn(line).has(f) && !UNIVERSAL.has(f)) why.push(`licence ${sub} ${f} is in no help`);
     }
   } else if (verb === 'docs') {
-    if (!['sync', 'verify', 'status', 'lookup', 'family'].includes(sub) || !new RegExp(`\\b${sub}\\b`).test(docsUsage)) why.push(`docs ${sub} is not a sub-command`);
+    // `family` is in the product's usage and is a maintainer's command: the reader's four are the ones below.
+    if (!['sync', 'verify', 'status', 'lookup'].includes(sub) || !new RegExp(`\\b${sub}\\b`).test(docsUsage)) why.push(`docs ${sub} is not a sub-command for the reader`);
     for (const f of tail.filter((w) => w.startsWith('--'))) if (!flagsIn(docsUsage).has(f) && !UNIVERSAL.has(f)) why.push(`docs ${f} is in no help`);
     if (tail.includes('--mode')) {
       const mode = tail[tail.indexOf('--mode') + 1];
@@ -263,6 +271,7 @@ test('ARC-09-C306 — every command on the page is in the product\'s help tables
   assert.ok(shown.length >= 70, `${shown.length} snowarch commands read: the reader found too few`);
   const problems = shown.flatMap(({ c }) => refused(c.os, c).map((why) => `${c.id}: ${why}`));
   assert.deepEqual(problems, []);
+  assert.deepEqual(data.commands.filter((c) => /\bsudo\b/.test(c.code)).map((c) => c.id), [], 'a command asks for sudo: the guide is for a user who has no administrator rights');
   // The verbs a reader of this guide meets are the ones the CLI has; none of the product's commands for the reader goes unmentioned except bootstrap, which has its own page.
   const used = new Set(shown.map((x) => x.p.args[0]));
   for (const verb of ['version', 'docs', 'mode', 'doctor', 'instance', 'store', 'status', 'upgrade', 'licence']) assert.ok(used.has(verb), `the page no longer shows ${verb}`);
@@ -287,6 +296,7 @@ test('ARC-09-C306 — the check can fail: a verb, a sub-command, an argument, a 
   assert.match(at('store migrate --nonsense')[0], /in no help/);
   assert.match(at('licence frobnicate')[0], /not a sub-command for the reader/);
   assert.match(at('docs sync --bogus')[0], /in no help/);
+  assert.match(at('docs family australia')[0], /not a sub-command for the reader/, 'family is the maintainer\'s command');
   assert.match(at('doctor --section nowhere')[0], /the sections are/);
   assert.match(at('mode sideways')[0], /live and design/);
   assert.match(at('upgrade --nonsense')[0], /in no help/);
@@ -401,25 +411,48 @@ test('ARC-09-C306 — the page spells the launchers as the product does', () => 
 });
 
 // ── the release, and the shipping ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-test('ARC-09-C306 — the release tag is one: every clone on the page and the release it names agree, and the release writer owns them', async () => {
-  const tags = [...html.matchAll(/--branch (v\d+\.\d+\.\d+)(?:-[0-9A-Za-z.]+)? /g)].map((m) => m[1]);
-  assert.ok(tags.length >= 2, 'the page clones no release');
-  assert.equal(new Set(tags).size, 1, `the page clones more than one release: ${[...new Set(tags)].join(', ')}`);
-  assert.equal(data.release, tags[0], 'the release the page names is not the one it clones');
+const installClone = (rel) => /clone --branch v\d+\.\d+\.\d+ (\S+) AI-Arch/.exec(read(rel))?.[1];
+
+test('ARC-09-C306 — the release is shown only through what the writer owns, the field, the four clone lines and the binding, and the writer moves exactly those', async () => {
+  assert.match(data.release, /^v\d+\.\d+\.\d+$/, 'the release the page names is not a final release tag');
+  // Four clone lines: a markup copy for a reader without a script and a data copy for one with, for each computer. All four name the release of the data and the address of the install guides.
+  const clones = [...html.matchAll(/git -c advice\.detachedHead=false clone --branch (v\d+\.\d+\.\d+) (\S+) AI-Arch/g)].map((m) => ({ tag: m[1], address: m[2] }));
+  assert.equal(clones.length, 4, 'the page has not got four clone lines, a markup copy and a data copy for each computer');
+  assert.deepEqual([...new Set(clones.map((c) => c.tag))], [data.release], 'a clone line names another release than the data does');
+  assert.deepEqual([...new Set(clones.map((c) => c.address))], [installClone('docs/AI-Architect-macOS-Install-Guide.html')], 'the page clones from another address than the macOS install guide');
+  assert.equal(installClone('docs/AI-Architect-Windows-Install-Guide.html'), installClone('docs/AI-Architect-macOS-Install-Guide.html'), 'the two install guides clone from different addresses');
+  assert.match(clones[0].address, /^https:\/\/github\.com\/[\w.-]+\/snowarch\.git$/, 'the address is not the distribution repository\'s');
+  assert.equal(clones.filter((c) => markup.includes(`clone --branch ${c.tag} ${c.address} AI-Arch`)).length, 4, 'the markup copies of the clone lines are lost');
+  for (const c of data.commands.filter((x) => /\bclone\b/.test(x.code))) assert.match(c.code, /^git -c advice\.detachedHead=false clone --branch v\d+\.\d+\.\d+ https:\/\/\S+ AI-Arch$/, `${c.id}: a clone that is not pinned, quiet and from an address`);
   assert.equal([...html.matchAll(/"release": "v\d+\.\d+\.\d+"/g)].length, 1, 'the release is named once in the data, where the writer moves it');
-  for (const c of data.commands.filter((x) => /\bclone\b/.test(x.code))) assert.match(c.code, /^git -c advice\.detachedHead=false clone --branch v\d+\.\d+\.\d+ (?:https:\/\/\S+|<[^>]+>) /, `${c.id}: a clone that is not pinned and quiet`);
+  // Once what the writer owns is taken out, the page spells no release: the one stamped at the cut shows through the field and the binding, so another would be wrong before the cut or stale after it.
+  const rest = html.replaceAll(/--branch v\d+\.\d+\.\d+/g, '--branch').replace(/"release": "v\d+\.\d+\.\d+"/, '"release": ""');
+  assert.equal(rest.includes(data.release.slice(1)), false, 'the page spells its release outside the shapes the writer owns');
+  assert.doesNotMatch(rest, /\bNew in \d+\.\d+|\bAt v\d+\.\d+|(?<![\w.])v\d+\.\d+\.\d+\b/, 'the page spells a release or marks something as new in one');
+  // The binding: the hero, the first section and the foot show it, and ten screens carry {ver}, filled from the same field.
+  assert.ok([...markup.matchAll(/<span data-bind="release"><\/span>/g)].length >= 3, 'the release is not shown through the binding in the hero, the first section and the foot');
+  assert.match(code, /\$\$\('\[data-bind="release"\]'\)\.forEach\(function \(el\) \{ setText\(el, D\.release\); \}\);/, 'the script does not bind the release');
+  assert.match(code, /ver: String\(D\.release \|\| ''\)\.replace\(\/\^v\/, ''\)/, '{ver} is not filled from the release of the data');
+  assert.match(code, /\\\{\(lic\|licId\|label\|client\|cli\|boot\|base\|ver\)\\\}/, 'the fill does not know {ver}');
+  assert.match(code, /'Release ' \+ D\.release/, 'the help message does not take the release from the data');
+  const withVer = Object.entries(data.terminals).filter(([, text]) => text.includes('{ver}')).map(([id]) => id);
+  assert.ok(withVer.length >= 10, `only ${withVer.length} screens show the release through {ver}: ${withVer.join(', ')}`);
   const { writeGuideRelease, STAGED } = await import(href('scripts/lib/release/writers.mjs'));
   assert.ok(STAGED.includes(PAGE), 'the release commit does not stage the page the writer rewrote');
   // 9.x, as the other writer tests: the shapes are what matter.
   const moved = writeGuideRelease(html, '9.9.9', PAGE);
   assert.equal(moved.ok, true);
+  assert.equal(moved.count, clones.length + 1, 'the writer did not move the four clone lines and the field, and nothing else');
   assert.equal(JSON.parse(/<script type="application\/json" id="guide-data">([\s\S]*?)<\/script>/.exec(moved.text)[1]).release, 'v9.9.9');
-  assert.equal([...moved.text.matchAll(/--branch v9\.9\.9 /g)].length, tags.length, 'the writer did not move every clone line');
-  assert.equal(moved.text.replaceAll('v9.9.9', tags[0]), html, 'the writer changed more than the clone tags and the release');
+  assert.equal([...moved.text.matchAll(/--branch v9\.9\.9 /g)].length, clones.length, 'the writer did not move every clone line');
+  assert.equal(moved.text.replaceAll('v9.9.9', data.release), html, 'the writer changed more than the clone tags and the release');
   const rc = writeGuideRelease(html, '9.9.9-rc.1', PAGE);
   assert.deepEqual([rc.ok, rc.skipped, rc.text === html], [true, 'prerelease', true], 'a release candidate leaves the page naming the newest final');
   assert.equal(writeGuideRelease(html.replace(/"release": "v[\d.]+"/, '"x": 1'), '9.9.9', PAGE).ok, false, 'a page whose release field is gone must refuse, not pass');
   assert.equal(writeGuideRelease(html.replaceAll(/--branch v[\d.]+/g, '--branch main'), '9.9.9', PAGE).ok, false);
+  // The instrument: a release spelled outside the writer's shapes is found by the same reading.
+  const planted = html.replace('<noscript><p', `<p>release ${data.release}</p><noscript><p`).replaceAll(/--branch v\d+\.\d+\.\d+/g, '--branch');
+  assert.equal(planted.includes(data.release.slice(1)), true);
 });
 
 test('ARC-09-C306 — the page ships: it is covered by the signed manifest, and the Release carries it as its last asset, as it does the two install guides', async () => {
@@ -443,11 +476,18 @@ test('ARC-09-C306 — the page ships: it is covered by the signed manifest, and 
   assert.ok(steps.includes('ten assets on the Release (three `doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`, the Windows and macOS install guides and the user guide\'s page)'),
     'the rehearsal checklist does not name the three pages');
   assert.ok(steps.includes('attach the three pages by hand'), 'step 6 of the release list does not attach the three pages');
+  assert.ok(steps.includes('release.yml` green on three OSes with its ten assets'), 'step 1 of the release list still counts nine assets');
+  // And the pages whose words no test can read are read by a person before each final: a stamped release claims that its facts hold.
+  const step5c = /> 5c\. \*\*([^*]+)\*\*([\s\S]*?)(?=\n> 6\. )/.exec(read('docs/CONTRIBUTING.md'));
+  assert.ok(step5c, 'the release list has no step 5c, the re-reading of the user guide before a final');
+  const step = fold(`${step5c[1]} ${step5c[2].replace(/\n> /g, ' ')}`);
+  assert.ok(step.includes('docs/AI-Architect-User-Guide.html') && /since the previous release/.test(step) && /ARC-09-C306/.test(step), `step 5c does not say what to re-read and against what: ${step}`);
+  assert.ok(/commands|checks|floors/.test(step) && /prose|words|text/.test(step), 'step 5c does not say what the test covers and what a person has to read');
 });
 
 test('ARC-09-C306 — the files the page names are in the tree', () => {
   // A path the page names is one the reader is told to open, or run, in the folder the install made. A folder of the reader's own (clients/, .local/) is not in the tree.
-  const named = new Set([...pageText.matchAll(/(?<![\w./~-])((?:docs|scripts|templates|governance)\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*\.[a-z]{2,4})\b/g)].map((m) => m[1]));
+  const named = new Set([...pageText.matchAll(/(?<![\w./~-])((?:docs|scripts|templates|governance|tools|packages)\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*\.[a-z]{2,4})\b/g)].map((m) => m[1]));
   for (const rel of ['CLAUDE.md', 'README.md']) if (new RegExp(`(?<![\\w./-])${rel.replace('.', '\\.')}\\b`).test(pageText)) named.add(rel);
   assert.ok(named.size >= 4, `${named.size} paths read: the pattern found too few`);
   assert.deepEqual([...named].filter((rel) => !existsSync(join(root, rel))), [], 'the page names a file that is not in the tree');
@@ -470,4 +510,249 @@ test('ARC-09-C306 — the doctor checks and the installer steps the page names a
   // The instrument: an id the doctor does not have, in either family, is found among the ones it has.
   assert.deepEqual(checkIdsIn('see E-99, SV-77 and E-00').filter((id) => !doctor.includes(id)), ['E-99', 'SV-77']);
   assert.deepEqual(checkIdsIn('E-0 and E-000 and SV-1 are not ids'), []);
+});
+
+// ── what a reader without a script sees ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** The placeholders the copy for a reader without a script shows where the page fills the reader's own values. */
+const NOSCRIPT_FORM = [['{client}', '<name>'], ['{label}', '<label>'], ['{base}', 'https://<your-instance>.service-now.com'], ['{lic}', '<licence file>']];
+
+/** The boxes whose copy for a reader without a script is not the command of the data (filled with the placeholders above), and the prompts that do not fit the computer. */
+function noscriptProblems(markupText, commands) {
+  const problems = [];
+  const slots = [...markupText.matchAll(/<div data-cmd="([^"]+)">(<noscript>[\s\S]*?<\/noscript>)?<\/div>/g)];
+  for (const [, id, noscript] of slots) {
+    const c = commands.find((x) => x.id === id);
+    const m = noscript && /<code class="cbox-code">(?:<span class="cbox-ps">([^<]*)<\/span>)?([\s\S]*?)<\/code>/.exec(noscript);
+    if (!c || !m) { problems.push(`${id}: no command of the data, or no copy for a reader without a script`); continue; }
+    const text = decode(m[2].replace(/<[^>]+>/g, ''));
+    const want = NOSCRIPT_FORM.reduce((acc, [token, shown]) => acc.replaceAll(token, shown), c.code);
+    if (text !== want) problems.push(`${id}: ${text}  is not  ${want}`);
+    const prompt = decode(m[1] ?? '');
+    const fits = c.os === undefined ? prompt === '' : c.os === 'mac' ? ['% ', '$ '].includes(prompt) : ['PS> ', '$ '].includes(prompt);
+    if (!fits) problems.push(`${id}: the prompt "${prompt}" is not one of ${c.os ?? 'no computer'}`);
+  }
+  return { problems, slots: slots.length };
+}
+
+test('ARC-09-C306 — a reader without a script sees the command of the data in every box, with the placeholders for what the page would fill, and the prompt of the computer', () => {
+  const { problems, slots } = noscriptProblems(markup, data.commands);
+  assert.equal(slots, data.commands.filter((c) => !COMPOSED.includes(c.id)).length, 'a box has no copy for a reader without a script');
+  assert.deepEqual(problems, []);
+  // The two copies of each clone line are one line: the instrument finds a copy that differs by one letter, and a prompt of the other computer.
+  const drifted = noscriptProblems(markup.replace('</span>git -c advice.detachedHead=false clone', '</span>git -c advice.detachedHead=true clone'), data.commands);
+  assert.equal(drifted.problems.length, 1);
+  assert.match(drifted.problems[0], /^x-clone-mac: /);
+  const wrongPrompt = noscriptProblems(markup.replace('<span class="cbox-ps">% </span>git -c advice.detachedHead=false clone', '<span class="cbox-ps">PS&gt; </span>git -c advice.detachedHead=false clone'), data.commands);
+  assert.match(wrongPrompt.problems.join(), /x-clone-mac: the prompt "PS> " is not one of mac/);
+});
+
+// ── the example screens ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+test('ARC-09-C306 — the version screen is the product\'s, and no screen carries a pin, a corpus count or a licence number of its own', () => {
+  const config = JSON.parse(read('engine.config.json'));
+  // The first three lines of `version`, made by the product with sentinels where the page has its placeholders.
+  const lines = renderVersion({ version: 'VER', contractSha: 'a'.repeat(12), docsPin: 'b'.repeat(7), docsFamily: config.docs.family, floors: config.floors, tag: { name: 'vVER', exact: true },
+    commit: { short: '<sha>', branch: null, detached: true, dirty: false } }).slice(0, 3).map((l) => l.replaceAll('VER', '{ver}').replaceAll('a'.repeat(12), '<12 characters>').replaceAll('b'.repeat(7), '<pin>'));
+  assert.deepEqual(data.terminals.version.split('\n').slice(0, 3), lines, 'the version screen is not the first lines the product prints');
+  // A pin, a count of the corpus and a licence number on a screen go stale or are somebody\'s: the screens carry placeholders, and {licId} for the licence.
+  for (const [id, screen] of Object.entries(data.terminals)) {
+    assert.doesNotMatch(screen, /\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b/, `${id}: a pin or a hash`);
+    assert.doesNotMatch(screen, /\b\d+\/\d+ areas\b|\b\d{1,3}(?:,\d{3})+ (?:files|pages)\b|\b\d+ (?:areas|pages)\b/, `${id}: a count of the corpus`);
+    assert.doesNotMatch(screen, /LIC-\d{4}-\d{4}/, `${id}: a licence number typed into a screen`);
+    assert.doesNotMatch(screen, /\{\w*\}/.exec(screen)?.[0] && !['{label}', '{licId}', '{ver}', '{cli}', '{base}'].includes(/\{\w*\}/.exec(screen)[0]) ? /\{\w*\}/ : /^(?!)/, `${id}: a token the page does not fill`);
+  }
+  const tokens = new Set(Object.values(data.terminals).flatMap((screen) => screen.match(/\{\w+\}/g) ?? []));
+  assert.deepEqual([...tokens].filter((t) => !['{label}', '{licId}', '{ver}', '{cli}', '{base}'].includes(t)), [], 'a screen has a token the page does not fill');
+  // The instrument.
+  assert.match('docs pin c10276e (australia)', /\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b/);
+  assert.match('australia · full · 56/56 areas', /\b\d+\/\d+ areas\b/);
+  assert.doesNotMatch('<n>/<n> areas, <n> files, <n> MB', /\b\d+\/\d+ areas\b|\b\d{1,3}(?:,\d{3})+ (?:files|pages)\b/);
+});
+
+// ── the numbers the page states about the build ──────────────────────────────────────────────────────────────────────────────────────────────
+test('ARC-09-C306 — the numbers the page states about the build are the build\'s: the tools, the ones that ask, the roster and the store format', () => {
+  const contract = JSON.parse(read('packages/snowarch/dist/contract.json'));
+  const asking = contract.tools.filter((t) => t.mutates || t.sessionMutates).length;
+  assert.equal(contract.toolCount, contract.tools.length);
+  const roster = collectRoster(root);
+  assert.equal(roster.problems.length, 0, 'the roster of this tree has a problem: the counts below would be the problem\'s');
+  const skills = roster.rosterSkills.length;
+  const specialists = skills - [...REFERENCE_SKILLS].filter((s) => roster.rosterSkills.some((r) => r.name === s || r === s)).length;
+  const numbers = (re) => [...pageText.matchAll(re)].map((m) => Number(m[1]));
+  const only = (found, want, what) => { assert.ok(found.length > 0, `the page no longer states ${what}`); assert.deepEqual([...new Set(found)], [want], `the page states ${what} as ${[...new Set(found)].join(' and ')}, the build says ${want}`); };
+  only(numbers(/\b(\d+) tools\b(?! that)/g), contract.toolCount, 'how many tools there are');
+  only(numbers(/\b(\d+) tools that change an instance/g), asking, 'how many tools change an instance and ask first');
+  only([...numbers(/\b(\d+) tools that only read/g), ...numbers(/\b(\d+) reading tools/g)], contract.toolCount - asking, 'how many tools only read');
+  only(numbers(/\bRoster: (\d+) skills \/ \d+ agents/g), skills, 'how many skills the roster has');
+  only(numbers(/\bRoster: \d+ skills \/ (\d+) agents/g), roster.agents.length, 'how many agents the roster has');
+  only(numbers(/\b(\d+) skills, \d+ agents\b/g), skills, 'how many skills the doctor expects');
+  only(numbers(/\b\d+ skills, (\d+) agents\b/g), roster.agents.length, 'how many agents the doctor expects');
+  only(numbers(/\b(\d+) specialists, as \d+ skills\b/g), specialists, 'how many specialists there are');
+  only(numbers(/\b\d+ specialists, as (\d+) skills\b/g), skills, 'how many skills they are');
+  only([...numbers(/store's format version \(v(\d+) in this release\)/g), ...numbers(/store's format is v(\d+)/g), ...numbers(/schema v(\d+) → v\d+/g), ...numbers(/schema v\d+ → v(\d+)/g)], contract.storeSchemaVersion, 'the store format');
+  // The instrument: the reading sees a wrong number.
+  assert.deepEqual([...'the 164 tools that change an instance'.matchAll(/\b(\d+) tools that change an instance/g)].map((m) => Number(m[1])), [164]);
+});
+
+// ── the corpus ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+test('ARC-09-C306 — the page states the corpus once, in the words of the install page, and the figures are the install page\'s; no size, pin or other count of it is on the page', () => {
+  const stated = [...pageText.matchAll(/all (\d+) areas and ([\d,]+) files/g)];
+  assert.equal(stated.length, 1, 'the page does not state "all <n> areas and <n> files" exactly once');
+  const mine = figures.userGuidePageFigures(html);
+  const install = figures.pageFigures(read('docs/INSTALL.md'));
+  assert.deepEqual(mine, { areas: install.areas, files: install.files }, 'the page states other figures of the corpus than docs/INSTALL.md does');
+  // The reading is not defeated by the markup: the figure is plain text in one paragraph, so a docs bump finds it in the file as it is.
+  assert.ok(html.includes(`all ${mine.areas} areas and ${mine.files.toLocaleString('en-US')} files`), 'the figure is split by a tag or an entity: the bump reads the file, not the page');
+  // No size of the corpus, no pin, and no other count of it: the bump measures files, areas, pages and the working tree, and the page says where the cost is (the install page).
+  const sentences = pageText.split(/(?<=[.!?])\s+/);
+  const sized = sentences.filter((x) => /\d+(?:\.\d+)?\s?(?:MB|GB|GiB|MiB)\b/.test(x) && /corpus|documentation|ServiceNowDocs|names index|working tree|on disk|checkout/i.test(x));
+  assert.deepEqual(sized, [], 'a sentence gives a size of the corpus');
+  assert.match(pageText, /What it costs on disk, and the time it takes to fetch, are in What the corpus costs in docs\/INSTALL\.md/, 'the page no longer sends the reader to the install page for the cost');
+  assert.deepEqual(pageText.match(/\b\d+ areas\b/g), ['54 areas'].slice(0, 1), 'a count of areas outside the one statement');
+});
+
+// ── nothing past the hooks, nothing past the licence, nothing of the engineering ─────────────────────────────────────────────────────────────────
+/** The blocks of text a reader meets together: the smallest chunks of the markup, its rows and list items, and the strings and rows of the data (each screen is one). */
+const BLOCK_TAGS = /<\/?(?:p|li|td|th|tr|div|section|article|aside|header|footer|nav|main|h[1-6]|pre|ul|ol|table|thead|tbody|blockquote|details|summary|dl|dt|dd|label|button|textarea|noscript)\b[^>]*>/gi;
+const textOf = (fragment) => fold(decode(fragment.replace(/<[^>]+>/g, ' ')));
+function dataBlocks(v) {
+  if (typeof v === 'string') return [v];
+  if (Array.isArray(v)) return v.every((x) => typeof x === 'string') ? [v.join(' ')] : v.flatMap(dataBlocks);
+  if (v && typeof v === 'object') return 'id' in v || 'k' in v ? [strings(v).join(' ')] : Object.values(v).flatMap(dataBlocks);
+  return [];
+}
+const blocksOf = (markupText, dataValue) => [
+  ...markupText.replace(BLOCK_TAGS, '\u0001').split('\u0001').map(textOf),
+  ...[...markupText.matchAll(/<(tr|li)\b[\s\S]*?<\/\1>/g)].map((m) => textOf(m[0])),
+  ...dataBlocks(dataValue).map(fold),
+].filter(Boolean);
+
+test('ARC-09-C306 — no block names disableAllHooks together with the Licence line, and the page names no engineering repository, design note or branch of the engineering checkout', () => {
+  const blocks = blocksOf(markup, data);
+  const hooks = blocks.filter((b) => b.includes('disableAllHooks'));
+  // The name is allowed, as something to leave unset or to remove: the scan has to see it where it is, or a page full of violations would pass it.
+  assert.ok(hooks.length >= 3, `the scan sees disableAllHooks ${hooks.length} times: it is on the page as something to leave unset or to remove`);
+  assert.deepEqual(hooks.filter((b) => /licen[cs]e/i.test(b)), [], 'a block names disableAllHooks together with the Licence line');
+  // The instrument: a planted block with both is found, whichever way round, in the markup and in the data.
+  const planted = blocksOf('<p>Set disableAllHooks and the Licence line goes away.</p><ul><li>Licence: set <code>disableAllHooks</code></li></ul>', { screen: 'Licence: ok\ndisableAllHooks' });
+  assert.equal(planted.filter((b) => b.includes('disableAllHooks') && /licen[cs]e/i.test(b)).length >= 3, true);
+  assert.deepEqual(blocksOf('<p>Set disableAllHooks.</p><p>The Licence line.</p>', {}).filter((b) => b.includes('disableAllHooks') && /licen[cs]e/i.test(b)), []);
+  // What the distribution check refuses, before it does: the engineering repository's name, and a link to a repository other than the two allowed.
+  assert.deepEqual(html.split('\n').filter((line) => namesEngineering(line)).map((line) => line.slice(0, 80)), [], 'the page names the engineering repository, or links another');
+  assert.doesNotMatch(html, /design-spec|origin\/develop|\.claude\/worktrees|scratchpad/, 'the page names a note or a branch of the engineering checkout: not a thing a reader has');
+  assert.equal(namesEngineering(`github.com/farstic/${['ai', 'servicenow', 'architect'].join('-')}`), true);
+});
+
+// ── the reading ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+const lum = (hex) => { const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+
+const css = style.replace(/\/\*[\s\S]*?\*\//g, '');
+const rules = [...css.matchAll(/([^{}@]+)\{([^{}]*)\}/g)].map((m) => [fold(m[1]), m[2]]);
+/** The page's colour tokens in one theme, each `var(--x)` followed to a colour. */
+function themeTokens(name) {
+  const sets = { common: {}, light: {}, dark: {} };
+  for (const [sel, body] of rules) {
+    const into = { ':root, [data-theme="light"]': sets.light, '[data-theme="dark"]': sets.dark, ':root': sets.common }[sel];
+    if (into) for (const d of body.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) into[d[1]] = fold(d[2]);
+  }
+  const t = { ...sets.common, ...sets[name] };
+  for (let i = 0; i < 3; i++) for (const k of Object.keys(t)) t[k] = t[k].replace(/var\(--([\w-]+)\)/g, (_, n) => t[n] ?? '');
+  return t;
+}
+/** A colour a declaration names: a hex, or a `var(--token)` (with or without a fallback) in this theme; null for anything else (inherit, rgba, a gradient). */
+const colourOf = (value, t) => {
+  const v = fold(value ?? '');
+  if (/^#[0-9A-Fa-f]{6}$/.test(v)) return v;
+  const m = /^var\(--([\w-]+)(?:\s*,\s*[^)]*)?\)$/.exec(v);
+  return m && /^#[0-9A-Fa-f]{6}$/.test(t[m[1]] ?? '') ? t[m[1]] : null;
+};
+
+test('ARC-09-C306 — a text colour and a background that one rule sets are 4.5 to 1 as the cascade leaves them, in both themes', () => {
+  // The last rule for a selector wins, as it does at equal specificity, so this reads the rules as written and not a table of token pairs.
+  const final = new Map();
+  for (const [sel, body] of rules) {
+    if (/^(?::root|\[data-theme)/.test(sel)) continue;
+    for (const one of sel.split(',').map(fold)) {
+      const have = final.get(one) ?? {};
+      for (const d of body.matchAll(/(?:^|;)\s*(color|background(?:-color)?)\s*:\s*([^;]+)/g)) have[d[1] === 'color' ? 'color' : 'background'] = d[2];
+      final.set(one, have);
+    }
+  }
+  const pairs = [...final].filter(([, d]) => d.color && d.background);
+  assert.ok(pairs.length >= 25, `only ${pairs.length} rules set both: the reader lost some`);
+  // The same for what a style attribute sets: an inline colour is the last word.
+  const inline = [...markup.matchAll(/style="([^"]*)"/g)].map((m) => ({ color: /(?:^|;)\s*color\s*:\s*([^;]+)/.exec(m[1])?.[1], background: /(?:^|;)\s*background\s*:\s*([^;]+)/.exec(m[1])?.[1] })).filter((d) => d.color && d.background);
+  for (const name of ['light', 'dark']) {
+    const t = themeTokens(name);
+    const low = [...pairs, ...inline.map((d, i) => [`style attribute ${i + 1}`, d])].flatMap(([sel, d]) => {
+      const f = colourOf(d.color, t); const b = colourOf(d.background, t);
+      return f && b && ratio(f, b) < 4.5 ? [`${sel}: ${fold(d.color)} on ${fold(d.background)} ${ratio(f, b).toFixed(2)}`] : [];
+    });
+    assert.deepEqual(low, [], `${name}: a rule leaves text below 4.5 to 1`);
+  }
+});
+
+test('ARC-09-C306 — text is at least 4.5 to 1 against what it sits on, in both themes', () => {
+  const used = [['ink', 'paper'], ['ink', 'paper-2'], ['ink', 'paper-3'], ['ink', 'accent-soft'], ['ink', 'ok-soft'], ['ink', 'warn-soft'], ['ink', 'bad-soft'],
+    ['ink-2', 'paper'], ['ink-2', 'paper-2'], ['ink-2', 'paper-3'], ['ink-2', 'accent-soft'], ['ink-2', 'ok-soft'], ['ink-2', 'warn-soft'], ['ink-2', 'bad-soft'],
+    ['ink-3', 'paper'], ['ink-3', 'paper-2'], ['ink-3', 'paper-3'], ['link', 'paper'], ['link', 'paper-2'], ['link', 'accent-soft'], ['link', 'ok-soft'], ['link', 'warn-soft'], ['link', 'bad-soft'],
+    ['accent', 'paper'], ['accent', 'paper-2'], ['paper', 'ink'], ['accent-ink', 'accent'], ['on-ok', 'ok'], ['on-warn', 'warn'], ['ok', 'paper-2'], ['warn', 'paper-2'], ['bad', 'paper-2'],
+    ['term-fg', 'term-bg'], ['term-dim', 'term-bg'], ['term-dim', 'term-bar'], ['term-typed', 'term-bg'], ['term-fg', 'term-bar']];
+  for (const name of ['light', 'dark']) {
+    const t = themeTokens(name);
+    const low = used.filter(([f, b]) => { assert.match(t[f] ?? '', /^#[0-9A-Fa-f]{6}$/, `${name}: --${f} is not a colour`); assert.match(t[b] ?? '', /^#[0-9A-Fa-f]{6}$/, `${name}: --${b}`); return ratio(t[f], t[b]) < 4.5; });
+    assert.deepEqual(low.map(([f, b]) => `${f} on ${b} ${ratio(t[f], t[b]).toFixed(2)}`), [], `${name}: text below 4.5 to 1`);
+  }
+});
+
+test('ARC-09-C306 — the page respects a reader who asks for less motion, and a narrow screen', () => {
+  assert.match(style, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?scroll-behavior: auto[\s\S]*?\.caret \{ animation: none; \}/);
+  assert.match(code, /prefers-reduced-motion: reduce/);
+  // Asked when it is used, not once at load: a reader can change the setting while the page is open.
+  assert.match(code, /function rm\(\) \{ return !!\(RMQ && RMQ\.matches\); \}/);
+  assert.doesNotMatch(code, /\bRM\b/, 'the setting is read once, at load');
+  assert.match(code, /rm\(\) \? 'auto' : 'smooth'/);
+  assert.match(code, /t\.btn\.hidden = rm\(\);/, 'the typing animation is offered to a reader who asked for none');
+  assert.match(code, /if \(rm\(\) \|\| t\.timer\) return stopTerm\(t\);/, 'Play types for a reader who asked for no motion');
+  assert.match(code, /RMQ\.addEventListener\('change', onRm\)/, 'a change of the setting while the page is open is not followed');
+  assert.match(style, /\[hidden\] \{ display: none !important; \}/);
+  assert.match(style, /\.stack, \.tool-b[^{]*\{ grid-template-columns: minmax\(0, 1fr\); \}/, 'a long command stretches its cell and the page scrolls sideways');
+});
+
+test('ARC-09-C306 — Safari from disk: the end of a scroll has its time fallback, the clipboard has its fallback, and nothing newer than Safari 16 is needed', () => {
+  // `scrollend` is not in Safari 16: the scroll spy is held until the event or 1.6 s, whichever comes first.
+  assert.match(code, /document\.addEventListener\('scrollend'/);
+  assert.match(code, /setTimeout\(free, 1600\)/, 'the end of the scroll after a reset waits for an event Safari 16 does not send');
+  // The clipboard from a file page can be refused: the command is selected and the button asks for the key of the computer. The same for the help message.
+  assert.match(code, /navigator\.clipboard\.writeText\(text\)\.then\(function \(\) \{ flashCopy\(b, 'Copied'\); \}, select\)/);
+  assert.match(code, /catch \(e\) \{ select\(\); \}/);
+  assert.match(code, /m\.focus\(\); m\.select\(\);/);
+  // Not in Safari 16.0: these would break the page there without a word.
+  assert.doesNotMatch(code, /\b(?:structuredClone|findLast|findLastIndex|toSorted|toReversed|toSpliced|Object\.groupBy|Array\.fromAsync|requestIdleCallback|ResizeObserver)\b|\bat\(-?\d+\)/);
+});
+
+// ── the commands the running text names ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+/** What is wrong with a command named in running text: its verb, or its sub-command where the verb has them. Its arguments are placeholders there, so they are the boxes' to check, above. */
+function mentionProblems(mention) {
+  const m = /^(?:\.\/snowarch|\.\\snowarch\.cmd)\s+(\S+)(?:\s+(\S+))?/.exec(mention);
+  if (!m) return [`${mention}: not a command`];
+  const [, verb, sub] = m;
+  const word = sub && !sub.startsWith('-') && !sub.startsWith('<') ? sub : null;
+  if (verb !== 'help' && !(verb in COMMANDS)) return [`${mention}: ${verb} is not a command of the CLI`];
+  const subs = { instance: [...Object.keys(SUB_COMMANDS), 'add'], store: Object.keys(STORE_SUB_COMMANDS), licence: READER_LICENCE, docs: ['sync', 'verify', 'status', 'lookup'], mode: ['live', 'design'] }[verb];
+  return word && subs && !subs.includes(word) ? [`${mention}: ${word} is not a sub-command of ${verb}`] : [];
+}
+
+test('ARC-09-C306 — the commands that the running text names are the product\'s too: each inline code that starts with a launcher is a verb of the CLI, and a sub-command of its verb', () => {
+  const mentions = [...markup.matchAll(/<code\b[^>]*>([\s\S]*?)<\/code>/g)].map((m) => textOf(m[1])).filter((c) => /^(?:\.\/snowarch|\.\\snowarch\.cmd)\s+\S/.test(c));
+  assert.ok(mentions.length >= 60, `only ${mentions.length} commands read from the running text: the pattern found too few`);
+  assert.deepEqual(mentions.flatMap(mentionProblems), []);
+  // The instrument.
+  assert.deepEqual(mentionProblems('./snowarch instance set-preset <label> <preset>'), []);
+  assert.deepEqual(mentionProblems('.\\snowarch.cmd mode --help'), []);
+  assert.match(mentionProblems('./snowarch statuz')[0], /statuz is not a command of the CLI/);
+  assert.match(mentionProblems('./snowarch instance lst')[0], /lst is not a sub-command of instance/);
+  assert.match(mentionProblems('./snowarch licence issue')[0], /issue is not a sub-command of licence/);
+  assert.match(mentionProblems('./snowarch docs family')[0], /family is not a sub-command of docs/);
+  assert.match(mentionProblems('./snowarch store restor')[0], /restor is not a sub-command of store/);
 });
