@@ -36,6 +36,7 @@ const fold = (s) => s.replace(/\s+/g, ' ').trim();
 
 // The launchers the page types are the product's own spelling of them, never a copy kept here.
 const { cliSpelling } = await import(href('packages/snowarch/dist/cli/tty.js'));
+const { defaultChanged } = await import(href('packages/snowarch/dist/cli/instance.js'));
 const { renderVersion } = await import(href('tools/snowarch/lib/version-info.mjs'));
 const { collectRoster, REFERENCE_SKILLS } = await import(href('tools/snowarch/lib/roster.mjs'));
 const { namesEngineering } = await import(href('scripts/lib/distribution.mjs'));
@@ -755,4 +756,22 @@ test('ARC-09-C306 — the commands that the running text names are the product\'
   assert.match(mentionProblems('./snowarch licence issue')[0], /issue is not a sub-command of licence/);
   assert.match(mentionProblems('./snowarch docs family')[0], /family is not a sub-command of docs/);
   assert.match(mentionProblems('./snowarch store restor')[0], /restor is not a sub-command of store/);
+});
+
+// ── ARC-09-C308: where a new session starts, and what an open one does ──────────────────────────────────────────────────────────────────────────
+// `instance set-default` said that the running server picks the new default up after a reload (a reload keeps an open session where it is), and the page
+// said so on its screen and then, in the next paragraph, that the sentence "is not right for a session that is open". `instance remove` of the default said
+// that the server would start unconfigured, where it starts on the first saved instance that loads. The product says what it does now (the architect's
+// words of 2026-11-22), and the page shows the product's sentence, not a copy of it that can age on its own.
+test('ARC-09-C308 — the screen for set-default is the sentence the product prints, and the paragraphs around it say what the product does', () => {
+  assert.equal(data.terminals['inst-default'], defaultChanged('{label}', { label: '{label}', environment: 'pdi' }),
+    'the page\'s screen is not what `instance set-default` prints');
+  const says = (re, where) => assert.match(pageText, re, `the page does not say, ${where}`);
+  says(/A session that is already open stays on its own instance\. To work on the new default now, ask the session to switch to it ?, or restart Claude\./,
+    'under "Choose the default instance", that an open session stays and how to move it');
+  says(/If it was the default, it says where a new session starts now: on the first saved instance that loads, which it names, or on nothing \(unconfigured\) when none loads or none is left\. Choose the default ?yourself\./,
+    'under "Remove an instance", where a new session starts when the default is gone');
+  for (const gone of [/picks it up after/i, /Its sentence about the running server is not right/i, /will start unconfigured until you choose a new default/i, /it adds that the connection will start unconfigured/i]) {
+    assert.doesNotMatch(pageText, gone, `a sentence that says what the product no longer says is back: ${gone}`);
+  }
 });
