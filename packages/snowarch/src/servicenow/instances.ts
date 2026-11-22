@@ -20,6 +20,7 @@ import {
   type StoreError, type StoreInstance, type StoreSource,
 } from '../store/index.js';
 import { FLAG_NAMES, type FlagName, type Flags, type InstanceRuntime } from './context.js';
+import { startInstance, type StartCandidate } from '../store/start.js';
 import { cliSpelling } from '../cli/tty.js';
 import {
   applyDependencyRule, checkPresetMismatch, checkProdPosture, expandPreset, type PresetName,
@@ -115,16 +116,21 @@ class InstanceManager {
     }
     if (result.warning) this.report.warnings.push(result.warning);
 
+    const entries: StartCandidate[] = [];
     for (const [label, inst] of Object.entries(result.store.instances)) {
       try {
-        if (this.register(label, inst)) this.report.loaded.push(label);
+        const loads = this.register(label, inst);
+        if (loads) this.report.loaded.push(label);
+        entries.push({ label, loads });
       } catch (e) {
         this.report.notLoaded.push({ label, code: 'INSTANCE_UNUSABLE', message: (e as Error).message });
+        entries.push({ label, loads: false });
       }
     }
-    const preferred = result.store.defaultInstance;
-    if (preferred && this.instances.has(preferred)) this.currentName = preferred;
-    else if (this.report.loaded.length > 0) this.currentName = this.report.loaded[0];
+    // ARC-09-C308 — the rule is `store/start.ts`'s, so that what `instance remove` and `instance set-default` say about where a new session starts is the
+    // answer to the same question: the store's default when it loads, else the first instance, in the store's order, that loads.
+    const start = startInstance(result.store.defaultInstance, entries);
+    if (start !== null) this.currentName = start;
     return this.report;
   }
 

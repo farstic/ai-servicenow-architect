@@ -7,6 +7,7 @@ import { maskUsername } from '../store/paths.js';
 import { probeReachability } from '../servicenow/reachability.js';
 import { probeAll, type LastProbe, type ProbeClient } from '../servicenow/probes.js';
 import { type AclTools } from '../store/acl.js';
+import { type StartsOn } from '../store/start.js';
 import { type StoreAclOutcome } from '../store/index.js';
 import { type StoreInstance } from '../store/schema.js';
 import { type FlagName, type Flags } from '../utils/permissions.js';
@@ -441,15 +442,27 @@ export declare const prodRaiseWarning: () => string;
 export declare const CONFIRM_PROMPT = "Type the instance label to confirm: ";
 export declare const credentialsUpdated: (label: string) => string;
 export declare const removeQuestion: (label: string, storePath: string) => string;
-export declare const WAS_DEFAULT: (label: string) => string;
 /**
- * The `set-default` sentence, with the reload tool named from the CONTRACT's own list.
+ * What `instance remove` says when the instance it removed was the default (ARC-09-C308, the architect's words of 2026-11-22).
  *
- * A retyped tool token is what L01 exists to catch: the name appears in the contract, in
- * `governance/`, in the rule file and here, and four spellings of it is three chances to be
- * wrong on the day a name changes.
+ * It said "the server will start unconfigured until you run set-default". With other instances left the server starts on the first saved instance that
+ * loads, in the order the store holds them (`store/start.ts`, the loader's rule), which can be a production instance, and it is unconfigured only when none
+ * loads or none is left (and then set-default cannot help). `left.start` is what a new session starts on once the instance is gone: the loader's answer,
+ * not a guess, and `left.count` how many instances the store still holds.
  */
-export declare const defaultChanged: (label: string) => string;
+export declare const WAS_DEFAULT: (label: string, left: {
+    start: StartsOn | null;
+    count: number;
+}) => string;
+/**
+ * The `set-default` sentence (ARC-09-C308, the architect's words of 2026-11-22).
+ *
+ * It said the running server picks the new default up after a reload. A reload keeps an open session on its own instance (ARC-09-C245, `tools/status.ts`),
+ * so what is true is: new sessions start on it, an open one stays where it is, and a person moves it by asking it to switch, or by restarting. `start` is what
+ * a new session starts on now (the loader's rule): the instance itself when it loads, and when it does not (a production instance raised without the
+ * acknowledgement) the one it falls back to, or nothing.
+ */
+export declare const defaultChanged: (label: string, start: StartsOn | null) => string;
 export interface ManageOptions {
     label?: string;
     json?: boolean;
