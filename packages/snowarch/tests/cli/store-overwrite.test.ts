@@ -21,6 +21,7 @@
  * Every secret here is assembled, never spelled.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -37,6 +38,7 @@ import { fakeRest } from '../helpers/fake-rest.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
 import { serverStderr } from '../helpers/server-stderr.js';
 import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
+import { licensedEnv } from '../../../../tools/snowarch/tests/helpers/licence-hook/index.mjs';
 import {
   IS_ROOT, IS_WINDOWS, PLANTS, SECRET_LIKE, STORED_PASSWORD, canPlant, look, plant, release, validStore, type Plant,
 } from '../helpers/broken-stores.js';
@@ -44,6 +46,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = resolve(here, '../fixtures/legacy-instances.json');
 const SERVER = resolve(here, '../../dist/server.js');
+const CLI_JS = resolve(here, '../../dist/cli/index.js');
 const SERVER_CLI = cliSpelling();
 const URL_PDI = 'https://dev12345.service-now.com';
 const USERNAME = 'svc.snowarch';
@@ -455,7 +458,50 @@ describe('the server prints the same content-free line, on its stderr', () => {
     expect(stderr).toContain('STORE_UNREADABLE');
     expect(stderr).toContain('is not valid JSON');
     for (const piece of [SECRET_LIKE, SECRET_LIKE.slice(0, 6), 'q7Zr', 'Unexpected', 'position ']) expect(stderr).not.toContain(piece);
-    expect(stderr).not.toContain(base);
-    expect(readdirSync(join(checkout, '.local')).filter((f) => f !== 'instances.json')).toEqual([]);
+    // the masking of a path is asserted where it is measured on Windows (tests/store/masking.test.ts); here, where it was measured, a path is not the temp root
+    if (!IS_WINDOWS) expect(stderr).not.toContain(base);
+    // the server only reads: no copy, no backup and no temporary file of the store appeared (the helper puts a licence beside it)
+    expect(readdirSync(join(checkout, '.local')).filter((f) => f.includes('instances.json'))).toEqual(['instances.json']);
   }, 60_000);
+});
+
+describe('the built CLI, as a process: the exit code, the words on stdout and the file, end to end', () => {
+  const spawned = (args: readonly string[]) => spawnSync(process.execPath, [CLI_JS, ...args], {
+    encoding: 'utf8', cwd: checkout,
+    env: licensedEnv({ ...process.env, HOME: home, USERPROFILE: home, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: undefined }),
+  });
+  const ADD = ['instance', 'add', 'pdi', '--url', URL_PDI, '--env', 'pdi', '--preset', 'read-only', '--username', USERNAME, '--yes'];
+
+  for (const p of PLANTS.filter((x) => canPlant(x))) {
+    it(`instance add over ${p.name}: exit 1, the store's error and "Nothing saved", the file as it was`, () => {
+      const was = plant(store, p);
+      const r = spawned(ADD);
+      expect(r.status).toBe(EXIT_FAILED);
+      expect(r.stdout).toContain(`${p.code} — `);
+      expect(r.stdout).toContain('Nothing saved: ');
+      expect(`${r.stdout}${r.stderr}`).not.toContain(SECRET_LIKE);
+      expect(look(store)).toEqual({ ...was, folder: expect.arrayContaining(was.folder) });
+    });
+  }
+
+  it('instance add --replace and instance import --from-legacy over an unparseable store: exit 1 each, and the file as it was', () => {
+    const was = plant(store, PLANTS[0]!);
+    const replaced = spawned([...ADD, '--replace']);
+    expect(replaced.status).toBe(EXIT_FAILED);
+    expect(replaced.stdout).toContain('STORE_UNREADABLE — ');
+    const imported = spawned(['instance', 'import', '--from-legacy', '--path', legacy, '--yes']);
+    expect(imported.status).toBe(EXIT_FAILED);
+    expect(imported.stdout).toContain('STORE_UNREADABLE — ');
+    expect(imported.stdout).toContain('Nothing imported: ');
+    expect(`${replaced.stdout}${replaced.stderr}${imported.stdout}${imported.stderr}`).not.toContain(SECRET_LIKE);
+    expect(look(store)).toEqual({ ...was, folder: expect.arrayContaining(was.folder) });
+  });
+
+  it('instance list over it prints the content-free line', () => {
+    plant(store, PLANTS[0]!);
+    const listed = spawned(['instance', 'list']);
+    expect(listed.status).not.toBe(EXIT_OK);
+    expect(listed.stdout).toContain(`STORE_UNREADABLE — ${maskPath(store)} is not valid JSON`);
+    expect(`${listed.stdout}${listed.stderr}`).not.toContain(SECRET_LIKE);
+  });
 });

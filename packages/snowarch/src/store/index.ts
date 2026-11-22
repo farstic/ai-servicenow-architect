@@ -5,13 +5,13 @@
  * doctor's `--fix` (ARC-08) are the writers, through `saveStore` here.
  */
 import {
-  chmodSync, closeSync, existsSync, fsyncSync, openSync, readFileSync,
+  chmodSync, closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync,
   renameSync, rmSync, statSync, writeSync,
 } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { isProductFolder, makePrivateDir, realAclTools, type AclTools, type EnsureResult, type Exposure } from './acl.js';
-import { parseStore, type Store, type StoreError } from './schema.js';
+import { parseStore, STORE_VERSION, type Store, type StoreError } from './schema.js';
 import { maskPath, shellRemedy } from './paths.js';
 import { cliSpelling } from '../cli/tty.js';
 
@@ -82,6 +82,15 @@ export function checkFileModes(path: string): { error?: StoreError; warning?: st
   return {};
 }
 
+/**
+ * The code of a failed system call (`EACCES`) and nothing else of it. The system's own sentence carries the path, unmasked, and a store's
+ * path under a home folder names the account (ARC-09-C307).
+ */
+export function errnoName(e: unknown): string {
+  const code = (e as NodeJS.ErrnoException | null)?.code;
+  return typeof code === 'string' && /^[A-Z][A-Z0-9_]*$/.test(code) ? code : 'unknown error';
+}
+
 export function loadStore(path: string): { store: Store; warning?: string } | { error: StoreError } {
   if (!existsSync(path)) {
     return { error: { code: 'STORE_NOT_FOUND', message: `store not found: ${maskPath(path)}` } };
@@ -89,11 +98,21 @@ export function loadStore(path: string): { store: Store; warning?: string } | { 
   const modes = checkFileModes(path);
   if (modes.error) return { error: modes.error };
 
+  // TWO TRIES, and CONTENT-FREE MESSAGES (ARC-09-C307, the architect's ruling of 2026-11-22). This file holds passwords. V8's own parse message
+  // quotes the first characters of the text it could not parse, and the errno message carries the absolute path, unmasked: either one, printed,
+  // is a secret or an account name in a terminal, a log or a ticket. So the message says which of the two failed and no more, in the words
+  // `store migrate` already uses: `<path> is not valid JSON`, and `<path> cannot be read (EACCES)`.
+  let text: string;
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch (e) {
+    return { error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)} cannot be read (${errnoName(e)})` } };
+  }
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(path, 'utf8'));
-  } catch (e) {
-    return { error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)}: ${(e as Error).message}` } };
+    raw = JSON.parse(text);
+  } catch {
+    return { error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)} is not valid JSON` } };
   }
   const parsed = parseStore(raw);
   if ('error' in parsed) {
@@ -108,6 +127,45 @@ export function loadStore(path: string): { store: Store; warning?: string } | { 
   // with its own preset. Completion now happens at the point of use, in `expandPreset`,
   // which is where "absent means false" is actually the question being asked.
   return modes.warning ? { store: parsed.store, warning: modes.warning } : parsed;
+}
+
+/**
+ * What a writer starts from (ARC-09-C307):
+ *
+ *   new      nothing is at the path, so a new store is the right start; the write makes the folder if it must
+ *   loaded   the store, as the loader reads it
+ *   refused  something IS at the path and it did not load, with the loader's own error; a writer says so and stops
+ *
+ * THE DEFECT THIS NAMES. `instance add`, `instance add --replace`, the 1.x import and the installer each called `loadStore` and took ANY error
+ * for "there is no store yet": a file with a typo in it, a file at the wrong mode, a file a newer build wrote, a file the account could not
+ * read. They built a store of one instance and saved it over the file, with no backup: every saved instance and its password, gone. The loader
+ * answers an error for a reader's sake, and a reader should stop; a writer that goes on destroys what the reader could not see.
+ *
+ * Only a path that is NOT THERE is nothing, and "not there" is ENOENT from `lstat` and nothing else: a link that points nowhere, a folder that
+ * cannot be searched, a path that runs through a file are all somebody's store that cannot be seen. `lstat` and not `stat`, so that a link is
+ * something, whatever it points at.
+ *
+ * The one writer that replaces a store that did not load is `store restore`: the user names the backup, and answers Proceed?
+ */
+export type StoreForWrite =
+  | { state: 'new'; store: Store }
+  | { state: 'loaded'; store: Store; warning?: string }
+  | { state: 'refused'; error: StoreError };
+
+export function openStoreForWrite(path: string): StoreForWrite {
+  try {
+    lstatSync(path);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { state: 'new', store: { version: STORE_VERSION, instances: {} } as Store };
+    return { state: 'refused', error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)} cannot be read (${errnoName(e)})` } };
+  }
+  const loaded = loadStore(path);
+  if ('store' in loaded) return { state: 'loaded', store: loaded.store, ...(loaded.warning ? { warning: loaded.warning } : {}) };
+  // `lstat` found something and the loader, which follows links, did not: a link that points nowhere.
+  if (loaded.error.code === 'STORE_NOT_FOUND') {
+    return { state: 'refused', error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)} cannot be read (ENOENT)` } };
+  }
+  return { state: 'refused', error: loaded.error };
 }
 
 /**

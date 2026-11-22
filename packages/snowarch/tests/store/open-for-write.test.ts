@@ -14,16 +14,31 @@
  * is `<masked path> is not valid JSON`, or `<masked path> cannot be read (<errno code>)`, in the words `store migrate` already uses.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { loadStore, maskPath, openStoreForWrite, saveStore } from '../../src/store/index.js';
+import { errnoName, loadStore, maskPath, openStoreForWrite, saveStore } from '../../src/store/index.js';
+import { storeRefusalWords, unreadableStore } from '../../src/store/refusal.js';
 import type { Store } from '../../src/store/schema.js';
-import { trackTempDir } from '../helpers/server-child.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 import {
   IS_ROOT, IS_WINDOWS, PLANTS, SECRET_LIKE, STORED_PASSWORD, canPlant, look, plant, release, validStore,
 } from '../helpers/broken-stores.js';
+
+/** The launcher as this platform spells it (read once, at module level, as every test that quotes one does). */
+const CLI = cliSpelling();
+/** What the installer's step tells a person to do, by the store's error: the words are the architect's (2026-11-22); the launcher is this platform's. */
+const FILE = join('.local', 'instances.json');
+const REMEDY = {
+  backup: `restore a backup (${CLI} store backups lists them) and run ${CLI} mode live again, or ask for help; moving the file aside starts an empty store`,
+  open: `run chmod 600 ${FILE} (from the checkout), then run ${CLI} mode live again`,
+  newer: `run ${CLI} upgrade, then run ${CLI} mode live again`,
+  older: `run ${CLI} store migrate, then run ${CLI} mode live again`,
+};
 
 let dir: string;
 let path: string;
@@ -32,7 +47,7 @@ beforeEach(() => {
   dir = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-open-for-write-')));
   path = join(dir, 'instances.json');
 });
-afterEach(() => { release(path); });
+afterEach(() => { release(path); removeTempDir(dir); });
 
 describe('a path with nothing at it is a new store, and only that is', () => {
   it('a file that is not there, in a folder that is: a new, empty store at this build\'s version', () => {
@@ -75,7 +90,7 @@ describe('a path with nothing at it is a new store, and only that is', () => {
     } finally { chmodSync(sealed, 0o700); }
   });
 
-  it('a path that runs through a file is refused as well: ENOTDIR is not ENOENT', () => {
+  it.skipIf(IS_WINDOWS)('a path that runs through a file is refused as well: ENOTDIR is not ENOENT (skipped on Windows: the system answers ENOENT for it there, and the write that follows fails on the folder it cannot make)', () => {
     writeFileSync(join(dir, 'file'), 'x');
     const opened = openStoreForWrite(join(dir, 'file', 'instances.json'));
     expect(opened.state).toBe('refused');
@@ -131,6 +146,17 @@ describe('the loader\'s STORE_UNREADABLE carries no content of the file and no r
     expect(loadStore(path)).toEqual({ error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)} is not valid JSON` } });
   });
 
+  it('the errno code is all that is said of a failed read: a code, never the system\'s sentence, never anything that is not a code', () => {
+    expect(errnoName(Object.assign(new Error('EACCES: permission denied, open \'/Users/x/instances.json\''), { code: 'EACCES' }))).toBe('EACCES');
+    expect(errnoName(Object.assign(new Error('x'), { code: 'ERR_INVALID_ARG_VALUE' }))).toBe('ERR_INVALID_ARG_VALUE');
+    // not a code: an error with none, one whose "code" is a sentence or a path, and what is not an error at all
+    expect(errnoName(new Error('Unexpected token \'s\', "sk-live-…" is not valid JSON'))).toBe('unknown error');
+    expect(errnoName(Object.assign(new Error('x'), { code: 'denied: /Users/x/instances.json' }))).toBe('unknown error');
+    expect(errnoName(Object.assign(new Error('x'), { code: 13 }))).toBe('unknown error');
+    expect(errnoName(null)).toBe('unknown error');
+    expect(errnoName('EACCES')).toBe('unknown error');
+  });
+
   it('what a store that loads says is unchanged: the schema errors keep their own words and their commands', () => {
     plant(path, PLANTS.find((x) => x.code === 'STORE_SCHEMA_NEWER')!);
     expect(loadStore(path)).toMatchObject({ error: { code: 'STORE_SCHEMA_NEWER', message: expect.stringMatching(/newer than this server supports \(1\) — run .* upgrade, or restore a backup \(.* store backups\)$/) } });
@@ -161,5 +187,39 @@ describe('opening for a write is a read, and only a read', () => {
       release(path);
       expect(readdirSync(dir).filter((f) => f.includes('.tmp-')), p.name).toEqual([]);
     }
+  });
+});
+
+describe('the half B06 uses, which cannot import the store: stdlib only, the package\'s names and words', () => {
+  it('a file that is not there, or parses, is not unreadable; a file that does not parse or cannot be read is', () => {
+    expect(unreadableStore(path)).toBeNull();                              // not there: no store yet
+    for (const p of PLANTS) {
+      if (!canPlant(p)) continue;
+      plant(path, p);
+      const answer = unreadableStore(path);
+      // what B06 can see without a schema: whether the file is JSON, and whether it can be read
+      expect(answer, p.name).toEqual(p.code === 'STORE_UNREADABLE' ? { code: 'STORE_UNREADABLE' } : null);
+      release(path);
+    }
+  });
+
+  it('its words: one for each of the store\'s errors, relative to the checkout, with the launcher it was given, and no full stop', () => {
+    const words = (code: string) => storeRefusalWords(code, CLI, FILE);
+    expect(words('STORE_UNREADABLE')).toEqual({ code: 'STORE_UNREADABLE', what: 'cannot be read as JSON', remedy: REMEDY.backup });
+    expect(words('STORE_SCHEMA_INVALID')).toEqual({ code: 'STORE_SCHEMA_INVALID', what: 'is not a store this release understands', remedy: REMEDY.backup });
+    expect(words('STORE_PERMISSIONS_TOO_OPEN').remedy).toBe(REMEDY.open);
+    expect(words('STORE_SCHEMA_NEWER').remedy).toBe(REMEDY.newer);
+    expect(words('STORE_SCHEMA_OUTDATED').remedy).toBe(REMEDY.older);
+    expect(words('SOMETHING_ELSE').code).toBe('STORE_UNREADABLE');
+    for (const code of ['STORE_UNREADABLE', 'STORE_SCHEMA_INVALID', 'STORE_PERMISSIONS_TOO_OPEN', 'STORE_SCHEMA_NEWER', 'STORE_SCHEMA_OUTDATED']) {
+      expect(words(code).remedy.endsWith('.'), code).toBe(false);
+      expect(JSON.stringify(words(code)), code).not.toMatch(/\/Users\/|[A-Z]:\\\\/);
+    }
+  });
+
+  it('the module imports node:fs and nothing else: B06 runs where there is no node_modules', () => {
+    const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../src/store/refusal.ts'), 'utf8');
+    const imports = [...source.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]);
+    expect(imports).toEqual(['node:fs']);
   });
 });

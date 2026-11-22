@@ -189,7 +189,9 @@ for (const p of PLANTS) {
       assert.ok(result.detail.startsWith(`${p.code} — `), result.detail);
       assert.ok(typeof result.remedy === 'string' && result.remedy.length > 0, 'a failure with no remedy prints "none recorded"');
       assert.equal(probed, 0, 'the instance was probed before the store was found unable to load');
-      assert.ok(!said(result, []).includes(SECRET_LIKE) && !said(result, []).includes(STORED_PASSWORD) && !said(result, []).includes(FILE_PASSWORD));
+      const out = said(result, []);
+      assert.ok(!out.includes(SECRET_LIKE) && !out.includes(STORED_PASSWORD) && !out.includes(FILE_PASSWORD));
+      assert.ok(!out.includes(root), 'an absolute path, the temp root, is in the answer: it goes to .local/logs');
       unchanged(root, was);
     } finally { release(root); }
   });
@@ -226,9 +228,11 @@ test('control: --instance-file with NO store creates one, as it always did', asy
   assert.deepEqual(Object.keys(saved.instances), ['pdi']);
 });
 
-test('control: in design-only mode a store that cannot be read is neither written nor made the reason to start a wizard', async (t) => {
+test('control: in design-only mode a store that cannot be read is neither written nor asked about: the step answers as it did, and starts nothing', async (t) => {
   const root = makeCheckout({}, t);
   const was = put(root, PLANTS[0]);
-  await runB06(ctxFor(root, { mode: 'design-only', spawn: refuseToSpawn }));
+  const result = await runB06(ctxFor(root, { mode: 'design-only', spawn: refuseToSpawn }));
+  // design-only never writes a store in this step, so it is not asked (and a checkout with no node_modules could not ask: the question is the package's)
+  assert.deepEqual([result.status, result.detail], ['ok', 'store present and current; no wizard in design-only mode']);
   unchanged(root, was);
 });

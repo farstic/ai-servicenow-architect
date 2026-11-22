@@ -142,6 +142,32 @@ function readFileSyncSafe(p) {
 }
 
 /**
+ * ARC-09-C307 — A STORE THAT IS THERE AND CANNOT BE READ AS JSON IS NOT A STORE WITH NO DEFAULT INSTANCE.
+ *
+ * `readDefaultSummary` answers `null` for a file it cannot parse: it is a mirror, and "an unreadable store is not this reader's failure".
+ * But this step read that `null` as "nothing to keep", and went on: a run with `--yes` or no terminal said NO_TERMINAL (which hides the
+ * cause), and an interactive one started the wizard, whose save replaced the file with a store of one instance. `--instance-file` was
+ * worse: it probed, then saved a new store over whatever was there. A store holds saved passwords, and a file that cannot be parsed may be
+ * every one of them with a typo in it.
+ *
+ * The question, and the words for the answer, are the PACKAGE'S (`store/refusal.ts`: stdlib only, and the error codes' names, which a tool of
+ * the engine may not hold as literals). They are imported where they are used, as `label.js` is, because `dist/` exists only after B04.
+ * Missing is not unreadable: ENOENT is "no store yet".
+ *
+ * The step's answer names the file RELATIVE and quotes nothing it held: the answer is written to `.local/logs`.
+ */
+const STORE_FILE = join('.local', 'instances.json');
+export const NOT_STARTED = 'the instance wizard was not started';
+export const NOT_USED = 'the instance file was not used';
+
+/** The step's answer for a store that is there and does not load: its own code, what that means for THIS run, and a remedy ("none recorded" is for what nobody anticipated). */
+export async function storeRefused(code, consequence) {
+  const { storeRefusalWords } = await import('../../../../packages/snowarch/dist/store/refusal.js');
+  const w = storeRefusalWords(code, SPELL.cli, STORE_FILE);
+  return { status: 'fail', detail: `${w.code} — ${STORE_FILE} ${w.what}, so ${consequence} and nothing was changed`, remedy: w.remedy };
+}
+
+/**
  * The five answers a wizard probe can give. Four of them used to be one boolean.
  *
  * `ABSENT` is the only one that means what the old message said, and it is the rarest: it needs a
@@ -320,6 +346,13 @@ export async function fromInstanceFile(ctx) {
   for (const note of file.notes) ctx.line?.(note);
   if (file.modeNote) ctx.line?.(`note: ${file.modeNote}`);
 
+  // ARC-09-C307 — BEFORE an instance is probed, and before anything is saved: the store this run replaces is read first, by the server's own
+  // loader, and a store that is there and does not load (a mode that is too open, a shape that is wrong, a schema from the future or the
+  // past, a file that is not JSON) is refused with its own code. Nothing at the path is a new store, as it always was.
+  const { openStoreForWrite } = await import('../../../../packages/snowarch/dist/store/index.js');
+  const opened = openStoreForWrite(storePath(ctx.root));
+  if (opened.state === 'refused') return storeRefused(opened.error.code, NOT_USED);
+
   const probe = ctx.probeAuth ?? probeAuth;
   for (const [label, entry] of Object.entries(file.store.instances)) {
     const result = await probe({ url: entry.url, username: entry.auth.username,
@@ -412,6 +445,7 @@ export const run = async (ctx) => {
   if (migrated && migrated.status !== 'ok') return migrated;
   if (migrated) return migrated;
 
+  // (`--instance-file` asks the store's own loader before it probes anything: `fromInstanceFile`, ARC-09-C307.)
   if (ctx.instanceFile) return fromInstanceFile(ctx);
 
   // A design-only checkout reaches this step only because a store exists (`runsWhen`), and with
@@ -443,6 +477,13 @@ export const run = async (ctx) => {
   //
   // The wizard exists to ADD an instance. A checkout that has one is not being asked to, whoever
   // is watching.
+  // ARC-09-C307 — BEFORE the question "does it have a default": a store that is there and cannot be read as JSON has none that this step can
+  // see, and the wizard that follows would replace it. The step stops with the store's code and a remedy (design-only never gets here: it
+  // writes no store in this step).
+  const { unreadableStore } = await import('../../../../packages/snowarch/dist/store/refusal.js');
+  const unreadable = unreadableStore(storePath(ctx.root));
+  if (unreadable) return storeRefused(unreadable.code, NOT_STARTED);
+
   const { readDefaultSummary } = await import('../../../../packages/snowarch/dist/store/label.js');
   const kept = readDefaultSummary(storePath(ctx.root));
   if (kept) {

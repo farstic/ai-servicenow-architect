@@ -4,11 +4,11 @@
  * Reading and writing the store. The server only ever reads; the wizard (ARC-07) and the
  * doctor's `--fix` (ARC-08) are the writers, through `saveStore` here.
  */
-import { chmodSync, closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, statSync, writeSync, } from 'node:fs';
+import { chmodSync, closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, rmSync, statSync, writeSync, } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { isProductFolder, makePrivateDir, realAclTools } from './acl.js';
-import { parseStore } from './schema.js';
+import { parseStore, STORE_VERSION } from './schema.js';
 import { maskPath, shellRemedy } from './paths.js';
 import { cliSpelling } from '../cli/tty.js';
 export * from './paths.js';
@@ -70,6 +70,14 @@ export function checkFileModes(path) {
     }
     return {};
 }
+/**
+ * The code of a failed system call (`EACCES`) and nothing else of it. The system's own sentence carries the path, unmasked, and a store's
+ * path under a home folder names the account (ARC-09-C307).
+ */
+export function errnoName(e) {
+    const code = e?.code;
+    return typeof code === 'string' && /^[A-Z][A-Z0-9_]*$/.test(code) ? code : 'unknown error';
+}
 export function loadStore(path) {
     if (!existsSync(path)) {
         return { error: { code: 'STORE_NOT_FOUND', message: `store not found: ${maskPath(path)}` } };
@@ -77,12 +85,23 @@ export function loadStore(path) {
     const modes = checkFileModes(path);
     if (modes.error)
         return { error: modes.error };
-    let raw;
+    // TWO TRIES, and CONTENT-FREE MESSAGES (ARC-09-C307, the architect's ruling of 2026-11-22). This file holds passwords. V8's own parse message
+    // quotes the first characters of the text it could not parse, and the errno message carries the absolute path, unmasked: either one, printed,
+    // is a secret or an account name in a terminal, a log or a ticket. So the message says which of the two failed and no more, in the words
+    // `store migrate` already uses: `<path> is not valid JSON`, and `<path> cannot be read (EACCES)`.
+    let text;
     try {
-        raw = JSON.parse(readFileSync(path, 'utf8'));
+        text = readFileSync(path, 'utf8');
     }
     catch (e) {
-        return { error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)}: ${e.message}` } };
+        return { error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)} cannot be read (${errnoName(e)})` } };
+    }
+    let raw;
+    try {
+        raw = JSON.parse(text);
+    }
+    catch {
+        return { error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)} is not valid JSON` } };
     }
     const parsed = parseStore(raw);
     if ('error' in parsed) {
@@ -97,6 +116,24 @@ export function loadStore(path) {
     // with its own preset. Completion now happens at the point of use, in `expandPreset`,
     // which is where "absent means false" is actually the question being asked.
     return modes.warning ? { store: parsed.store, warning: modes.warning } : parsed;
+}
+export function openStoreForWrite(path) {
+    try {
+        lstatSync(path);
+    }
+    catch (e) {
+        if (e.code === 'ENOENT')
+            return { state: 'new', store: { version: STORE_VERSION, instances: {} } };
+        return { state: 'refused', error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)} cannot be read (${errnoName(e)})` } };
+    }
+    const loaded = loadStore(path);
+    if ('store' in loaded)
+        return { state: 'loaded', store: loaded.store, ...(loaded.warning ? { warning: loaded.warning } : {}) };
+    // `lstat` found something and the loader, which follows links, did not: a link that points nowhere.
+    if (loaded.error.code === 'STORE_NOT_FOUND') {
+        return { state: 'refused', error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)} cannot be read (ENOENT)` } };
+    }
+    return { state: 'refused', error: loaded.error };
 }
 /**
  * Atomic write: temp file in the same directory, fsync, rename over the target.

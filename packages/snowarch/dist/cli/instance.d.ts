@@ -8,7 +8,7 @@ import { probeReachability } from '../servicenow/reachability.js';
 import { probeAll, type LastProbe, type ProbeClient } from '../servicenow/probes.js';
 import { type AclTools } from '../store/acl.js';
 import { type StoreAclOutcome } from '../store/index.js';
-import { type StoreInstance } from '../store/schema.js';
+import { type StoreError, type StoreInstance } from '../store/schema.js';
 import { type FlagName, type Flags } from '../utils/permissions.js';
 export declare const EXIT_OK = 0;
 export declare const EXIT_FAILED = 1;
@@ -43,6 +43,20 @@ export declare const NOTHING_SAVED = "Nothing saved.";
  * The registry is the single source; only the label, which no registry entry can hold, is added.
  */
 export declare const labelExists: (label: string) => string;
+/**
+ * What a command that would WRITE the store says when the store is there and did not load (ARC-09-C307): two lines, and the second is
+ * what makes the first a refusal. The first is the store's own error, as `instance list` prints it; the second says that nothing was
+ * done, and what to do about it. `nothing` is the command's own word for "it did not do what it was for" (`Nothing saved`,
+ * `Nothing imported`); `cli` is the launcher as this platform spells it.
+ *
+ * WHAT A STORE THAT CANNOT BE READ MAY HOLD is the reason for the long sentence: saved passwords. So the file is left alone, and the
+ * way forward that costs nothing is a backup. The one that starts again (moving the file aside) is named for what it does, an empty
+ * store, because a person who does it believing the instances are still there finds out later.
+ *
+ * The words are the architect's, 2026-11-22. They are not in the error registry: the registry holds the store's own errors, which this
+ * line quotes, and one more code for "a writer refused" would have to be explained in `docs/TROUBLESHOOTING.md` next to the ones it quotes.
+ */
+export declare function storeRefusalLines(error: StoreError, path: string, nothing: 'Nothing saved' | 'Nothing imported', cli: string): string[];
 /**
  * The 401 re-entry question, with its REASON rendered from the registry.
  *
