@@ -33,7 +33,9 @@ const instanceUrl = z.string().refine((v) => {
     }
     return u.protocol === 'https:' && u.pathname === '/' && !u.search && !u.hash && !v.endsWith('/');
 }, { message: 'must be a bare https:// origin with no path or trailing slash' });
-const label = z.string().regex(/^[a-z][a-z0-9_-]{0,31}$/, 'must match ^[a-z][a-z0-9_-]{0,31}$');
+/** What an instance label, and the default instance, must look like. Also what tells a label from the text of a broken file (see `issuePath`). */
+const LABEL_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
+const label = z.string().regex(LABEL_PATTERN, 'must match ^[a-z][a-z0-9_-]{0,31}$');
 const authBasic = z.object({
     method: z.literal('basic'),
     username: z.string().min(1),
@@ -72,16 +74,51 @@ export const storeSchema = z.object({
     instances: z.record(label, instanceSchema),
 }).strict();
 /**
+ * Every field name a store can have: the places a path may name without saying anything of the file. Derived from the schemas, so that a field
+ * added to one is a name here; `at` is the one a passthrough object (`lastProbe`) is known by.
+ */
+const KNOWN_FIELDS = new Set([
+    ...Object.keys(storeSchema.shape), ...Object.keys(instanceSchema.shape),
+    ...Object.keys(authBasic.shape), ...Object.keys(authOauthRopc.shape), 'at', ...FLAG_NAMES,
+]);
+/** `<key>`: where a path would carry a name that is the file's own and not the schema's. */
+const UNNAMED = '<key>';
+/**
  * `instances.pdi.flags.WRITE_ENABLED`, in backticks: the path a user can find in their own file, or nothing for the
  * store's root.
  *
  * ARC-09-C211 — IN BACKTICKS, because a bare `word.word` is what the engine's printer masks as a person's first.last:
  * the doctor's SV-02 printed "instances.pdi Unrecognized key(s) …" as "i***.p*** …". A key in backticks is left alone.
+ *
+ * ARC-09-C307 — AND NOTHING OF THE FILE IN IT BUT WHAT THE SCHEMA NAMES. A path through a record carries the record's key: the label of an
+ * instance, the name of a flag. A label that is a label (`^[a-z][a-z0-9_-]{0,31}$`: what `instance list` prints, and what the instance that is
+ * wrong is called) stays; every other name the file chose, which can be a password pasted where a name goes, is `<key>`. A name the schema
+ * knows stays.
  */
 export function issuePath(issue) {
-    const path = issue.path.join('.');
+    const path = issue.path.map((segment, index) => {
+        if (typeof segment === 'number')
+            return String(segment);
+        if (index === 1 && issue.path[0] === 'instances')
+            return LABEL_PATTERN.test(segment) ? segment : UNNAMED;
+        return KNOWN_FIELDS.has(segment) ? segment : UNNAMED;
+    }).join('.');
     return path ? `\`${path}\`` : '';
 }
+/**
+ * The two sentences zod writes with what the file held in them (ARC-09-C307, the architect's ruling of 2026-11-22), without it. A value that
+ * is not one of the allowed ones is `Invalid enum value. Expected 'a' | 'b', received '<the value>'`, and an unknown field
+ * `Unrecognized key(s) in object: '<its name>'`: a store holds passwords, and either can be one. Everything else zod says is about the shape
+ * (a type's name, a size, a pattern, a text this file's schema wrote) and is left as it is, including the schema's own words for a flag.
+ */
+const contentFree = (issue, ctx) => {
+    if (issue.code === z.ZodIssueCode.unrecognized_keys)
+        return { message: 'Unrecognized key(s) in object' };
+    if (issue.code === z.ZodIssueCode.invalid_enum_value && ctx.defaultError.includes(', received ')) {
+        return { message: `Invalid enum value. Expected ${issue.options.map((o) => (typeof o === 'string' ? `'${o}'` : String(o))).join(' | ')}` };
+    }
+    return { message: ctx.defaultError };
+};
 /**
  * Version first, and separately from the schema: a store written by a different server is a
  * different failure from a malformed one, and the remedy is a command, not an edit.
@@ -108,7 +145,7 @@ export function parseStore(raw, cli = cliSpelling()) {
                             + `run ${cli} store migrate` } };
         }
     }
-    const parsed = storeSchema.safeParse(raw);
+    const parsed = storeSchema.safeParse(raw, { errorMap: contentFree });
     if (parsed.success)
         return { store: parsed.data };
     const first = parsed.error.issues[0];

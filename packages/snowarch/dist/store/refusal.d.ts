@@ -1,10 +1,24 @@
 /**
- * `{ code }` when a file is at `path` and cannot be read as JSON, `null` when it is not there or parses. ENOENT is "no store yet" and nothing
- * else is: a file that cannot be read is somebody's store.
+ * What the installer says when the store is there and does not load (ARC-09-C307), from code that cannot import the store.
+ *
+ * B06, the bootstrap's instance step, starts the instance wizard or reads an instance file, and both write the store. A store that is there
+ * and does not load used to read as "no default instance" to it, and the wizard's save replaced the file. The step asks the server's own
+ * loader now, and this is where it finds its words, for two reasons that are the reasons `label.ts` gives:
+ *
+ *   NO ZOD. `index.ts` validates through a schema, and the schema package only exists after B04's `npm ci`. The step also answers in a
+ *   design-only checkout that has a store (a schema from the future is a warning there), where nothing was installed, so the words come from
+ *   a module that imports nothing at all, and a test pins that.
+ *
+ *   THE NAMES ARE THE PACKAGE'S. The engine's tools may not hold an error code's name as a literal (`tests/contract/no-literals.test.mjs`):
+ *   a name typed into a tool is a second list, and drifts. The step takes the code from here, and the sentences about it.
+ *
+ * The sentences carry no content of the file and no absolute path: the step's answer is written to `.local/logs`.
  */
-export declare function unreadableStore(path: string): {
-    code: string;
-} | null;
+/**
+ * The store's code for a schema from a release ahead of this one. The step reads the version out of the file itself (it has no schema to ask)
+ * and says it in its own words, but the name of the error is the package's to give.
+ */
+export declare const NEWER_STORE_CODE = "STORE_SCHEMA_NEWER";
 export interface StoreRefusalWords {
     /** The store's own error, as the step names it. */
     code: string;

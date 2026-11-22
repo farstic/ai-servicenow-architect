@@ -148,8 +148,9 @@ export declare const ERROR_CODES: readonly [{
     readonly showInRule: false;
 }, {
     readonly code: "STORE_UNREADABLE";
-    readonly meaning: "The store exists but is not valid JSON.";
-    readonly remedy: "repair or recreate it; the message names the parse error";
+    readonly meaning: string;
+    readonly remedy: string;
+    readonly command: "<cli> store backups";
     readonly showInRule: false;
 }, {
     readonly code: "STORE_SCHEMA_INVALID";

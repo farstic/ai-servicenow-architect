@@ -142,7 +142,7 @@ function readFileSyncSafe(p) {
 }
 
 /**
- * ARC-09-C307 — A STORE THAT IS THERE AND CANNOT BE READ AS JSON IS NOT A STORE WITH NO DEFAULT INSTANCE.
+ * ARC-09-C307 — A STORE THAT IS THERE AND DOES NOT LOAD IS NOT A STORE WITH NO DEFAULT INSTANCE.
  *
  * `readDefaultSummary` answers `null` for a file it cannot parse: it is a mirror, and "an unreadable store is not this reader's failure".
  * But this step read that `null` as "nothing to keep", and went on: a run with `--yes` or no terminal said NO_TERMINAL (which hides the
@@ -150,9 +150,14 @@ function readFileSyncSafe(p) {
  * worse: it probed, then saved a new store over whatever was there. A store holds saved passwords, and a file that cannot be parsed may be
  * every one of them with a typo in it.
  *
- * The question, and the words for the answer, are the PACKAGE'S (`store/refusal.ts`: stdlib only, and the error codes' names, which a tool of
- * the engine may not hold as literals). They are imported where they are used, as `label.js` is, because `dist/` exists only after B04.
- * Missing is not unreadable: ENOENT is "no store yet".
+ * The question is the server's own loader's (`openStoreForWrite`), asked in two places: by `fromInstanceFile`, before it probes, and by
+ * `loaderRefusal` on the wizard path, after the keep decision. The architect's ruling of 2026-11-22 is that the step names the cause for
+ * EVERY store error (a file that is not JSON or cannot be read, a mode that is too open, a shape that is wrong, a schema from the future or
+ * the past), so there is one question and not one for each. Missing is not a refusal: ENOENT is "no store yet".
+ *
+ * The words for the answer are the PACKAGE'S (`store/refusal.ts`: it imports nothing, so that it loads where there is no `node_modules`, and it
+ * holds the error codes' names, which a tool of the engine may not hold as literals). They are imported where they are used, as `label.js` is,
+ * because `dist/` exists only after B04.
  *
  * The step's answer names the file RELATIVE and quotes nothing it held: the answer is written to `.local/logs`.
  */
@@ -165,6 +170,21 @@ export async function storeRefused(code, consequence) {
   const { storeRefusalWords } = await import('../../../../packages/snowarch/dist/store/refusal.js');
   const w = storeRefusalWords(code, SPELL.cli, STORE_FILE);
   return { status: 'fail', detail: `${w.code} — ${STORE_FILE} ${w.what}, so ${consequence} and nothing was changed`, remedy: w.remedy };
+}
+
+/**
+ * The server's own loader's verdict on the store that is at the path, as a step answer: `null` when nothing is there (a new store), when it
+ * loads, or when the loader cannot be imported here (no `node_modules`: the wizard probe that follows says so, with its remedy, and no writer
+ * can run either). The same question `fromInstanceFile` asks before it probes, for the wizard path.
+ */
+export async function loaderRefusal(root, consequence,
+  { load = () => import('../../../../packages/snowarch/dist/store/index.js') } = {}) {
+  let opened;
+  try {
+    const { openStoreForWrite } = await load();
+    opened = openStoreForWrite(storePath(root));
+  } catch { return null; }
+  return opened.state === 'refused' ? storeRefused(opened.error.code, consequence) : null;
 }
 
 /**
@@ -408,9 +428,14 @@ export async function migrateIfBehind(ctx) {
   if (shape.version > current) {
     // A store from the FUTURE is not this step's to fix: downgrading it would mean discarding
     // whatever the newer build added. The doctor's SV-09 says the same thing with the command.
-    return { status: 'warn', remedy: null,
-      detail: `store schema v${shape.version} is newer than this build's v${current} — `
-        + `run ${SPELL.cli} upgrade` };
+    //
+    // ARC-09-C307 (the architect's ruling of 2026-11-22: B06 names the cause for every store error) — with the store's own code, and the
+    // remedy in the detail, which is ON THE STEP'S LINE: a warning's detail is shown there only when the step says so, and this one printed
+    // `warn` and nothing else. The name of the code and the remedy's words are the package's (`store/refusal.ts`).
+    const { storeRefusalWords, NEWER_STORE_CODE } = await import('../../../../packages/snowarch/dist/store/refusal.js');
+    const w = storeRefusalWords(NEWER_STORE_CODE, SPELL.cli, STORE_FILE);
+    return { status: 'warn', remedy: null, showDetail: true,
+      detail: `${w.code} — store schema v${shape.version} is newer than this build's v${current} — ${w.remedy}` };
   }
 
   const spawn = ctx.spawn ?? spawnSync;
@@ -477,13 +502,6 @@ export const run = async (ctx) => {
   //
   // The wizard exists to ADD an instance. A checkout that has one is not being asked to, whoever
   // is watching.
-  // ARC-09-C307 — BEFORE the question "does it have a default": a store that is there and cannot be read as JSON has none that this step can
-  // see, and the wizard that follows would replace it. The step stops with the store's code and a remedy (design-only never gets here: it
-  // writes no store in this step).
-  const { unreadableStore } = await import('../../../../packages/snowarch/dist/store/refusal.js');
-  const unreadable = unreadableStore(storePath(ctx.root));
-  if (unreadable) return storeRefused(unreadable.code, NOT_STARTED);
-
   const { readDefaultSummary } = await import('../../../../packages/snowarch/dist/store/label.js');
   const kept = readDefaultSummary(storePath(ctx.root));
   if (kept) {
@@ -496,6 +514,16 @@ export const run = async (ctx) => {
       detail: `kept instance "${kept.label}"; the store already has one, so the wizard did not run`,
       data: { saved: 0, defaultInstance: kept.label, instance: kept, kept: true } };
   }
+
+  // ARC-09-C307 (the architect's ruling of 2026-11-22: B06 names the cause for every store error) — NOTHING TO KEEP IS NOT "NO STORE". A
+  // store that is there and that the server's own loader refuses (a file that is not JSON or cannot be read, a mode that is too open, a shape
+  // that is wrong, a schema from the past that no contract told this step about) used to go on to NO_TERMINAL, or to the wizard, which would
+  // replace it, or whose refusal this step then reported as "the answer it got was refused", with a remedy about credentials: nothing had
+  // been asked. The step says which error it is, and what to do, before it starts anything. After the keep decision, because that path
+  // writes nothing (and the verify step that follows names a mode that is too open); a store that is not there is not refused, it is new.
+  // (Design-only never gets here: it writes no store in this step.)
+  const refused = await loaderRefusal(ctx.root, NOT_STARTED);
+  if (refused) return refused;
 
   // Nothing to keep. A run told not to ask REFUSES rather than asking — `--yes` means "do not put
   // a question in front of me", and a prompt is the one thing it must never produce. The sentence

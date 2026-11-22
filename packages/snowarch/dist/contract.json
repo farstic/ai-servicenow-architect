@@ -445,8 +445,9 @@
     },
     {
       "code": "STORE_UNREADABLE",
-      "meaning": "The store exists but is not valid JSON.",
-      "remedy": "repair or recreate it; the message names the parse error",
+      "meaning": "The store file is there and cannot be used as a store: either it is not valid JSON, or the file cannot be read at all. The message says which: `<path> is not valid JSON`, or `<path> cannot be read (<error code>)` with the operating system's own error code, for example `EACCES`. It never quotes what the file held.",
+      "remedy": "restore a backup (the `store backups` command lists them), or ask for help; moving the file aside starts an empty store, and no command that adds an instance saves over a store that cannot be read",
+      "command": "<cli> store backups",
       "showInRule": false
     },
     {

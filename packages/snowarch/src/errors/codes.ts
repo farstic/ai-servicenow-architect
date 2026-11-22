@@ -171,9 +171,16 @@ export const ERROR_CODES = [
     showInRule: false,
   },
   {
+    // ARC-09-C307 — two forms of one error, and neither quotes what the file held (a store holds passwords, and a parser's own sentence quotes
+    // the first characters of a file that is not JSON; an operating system's error carries an absolute path). The wizard, `instance add`, the
+    // 1.x import and the installer refuse a store like this before they write, and say so with this code.
     code: 'STORE_UNREADABLE',
-    meaning: "The store exists but is not valid JSON.",
-    remedy: "repair or recreate it; the message names the parse error",
+    meaning: "The store file is there and cannot be used as a store: either it is not valid JSON, or the file cannot be read at all. "
+      + "The message says which: `<path> is not valid JSON`, or `<path> cannot be read (<error code>)` with the operating system's own "
+      + "error code, for example `EACCES`. It never quotes what the file held.",
+    remedy: "restore a backup (the `store backups` command lists them), or ask for help; moving the file aside starts an empty store, "
+      + "and no command that adds an instance saves over a store that cannot be read",
+    command: "<cli> store backups",
     showInRule: false,
   },
   {
