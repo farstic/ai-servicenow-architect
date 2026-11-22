@@ -99,6 +99,15 @@ step of both install guides, and of their pages, says that every command and set
 test can read: every `snowarch` command to the product's help tables and parsers, its floors to `engine.config.json`, the numbers it states about the build to the build, and its
 one figure of the corpus to the corpus. What no test can read, its prose, is read by a person before each final (step 5c of the release list in `docs/CONTRIBUTING.md`).
 
+**A store that cannot be read is never replaced.** `./snowarch instance add`, `instance add --replace`, the wizard that the installer starts, `instance import --from-legacy` and
+`mode live --instance-file` each read a store that was there and did not load as if there were none, built a store of one instance and saved it over the file, with no backup: every
+saved instance and its password, gone. Now a path with nothing at it is a new store, and nothing else is. A store that is there and is not valid JSON, cannot be read, is at a mode
+that is too open, is of the wrong shape, or comes from a newer or an older schema stops each of them before it asks, probes or writes anything: exit 1, the store's own error
+(`STORE_UNREADABLE`, `STORE_PERMISSIONS_TOO_OPEN`, `STORE_SCHEMA_INVALID`, `STORE_SCHEMA_NEWER` or `STORE_SCHEMA_OUTDATED`), what to do about it, and the file as it was, byte for
+byte. The installer's instance step says the cause itself, where it said that it had no terminal. `store restore` still replaces a store that did not load: it is the remedy, and
+asks first. The loader's `STORE_UNREADABLE` no longer quotes the file or the system's own sentence, which could be the first characters of a password and an absolute path: it says
+`<path> is not valid JSON` or `<path> cannot be read (EACCES)`, as `instance list`, the doctor and the server now print it.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -209,9 +218,11 @@ one figure of the corpus to the corpus. What no test can read, its prose, is rea
   and, for the PowerShell tool on Windows, `PowerShell(.\snowarch.cmd docs lookup *)`; no other command of the launcher is
   allowed. The two entries are generated from the launcher spelling, like the rest of `permissions` (ARC-09-C268).
 - The ELSEWHERE clause of the name check asks for a Correction that cites "a page you have opened that prints it", where it said "a page that prints it". Measured on the architect's sitting: the never-opened citations on those lines 11 of 69 against 8 of 67, every guard held (ARC-09-C293).
+- The loader's `STORE_UNREADABLE` message is content-free. It was `<path>: <the parser's own message>`, which V8 words with the first characters of the file (`Unexpected token 's', "sk-live-…" is not valid JSON`), or `<path>: EACCES: permission denied, open '<absolute path>'`; it is `<path> is not valid JSON` or `<path> cannot be read (<errno code>)`, in the words `store migrate` already uses. `instance list`, the doctor's SV-02 and the server's start-up line print it, so they change with it (ARC-09-C307).
 
 ### Fixed
 
+- `instance add`, `instance add --replace`, the wizard that the installer starts, `instance import --from-legacy` (a dry run too, whose plan was made against nothing) and `mode live --instance-file` no longer save over a store that is there and did not load. Each starts from one function, `openStoreForWrite`, which answers a new store only for a path with nothing at it (a link that points nowhere, a folder that cannot be searched and a path through a file are refused), and otherwise the store or the loader's own error. `tests/cli/store-overwrite.test.ts`, `tests/store/open-for-write.test.ts` and `tools/snowarch/tests/b06-unreadable-store.test.mjs` plant six kinds of broken store on every path and hold the refusal, the exit code, the words, the file byte for byte, and that nothing was asked or probed, with a spy on the Windows permission calls; `tests/store/writers.test.ts` lists every call to `saveStore` with the reason it may write (ARC-09-C307).
 - B01 fetches the release manifest only when the cache does not hold it. A release's manifest is signed once and the revocation
   list is fetched separately, so a held manifest stays valid. B01 used to fetch whenever it ran on a release tree, so a bootstrap
   that ran it because its inputs had moved (a changed `.claude/settings.json`, say) printed
