@@ -16,6 +16,11 @@ distribution carries them and its signed manifest covers them. Nothing else in t
 **The shipped list names the user guide's interactive page (ARC-09-C306).** `docs/AI-Architect-User-Guide.html` joins the user's documentation in the release
 coverage (`licence/integrity.ts`), beside `docs/USER-GUIDE.md`, so a distribution carries it and its signed manifest covers it. Nothing else in the package changed.
 
+**Two instance messages say what the loader does (ARC-09-C308).** `store/start.ts` (new, no zod) holds the rule for which instance a new session starts on: `startInstance` (the store's default when it loads,
+else the first instance, in the store's order, that loads, else nothing), `entryLoads` (the loader's refusal of a production instance raised without the acknowledgement, without building a client) and
+`startOfStore`. `servicenow/instances.ts`'s `load()` asks it, and so do `instance set-default` and `instance remove`, whose messages (`defaultChanged` and `WAS_DEFAULT` in `cli/instance.ts`) take what a new
+session starts on as a second argument and say it. The loader's behaviour did not change. Nothing else in the package changed.
+
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
