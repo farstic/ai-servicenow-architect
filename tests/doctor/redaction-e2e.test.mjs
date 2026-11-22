@@ -158,7 +158,9 @@ test('ARC-09-C211 — a store with an unknown key: SV-02 names the key path in b
   const json = await report({ json: true });
   const text = await report({});
   const sv02 = JSON.parse(json).checks.find((c) => c.id === 'SV-02');
-  assert.match(sv02?.detail ?? '', /`instances\.pdi` Unrecognized key\(s\) in object: 'notes'/, JSON.stringify(sv02));
+  // ARC-09-C307: the object that holds the unknown key is named, and the key's own name is not: it can be a password somebody pasted in the wrong place.
+  assert.match(sv02?.detail ?? '', /`instances\.pdi` Unrecognized key\(s\) in object(?!:)/, JSON.stringify(sv02));
+  assert.ok(!(sv02?.detail ?? '').includes('notes'), `SV-02 quotes the unknown key: ${JSON.stringify(sv02)}`);
   for (const [form, out] of [['text', text], ['json', json]]) {
     const masked = out.split('\n').filter((l) => MASKED.test(l));
     assert.deepEqual(masked, [], `the ${form} report prints a masked key:\n  ${masked.join('\n  ')}`);

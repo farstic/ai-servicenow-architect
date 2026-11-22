@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { errnoName, loadStore, maskPath, openStoreForWrite, saveStore } from '../../src/store/index.js';
-import { storeRefusalWords, unreadableStore } from '../../src/store/refusal.js';
+import { NEWER_STORE_CODE, storeRefusalWords } from '../../src/store/refusal.js';
 import type { Store } from '../../src/store/schema.js';
 import { cliSpelling } from '../../src/cli/tty.js';
 import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
@@ -190,19 +190,7 @@ describe('opening for a write is a read, and only a read', () => {
   });
 });
 
-describe('the half B06 uses, which cannot import the store: stdlib only, the package\'s names and words', () => {
-  it('a file that is not there, or parses, is not unreadable; a file that does not parse or cannot be read is', () => {
-    expect(unreadableStore(path)).toBeNull();                              // not there: no store yet
-    for (const p of PLANTS) {
-      if (!canPlant(p)) continue;
-      plant(path, p);
-      const answer = unreadableStore(path);
-      // what B06 can see without a schema: whether the file is JSON, and whether it can be read
-      expect(answer, p.name).toEqual(p.code === 'STORE_UNREADABLE' ? { code: 'STORE_UNREADABLE' } : null);
-      release(path);
-    }
-  });
-
+describe('the words B06 uses, which cannot import the store: the package\'s names and sentences, from a module that imports nothing', () => {
   it('its words: one for each of the store\'s errors, relative to the checkout, with the launcher it was given, and no full stop', () => {
     const words = (code: string) => storeRefusalWords(code, CLI, FILE);
     expect(words('STORE_UNREADABLE')).toEqual({ code: 'STORE_UNREADABLE', what: 'cannot be read as JSON', remedy: REMEDY.backup });
@@ -211,15 +199,17 @@ describe('the half B06 uses, which cannot import the store: stdlib only, the pac
     expect(words('STORE_SCHEMA_NEWER').remedy).toBe(REMEDY.newer);
     expect(words('STORE_SCHEMA_OUTDATED').remedy).toBe(REMEDY.older);
     expect(words('SOMETHING_ELSE').code).toBe('STORE_UNREADABLE');
+    expect(NEWER_STORE_CODE).toBe('STORE_SCHEMA_NEWER');          // B06 reads the version out of the file itself, and takes the name of the error from here
     for (const code of ['STORE_UNREADABLE', 'STORE_SCHEMA_INVALID', 'STORE_PERMISSIONS_TOO_OPEN', 'STORE_SCHEMA_NEWER', 'STORE_SCHEMA_OUTDATED']) {
       expect(words(code).remedy.endsWith('.'), code).toBe(false);
       expect(JSON.stringify(words(code)), code).not.toMatch(/\/Users\/|[A-Z]:\\\\/);
     }
   });
 
-  it('the module imports node:fs and nothing else: B06 runs where there is no node_modules', () => {
+  it('the module imports nothing at all: B06 answers where there is no node_modules (a design-only checkout that has a store)', () => {
     const source = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../src/store/refusal.ts'), 'utf8');
     const imports = [...source.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]);
-    expect(imports).toEqual(['node:fs']);
+    expect(imports).toEqual([]);
+    expect(source).not.toMatch(/^\s*(import\b|require\()/m);
   });
 });

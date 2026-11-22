@@ -287,7 +287,9 @@ test('ARC-06-C16 — an EMPTY store still fails for want of a terminal', async (
   // in the store a non-interactive live run genuinely cannot proceed, and must say so.
   const root = makeCheckout({}, t);
   mkdirSync(join(root, '.local'), { recursive: true });
-  writeFileSync(join(root, '.local', 'instances.json'), JSON.stringify({ version: 1, instances: {} }));
+  // 0600, as a store the wizard wrote is (ARC-09-C307): a store at the umask's mode is one the server's loader refuses as too open, and the
+  // step now says THAT, with its own code, instead of "no terminal" — it is not an empty store, it is one that does not load.
+  writeFileSync(join(root, '.local', 'instances.json'), JSON.stringify({ version: 1, instances: {} }), { mode: 0o600 });
 
   const result = await runB06({ ...ctxFor(root, { spawn: () => ({ status: 0 }) }), mode: 'live' });
   assert.equal(result.status, 'fail');
@@ -388,8 +390,9 @@ test('ARC-08-C28 — a --yes run with nothing to keep REFUSES rather than asking
   // never produce. The sentence names the flag that answers it without a terminal.
   const root = makeCheckout({}, t);
   mkdirSync(join(root, '.local'), { recursive: true });
+  // 0600, as a store the wizard wrote is (ARC-09-C307): see the case above.
   writeFileSync(join(root, '.local', 'instances.json'),
-    JSON.stringify({ version: 1, instances: {} }));
+    JSON.stringify({ version: 1, instances: {} }), { mode: 0o600 });
 
   for (const isTTY of [true, false]) {
     const result = await runB06(ctxFor(root, {

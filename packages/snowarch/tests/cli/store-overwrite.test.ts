@@ -352,6 +352,7 @@ describe('controls — the commands that already refused still do', () => {
       const code = runList({}, t, { storePath: store });
       expect(code).not.toBe(EXIT_OK);
       expect(t.written()).toContain(`${p.code} — `);
+      expect(t.written()).not.toContain(SECRET_LIKE);
       expect(look(store)).toEqual(was);
     });
   }
@@ -412,32 +413,45 @@ describe('instance import --from-legacy refuses a store that exists and does not
 });
 
 // ── nothing the broken file said, on any path ───────────────────────────────────────────────────────────────────────────────────────────────
-describe('a broken store that begins with a secret-like string: that string is in no output, on any path', () => {
-  const SECRETISH = PLANTS[0]!;
+// The plants that hold the secret-like string: a file that is not JSON (V8 quotes its first characters), and, since the architect's ruling of
+// 2026-11-22, a store that parses and has the wrong shape (zod quotes a value it was given and a key it did not know, and a path through a
+// record carries the record's key). Every path that prints a store's error prints it content-free.
+const SECRETISH = PLANTS.filter((p) => p.holdsSecret);
+const PIECES = [SECRET_LIKE, SECRET_LIKE.slice(0, 6), 'q7Zr', '4491xv', 'Unexpected', 'position '];
 
-  it('list, add, add --replace, the wizard, import and import --dry-run print none of it, and not the temp root either', async () => {
-    const outputs: string[] = [];
-    const take = (t: { written: () => string }) => outputs.push(t.written());
-
-    plant(store, SECRETISH);
-    const l = io(); runList({}, l, { storePath: store }); take(l);
-    const a = io(); await runAdd({ ...addOptions }, a, addDeps().deps); take(a);
-    const r = io(); await runAdd({ ...addOptions, replace: true }, r, addDeps().deps); take(r);
-    const w = io(); await runAdd({ label: 'pdi', fromBootstrap: true }, w, addDeps().deps); take(w);
-    const i = io(); await runImport({ path: legacy, yes: true }, i, importDeps().deps); take(i);
-    const n = io(); await runImport({ path: legacy, dryRun: true }, n, importDeps().deps); take(n);
-
-    expect(outputs).toHaveLength(6);
-    for (const out of outputs) {
-      expect(out).toContain('STORE_UNREADABLE — ');
-      for (const piece of [SECRET_LIKE, SECRET_LIKE.slice(0, 6), 'q7Zr', 'Unexpected', 'position ']) expect(out).not.toContain(piece);
-      expect(out).not.toContain(base);
-    }
-    // and the whole of what any of them wrote to this terminal, in one place
-    const all = everything.join('');
-    expect(all).not.toContain(SECRET_LIKE);
-    expect(readdirSync(join(checkout, '.local')).filter((f) => f !== 'instances.json')).toEqual([]);     // no log, no backup, no temporary file
+describe('a broken store that holds a secret-like string: that string is in no output, on any path', () => {
+  it('the plants that hold it are the ones this block is about: a file that is not JSON, and a store whose shape is wrong in each place a parser quotes', () => {
+    expect(SECRETISH.length).toBeGreaterThanOrEqual(9);
+    expect(SECRETISH.map((p) => p.code)).toContain('STORE_UNREADABLE');
+    expect(SECRETISH.filter((p) => p.code === 'STORE_SCHEMA_INVALID').length).toBeGreaterThanOrEqual(8);
   });
+
+  for (const p of SECRETISH) {
+    it(`${p.name}: list, add, add --replace, the wizard, import and import --dry-run print none of it, and not the temp root either`, async () => {
+      everything.length = 0;
+      const outputs: string[] = [];
+      const take = (t: { written: () => string }) => outputs.push(t.written());
+
+      plant(store, p);
+      const l = io(); runList({}, l, { storePath: store }); take(l);
+      const a = io(); await runAdd({ ...addOptions }, a, addDeps().deps); take(a);
+      const r = io(); await runAdd({ ...addOptions, replace: true }, r, addDeps().deps); take(r);
+      const w = io(); await runAdd({ label: 'pdi', fromBootstrap: true }, w, addDeps().deps); take(w);
+      const i = io(); await runImport({ path: legacy, yes: true }, i, importDeps().deps); take(i);
+      const n = io(); await runImport({ path: legacy, dryRun: true }, n, importDeps().deps); take(n);
+
+      expect(outputs).toHaveLength(6);
+      for (const out of outputs) {
+        expect(out).toContain(`${p.code} — `);
+        for (const piece of PIECES) expect(out, `${piece} is in: ${out}`).not.toContain(piece);
+        expect(out).not.toContain(base);
+      }
+      // and the whole of what any of them wrote to this terminal, in one place
+      const all = everything.join('');
+      expect(all).not.toContain(SECRET_LIKE);
+      expect(readdirSync(join(checkout, '.local')).filter((f) => f !== 'instances.json')).toEqual([]);     // no log, no backup, no temporary file
+    });
+  }
 
   it.skipIf(IS_WINDOWS || IS_ROOT)('an unreadable one (mode 000) prints the errno code and neither the raw path nor the system\'s sentence (skipped on Windows: modes are ACL-inherited; skipped as root)', async () => {
     const p = PLANTS.find((x) => x.name.startsWith('unreadable'))!;
@@ -452,17 +466,19 @@ describe('a broken store that begins with a secret-like string: that string is i
 });
 
 describe('the server prints the same content-free line, on its stderr', () => {
-  it('a broken store that begins with a secret-like string: the code and "is not valid JSON", and none of the file, none of the temp root', async () => {
-    plant(store, PLANTS[0]!);
-    const stderr = await serverStderr(SERVER, { HOME: home, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: undefined, SERVICENOW_INSTANCE_URL: undefined }, checkout);
-    expect(stderr).toContain('STORE_UNREADABLE');
-    expect(stderr).toContain('is not valid JSON');
-    for (const piece of [SECRET_LIKE, SECRET_LIKE.slice(0, 6), 'q7Zr', 'Unexpected', 'position ']) expect(stderr).not.toContain(piece);
-    // the masking of a path is asserted where it is measured on Windows (tests/store/masking.test.ts); here, where it was measured, a path is not the temp root
-    if (!IS_WINDOWS) expect(stderr).not.toContain(base);
-    // the server only reads: no copy, no backup and no temporary file of the store appeared (the helper puts a licence beside it)
-    expect(readdirSync(join(checkout, '.local')).filter((f) => f.includes('instances.json'))).toEqual(['instances.json']);
-  }, 60_000);
+  for (const p of SECRETISH) {
+    it(`${p.name}: the code, and none of the file, none of the temp root`, async () => {
+      plant(store, p);
+      const stderr = await serverStderr(SERVER, { HOME: home, CLAUDE_PROJECT_DIR: checkout, SNOW_STORE: undefined, SERVICENOW_INSTANCE_URL: undefined }, checkout);
+      expect(stderr).toContain(p.code);
+      if (p.code === 'STORE_UNREADABLE') expect(stderr).toContain('is not valid JSON');
+      for (const piece of PIECES) expect(stderr, `${piece} is in the server's stderr`).not.toContain(piece);
+      // the masking of a path is asserted where it is measured on Windows (tests/store/masking.test.ts); here, where it was measured, a path is not the temp root
+      if (!IS_WINDOWS) expect(stderr).not.toContain(base);
+      // the server only reads: no copy, no backup and no temporary file of the store appeared (the helper puts a licence beside it)
+      expect(readdirSync(join(checkout, '.local')).filter((f) => f.includes('instances.json'))).toEqual(['instances.json']);
+    }, 60_000);
+  }
 });
 
 describe('the built CLI, as a process: the exit code, the words on stdout and the file, end to end', () => {
@@ -497,11 +513,21 @@ describe('the built CLI, as a process: the exit code, the words on stdout and th
     expect(look(store)).toEqual({ ...was, folder: expect.arrayContaining(was.folder) });
   });
 
-  it('instance list over it prints the content-free line', () => {
+  it('instance list over an unparseable store prints the content-free line', () => {
     plant(store, PLANTS[0]!);
     const listed = spawned(['instance', 'list']);
     expect(listed.status).not.toBe(EXIT_OK);
     expect(listed.stdout).toContain(`STORE_UNREADABLE — ${maskPath(store)} is not valid JSON`);
     expect(`${listed.stdout}${listed.stderr}`).not.toContain(SECRET_LIKE);
   });
+
+  for (const p of SECRETISH) {
+    it(`instance list over ${p.name} names the store's error and quotes none of the file`, () => {
+      plant(store, p);
+      const listed = spawned(['instance', 'list']);
+      expect(listed.status).not.toBe(EXIT_OK);
+      expect(listed.stdout).toContain(`${p.code} — `);
+      for (const piece of PIECES) expect(`${listed.stdout}${listed.stderr}`, piece).not.toContain(piece);
+    });
+  }
 });
