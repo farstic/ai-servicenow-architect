@@ -756,3 +756,33 @@ test('ARC-09-C306 — the commands that the running text names are the product\'
   assert.match(mentionProblems('./snowarch docs family')[0], /family is not a sub-command of docs/);
   assert.match(mentionProblems('./snowarch store restor')[0], /restor is not a sub-command of store/);
 });
+
+// ── ARC-09-C307: what 2.2.8 does with a store the product cannot use ───────────────────────────────────────────────────────────────────────────
+// The page of 2.2.7 said, in five places, that a store the product could not read was counted as none and saved over (the instance added, the
+// 1.x import, the wizard the installer starts), and told the reader to list first because of it. 2.2.8 refuses instead, so those sentences are
+// untrue for the build that carries this page, and an edit that brought one back would be telling the reader what the product no longer does.
+const OVERWRITE_CLAIMS = [
+  /counts as none/i, /saves a store that holds only the new one/i, /(?:would|will) (?:then )?save only (?:a |the )?new/i,
+  /saves only the new instance/i, /would save only the new one/i, /keeps only the imported instances/i,
+];
+const OVERWRITE_OF_2_2_7 = [
+  'When the store cannot be read, adding an instance saves a store that holds only the new one: every other saved instance, and its password, is lost.',
+  'because a wizard started over a store it cannot read saves only the new instance.',
+  'because an import over a store it cannot read keeps only the imported instances.',
+  'A store it cannot read counts as none, and the wizard would then save only a new instance',
+  'do not add an instance first: that would save only the new one.',
+];
+
+test('ARC-09-C307 — the page does not say that a store the product cannot use is saved over, and says what 2.2.8 does in the places that did', () => {
+  for (const claim of OVERWRITE_CLAIMS) assert.doesNotMatch(pageText, claim, `a sentence that says a store the product cannot use is saved over is back: ${claim}`);
+  const says = (re, where) => assert.match(pageText, re, `the page does not say, ${where}`);
+  says(/When the store cannot be used, adding an instance refuses and saves nothing: restore a backup \(.*store backups.* lists them\), or ask for help\./, 'in the box "First list, and stop on any error", that adding an instance refuses');
+  says(/Adding an instance refuses until the store can be read\. Restore a backup \(.*store backups lists them.*\), or ask for help; moving the file aside starts an empty store\./, 'in the row of a store that is unreadable, what to do');
+  says(/When the store cannot be used, the wizard does not start: the command names the error and leaves the store as it is\./, 'under "Switch to live mode", what the wizard does');
+  says(/stop and get help: when the store cannot be used, the import refuses and imports nothing\./, 'under the 1.x import, what the import does');
+  says(/When the store cannot be used, the wizard does not start: the installer names the error and leaves the store as it is\./, 'under "Re-run the installer", what the installer does');
+});
+
+test('ARC-09-C307 — the check can fail: each sentence of the previous release that the page lost is one of the claims it looks for', () => {
+  for (const old of OVERWRITE_OF_2_2_7) assert.ok(OVERWRITE_CLAIMS.some((claim) => claim.test(old)), `no claim matches: ${old}`);
+});

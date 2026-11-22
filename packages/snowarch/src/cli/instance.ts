@@ -49,8 +49,8 @@ import { probeAll, PROBE_FIELDS, probeFieldText, toLastProbe, type AuthProbe, ty
   type ProbeClient } from '../servicenow/probes.js';
 import { probeClientFor, probeOptionsFor } from '../servicenow/probe-client.js';
 import { nameList, type AclTools } from '../store/acl.js';
-import { loadStore, projectStorePath, resolveStorePath, saveStore, type SaveStoreOptions, type SaveStoreResult, type StoreAclOutcome } from '../store/index.js';
-import { STORE_VERSION, completeFlags, type Store, type StoreInstance } from '../store/schema.js';
+import { loadStore, openStoreForWrite, projectStorePath, resolveStorePath, saveStore, type SaveStoreOptions, type SaveStoreResult, type StoreAclOutcome } from '../store/index.js';
+import { STORE_VERSION, completeFlags, type Store, type StoreError, type StoreInstance } from '../store/schema.js';
 import { FLAG_NAMES, matchPreset, type FlagName, type Flags } from '../utils/permissions.js';
 
 export const EXIT_OK = 0;
@@ -98,6 +98,33 @@ export const labelExists = (label: string): string => {
   const remedy = remedyFor('LABEL_EXISTS').remedy;
   return `LABEL_EXISTS — "${label}" already exists. ${remedy.charAt(0).toUpperCase()}${remedy.slice(1)}.`;
 };
+
+/**
+ * What a command that would WRITE the store says when the store is there and did not load (ARC-09-C307): two lines, and the second is
+ * what makes the first a refusal. The first is the store's own error, as `instance list` prints it; the second says that nothing was
+ * done, and what to do about it. `nothing` is the command's own word for "it did not do what it was for" (`Nothing saved`,
+ * `Nothing imported`); `cli` is the launcher as this platform spells it.
+ *
+ * WHAT A STORE THAT CANNOT BE READ MAY HOLD is the reason for the long sentence: saved passwords. So the file is left alone, and the
+ * way forward that costs nothing is a backup. The one that starts again (moving the file aside) is named for what it does, an empty
+ * store, because a person who does it believing the instances are still there finds out later.
+ *
+ * The words are the architect's, 2026-11-22. They are not in the error registry: the registry holds the store's own errors, which this
+ * line quotes, and one more code for "a writer refused" would have to be explained in `docs/TROUBLESHOOTING.md` next to the ones it quotes.
+ */
+export function storeRefusalLines(error: StoreError, path: string, nothing: 'Nothing saved' | 'Nothing imported', cli: string): string[] {
+  const first = `${error.code} — ${error.message}`;
+  switch (error.code) {
+    case 'STORE_UNREADABLE':
+    case 'STORE_SCHEMA_INVALID':
+      return [first, `${nothing}: ${maskPath(path)} may hold saved passwords, so it was left as it is. `
+        + `Restore a backup (${cli} store backups lists them) and run this again, or ask for help. Moving the file aside starts an empty store.`];
+    case 'STORE_PERMISSIONS_TOO_OPEN':
+      return [first, `${nothing}: the store was left as it is. Run that command, then run this again.`];
+    default:
+      return [first, `${nothing}: the store was left as it is.`];
+  }
+}
 
 /**
  * The 401 re-entry question, with its REASON rendered from the registry.
@@ -776,12 +803,17 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
       : resolveStorePath().path ?? projectStorePath());
   const label = options.label as string;
 
-  // The store is read FIRST, so a duplicate label costs nobody a password.
-  const existing = loadStore(storePath);
-  const store: Store = 'store' in existing
-    ? existing.store
-    : { version: STORE_VERSION, instances: {} } as Store;
-  if ('store' in existing && store.instances[label] && !options.replace) {
+  // The store is read FIRST, so a duplicate label costs nobody a password, and a store that is there and does not load costs nobody every
+  // password they had saved (ARC-09-C307). Only a path with NOTHING at it is a new store: an error from the loader used to be read as
+  // that, and the save below replaced the file, whatever it was, with a store of one instance.
+  const opened = openStoreForWrite(storePath);
+  if (opened.state === 'refused') {
+    const message = storeRefusalLines(opened.error, storePath, 'Nothing saved', cliSpelling()).join('\n');
+    io.write(`${message}\n`);
+    return { saved: false, exitCode: EXIT_FAILED, message };
+  }
+  const store: Store = opened.store;
+  if (opened.state === 'loaded' && store.instances[label] && !options.replace) {
     io.write(`${labelExists(label)}\n`);
     return { saved: false, exitCode: EXIT_USAGE, message: labelExists(label) };
   }

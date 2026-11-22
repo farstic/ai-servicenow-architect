@@ -29,11 +29,11 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { normalizeInstanceUrl, proposeEnvironment } from './url.js';
 import { COLUMNS, ENTRY_DEFAULTS, labelOf, resolveFlags, wrapText, } from './preset-ui.js';
-import { aclNote, cloudSyncGate, maskUsername, probeOptionsFor, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY, EXIT_USAGE, LABEL_RULE, } from './instance.js';
+import { aclNote, cloudSyncGate, maskUsername, probeOptionsFor, storeRefusalLines, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY, EXIT_USAGE, LABEL_RULE, } from './instance.js';
 import { probeAll, toLastProbe } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
-import { loadStore, saveStore } from '../store/index.js';
-import { STORE_VERSION, completeFlags } from '../store/schema.js';
+import { openStoreForWrite, saveStore } from '../store/index.js';
+import { completeFlags } from '../store/schema.js';
 import { maskPath, projectStorePath } from '../store/paths.js';
 import { applyDependencyRule, matchPreset, FLAG_NAMES } from '../utils/permissions.js';
 import { remedyFor } from '../errors/codes.js';
@@ -350,10 +350,15 @@ export async function runImport(options, io, deps = {}) {
         return { exitCode: EXIT_USAGE, imported: 0, total: 0, plan: empty };
     }
     const target = targetStore(deps, options);
-    const existing = existsSync(target.path) ? loadStore(target.path) : null;
-    const store = existing && 'store' in existing
-        ? existing.store
-        : { version: STORE_VERSION, instances: {} };
+    // A store that is there and does not load is not an empty one (ARC-09-C307). The import used to take the loader's error for "no store yet",
+    // plan against nothing (so a dry run said every label was free) and save over the file: every saved instance and password, gone. It refuses
+    // here, before it plans, asks or probes, and a dry run refuses too: its plan would be made against a store nobody read.
+    const opened = openStoreForWrite(target.path);
+    if (opened.state === 'refused') {
+        io.write(`${storeRefusalLines(opened.error, target.path, 'Nothing imported', cliSpelling()).join('\n')}\n`);
+        return { exitCode: EXIT_FAILED, imported: 0, total: 0, plan: empty };
+    }
+    const store = opened.store;
     const only = options.only && options.only.length > 0 ? new Set(options.only) : null;
     const taken = new Set(Object.keys(store.instances));
     const entries = [];

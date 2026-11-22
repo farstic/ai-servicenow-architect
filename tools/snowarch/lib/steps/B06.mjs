@@ -142,6 +142,52 @@ function readFileSyncSafe(p) {
 }
 
 /**
+ * ARC-09-C307 — A STORE THAT IS THERE AND DOES NOT LOAD IS NOT A STORE WITH NO DEFAULT INSTANCE.
+ *
+ * `readDefaultSummary` answers `null` for a file it cannot parse: it is a mirror, and "an unreadable store is not this reader's failure".
+ * But this step read that `null` as "nothing to keep", and went on: a run with `--yes` or no terminal said NO_TERMINAL (which hides the
+ * cause), and an interactive one started the wizard, whose save replaced the file with a store of one instance. `--instance-file` was
+ * worse: it probed, then saved a new store over whatever was there. A store holds saved passwords, and a file that cannot be parsed may be
+ * every one of them with a typo in it.
+ *
+ * The question is the server's own loader's (`openStoreForWrite`), asked in two places: by `fromInstanceFile`, before it probes, and by
+ * `loaderRefusal` on the wizard path, after the keep decision. The architect's ruling of 2026-11-22 is that the step names the cause for
+ * EVERY store error (a file that is not JSON or cannot be read, a mode that is too open, a shape that is wrong, a schema from the future or
+ * the past), so there is one question and not one for each. Missing is not a refusal: ENOENT is "no store yet".
+ *
+ * The words for the answer are the PACKAGE'S (`store/refusal.ts`: it imports nothing, so that it loads where there is no `node_modules`, and it
+ * holds the error codes' names, which a tool of the engine may not hold as literals). They are imported where they are used, as `label.js` is,
+ * because `dist/` exists only after B04.
+ *
+ * The step's answer names the file RELATIVE and quotes nothing it held: the answer is written to `.local/logs`.
+ */
+const STORE_FILE = join('.local', 'instances.json');
+export const NOT_STARTED = 'the instance wizard was not started';
+export const NOT_USED = 'the instance file was not used';
+
+/** The step's answer for a store that is there and does not load: its own code, what that means for THIS run, and a remedy ("none recorded" is for what nobody anticipated). */
+export async function storeRefused(code, consequence) {
+  const { storeRefusalWords } = await import('../../../../packages/snowarch/dist/store/refusal.js');
+  const w = storeRefusalWords(code, SPELL.cli, STORE_FILE);
+  return { status: 'fail', detail: `${w.code} — ${STORE_FILE} ${w.what}, so ${consequence} and nothing was changed`, remedy: w.remedy };
+}
+
+/**
+ * The server's own loader's verdict on the store that is at the path, as a step answer: `null` when nothing is there (a new store), when it
+ * loads, or when the loader cannot be imported here (no `node_modules`: the wizard probe that follows says so, with its remedy, and no writer
+ * can run either). The same question `fromInstanceFile` asks before it probes, for the wizard path.
+ */
+export async function loaderRefusal(root, consequence,
+  { load = () => import('../../../../packages/snowarch/dist/store/index.js') } = {}) {
+  let opened;
+  try {
+    const { openStoreForWrite } = await load();
+    opened = openStoreForWrite(storePath(root));
+  } catch { return null; }
+  return opened.state === 'refused' ? storeRefused(opened.error.code, consequence) : null;
+}
+
+/**
  * The five answers a wizard probe can give. Four of them used to be one boolean.
  *
  * `ABSENT` is the only one that means what the old message said, and it is the rarest: it needs a
@@ -320,6 +366,13 @@ export async function fromInstanceFile(ctx) {
   for (const note of file.notes) ctx.line?.(note);
   if (file.modeNote) ctx.line?.(`note: ${file.modeNote}`);
 
+  // ARC-09-C307 — BEFORE an instance is probed, and before anything is saved: the store this run replaces is read first, by the server's own
+  // loader, and a store that is there and does not load (a mode that is too open, a shape that is wrong, a schema from the future or the
+  // past, a file that is not JSON) is refused with its own code. Nothing at the path is a new store, as it always was.
+  const { openStoreForWrite } = await import('../../../../packages/snowarch/dist/store/index.js');
+  const opened = openStoreForWrite(storePath(ctx.root));
+  if (opened.state === 'refused') return storeRefused(opened.error.code, NOT_USED);
+
   const probe = ctx.probeAuth ?? probeAuth;
   for (const [label, entry] of Object.entries(file.store.instances)) {
     const result = await probe({ url: entry.url, username: entry.auth.username,
@@ -375,9 +428,14 @@ export async function migrateIfBehind(ctx) {
   if (shape.version > current) {
     // A store from the FUTURE is not this step's to fix: downgrading it would mean discarding
     // whatever the newer build added. The doctor's SV-09 says the same thing with the command.
-    return { status: 'warn', remedy: null,
-      detail: `store schema v${shape.version} is newer than this build's v${current} — `
-        + `run ${SPELL.cli} upgrade` };
+    //
+    // ARC-09-C307 (the architect's ruling of 2026-11-22: B06 names the cause for every store error) — with the store's own code, and the
+    // remedy in the detail, which is ON THE STEP'S LINE: a warning's detail is shown there only when the step says so, and this one printed
+    // `warn` and nothing else. The name of the code and the remedy's words are the package's (`store/refusal.ts`).
+    const { storeRefusalWords, NEWER_STORE_CODE } = await import('../../../../packages/snowarch/dist/store/refusal.js');
+    const w = storeRefusalWords(NEWER_STORE_CODE, SPELL.cli, STORE_FILE);
+    return { status: 'warn', remedy: null, showDetail: true,
+      detail: `${w.code} — store schema v${shape.version} is newer than this build's v${current} — ${w.remedy}` };
   }
 
   const spawn = ctx.spawn ?? spawnSync;
@@ -412,6 +470,7 @@ export const run = async (ctx) => {
   if (migrated && migrated.status !== 'ok') return migrated;
   if (migrated) return migrated;
 
+  // (`--instance-file` asks the store's own loader before it probes anything: `fromInstanceFile`, ARC-09-C307.)
   if (ctx.instanceFile) return fromInstanceFile(ctx);
 
   // A design-only checkout reaches this step only because a store exists (`runsWhen`), and with
@@ -455,6 +514,16 @@ export const run = async (ctx) => {
       detail: `kept instance "${kept.label}"; the store already has one, so the wizard did not run`,
       data: { saved: 0, defaultInstance: kept.label, instance: kept, kept: true } };
   }
+
+  // ARC-09-C307 (the architect's ruling of 2026-11-22: B06 names the cause for every store error) — NOTHING TO KEEP IS NOT "NO STORE". A
+  // store that is there and that the server's own loader refuses (a file that is not JSON or cannot be read, a mode that is too open, a shape
+  // that is wrong, a schema from the past that no contract told this step about) used to go on to NO_TERMINAL, or to the wizard, which would
+  // replace it, or whose refusal this step then reported as "the answer it got was refused", with a remedy about credentials: nothing had
+  // been asked. The step says which error it is, and what to do, before it starts anything. After the keep decision, because that path
+  // writes nothing (and the verify step that follows names a mode that is too open); a store that is not there is not refused, it is new.
+  // (Design-only never gets here: it writes no store in this step.)
+  const refused = await loaderRefusal(ctx.root, NOT_STARTED);
+  if (refused) return refused;
 
   // Nothing to keep. A run told not to ask REFUSES rather than asking — `--yes` means "do not put
   // a question in front of me", and a prompt is the one thing it must never produce. The sentence

@@ -34,12 +34,47 @@ export declare function checkFileModes(path: string): {
     error?: StoreError;
     warning?: string;
 };
+/**
+ * The code of a failed system call (`EACCES`) and nothing else of it. The system's own sentence carries the path, unmasked, and a store's
+ * path under a home folder names the account (ARC-09-C307).
+ */
+export declare function errnoName(e: unknown): string;
 export declare function loadStore(path: string): {
     store: Store;
     warning?: string;
 } | {
     error: StoreError;
 };
+/**
+ * What a writer starts from (ARC-09-C307):
+ *
+ *   new      nothing is at the path, so a new store is the right start; the write makes the folder if it must
+ *   loaded   the store, as the loader reads it
+ *   refused  something IS at the path and it did not load, with the loader's own error; a writer says so and stops
+ *
+ * THE DEFECT THIS NAMES. `instance add`, `instance add --replace`, the 1.x import and the installer each called `loadStore` and took ANY error
+ * for "there is no store yet": a file with a typo in it, a file at the wrong mode, a file a newer build wrote, a file the account could not
+ * read. They built a store of one instance and saved it over the file, with no backup: every saved instance and its password, gone. The loader
+ * answers an error for a reader's sake, and a reader should stop; a writer that goes on destroys what the reader could not see.
+ *
+ * Only a path that is NOT THERE is nothing, and "not there" is ENOENT from `lstat` and nothing else: a link that points nowhere, a folder that
+ * cannot be searched, a path that runs through a file are all somebody's store that cannot be seen. `lstat` and not `stat`, so that a link is
+ * something, whatever it points at.
+ *
+ * The one writer that replaces a store that did not load is `store restore`: the user names the backup, and answers Proceed?
+ */
+export type StoreForWrite = {
+    state: 'new';
+    store: Store;
+} | {
+    state: 'loaded';
+    store: Store;
+    warning?: string;
+} | {
+    state: 'refused';
+    error: StoreError;
+};
+export declare function openStoreForWrite(path: string): StoreForWrite;
 /**
  * Atomic write: temp file in the same directory, fsync, rename over the target.
  *

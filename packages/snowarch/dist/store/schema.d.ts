@@ -263,6 +263,11 @@ export interface StoreError {
  *
  * ARC-09-C211 — IN BACKTICKS, because a bare `word.word` is what the engine's printer masks as a person's first.last:
  * the doctor's SV-02 printed "instances.pdi Unrecognized key(s) …" as "i***.p*** …". A key in backticks is left alone.
+ *
+ * ARC-09-C307 — AND NOTHING OF THE FILE IN IT BUT WHAT THE SCHEMA NAMES. A path through a record carries the record's key: the label of an
+ * instance, the name of a flag. A label that is a label (`^[a-z][a-z0-9_-]{0,31}$`: what `instance list` prints, and what the instance that is
+ * wrong is called) stays; every other name the file chose, which can be a password pasted where a name goes, is `<key>`. A name the schema
+ * knows stays.
  */
 export declare function issuePath(issue: z.ZodIssue): string;
 /**

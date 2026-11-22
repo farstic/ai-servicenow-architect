@@ -33,13 +33,13 @@ import {
   COLUMNS, ENTRY_DEFAULTS, labelOf, resolveFlags, wrapText, type ReviewIo,
 } from './preset-ui.js';
 import {
-  aclNote, cloudSyncGate, maskUsername, probeOptionsFor, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY,
+  aclNote, cloudSyncGate, maskUsername, probeOptionsFor, storeRefusalLines, targetStore, EXIT_FAILED, EXIT_OK, EXIT_POLICY,
   EXIT_USAGE, LABEL_RULE, type AddIo, type ManageDeps,
 } from './instance.js';
 import { probeAll, toLastProbe, type LastProbe } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
-import { loadStore, saveStore } from '../store/index.js';
-import { STORE_VERSION, completeFlags, type Store, type StoreInstance } from '../store/schema.js';
+import { openStoreForWrite, saveStore } from '../store/index.js';
+import { completeFlags, type Store, type StoreInstance } from '../store/schema.js';
 import { maskPath, projectStorePath } from '../store/paths.js';
 import { applyDependencyRule, matchPreset, FLAG_NAMES, type Flags } from '../utils/permissions.js';
 import { remedyFor } from '../errors/codes.js';
@@ -435,10 +435,15 @@ Promise<ImportResult> {
   if (!legacy.ok) { io.write(`${legacy.message}\n`); return { exitCode: EXIT_USAGE, imported: 0, total: 0, plan: empty }; }
 
   const target = targetStore(deps, options);
-  const existing = existsSync(target.path) ? loadStore(target.path) : null;
-  const store: Store = existing && 'store' in existing
-    ? existing.store
-    : { version: STORE_VERSION, instances: {} } as Store;
+  // A store that is there and does not load is not an empty one (ARC-09-C307). The import used to take the loader's error for "no store yet",
+  // plan against nothing (so a dry run said every label was free) and save over the file: every saved instance and password, gone. It refuses
+  // here, before it plans, asks or probes, and a dry run refuses too: its plan would be made against a store nobody read.
+  const opened = openStoreForWrite(target.path);
+  if (opened.state === 'refused') {
+    io.write(`${storeRefusalLines(opened.error, target.path, 'Nothing imported', cliSpelling()).join('\n')}\n`);
+    return { exitCode: EXIT_FAILED, imported: 0, total: 0, plan: empty };
+  }
+  const store: Store = opened.store;
 
   const only = options.only && options.only.length > 0 ? new Set(options.only) : null;
   const taken = new Set(Object.keys(store.instances));

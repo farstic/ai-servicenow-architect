@@ -16,6 +16,14 @@ distribution carries them and its signed manifest covers them. Nothing else in t
 **The shipped list names the user guide's interactive page (ARC-09-C306).** `docs/AI-Architect-User-Guide.html` joins the user's documentation in the release
 coverage (`licence/integrity.ts`), beside `docs/USER-GUIDE.md`, so a distribution carries it and its signed manifest covers it. Nothing else in the package changed.
 
+**A store that cannot be read is never replaced (ARC-09-C307).** `openStoreForWrite(path)` in `store/index.ts` is what a writer starts from: `new` for a path with nothing at it (`lstat` says ENOENT, and nothing else counts as nothing),
+`loaded` for a store that loads, `refused` with the loader's own error for anything else. `instance add` (and `--replace`, the wizard, `addInstance`) and `instance import --from-legacy` start from it and refuse with exit 1
+before they ask, probe or write; `storeRefusalLines` (`cli/instance.ts`) words the refusal. `loadStore`'s `STORE_UNREADABLE` message is content-free: `<path> is not valid JSON` or `<path> cannot be read (<errno code>)`, not the
+parser's own text (which quotes the file) or the system's (which has the absolute path). So is `STORE_SCHEMA_INVALID` (`parseStore`, `store/schema.ts`): zod's two sentences that quote the file (`Invalid enum value … received '<value>'`
+and `Unrecognized key(s) in object: '<name>'`) are given a contextual error map that leaves the value and the name out, and `issuePath` prints a record's key only when it is an instance label (and `<key>` for any other name the file chose;
+a field name the schema knows stays). `store/refusal.ts` (it imports nothing, for the installer) exports `NEWER_STORE_CODE` besides `storeRefusalWords`, and the error registry's `STORE_UNREADABLE` entry covers both forms of the error and the
+remedy that goes with them, so `dist/contract.json`, its pin and the generated pages moved. Nothing else in the package changed.
+
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
