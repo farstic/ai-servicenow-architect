@@ -22,6 +22,7 @@ import { readFileSync } from 'node:fs';
 
 import { applyDependencyRule, expandPreset, PRESETS, type Flags, type PresetName }
   from '../utils/permissions.js';
+import { entryLoads } from './start.js';
 
 export interface DefaultLabel {
   label: string;
@@ -106,6 +107,14 @@ export function readDefaultSummary(storePath: string): DefaultSummary | null {
  */
 export interface StoreSummary extends DefaultSummary {
   effectiveFlags: Flags | null;
+  /**
+   * Whether the server's loader would load this entry (ARC-09-C309): the loader's own refusal of a production instance raised without the acknowledgement
+   * (`store/start.ts`). `null` when this build cannot tell: the entry names a preset it does not know (a store written by a newer build) or names no
+   * environment. It is not `false`: this reader is a mirror and does not judge what it cannot read, and the Mode line keeps saying what the store says
+   * rather than calling such an entry one that does not load (ARC-08-C21). It lets a run that did not probe name the instance a new session starts on by
+   * the loader's rule, instead of the first one in the store.
+   */
+  loads: boolean | null;
 }
 
 const KNOWN_PRESETS: readonly string[] = [...Object.keys(PRESETS), 'custom'];
@@ -128,12 +137,20 @@ export function readStoreSummaries(storePath: string): StoreSummary[] {
   if (!instances || typeof instances !== 'object') return [];
   const str = (v: unknown) => (typeof v === 'string' && v.length > 0 ? v : null);
   return Object.entries(instances).map(([label, raw]) => {
-    const entry = raw as { environment?: unknown; preset?: unknown } | undefined;
+    const entry = raw as { environment?: unknown; preset?: unknown; flags?: unknown; prodWriteAck?: unknown } | undefined;
     const preset = str(entry?.preset);
+    const environment = str(entry?.environment);
     // Named one at a time, never a spread: a spread of the entry would carry the credential block,
     // which is the rule this reader and its two siblings are built on. `effectiveFlags` is derived,
-    // not copied — six `'true'`/`'false'` strings and nothing from the entry itself.
-    return { label, environment: str(entry?.environment), preset,
-      effectiveFlags: effectiveFlagsOf(label, preset, raw) };
+    // not copied — six `'true'`/`'false'` strings and nothing from the entry itself. `loads` is a
+    // boolean the loader's own refusal rule derives from the non-secret fields (ARC-09-C309), or null when this build cannot tell.
+    const loads = preset !== null && KNOWN_PRESETS.includes(preset) && environment !== null
+      ? entryLoads(label, {
+        environment, preset,
+        flags: entry?.flags && typeof entry.flags === 'object' ? entry.flags as Partial<Record<string, string>> : undefined,
+        prodWriteAck: entry?.prodWriteAck === true,
+      })
+      : null;
+    return { label, environment, preset, effectiveFlags: effectiveFlagsOf(label, preset, raw), loads };
   });
 }

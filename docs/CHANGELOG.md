@@ -109,6 +109,12 @@ instance that loads, in the order the store holds them, which depends on the ord
 without the acknowledgement) says that, and where a new session starts instead. The server's behaviour did not change: both messages come from the one rule the server's loader follows, now written once
 (`store/start.ts`), and a test holds the two answers to each other over 300 generated stores. The user guide shows the product's sentence on its screen and says the same in the two paragraphs around it.
 
+**The Mode line names the instance a new session starts on.** The line printed by the SessionStart hook and by `./snowarch status` and `doctor` named the FIRST instance of the store, so a store whose
+default is its second instance (`set-default` makes that) said `Mode: live — alpha` about a session that starts on `beta`: a user could believe the session was on another instance. It names the one the
+server starts on, by the rule the loader follows and the two messages above say (`store/start.ts`): the default when it loads, otherwise the first instance, in the store's order, that loads. A quick run,
+which does not start the server, asks that rule of the store (`loads`, which the store readers now report for each entry, and `null` when this build cannot tell, as for a preset that a newer build wrote: such an entry does not turn the line design-only); a full run takes the server's own answer, which its instance list now carries (`active`).
+When the store says that no instance loads, a quick run names none and does not call itself live: it says `Mode: design-only — server enabled but no saved instance loads (./snowarch instance list says why)`, as the full run already said design-only for that store. A test holds the line to the loader over generated stores.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -222,6 +228,7 @@ without the acknowledgement) says that, and where a new session starts instead. 
 
 ### Fixed
 
+- The Mode line names the instance a new session starts on, where it named the first instance of the store: with a default that is not first, `Mode: live — alpha` was said about a session on `beta`; and when no instance loads it says so, where a quick run named the first and called itself live (ARC-09-C309).
 - `instance set-default` no longer says that a reload moves the running server to the new default, and `instance remove` of the default no longer says that the server starts unconfigured when other instances remain: each says where a new session starts, from the loader's own rule, and the guide says the same (ARC-09-C308).
 - B01 fetches the release manifest only when the cache does not hold it. A release's manifest is signed once and the revocation
   list is fetched separately, so a held manifest stays valid. B01 used to fetch whenever it ran on a release tree, so a bootstrap

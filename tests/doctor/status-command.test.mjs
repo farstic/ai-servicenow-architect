@@ -500,3 +500,47 @@ describe('ARC-08-C24 — the capability packs appear under one key', () => {
       'the renderer is still reading prereqs.capabilities');
   });
 });
+
+/**
+ * ARC-09-C309 — the wiring, driven through the real doctor: the quick run's Mode line names the instance a new session starts on.
+ *
+ * `mode-instance-parity.test.mjs` holds `deriveMode` and the readers it asks to the server's loader, and builds the call itself, so it says nothing about
+ * whether the doctor PASSES the store's default and what loads to it. A line that names the first instance of the store reached a user with every unit test
+ * green (`Mode: live — alpha` for a store whose default is `beta`), and a unit test of a pure function cannot see a wire that is not connected.
+ */
+describe('ARC-09-C309 — the quick run names the instance a new session starts on', () => {
+  const instance = (environment, over = {}) => ({
+    url: 'https://example.test', environment, preset: 'read-only',
+    auth: { method: 'basic', username: 'u', password: 'p' },
+    flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false, ...over,
+  });
+  // A production instance raised above read-only without the acknowledgement: the loader refuses it, so it is not where a session starts.
+  const refused = () => instance('prod', { preset: 'full' });
+  const withStore = (t, body) => {
+    const root = linkInstall(greenTree(t, { mode: 'live' }));
+    writeFileSync(join(root, '.local', 'instances.json'), `${JSON.stringify({ version: 1, ...body }, null, 2)}\n`, { mode: 0o600 });
+    return root;
+  };
+  const modeLine = async (root) => {
+    const out = sink();
+    await statusCommand({ out, cwd: root, flags: { json: true }, registry: registry({}) });
+    return JSON.parse(out.text()).modeLineDetailed;
+  };
+
+  test('a default that is not the first instance of the store is the one the line names', async (t) => {
+    const line = await modeLine(withStore(t, { defaultInstance: 'beta', instances: { alpha: instance('pdi'), beta: instance('test') } }));
+    assert.match(line, /^Mode: live — beta \(test\)/, line);
+    assert.equal(line.includes('alpha'), false, line);
+  });
+
+  test('with no default, the first instance that LOADS is the one: a refused production instance before it is skipped', async (t) => {
+    const line = await modeLine(withStore(t, { instances: { prodr: refused(), beta: instance('test') } }));
+    assert.match(line, /^Mode: live — beta \(test\)/, line);
+  });
+
+  test('a store in which nothing loads is no live line, and it names no instance', async (t) => {
+    const line = await modeLine(withStore(t, { defaultInstance: 'prodr', instances: { prodr: refused() } }));
+    assert.match(line, /^Mode: design-only — server enabled but no saved instance loads \(/, line);
+    assert.equal(line.includes('prodr'), false, line);
+  });
+});

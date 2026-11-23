@@ -24,6 +24,12 @@ export interface DoctorOptions {
     env?: NodeJS.ProcessEnv;
 }
 export declare function runServerDoctor(opts?: DoctorOptions): Promise<DoctorReport>;
+/**
+ * The instances the report lists (ARC-09-C309): what the manager loaded, in store order, then what it refused, each with `active` — the one the server is
+ * on, which a new session starts on (`store/start.ts`). The engine's Mode line names it; it used to name the first of the list, which is not the default
+ * when the default is not first.
+ */
+export declare function doctorInstances(): DoctorReport['instances'];
 /** 0 = nothing failed, 1 = at least one FAIL, 3 = the run itself could not complete. */
 export declare function exitCodeFor(report: DoctorReport): 0 | 1 | 3;
 /** The human rendering: one aligned line per check, then a summary. */

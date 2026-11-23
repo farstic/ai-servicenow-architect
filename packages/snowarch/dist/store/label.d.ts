@@ -55,5 +55,13 @@ export declare function readDefaultSummary(storePath: string): DefaultSummary | 
  */
 export interface StoreSummary extends DefaultSummary {
     effectiveFlags: Flags | null;
+    /**
+     * Whether the server's loader would load this entry (ARC-09-C309): the loader's own refusal of a production instance raised without the acknowledgement
+     * (`store/start.ts`). `null` when this build cannot tell: the entry names a preset it does not know (a store written by a newer build) or names no
+     * environment. It is not `false`: this reader is a mirror and does not judge what it cannot read, and the Mode line keeps saying what the store says
+     * rather than calling such an entry one that does not load (ARC-08-C21). It lets a run that did not probe name the instance a new session starts on by
+     * the loader's rule, instead of the first one in the store.
+     */
+    loads: boolean | null;
 }
 export declare function readStoreSummaries(storePath: string): StoreSummary[];
