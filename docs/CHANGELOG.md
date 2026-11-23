@@ -101,6 +101,14 @@ one figure of the corpus to the corpus. What no test can read, its prose, is rea
 
 **The Windows guides type `npm.cmd` and `now-sdk.cmd`.** A reader who followed `docs/INSTALL-WINDOWS.md` in Windows PowerShell 5.1 got `npm.ps1 cannot be loaded because running scripts is disabled on this system` at step 2e: the Node.js zip puts `npm.ps1` beside `npm.cmd`, PowerShell picks the script, and the default policy blocks it. CI's Windows runners allow scripts, so no test saw it. The product is not affected: the launchers start PowerShell with `-ExecutionPolicy Bypass`, and it runs npm as `npm.cmd`. Step 2e and the optional SDK step, in the guide and in its page, now type the `.cmd` names and say why; both have a troubleshooting row with the error line; the page's paste check reads the error and names the fix; the user guide shows a Windows reader the `.cmd` spelling; and a test holds that no Windows PowerShell command of the three guides runs a bare `npm`, `npx` or a tool that npm installed.
 
+**Two instance messages say what the server does.** `./snowarch instance set-default` said that the running server picks the new default up after `snow_core_instances_reload`; a reload keeps an open
+session on its own instance, so the message now says that new sessions start on the new default, that a session that is already open stays on its own instance, and that it moves when you ask it to
+switch, or when you restart Claude. `./snowarch instance remove` of the default said that the server would start unconfigured until `set-default`; with other instances left it starts on the first saved
+instance that loads, in the order the store holds them, which depends on the order they were added and can be a production instance, and it is unconfigured only when none loads or none is left, where
+`set-default` cannot help. It now names that instance and its environment, and says so when none loads or none is left. `set-default` of an instance that does not load (a production instance raised
+without the acknowledgement) says that, and where a new session starts instead. The server's behaviour did not change: both messages come from the one rule the server's loader follows, now written once
+(`store/start.ts`), and a test holds the two answers to each other over 300 generated stores. The user guide shows the product's sentence on its screen and says the same in the two paragraphs around it.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -214,6 +222,7 @@ one figure of the corpus to the corpus. What no test can read, its prose, is rea
 
 ### Fixed
 
+- `instance set-default` no longer says that a reload moves the running server to the new default, and `instance remove` of the default no longer says that the server starts unconfigured when other instances remain: each says where a new session starts, from the loader's own rule, and the guide says the same (ARC-09-C308).
 - B01 fetches the release manifest only when the cache does not hold it. A release's manifest is signed once and the revocation
   list is fetched separately, so a held manifest stays valid. B01 used to fetch whenever it ran on a release tree, so a bootstrap
   that ran it because its inputs had moved (a changed `.claude/settings.json`, say) printed

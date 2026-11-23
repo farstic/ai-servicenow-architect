@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
-  EXIT_FAILED, EXIT_OK, EXIT_POLICY, MISMATCH, WAS_DEFAULT, credentialsUpdated, defaultChanged,
+  EXIT_FAILED, EXIT_OK, EXIT_POLICY, MISMATCH, credentialsUpdated,
   labelNotFound, mirrorDefault, parseFlagPairs, prodRaiseWarning, removeQuestion, runList,
   runRemove, runSetCredentials, runSetDefault, runSetFlags, runSetPreset, runTest, probeSummary,
   type AddIo, type ManageDeps,
@@ -15,7 +15,6 @@ import { expandPreset } from '../../src/utils/permissions.js';
 import { EXIT_USAGE } from '../../src/cli/tty.js';
 import { instanceHelp, parseManageArgs } from '../../src/cli/instance-command.js';
 import { NO_INSTANCES, listJson, listTable, secretNote } from '../../src/cli/format.js';
-import { CORE_TOOLS_UNCONFIGURED } from '../../src/tools/status.js';
 import type { Store } from '../../src/store/schema.js';
 import { fakeRest } from '../helpers/fake-rest.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
@@ -32,6 +31,18 @@ import { trackTempDir } from '../helpers/server-child.js';
  * it is worth knowing that the compiler is not a complete audit for it.
  */
 const SERVER_CLI = cliSpelling();
+
+/**
+ * ARC-09-C308 — what `set-default` and `remove` say about where a new session starts, as the architect worded it (2026-11-22). Written out here and not
+ * built from the product's functions: a test that compares a message to the function that makes it passes whatever the message says, which is how two of
+ * them came to say what was no longer true. The launcher is this platform's, read once, at module level.
+ */
+const SAID_SET_DEFAULT = 'Default instance is now "uat". New sessions start on it. A session that is already open stays on its own instance: ask it to switch to "uat", or restart Claude.';
+const SAID_SET_DEFAULT_FALLS_BACK = `Default instance is now "prodx", but it does not load, so a new session starts on "uat" (test), the first saved instance that loads. Run ${SERVER_CLI} instance list to see why.`;
+const SAID_SET_DEFAULT_NONE_LOADS = `Default instance is now "prodx", but none of the saved instances loads, so the server will start unconfigured. Run ${SERVER_CLI} instance list to see why.`;
+const SAID_REMOVED_ONE_LOADS = `"pdi" was the default instance. No default is set now, so a new session starts on "acme" (prod), the first saved instance that loads. Choose one with ${SERVER_CLI} instance set-default <label>.`;
+const SAID_REMOVED_NONE_LOADS = `"pdi" was the default instance. No default is set now, and none of the saved instances loads, so the server will start unconfigured. Run ${SERVER_CLI} instance list to see why.`;
+const SAID_REMOVED_NONE_LEFT = '"pdi" was the default instance and the last one saved, so the server will start unconfigured until you add an instance.';
 
 /**
  * ARC-07-S06 — the seven maintenance commands.
@@ -495,7 +506,7 @@ describe('AC 7 — set-flags', () => {
 });
 
 describe('AC 9 — set-default', () => {
-  it('writes the store, mirrors the label, and names the reload tool from the contract', () => {
+  it('writes the store, mirrors the label, and says where a new session starts and how an open one moves', () => {
     const ws = workspace({ pdi: entry(), uat: entry({ environment: 'test' }) });
     try {
       writeFileSync(ws.config, `${JSON.stringify({ version: 1, mode: 'live', defaultInstance: 'pdi',
@@ -512,8 +523,9 @@ describe('AC 9 — set-default', () => {
       expect(config.registration).toBe('project');
       expect(config.version).toBe(1);
 
-      expect(terminal.written()).toContain(CORE_TOOLS_UNCONFIGURED[1]);
-      expect(terminal.written()).toBe(`${defaultChanged('uat')}\n`);
+      expect(terminal.written()).toBe(`${SAID_SET_DEFAULT}\n`);
+      // The sentence that was there said the running server picks the default up after a reload. A reload keeps an open session where it is.
+      expect(terminal.written()).not.toMatch(/snow_core|reload|picks it up|running server/);
     } finally { ws.cleanup(); }
   });
 
@@ -556,7 +568,7 @@ describe('AC 8 — remove', () => {
       expect(await runRemove({ label: 'pdi', yes: true }, terminal, deps(ws))).toBe(EXIT_OK);
       expect(Object.keys(read(ws).instances)).toEqual([]);
       expect(read(ws).defaultInstance).toBeUndefined();
-      expect(terminal.written()).toContain(WAS_DEFAULT('pdi'));
+      expect(terminal.written()).toContain(SAID_REMOVED_NONE_LEFT);
       expect(auditLines(ws).at(-1)).toMatchObject({ action: 'remove', actor: 'cli' });
 
       const listing = io([]);
@@ -570,6 +582,91 @@ describe('AC 8 — remove', () => {
     try {
       expect(await runRemove({ label: 'uat', yes: true }, io([]), deps(ws))).toBe(EXIT_OK);
       expect(read(ws).defaultInstance).toBe('pdi');
+    } finally { ws.cleanup(); }
+  });
+});
+
+describe('ARC-09-C308 — set-default says where a new session starts, and what an open one does', () => {
+  const prodRaised = (): Record<string, unknown> => entry({ environment: 'prod', url: URL_PROD, preset: 'full',
+    flags: { WRITE_ENABLED: 'true', CMDB_WRITE_ENABLED: 'true', SCRIPTING_ENABLED: 'true', ATF_ENABLED: 'true', NOW_ASSIST_ENABLED: 'true', FLUENT_ENABLED: 'true' } });
+
+  it('a default that loads: new sessions start on it, an open one stays, and the way to move it is to ask it or restart', () => {
+    const ws = workspace({ pdi: entry(), uat: entry({ environment: 'test' }) });
+    try {
+      const terminal = io([]);
+      expect(runSetDefault({ label: 'uat' }, terminal, deps(ws))).toBe(EXIT_OK);
+      expect(terminal.written()).toBe(`${SAID_SET_DEFAULT}\n`);
+    } finally { ws.cleanup(); }
+  });
+
+  it('a default that does not load (a production instance raised without the acknowledgement): it says so, and where a new session starts instead', () => {
+    const ws = workspace({ uat: entry({ environment: 'test' }), prodx: prodRaised() }, 'uat');
+    try {
+      const terminal = io([]);
+      expect(runSetDefault({ label: 'prodx' }, terminal, deps(ws))).toBe(EXIT_OK);
+      expect(read(ws).defaultInstance).toBe('prodx');               // it is saved: the user may mean to fix the instance later
+      expect(terminal.written()).toBe(`${SAID_SET_DEFAULT_FALLS_BACK}\n`);
+    } finally { ws.cleanup(); }
+  });
+
+  it('a default that does not load, and nothing else does: the server will start unconfigured', () => {
+    const ws = workspace({ prodx: prodRaised() }, 'prodx');
+    try {
+      const terminal = io([]);
+      expect(runSetDefault({ label: 'prodx' }, terminal, deps(ws))).toBe(EXIT_OK);
+      expect(terminal.written()).toBe(`${SAID_SET_DEFAULT_NONE_LOADS}\n`);
+    } finally { ws.cleanup(); }
+  });
+});
+
+describe('ARC-09-C308 — remove says where a new session starts when the default is gone', () => {
+  const prodRaised = (): Record<string, unknown> => entry({ environment: 'prod', url: URL_PROD, preset: 'full',
+    flags: { WRITE_ENABLED: 'true', CMDB_WRITE_ENABLED: 'true', SCRIPTING_ENABLED: 'true', ATF_ENABLED: 'true', NOW_ASSIST_ENABLED: 'true', FLUENT_ENABLED: 'true' } });
+
+  it('others are left and one loads: it names the first that loads, with its environment, in the store\'s own order', async () => {
+    const ws = workspace({ pdi: entry(), acme: entry({ environment: 'prod', url: URL_PROD }), uat: entry({ environment: 'test' }) });
+    try {
+      const terminal = io([]);
+      expect(await runRemove({ label: 'pdi', yes: true }, terminal, deps(ws))).toBe(EXIT_OK);
+      expect(terminal.written()).toBe(`Removed instance "pdi".\n${SAID_REMOVED_ONE_LOADS}\n`);
+      expect(read(ws).defaultInstance).toBeUndefined();               // the behaviour is not changed: no default is chosen for the user
+    } finally { ws.cleanup(); }
+  });
+
+  it('...and skips one that does not load: the first that LOADS', async () => {
+    const ws = workspace({ pdi: entry(), prodr: prodRaised(), acme: entry({ environment: 'prod', url: URL_PROD }) });
+    try {
+      const terminal = io([]);
+      expect(await runRemove({ label: 'pdi', yes: true }, terminal, deps(ws))).toBe(EXIT_OK);
+      expect(terminal.written()).toBe(`Removed instance "pdi".\n${SAID_REMOVED_ONE_LOADS}\n`);
+    } finally { ws.cleanup(); }
+  });
+
+  it('others are left and none loads: the server will start unconfigured, and the way to see why', async () => {
+    const ws = workspace({ pdi: entry(), prodr: prodRaised() });
+    try {
+      const terminal = io([]);
+      expect(await runRemove({ label: 'pdi', yes: true }, terminal, deps(ws))).toBe(EXIT_OK);
+      expect(terminal.written()).toBe(`Removed instance "pdi".\n${SAID_REMOVED_NONE_LOADS}\n`);
+    } finally { ws.cleanup(); }
+  });
+
+  it('it was the last one: unconfigured until an instance is added (set-default cannot help with none)', async () => {
+    const ws = workspace({ pdi: entry() });
+    try {
+      const terminal = io([]);
+      expect(await runRemove({ label: 'pdi', yes: true }, terminal, deps(ws))).toBe(EXIT_OK);
+      expect(terminal.written()).toBe(`Removed instance "pdi".\n${SAID_REMOVED_NONE_LEFT}\n`);
+      expect(terminal.written()).not.toContain('set-default');
+    } finally { ws.cleanup(); }
+  });
+
+  it('it was not the default: nothing is said about one', async () => {
+    const ws = workspace({ pdi: entry(), uat: entry({ environment: 'test' }) });
+    try {
+      const terminal = io([]);
+      expect(await runRemove({ label: 'uat', yes: true }, terminal, deps(ws))).toBe(EXIT_OK);
+      expect(terminal.written()).toBe('Removed instance "uat".\n');
     } finally { ws.cleanup(); }
   });
 });

@@ -39,7 +39,6 @@ import {
   probesJson, storeLabelFor, type StoreLabel,
 } from './format.js';
 import { appendAudit, type CliAuditEntry } from '../audit/writer.js';
-import { CORE_TOOLS_UNCONFIGURED } from '../tools/status.js';
 import {
   detectCloudSync, globalStorePath, maskPath, maskUsername, type StoreSource,
 } from '../store/paths.js';
@@ -49,6 +48,7 @@ import { probeAll, PROBE_FIELDS, probeFieldText, toLastProbe, type AuthProbe, ty
   type ProbeClient } from '../servicenow/probes.js';
 import { probeClientFor, probeOptionsFor } from '../servicenow/probe-client.js';
 import { nameList, type AclTools } from '../store/acl.js';
+import { startOfStore, type StartsOn } from '../store/start.js';
 import { loadStore, projectStorePath, resolveStorePath, saveStore, type SaveStoreOptions, type SaveStoreResult, type StoreAclOutcome } from '../store/index.js';
 import { STORE_VERSION, completeFlags, type Store, type StoreInstance } from '../store/schema.js';
 import { FLAG_NAMES, matchPreset, type FlagName, type Flags } from '../utils/permissions.js';
@@ -1431,19 +1431,43 @@ export const removeQuestion = (label: string, storePath: string): string =>
   `Remove instance "${label}"? This deletes its stored credentials from `
   + `${maskPath(storePath)}. [y/N] `;
 
-export const WAS_DEFAULT = (label: string): string =>
-  `"${label}" was the default instance; the server will start unconfigured until you run set-default.`;
+/**
+ * What `instance remove` says when the instance it removed was the default (ARC-09-C308, the architect's words of 2026-11-22).
+ *
+ * It said "the server will start unconfigured until you run set-default". With other instances left the server starts on the first saved instance that
+ * loads, in the order the store holds them (`store/start.ts`, the loader's rule), which can be a production instance, and it is unconfigured only when none
+ * loads or none is left (and then set-default cannot help). `left.start` is what a new session starts on once the instance is gone: the loader's answer,
+ * not a guess, and `left.count` how many instances the store still holds.
+ */
+export const WAS_DEFAULT = (label: string, left: { start: StartsOn | null; count: number }): string => {
+  const cli = cliSpelling();
+  if (left.count === 0) return `"${label}" was the default instance and the last one saved, so the server will start unconfigured until you add an instance.`;
+  if (left.start === null) {
+    return `"${label}" was the default instance. No default is set now, and none of the saved instances loads, so the server will start unconfigured. Run ${cli} instance list to see why.`;
+  }
+  return `"${label}" was the default instance. No default is set now, so a new session starts on "${left.start.label}" (${left.start.environment}), `
+    + `the first saved instance that loads. Choose one with ${cli} instance set-default <label>.`;
+};
 
 /**
- * The `set-default` sentence, with the reload tool named from the CONTRACT's own list.
+ * The `set-default` sentence (ARC-09-C308, the architect's words of 2026-11-22).
  *
- * A retyped tool token is what L01 exists to catch: the name appears in the contract, in
- * `governance/`, in the rule file and here, and four spellings of it is three chances to be
- * wrong on the day a name changes.
+ * It said the running server picks the new default up after a reload. A reload keeps an open session on its own instance (ARC-09-C245, `tools/status.ts`),
+ * so what is true is: new sessions start on it, an open one stays where it is, and a person moves it by asking it to switch, or by restarting. `start` is what
+ * a new session starts on now (the loader's rule): the instance itself when it loads, and when it does not (a production instance raised without the
+ * acknowledgement) the one it falls back to, or nothing.
  */
-export const defaultChanged = (label: string): string =>
-  `Default instance is now "${label}". The running server picks it up after `
-  + `${CORE_TOOLS_UNCONFIGURED[1]} (or /snowarch setup-instance --resume).`;
+export const defaultChanged = (label: string, start: StartsOn | null): string => {
+  const cli = cliSpelling();
+  if (start !== null && start.label === label) {
+    return `Default instance is now "${label}". New sessions start on it. A session that is already open stays on its own instance: ask it to switch to "${label}", or restart Claude.`;
+  }
+  if (start !== null) {
+    return `Default instance is now "${label}", but it does not load, so a new session starts on "${start.label}" (${start.environment}), `
+      + `the first saved instance that loads. Run ${cli} instance list to see why.`;
+  }
+  return `Default instance is now "${label}", but none of the saved instances loads, so the server will start unconfigured. Run ${cli} instance list to see why.`;
+};
 
 export interface ManageOptions {
   label?: string;
@@ -1968,12 +1992,13 @@ export function runSetDefault(options: ManageOptions, io: AddIo, deps: ManageDep
   if (!found.ok) { io.write(`${found.message}\n`); return EXIT_USAGE; }
   if (options.verbose) io.write(`${verboseStoreLine(opened.opened.path)}\n`);
 
-  saveStore(opened.opened.path, { ...opened.opened.store, defaultInstance: label } as Store);
+  const next = { ...opened.opened.store, defaultInstance: label } as Store;
+  saveStore(opened.opened.path, next);
   mirrorDefault(configFor(opened.opened.path, deps), label);
   audit({ ts: (deps.now ?? (() => new Date().toISOString()))(), instance: label,
     environment: found.entry.environment, tool: null, actor: 'cli', action: 'set-default',
     result: 'ok' });
-  io.write(`${defaultChanged(label)}\n`);
+  io.write(`${defaultChanged(label, startOfStore(next))}\n`);
   return EXIT_OK;
 }
 
@@ -2005,6 +2030,6 @@ export async function runRemove(options: ManageOptions, io: AddIo, deps: ManageD
   audit({ ts: (deps.now ?? (() => new Date().toISOString()))(), instance: label,
     environment: found.entry.environment, tool: null, actor: 'cli', action: 'remove', result: 'ok' });
   io.write(`Removed instance "${label}".\n`);
-  if (wasDefault) io.write(`${WAS_DEFAULT(label)}\n`);
+  if (wasDefault) io.write(`${WAS_DEFAULT(label, { start: startOfStore(next), count: Object.keys(next.instances).length })}\n`);
   return EXIT_OK;
 }
