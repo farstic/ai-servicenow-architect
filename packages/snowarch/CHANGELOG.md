@@ -21,6 +21,10 @@ else the first instance, in the store's order, that loads, else nothing), `entry
 `startOfStore`. `servicenow/instances.ts`'s `load()` asks it, and so do `instance set-default` and `instance remove`, whose messages (`defaultChanged` and `WAS_DEFAULT` in `cli/instance.ts`) take what a new
 session starts on as a second argument and say it. The loader's behaviour did not change. Nothing else in the package changed.
 
+**The doctor's instances say which one the server is on (ARC-09-C309).** `readStoreSummaries` (`store/label.ts`) reports `loads` for each entry (the loader's refusal rule, from `store/start.ts`, over fields that
+hold no credential; `null` when this build cannot tell, as for a preset it does not know), and the server doctor's `instances` entries carry `active` (`doctorInstances()` in `doctor/index.ts`, from the manager's own `listAll()`), so that the engine's Mode line can name the instance a
+new session starts on. Nothing else in the package changed.
+
 **Known gap, raised not closed: a second failed login (ARC-09-C119).** A call that wrote a cut value and
 then failed with `AUTHENTICATION_FAILED` still reads the dictionary to confirm the cut: a second request
 with credentials the instance has just refused.
