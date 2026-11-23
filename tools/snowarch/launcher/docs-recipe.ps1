@@ -17,9 +17,9 @@ function Invoke-DocsRecipeSparse {
   }
   git -c core.longpaths=true -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/acct-lifecycle-events markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-relationship-management markdown/customer-service-management markdown/delta-xanadu-australia markdown/employee-service-management markdown/financial-services-operations markdown/governance-risk-compliance markdown/healthcare-life-sciences markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/release-notes markdown/servicenow-platform legal
   if ($LASTEXITCODE -ne 0) { throw "corpus: sparse-checkout set failed" }
-  git -c core.longpaths=true -C vendor/ServiceNowDocs fetch --depth 1 origin 96d32129bb43ac72057be47de4ffd83cf128813c
+  git -c core.longpaths=true -C vendor/ServiceNowDocs fetch --depth 1 origin c85139fe9661a0a439ae47f1650afb6d055539d8
   if ($LASTEXITCODE -ne 0) { throw "corpus: fetch failed" }
-  git -c core.longpaths=true -C vendor/ServiceNowDocs checkout --detach 96d32129bb43ac72057be47de4ffd83cf128813c
+  git -c core.longpaths=true -C vendor/ServiceNowDocs checkout --detach c85139fe9661a0a439ae47f1650afb6d055539d8
   if ($LASTEXITCODE -ne 0) { throw "corpus: checkout failed" }
   git -c core.longpaths=true submodule absorbgitdirs vendor/ServiceNowDocs
   git -c core.longpaths=true submodule init -- vendor/ServiceNowDocs
@@ -38,9 +38,9 @@ function Invoke-DocsRecipeFull {
   }
   git -c core.longpaths=true -C vendor/ServiceNowDocs sparse-checkout disable
   if ($LASTEXITCODE -ne 0) { throw "corpus: sparse-checkout disable failed" }
-  git -c core.longpaths=true -C vendor/ServiceNowDocs fetch --depth 1 origin 96d32129bb43ac72057be47de4ffd83cf128813c
+  git -c core.longpaths=true -C vendor/ServiceNowDocs fetch --depth 1 origin c85139fe9661a0a439ae47f1650afb6d055539d8
   if ($LASTEXITCODE -ne 0) { throw "corpus: fetch failed" }
-  git -c core.longpaths=true -C vendor/ServiceNowDocs checkout --detach 96d32129bb43ac72057be47de4ffd83cf128813c
+  git -c core.longpaths=true -C vendor/ServiceNowDocs checkout --detach c85139fe9661a0a439ae47f1650afb6d055539d8
   if ($LASTEXITCODE -ne 0) { throw "corpus: checkout failed" }
   git -c core.longpaths=true submodule absorbgitdirs vendor/ServiceNowDocs
   git -c core.longpaths=true submodule init -- vendor/ServiceNowDocs
