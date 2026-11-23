@@ -658,3 +658,102 @@ test('ARC-08-C17 — the quick run reads the store, end to end', async (t) => {
     if (saved === undefined) delete process.env.SNOW_STORE; else process.env.SNOW_STORE = saved;
   }
 });
+
+/**
+ * ARC-09-C309 — the Mode line names the instance a new session starts on, not the first one in the store.
+ *
+ * `deriveMode` took `loaded[0]` (or `instances[0]` on a run that did not probe), so with a store whose default is its second instance the banner said
+ * `Mode: live — alpha` about a session that starts on `beta`: a user could believe the session was on another instance, which is worse than a wording
+ * issue. The rule for where a session starts is one (`store/start.ts`, ARC-09-C308): the default when it loads, else the first instance that loads.
+ * A run that did not probe asks it of the store's own entries (`loads`, from `readStoreSummaries`) and the default; a run that did takes what the server
+ * answered (`active`), and the same rule over what the server loaded when the answer carries no `active`. A caller that gives none of them gets what it
+ * always got.
+ */
+test('ARC-09-C309 — an unprobed run names the default, not the first instance of the store', () => {
+  const derived = deriveMode({ toggles: { enabled: true }, defaultInstance: 'beta', probed: false, spell: SPELL,
+    instances: [configured({ label: 'alpha', loads: true }), configured({ label: 'beta', environment: 'dev', loads: true })] });
+  assert.equal(derived.mode, 'live');
+  assert.deepEqual(derived.instance, { label: 'beta', environment: 'dev', preset: 'custom' });
+});
+
+test('ARC-09-C309 — an unprobed run with no default names the first instance that LOADS', () => {
+  const derived = deriveMode({ toggles: { enabled: true }, defaultInstance: null, probed: false, spell: SPELL,
+    instances: [configured({ label: 'prodr', environment: 'prod', loads: false }), configured({ label: 'devy', environment: 'dev', loads: true })] });
+  assert.equal(derived.instance.label, 'devy');
+});
+
+test('ARC-09-C309 — a default that does not load, or is not in the store, is no default', () => {
+  const instances = [configured({ label: 'prodr', environment: 'prod', loads: false }), configured({ label: 'alpha', loads: true }), configured({ label: 'beta', loads: true })];
+  assert.equal(deriveMode({ toggles: { enabled: true }, defaultInstance: 'prodr', probed: false, spell: SPELL, instances }).instance.label, 'alpha');
+  assert.equal(deriveMode({ toggles: { enabled: true }, defaultInstance: 'gone', probed: false, spell: SPELL, instances }).instance.label, 'alpha');
+});
+
+test('ARC-09-C309 — a production instance that loads can be where a session starts, and the line says so by naming it', () => {
+  const derived = deriveMode({ toggles: { enabled: true }, defaultInstance: null, probed: false, spell: SPELL,
+    instances: [configured({ label: 'prodx', environment: 'prod', loads: true }), configured({ label: 'devy', environment: 'dev', loads: true })] });
+  assert.deepEqual([derived.instance.label, derived.instance.environment], ['prodx', 'prod']);
+});
+
+test('ARC-09-C309 — a caller that knows neither the store nor the server\'s answer is unchanged: the first, as it was', () => {
+  const derived = deriveMode({ toggles: { enabled: true }, probed: false, spell: SPELL,
+    instances: [configured({ label: 'alpha' }), configured({ label: 'beta' })] });
+  assert.equal(derived.instance.label, 'alpha');
+  assert.equal(derived.variant, 'liveUnprobed');
+});
+
+/**
+ * The line must not name an instance the session will not use (the architect's ruling, 2026-11-22). A store in which nothing loads (every entry a
+ * production instance raised without the acknowledgement, say) has no instance a session starts on; the quick run used to name the first one and call
+ * itself live. It says that no saved instance loads and where to look, with the launcher this platform spells, and it is not live: the same verdict the
+ * full run gives for the same store (`noInstanceLoaded`), so the banner and the doctor do not disagree.
+ */
+const SAID_NONE_LOADS = `Mode: design-only — server enabled but no saved instance loads (${SPELL.cli} instance list says why)`;
+
+test('ARC-09-C309 — a store in which nothing loads: the line names no instance, says so, and says where to look', () => {
+  const derived = deriveMode({ toggles: { enabled: true }, defaultInstance: 'prodr', probed: false, spell: SPELL,
+    instances: [configured({ label: 'prodr', environment: 'prod', loads: false }), configured({ label: 'prodw', environment: 'prod', loads: false })] });
+  assert.equal(derived.mode, 'design-only');
+  assert.equal(derived.variant, 'noSavedInstanceLoads');
+  assert.equal(derived.instance, null);
+  assert.equal(modeLine(derived), SAID_NONE_LOADS);
+});
+
+test('ARC-09-C309 — ...and one entry that loads is enough for the line to be live, naming it', () => {
+  const derived = deriveMode({ toggles: { enabled: true }, defaultInstance: 'prodr', probed: false, spell: SPELL,
+    instances: [configured({ label: 'prodr', environment: 'prod', loads: false }), configured({ label: 'devy', environment: 'dev', loads: true })] });
+  assert.equal(derived.mode, 'live');
+  assert.equal(derived.instance.label, 'devy');
+});
+
+test('ARC-09-C309 — ...and an entry that does not say whether it loads is not "none loads": only a store that says so is believed', () => {
+  const derived = deriveMode({ toggles: { enabled: true }, probed: false, spell: SPELL,
+    instances: [configured({ label: 'prodr', loads: false }), configured({ label: 'alpha' })] });
+  assert.equal(derived.mode, 'live');
+  assert.equal(derived.instance.label, 'alpha');
+});
+
+test('ARC-09-C309 — ...nor is an entry the build cannot read (`loads` is null: a preset it does not know): the line stays live and names it', () => {
+  // a store written by a newer build: this build cannot tell whether the loader takes the entry, and says so with null (it does not guess false, which would
+  // turn the line into "no saved instance loads", where ARC-08-C21 keeps it live with its flags unknown)
+  const mixed = deriveMode({ toggles: { enabled: true }, probed: false, spell: SPELL,
+    instances: [configured({ label: 'prodr', loads: false }), configured({ label: 'newer', loads: null })] });
+  assert.equal(mixed.mode, 'live');
+  assert.equal(mixed.instance.label, 'newer');
+  const only = deriveMode({ toggles: { enabled: true }, probed: false, spell: SPELL, instances: [configured({ label: 'newer', loads: null })] });
+  assert.equal(only.mode, 'live');
+  assert.equal(only.instance.label, 'newer');
+});
+
+test('ARC-09-C309 — a probed run names the instance the server is on (`active`), then the default among those it loaded, then the first it loaded', () => {
+  const two = [loaded({ label: 'alpha' }), loaded({ label: 'beta', environment: 'dev', active: true })];
+  assert.equal(deriveMode({ toggles: { enabled: true }, instances: two, spell: SPELL }).instance.label, 'beta');
+  // no `active` in the answer: the rule over what the server loaded
+  const plain = [loaded({ label: 'alpha' }), loaded({ label: 'beta', environment: 'dev' })];
+  assert.equal(deriveMode({ toggles: { enabled: true }, defaultInstance: 'beta', instances: plain, spell: SPELL }).instance.label, 'beta');
+  assert.equal(deriveMode({ toggles: { enabled: true }, defaultInstance: null, instances: plain, spell: SPELL }).instance.label, 'alpha');
+  // a default the server refused is no default
+  const refused = [loaded({ label: 'prodr', status: 'not_loaded' }), ...plain];
+  assert.equal(deriveMode({ toggles: { enabled: true }, defaultInstance: 'prodr', instances: refused, spell: SPELL }).instance.label, 'alpha');
+  // the old shape, with neither: the first it loaded
+  assert.equal(deriveMode({ toggles: { enabled: true }, instances: plain, spell: SPELL }).instance.label, 'alpha');
+});

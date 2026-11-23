@@ -316,4 +316,13 @@ describe('the report ARC-07-S09 reads', () => {
     expect(first?.username).toBe('s***@corp.example.com');
     expect(JSON.stringify(report)).not.toContain(FIXTURE_PASS);
   });
+
+  // ARC-09-C309: the entry the server is on is marked, so that the engine's Mode line names it and not the first of the list. `report-instances.test.ts` holds
+  // `doctorInstances()`; this holds that the report carries it, through the real run.
+  it('marks the instance the server started on as active, and only that one, when the default is not the first', async () => {
+    const p = writeStore({ alpha: entry({ preset: 'custom', flags: allFlags('false') }), beta: entry({ preset: 'custom', flags: allFlags('false') }) });
+    writeFileSync(p, `${JSON.stringify({ ...JSON.parse(readFileSync(p, 'utf8')), defaultInstance: 'beta' }, null, 2)}\n`, { mode: 0o600 });
+    const report = await runDoctor();
+    expect(report.instances.map((i) => [i.label, i.active])).toEqual([['alpha', false], ['beta', true]]);
+  });
 });

@@ -501,8 +501,15 @@ jobs:
       # '@modelcontextprotocol/sdk'`), so those nine cases are about the installed machine, and the
       # `test (os, node)` matrix is where they run. Measured in the acceptance pass: 222 of 231
       # cases pass here, and the nine that do not are exactly those three files.
+      #
+      # ARC-09-C309 — SNOWARCH_STDLIB_ONLY=1, set below in both variants of the step, is this step's own marker. A test that needs the installed
+      # dependencies (the comparisons with the loader, tests/doctor/mode-instance-parity.test.mjs) skips ONLY when it is set, because here there are none by
+      # design; anywhere else a missing package fails the test, so a step that lost its node_modules cannot skip them in silence.
+      # tests/doctor/stdlib-marker.test.mjs holds both, and that both variants set it.
       - name: The doctor's stdlib-only tests, before any install (POSIX)
         if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        env:
+          SNOWARCH_STDLIB_ONLY: '1'
         run: |
           test ! -d node_modules || { echo "node_modules exists — this step proves nothing"; exit 1; }
           # Positional parameters, not a string: `ls | grep` is SC2010 and an unquoted `$files` is
@@ -535,6 +542,8 @@ jobs:
       - name: The doctor's stdlib-only tests, before any install (Windows)
         if: matrix.variant == 'node-cli' && matrix.os == 'windows-latest'
         shell: powershell
+        env:
+          SNOWARCH_STDLIB_ONLY: '1'
         run: |
           if (Test-Path node_modules) { Write-Error "node_modules exists - this step proves nothing"; exit 1 }
           $files = Get-ChildItem tests/doctor/*.test.mjs |
