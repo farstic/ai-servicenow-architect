@@ -347,7 +347,7 @@ const SENTENCES = [
   `Your password is saved, but Windows would not let the installer lock the file, so other accounts on this computer might be able to read it. Run ${CLI} doctor --fix. It shows what it will change and changes it when you press Enter. If it cannot lock the file either, send the output of ${CLI} doctor (see Asking for help).`,
   'The installer locks that file, and the folder .local around it, so that only your account and the system can read them (the computer\'s administrators can always take a file over).',
   `${CLI} doctor checks it (check SV-02) and names anyone else who could read the file; ${CLI} doctor --fix repairs it after showing what it will change.`,
-  'This guide was written from one end-to-end install (12 November 2026) and confirmed by a second, on a new laptop on 19 November 2026, that followed every step as written. Four things in it rest on something other than a run:',
+  'This guide was written from one end-to-end install (12 November 2026) and confirmed by a second, on a new laptop on 19 November 2026, that followed every step as written. Five things in it rest on something other than a run:',
   'Windows 10. The test machine ran Windows 11. Windows 10 (version 1809 or later) has the same PowerShell 5.1 and takes the same commands.',
   'Claude Code\'s first-run screens on Windows (Step 3). They are described in general terms because they change with Claude Code\'s releases.',
   'A folder name with a space in it, a folder on a network drive, and a folder that OneDrive or another sync tool manages (Step 4).',
@@ -359,6 +359,17 @@ const SENTENCES = [
   // The closing line of the last step sends the reader to the user guide's page, which holds every command and setting (ARC-09-C306).
   'The User Guide in your folder, docs\\USER-GUIDE.md, shows how to work with it, with examples for analysts, architects and developers.',
   'Every command and setting is in docs\\AI-Architect-User-Guide.html, which you open in your browser.',
+  // ARC-09-C310: Windows PowerShell takes npm.ps1 for the bare name and the default policy blocks it, so the guide types the .cmd names (the words the architect approved, 2026-11-23).
+  'The last one is `npm.cmd` and not `npm`, because PowerShell would pick `npm.ps1`, which Windows blocks by default, while `npm.cmd` needs no change to that setting.',
+  'If one of them answers *is not recognized*, or npm answers *cannot be loaded because running scripts is disabled*, see "If something goes wrong".',
+  'Type `npm.cmd` and `now-sdk.cmd` with the `.cmd`, for the reason given in 2e.',
+  '\'git\', \'node\', \'npm.cmd\' or \'now-sdk.cmd\' is not recognized',
+  'npm.ps1 cannot be loaded because running scripts is disabled on this system',
+  'Windows blocks PowerShell scripts by default, and PowerShell took the script `npm.ps1` for `npm`.',
+  'Type `npm.cmd` in place of `npm` (for example `npm.cmd --version`), and `now-sdk.cmd` in place of `now-sdk`: no setting needs to change.',
+  'If you want `npm` itself to run, type `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` and open a new window.',
+  'If your company sets the policy with Group Policy, that command has no effect, and `npm.cmd` is the way.',
+  '**`npm.cmd` and `now-sdk.cmd`** (step 2e, Optional tools). The two installs typed `npm` and `now-sdk`, which ran on those computers. A reader whose PowerShell blocked scripts reported the failure, and the `.cmd` names are the ones that need no change to that setting.',
 ];
 
 test('ARC-09-C285 — the sentences of the review of 2026-11-16 are on the page, and they are the Markdown guide\'s', () => {
@@ -375,6 +386,51 @@ test('ARC-09-C285 — the sentences of the review of 2026-11-16 are on the page,
     assert.equal(pageText.includes(gone) || code.includes(gone), false, `the page still says: ${gone}`);
   }
   assert.doesNotMatch(markup, /LIC-\d{4}-(?!0000)\d{4}/, 'a licence number on a page is the placeholder');
+});
+
+// ARC-09-C310: the paste check and the list of problems, built from the page's own command and row, so a change of either is followed by the other.
+test('ARC-09-C310 — the paste check reads the answer of npm.cmd, the error that makes the name necessary, and the failure of the new name', () => {
+  const npmCmd = data.commands.find((c) => c.id === 's2e-npm').code;
+  assert.equal(npmCmd, 'npm.cmd --version', 'the page checks npm by the name that has no script beside it');
+  const npmRow = (text) => P.checkVersions(text).items.find((i) => i.k === 'npm');
+  // What it answers, with the prompt line a reader pastes with it, and alone.
+  const answered = npmRow(`PS C:\\Users\\you> ${npmCmd}\n11.20.0\n`);
+  assert.deepEqual([answered.cls, answered.t], ['oci ok', '✓ 11.20.0 — any version works.']);
+  assert.equal(npmRow('11.20.0').cls, 'oci ok');
+  // The error of the bare name as Windows PowerShell 5.1 prints it, around the page's own row, and wrapped at the width of a console.
+  const see = data.trouble.find((r) => r.id === 'npm-ps1').see;
+  const error = `npm : File C:\\Users\\you\\AppData\\Local\\Programs\\node-v26.13.0-win-x64\\${see}. For more information, see about_Execution_Policies at https:/go.microsoft.com/fwlink/?LinkID=135170.\n`
+    + 'At line:1 char:1\n+ npm --version\n+ ~~~\n    + CategoryInfo          : SecurityError: (:) [], PSSecurityException\n    + FullyQualifiedErrorId : UnauthorizedAccess\n';
+  const blocked = `✕ Windows blocked npm.ps1, the script PowerShell picked for npm. Run ${npmCmd} instead: npm.cmd needs no setting changed.`;
+  for (const text of [error, error.replace('running scripts', 'running\nscripts'), error.replace('cannot be loaded', 'cannot be\nloaded')]) {
+    const row = npmRow(text);
+    assert.deepEqual([row.cls, row.t], ['oci bad', blocked], text.slice(0, 120));
+  }
+  // The answer of the right name, pasted after the error, is the one that counts.
+  assert.equal(npmRow(`${error}PS C:\\Users\\you> ${npmCmd}\n11.20.0\n`).cls, 'oci ok');
+  // PowerShell prints the name that was typed: `npm.cmd` is not recognized when the folder is not on PATH, and the check used to read only `'npm'`.
+  for (const name of ['npm.cmd', 'npm']) {
+    const row = npmRow(`${name} : The term '${name}' is not recognized as the name of a cmdlet, function, script file, or operable program.\n`);
+    assert.deepEqual([row.cls, row.t.startsWith('✕ Not found.')], ['oci bad', true], name);
+  }
+  // Nothing about npm in the paste: the line says which command to run, and it is the page's.
+  const none = npmRow('v26.13.0\n');
+  assert.deepEqual([none.cls, none.t], ['oci warn', `! Not in what you pasted. Run ${npmCmd}.`]);
+  // The error is about npm: the other three rows read what is in the paste, as before.
+  assert.deepEqual(P.checkVersions(error).items.filter((i) => i.k !== 'npm').map((i) => i.cls), ['oci warn', 'oci warn', 'oci warn']);
+});
+
+test('ARC-09-C310 — the list of problems has the row of the blocked script, offered under 2e and worded as the guide words it, and the missing-program row names what the reader types', () => {
+  const row = data.trouble.find((r) => r.id === 'npm-ps1');
+  assert.ok(row, 'no row for the blocked script');
+  assert.equal(row.see, 'npm.ps1 cannot be loaded because running scripts is disabled on this system');
+  assert.deepEqual([row.href, row.link], ['#step-2', 'Step 2e']);
+  assert.ok(data.stepTrouble['step-2'].includes('npm-ps1'), 'the reader of step 2 is not offered the row');
+  // The same fix as the Markdown guide's row: the words of its second cell, without the marks the page does not show.
+  const mdLine = md.split('\n').find((l) => l.startsWith(`| ${row.see} | `));
+  assert.ok(mdLine, 'the Markdown guide has no row for the message');
+  assert.equal(plain(row.do), plain(mdLine.slice(1, -1).split(' | ')[1]), 'the page says another fix than the guide');
+  assert.equal(data.trouble.find((r) => r.id === 'tools-nr').see, '\'git\', \'node\', \'npm.cmd\' or \'now-sdk.cmd\' is not recognized');
 });
 
 // ARC-09-C300: the guide was run end to end twice, on 12 November 2026 and, by a second install on a new laptop, on 19 November 2026. The second run is recorded

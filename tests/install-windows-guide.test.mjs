@@ -369,3 +369,62 @@ test('ARC-09-C271 — the Word converter is run under the PowerShell every Windo
   }
   assert.match(read('scripts/README.md'), /`render-pdf-pages\.ps1` needs Word and has not been tested under 5\.1 yet/);
 });
+
+// ── ARC-09-C310: Windows PowerShell takes npm.ps1 for the bare name npm, and the default policy blocks every script ───────────────────────────────
+// A reader followed this page in Windows PowerShell 5.1 and `npm --version` of step 2e answered `npm.ps1 cannot be loaded because running scripts is disabled
+// on this system`. The Node.js zip puts `npm.ps1` beside `npm.cmd`, and so does `npm install -g` for a tool it installs. The page types the `.cmd` names; the
+// guard over all three guides is tests/windows-npm-shims.test.mjs, and the words below are the ones the architect approved (2026-11-23).
+const BLOCKED = 'npm.ps1 cannot be loaded because running scripts is disabled on this system';
+const BLOCKED_FIX = 'Windows blocks PowerShell scripts by default, and PowerShell took the script `npm.ps1` for `npm`. Type `npm.cmd` in place of `npm` (for example `npm.cmd --version`), '
+  + 'and `now-sdk.cmd` in place of `now-sdk`: no setting needs to change. If you want `npm` itself to run, type `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` '
+  + 'and open a new window. If your company sets the policy with Group Policy, that command has no effect, and `npm.cmd` is the way.';
+
+/** The text of a heading's section: from its line to the next heading of the same level or above. */
+function sectionOf(level, heading) {
+  const lines = page.split('\n');
+  const start = lines.findIndex((l) => l === `${'#'.repeat(level)} ${heading}`);
+  assert.ok(start >= 0, `no heading "${heading}"`);
+  const end = lines.findIndex((l, i) => i > start && new RegExp(`^#{1,${level}} `).test(l));
+  return lines.slice(start + 1, end < 0 ? undefined : end).join('\n');
+}
+/** The rows of the Markdown tables in a text, as trimmed cells (the page writes no pipe inside a cell). */
+const tableRows = (text) => text.split('\n').filter((l) => /^\|.*\|$/.test(l) && !/^\|[\s|:-]+\|$/.test(l)).map((l) => l.slice(1, -1).split(' | ').map((c) => c.trim()));
+
+test('ARC-09-C310 — step 2e checks npm with npm.cmd and says why in one sentence, and sends a reader who meets the error to the rows of problems', () => {
+  assert.deepEqual(runs.filter((b) => b.heading.startsWith('2e · ')).map((b) => b.lines.join('').trim()),
+    ['claude --version', 'git --version', 'node --version', 'npm.cmd --version'], 'the four checks of 2e, in order, the last by the name that has no script beside it');
+  const s2e = fold(sectionOf(3, '2e · Open a fresh window and check'));
+  assert.ok(s2e.includes('The last one is `npm.cmd` and not `npm`, because PowerShell would pick `npm.ps1`, which Windows blocks by default, while `npm.cmd` needs no change to that setting.'));
+  assert.ok(s2e.includes('If one of them answers *is not recognized*, or npm answers *cannot be loaded because running scripts is disabled*, see "If something goes wrong".'));
+});
+
+test('ARC-09-C310 — the SDK step types the .cmd names of npm and of the tool it installs, for the reason given in 2e', () => {
+  assert.deepEqual(runs.filter((b) => b.heading === 'ServiceNow SDK').map((b) => b.lines.join('').trim()).slice(0, 2), ['npm.cmd install -g @servicenow/sdk', 'now-sdk.cmd --version']);
+  assert.ok(fold(sectionOf(3, 'ServiceNow SDK')).includes('Type `npm.cmd` and `now-sdk.cmd` with the `.cmd`, for the reason given in 2e.'));
+});
+
+test('ARC-09-C310 — "If something goes wrong" has the row of the blocked script, and the troubleshooting page says it in the same words', () => {
+  const rows = tableRows(sectionOf(2, 'If something goes wrong'));
+  // PowerShell prints the name that was typed, and the page no longer types the bare one.
+  assert.ok(rows.some((r) => r[0] === "'git', 'node', 'npm.cmd' or 'now-sdk.cmd' is not recognized"), 'the row of the missing programs names a command the reader no longer types');
+  const row = rows.find((r) => r[0] === BLOCKED);
+  assert.ok(row, 'no row for the blocked script');
+  assert.equal(row[1], BLOCKED_FIX);
+  // The policy change is the reader's option, in a sentence; it is never a step (the test of the commands refuses the cmdlet in a block).
+  assert.equal(commands.some((c) => /Set-ExecutionPolicy/.test(c.line)), false);
+  // The troubleshooting page, beside the other messages of installing on Windows.
+  const troubleshooting = fold(read('docs/TROUBLESHOOTING.md'));
+  assert.ok(troubleshooting.includes(BLOCKED), 'the troubleshooting page lacks the message');
+  assert.ok(troubleshooting.includes(BLOCKED_FIX), 'the troubleshooting page says another fix');
+  assert.ok(troubleshooting.includes('The product is not affected: the launchers start PowerShell with `-ExecutionPolicy Bypass`, and it runs npm as `npm.cmd`.'));
+  assert.ok(troubleshooting.includes("`'git' is not recognized` (or `'node'`, `'npm.cmd'`, `'now-sdk.cmd'`)"), 'the page of messages names the bare commands');
+});
+
+test('ARC-09-C310 — the record says that the .cmd names rest on something other than a run: both installs typed npm and now-sdk', () => {
+  const record = sectionOf(2, 'What has not been tested');
+  assert.ok(fold(record).includes('Five things in it rest on something other than a run:'));
+  const bullets = record.split('\n').filter((l) => l.startsWith('- '));
+  assert.equal(bullets.length, 5);
+  assert.equal(bullets[4], '- **`npm.cmd` and `now-sdk.cmd`** (step 2e, Optional tools). The two installs typed `npm` and `now-sdk`, which ran on those computers. '
+    + 'A reader whose PowerShell blocked scripts reported the failure, and the `.cmd` names are the ones that need no change to that setting.');
+});

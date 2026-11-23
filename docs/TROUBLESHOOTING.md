@@ -57,11 +57,18 @@ done about it; `./snowarch doctor` is what tells you whether the install is actu
 **Three messages from installing on Windows without administrator rights.** On a computer where you are a standard user,
 `0x8a15000f : Data required by the source is missing` from `winget` means its package list is broken, and only an
 administrator can repair it; `The operation was canceled by the user` from an installer means it asked for an administrator
-password and none was given; and `'git' is not recognized` (or `'node'`, `'npm'`, `'now-sdk'`) for a program that is installed
+password and none was given; and `'git' is not recognized` (or `'node'`, `'npm.cmd'`, `'now-sdk.cmd'`) for a program that is installed
 means the window was opened before the program's folder was added to `PATH`: open a new PowerShell window, or reload it in this one with
 `$env:Path = [Environment]::GetEnvironmentVariable("Path", "User") + ";" + [Environment]::GetEnvironmentVariable("Path", "Machine")`.
 None of the three is a fault in the product. [INSTALL-WINDOWS.md](INSTALL-WINDOWS.md) installs everything for your own user, without
 `winget` and without an installer that needs an administrator.
+
+**A message from PowerShell's script policy.** `npm.ps1 cannot be loaded because running scripts is disabled on this system` is what PowerShell
+prints when `npm` is typed. Windows blocks PowerShell scripts by default, and PowerShell took the script `npm.ps1` for `npm`. Type `npm.cmd`
+in place of `npm` (for example `npm.cmd --version`), and `now-sdk.cmd` in place of `now-sdk`: no setting needs to change. If you want `npm`
+itself to run, type `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` and open a new window. If your company sets the policy
+with Group Policy, that command has no effect, and `npm.cmd` is the way. The product is not affected: the launchers start PowerShell with
+`-ExecutionPolicy Bypass`, and it runs npm as `npm.cmd`. [INSTALL-WINDOWS.md](INSTALL-WINDOWS.md) types the `.cmd` names.
 
 75 codes.
 

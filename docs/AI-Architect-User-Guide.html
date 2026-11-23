@@ -1267,7 +1267,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">SCRIPTING</code></td><td>Write Script Includes, Business Rules, Client Scripts, ACLs and UI Actions, and change update sets — which every configuration change needs (see <a href="#capture">Update sets</a>). Needs WRITE.</td></tr>
             <tr><td><code class="ic">ATF</code></td><td>Create Automated Test Framework tests and their steps, which also needs WRITE, and run them. A step that runs a server script also needs SCRIPTING.</td></tr>
             <tr><td><code class="ic">NOW_ASSIST</code></td><td>The Now Assist tools. Needs a Now Assist licence on the instance. Building an AI agent or an agentic workflow also needs WRITE.</td></tr>
-            <tr><td><code class="ic">FLUENT</code></td><td>The ServiceNow SDK (Fluent) tools; creating or building a project also needs WRITE. Needs the SDK installed for your user with <code class="ic">npm i -g @servicenow/sdk</code><span class="os-win">, with <code class="ic">%APPDATA%\npm</code> on PATH</span>. If you do not use it, switch it off.</td></tr>
+            <tr><td><code class="ic">FLUENT</code></td><td>The ServiceNow SDK (Fluent) tools; creating or building a project also needs WRITE. Needs the SDK installed for your user with <code class="ic os-mac">npm i -g @servicenow/sdk</code><span class="os-or"> or </span><code class="ic os-win">npm.cmd i -g @servicenow/sdk</code><span class="os-win">, with <code class="ic">%APPDATA%\npm</code> on PATH</span>. If you do not use it, switch it off.</td></tr>
           </tbody>
         </table></div>
         <div class="tw trouble"><table>
@@ -1405,7 +1405,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <tr><td><code class="ic">INSTANCE_NOT_LOADED</code></td><td>A saved instance did not load. Ask which instances loaded and why; a production instance with raised permissions needs the acknowledgement.</td></tr>
             <tr><td><code class="ic">UNKNOWN_INSTANCE</code></td><td>No instance with that label is saved: check the label in <a href="#inst-list">your instances</a>.</td></tr>
             <tr><td><code class="ic">STORE_SCHEMA_NEWER</code> · <code class="ic">STORE_SCHEMA_OUTDATED</code></td><td>The saved instances were written by a newer, or an older, release: <a href="#upgrading">upgrade</a>, or <a href="#migrate">migrate the store</a>.</td></tr>
-            <tr><td><code class="ic">FLUENT_NOT_INSTALLED</code></td><td>Install the ServiceNow SDK for your user: <code class="ic">npm i -g @servicenow/sdk</code>.</td></tr>
+            <tr><td><code class="ic">FLUENT_NOT_INSTALLED</code></td><td>Install the ServiceNow SDK for your user: <code class="ic os-mac">npm i -g @servicenow/sdk</code><span class="os-or"> or </span><code class="ic os-win">npm.cmd i -g @servicenow/sdk</code>.</td></tr>
             <tr><td><code class="ic">LICENCE_NOT_VALID</code></td><td>The licence is not in force, or covers design-only work: <a href="#licence">Your licence</a>. Restart Claude afterwards.</td></tr>
             <tr><td><code class="ic">INTEGRITY_NOT_VERIFIED</code></td><td>The AI Architect's own files cannot be checked or put back: run the <a href="#health">health check</a>; see <a href="#signed-files">Files you never edit</a>. Restart Claude afterwards.</td></tr>
           </tbody>
@@ -3589,7 +3589,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "fluent",
    "see": "FLUENT_NOT_INSTALLED",
-   "do": "Install the ServiceNow SDK for your user: npm i -g @servicenow/sdk, then open a new window.",
+   "do": "Install the ServiceNow SDK for your user: npm i -g @servicenow/sdk, or in Windows PowerShell npm.cmd i -g @servicenow/sdk, then open a new window.",
    "href": "#permissions",
    "link": "Permissions",
    "k": "fluent sdk servicenow now-sdk not installed npm"
