@@ -522,7 +522,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <div class="stack"><div data-cmd="s2d"></div></div>
 
         <h3><b>2e</b>Open a fresh window and check</h3>
-        <p>Close PowerShell and open a new one exactly as in Step 1, so it sees the new programs. Then run these four commands, one at a time.</p>
+        <p>Close PowerShell and open a new one exactly as in Step 1, so it sees the new programs. Then run these four commands, one at a time. The last one is <code class="ic">npm.cmd</code> and not <code class="ic">npm</code>, because PowerShell would pick <code class="ic">npm.ps1</code>, which Windows blocks by default, while <code class="ic">npm.cmd</code> needs no change to that setting.</p>
         <div class="stack">
           <div data-cmd="s2e-claude"></div>
           <div data-cmd="s2e-git"></div>
@@ -548,7 +548,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <div class="oclist" id="oc-v-list" hidden></div>
           </div>
         </div>
-        <p class="muted">If one of them answers <i>is not recognized</i>, see <a href="#trouble">If something goes wrong</a>.</p>
+        <p class="muted">If one of them answers <i>is not recognized</i>, or npm answers <i>cannot be loaded because running scripts is disabled</i>, see <a href="#trouble">If something goes wrong</a>.</p>
 
         <h3><b>2f</b>draw.io Desktop (for the diagrams)</h3>
         <p>The AI Architect draws its diagrams in draw.io and turns them into pictures for your Word documents. Without draw.io Desktop on this computer it stops with <code class="ic">ERROR: draw.io Desktop not found</code> and cannot make the Word file. This is the zip version (180 MB): no installer, no administrator rights. Download it:</p>
@@ -898,6 +898,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
           </tbody>
         </table></div>
         <h3><b>■</b>ServiceNow SDK</h3>
+        <p>Type <code class="ic">npm.cmd</code> and <code class="ic">now-sdk.cmd</code> with the <code class="ic">.cmd</code>, for the reason given in 2e.</p>
         <div class="stack">
           <div data-cmd="o-sdk"></div>
           <div data-cmd="o-sdkv"></div>
@@ -1041,12 +1042,13 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
       <!-- NOT TESTED -->
       <section class="sec" id="untested">
         <div class="sec-head"><div class="num ink">?</div><div class="t"><small>Read once</small><h2>What has not been tested</h2></div></div>
-        <p>This guide was written from one end-to-end install (12 November 2026) and confirmed by a second, on a new laptop on 19 November 2026, that followed every step as written. Four things in it rest on something other than a run:</p>
+        <p>This guide was written from one end-to-end install (12 November 2026) and confirmed by a second, on a new laptop on 19 November 2026, that followed every step as written. Five things in it rest on something other than a run:</p>
         <ul>
           <li><b>Windows 10.</b> The test machine ran Windows 11. Windows 10 (version 1809 or later) has the same PowerShell 5.1 and takes the same commands.</li>
           <li><b>Claude Code's first-run screens on Windows</b> (Step 3). They are described in general terms because they change with Claude Code's releases.</li>
           <li><b>A folder name with a space in it, a folder on a network drive, and a folder that OneDrive or another sync tool manages</b> (Step 4).</li>
           <li><b>What the screens say after the licence has ended</b> (Step 7). The table is the product's own list of states, not a transcript of each one.</li>
+          <li><b><code class="ic">npm.cmd</code> and <code class="ic">now-sdk.cmd</code></b> (step 2e, Optional tools). The two installs typed <code class="ic">npm</code> and <code class="ic">now-sdk</code>, which ran on those computers. A reader whose PowerShell blocked scripts reported the failure, and the <code class="ic">.cmd</code> names are the ones that need no change to that setting.</li>
         </ul>
         <p>If you meet a difference, <code class="ic">.\snowarch.cmd version</code> and <code class="ic">.\snowarch.cmd doctor</code> (see <a href="#help">Asking for help</a>) are what to send.</p>
       </section>
@@ -1133,7 +1135,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   },
   {
    "id": "s2e-npm",
-   "code": "npm --version"
+   "code": "npm.cmd --version"
   },
   {
    "id": "s2f-dl",
@@ -1189,11 +1191,11 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   },
   {
    "id": "o-sdk",
-   "code": "npm install -g @servicenow/sdk"
+   "code": "npm.cmd install -g @servicenow/sdk"
   },
   {
    "id": "o-sdkv",
-   "code": "now-sdk --version"
+   "code": "now-sdk.cmd --version"
   },
   {
    "id": "o-fluent",
@@ -1636,11 +1638,19 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   },
   {
    "id": "tools-nr",
-   "see": "'git', 'node', 'npm' or 'now-sdk' is not recognized",
+   "see": "'git', 'node', 'npm.cmd' or 'now-sdk.cmd' is not recognized",
    "do": "Open a new PowerShell window: programs installed in Step 2 are seen only by new windows. If it persists, repeat that program's part of Step 2, including its PATH command.",
    "href": "#step-2",
    "link": "Step 2",
    "k": "git node npm now-sdk path command not found"
+  },
+  {
+   "id": "npm-ps1",
+   "see": "npm.ps1 cannot be loaded because running scripts is disabled on this system",
+   "do": "Windows blocks PowerShell scripts by default, and PowerShell took the script npm.ps1 for npm. Type npm.cmd in place of npm (for example npm.cmd --version), and now-sdk.cmd in place of now-sdk: no setting needs to change. If you want npm itself to run, type Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned and open a new window. If your company sets the policy with Group Policy, that command has no effect, and npm.cmd is the way.",
+   "href": "#step-2",
+   "link": "Step 2e",
+   "k": "npm ps1 script scripts disabled blocked execution policy PSSecurityException UnauthorizedAccess cmd now-sdk"
   },
   {
    "id": "admin-prompt",
@@ -1759,6 +1769,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   "step-2": [
    "claude-nr",
    "tools-nr",
+   "npm-ps1",
    "admin-prompt",
    "winget",
    "drawio",
@@ -2106,7 +2117,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   function checkVersions(T) {
     var F = D.floors;
     var items = [];
-    var nr = function (n) { return new RegExp("'" + n + "'[^\\n]{0,40}is not recognized", 'i').test(T); };
+    var nr = function (n) { return new RegExp("'" + n + "(?:\\.cmd)?'[^\\n]{0,40}is not recognized", 'i').test(T); };
     if (/is not recognized as an internal or external command/i.test(T)) items.push(ocItem('Window', 'bad', 'This is Command Prompt, not PowerShell. Open PowerShell as in Step 1.'));
     var m = T.match(/(\d+\.\d+\.\d+)\s*\(Claude Code\)/i);
     if (m) items.push(cmpVer(m[1], F.claudeCode) >= 0 ? ocItem('Claude Code', 'ok', m[1] + ' — new enough.') : ocItem('Claude Code', 'bad', m[1] + ' is too old: you need ' + F.claudeCode + ' or later. Run 2c again.'));
@@ -2125,8 +2136,9 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
     var lines = T.split(/\r?\n/).map(function (l) { return l.replace(/^PS [^>]*>\s*/, '').trim(); });
     var npm = lines.filter(function (l) { return /^\d+\.\d+\.\d+$/.test(l); })[0];
     if (npm) items.push(ocItem('npm', 'ok', npm + ' — any version works.'));
+    else if (/cannot be loaded because running scripts is disabled/i.test(T.replace(/\s+/g, ' '))) items.push(ocItem('npm', 'bad', 'Windows blocked npm.ps1, the script PowerShell picked for npm. Run npm.cmd --version instead: npm.cmd needs no setting changed.'));
     else if (nr('npm')) items.push(ocItem('npm', 'bad', 'Not found. It comes with Node.js: repeat 2b including its PATH command, then open a new window.'));
-    else items.push(ocItem('npm', 'warn', 'Not in what you pasted. Run npm --version.'));
+    else items.push(ocItem('npm', 'warn', 'Not in what you pasted. Run npm.cmd --version.'));
     return { items: items, sum: ocSum(items) };
   }
   // What the installer prints for a failing check has no key (checkLine in tools/snowarch/lib/steps/B00.mjs: "FAIL B00: <detail>"),

@@ -99,6 +99,8 @@ step of both install guides, and of their pages, says that every command and set
 test can read: every `snowarch` command to the product's help tables and parsers, its floors to `engine.config.json`, the numbers it states about the build to the build, and its
 one figure of the corpus to the corpus. What no test can read, its prose, is read by a person before each final (step 5c of the release list in `docs/CONTRIBUTING.md`).
 
+**The Windows guides type `npm.cmd` and `now-sdk.cmd`.** A reader who followed `docs/INSTALL-WINDOWS.md` in Windows PowerShell 5.1 got `npm.ps1 cannot be loaded because running scripts is disabled on this system` at step 2e: the Node.js zip puts `npm.ps1` beside `npm.cmd`, PowerShell picks the script, and the default policy blocks it. CI's Windows runners allow scripts, so no test saw it. The product is not affected: the launchers start PowerShell with `-ExecutionPolicy Bypass`, and it runs npm as `npm.cmd`. Step 2e and the optional SDK step, in the guide and in its page, now type the `.cmd` names and say why; both have a troubleshooting row with the error line; the page's paste check reads the error and names the fix; the user guide shows a Windows reader the `.cmd` spelling; and a test holds that no Windows PowerShell command of the three guides runs a bare `npm`, `npx` or a tool that npm installed.
+
 ### Added
 
 - `docs/AI-Architect-Windows-Install-Guide.html`: the interactive form of the Windows install guide. One file of plain HTML, CSS and JavaScript,
@@ -221,6 +223,7 @@ one figure of the corpus to the corpus. What no test can read, its prose, is rea
   sentence under it, where they said 51,665 and 299 MB, and their example screens show the 96d3212 pin. A docs bump now checks both guides against the corpus and the install page (ARC-09-C290).
 - The Stop hook asks about a never-opened page that is cited only with back-slashes, in an answer and in a file the turn wrote (ARC-09-C292).
 - The name check does not ask about a prefix that ends with an underscore (`sn_ins_`), nor about a token that starts indexed names at a name boundary. On the architect's replay over the sitting's 75 turns, 74 were unchanged and the one that changed lost an ask that named a prefix (ARC-09-C293).
+- The Windows install guide and its page type `npm.cmd --version` at step 2e, and `npm.cmd install -g @servicenow/sdk` and `now-sdk.cmd --version` in the optional SDK step, where they typed `npm` and `now-sdk`: Windows PowerShell takes `npm.ps1` for the bare name, and its default policy blocks the script (`npm.ps1 cannot be loaded because running scripts is disabled on this system`). The guide and its page say why in one sentence and have a row of problems with the error and the fix, the page's paste check reads the error and names `npm.cmd --version`, `docs/TROUBLESHOOTING.md` has the message, and the user guide shows a Windows reader `npm.cmd i -g @servicenow/sdk` (ARC-09-C310).
 
 ## 2.2.6 — 2026-11-15
 

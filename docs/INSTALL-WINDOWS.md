@@ -134,7 +134,7 @@ Run:
 
 ### 2e · Open a fresh window and check
 
-Close PowerShell and open a new one exactly as in Step 1, so it sees the new programs. Then run these four commands, one at a time.
+Close PowerShell and open a new one exactly as in Step 1, so it sees the new programs. Then run these four commands, one at a time. The last one is `npm.cmd` and not `npm`, because PowerShell would pick `npm.ps1`, which Windows blocks by default, while `npm.cmd` needs no change to that setting.
 
 Run:
 
@@ -157,7 +157,7 @@ node --version
 Run:
 
 ```
-npm --version
+npm.cmd --version
 ```
 
 On screen (the numbers on your computer may be higher):
@@ -175,7 +175,7 @@ v26.13.0
 | Node.js | v20. Step 2b installs v26.13.0, the version this guide was tested with. The AI Architect is tested with Node.js 20, 22, 24 and 26 on Windows, macOS and Linux. |
 | npm | Any version. It comes with Node.js. |
 
-If one of them answers *is not recognized*, see "If something goes wrong".
+If one of them answers *is not recognized*, or npm answers *cannot be loaded because running scripts is disabled*, see "If something goes wrong".
 
 ### 2f · draw.io Desktop (for the diagrams)
 
@@ -659,16 +659,18 @@ The AI Architect works without them. Each one adds a feature, and each installs 
 
 ### ServiceNow SDK
 
-Run:
-
-```
-npm install -g @servicenow/sdk
-```
+Type `npm.cmd` and `now-sdk.cmd` with the `.cmd`, for the reason given in 2e.
 
 Run:
 
 ```
-now-sdk --version
+npm.cmd install -g @servicenow/sdk
+```
+
+Run:
+
+```
+now-sdk.cmd --version
 ```
 
 Then switch the FLUENT permission on, in your AI-Arch folder (use your own label in place of `pdi`), and restart Claude:
@@ -812,7 +814,8 @@ It shows a plan first and changes nothing until you accept it. Your instances an
 | What you see | What to do |
 |---|---|
 | 'claude' is not recognized | Run the PATH command in Step 2d, close PowerShell and open a new one. |
-| 'git', 'node', 'npm' or 'now-sdk' is not recognized | Open a new PowerShell window: programs installed in Step 2 are seen only by new windows. If it persists, repeat that program's part of Step 2, including its PATH command. |
+| 'git', 'node', 'npm.cmd' or 'now-sdk.cmd' is not recognized | Open a new PowerShell window: programs installed in Step 2 are seen only by new windows. If it persists, repeat that program's part of Step 2, including its PATH command. |
+| npm.ps1 cannot be loaded because running scripts is disabled on this system | Windows blocks PowerShell scripts by default, and PowerShell took the script `npm.ps1` for `npm`. Type `npm.cmd` in place of `npm` (for example `npm.cmd --version`), and `now-sdk.cmd` in place of `now-sdk`: no setting needs to change. If you want `npm` itself to run, type `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` and open a new window. If your company sets the policy with Group Policy, that command has no effect, and `npm.cmd` is the way. |
 | A password prompt for an administrator, or The operation was canceled by the user | You started a normal installer, and it needs administrator rights. Use the silent command in 2a for Git and the zip in 2b for Node.js; neither needs administrator rights. |
 | winget answers 0x8a15000f : Data required by the source is missing | winget's package list is broken, and only an administrator can repair it. This guide does not use winget: follow Step 2. |
 | ERROR: draw.io Desktop not found | draw.io is not in `%LOCALAPPDATA%\Programs\drawio`. Repeat 2f and check that the last command answers `True`. |
@@ -879,12 +882,13 @@ Run:
 
 ## What has not been tested
 
-This guide was written from one end-to-end install (12 November 2026) and confirmed by a second, on a new laptop on 19 November 2026, that followed every step as written. Four things in it rest on something other than a run:
+This guide was written from one end-to-end install (12 November 2026) and confirmed by a second, on a new laptop on 19 November 2026, that followed every step as written. Five things in it rest on something other than a run:
 
 - **Windows 10.** The test machine ran Windows 11. Windows 10 (version 1809 or later) has the same PowerShell 5.1 and takes the same commands.
 - **Claude Code's first-run screens on Windows** (Step 3). They are described in general terms because they change with Claude Code's releases.
 - **A folder name with a space in it, a folder on a network drive, and a folder that OneDrive or another sync tool manages** (Step 4).
 - **What the screens say after the licence has ended** (Step 7). The table is the product's own list of states, not a transcript of each one.
+- **`npm.cmd` and `now-sdk.cmd`** (step 2e, Optional tools). The two installs typed `npm` and `now-sdk`, which ran on those computers. A reader whose PowerShell blocked scripts reported the failure, and the `.cmd` names are the ones that need no change to that setting.
 
 If you meet a difference, `.\snowarch.cmd version` and `.\snowarch.cmd doctor` (see "Asking for help") are what to send.
 
