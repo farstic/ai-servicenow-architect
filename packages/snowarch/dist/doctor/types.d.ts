@@ -165,6 +165,8 @@ export interface DoctorReport {
         environment: string;
         preset: string;
         status: 'loaded' | 'not_loaded';
+        /** The instance the server is on, which a new session starts on (ARC-09-C309). At most one entry is. */
+        active?: boolean;
         /** Masked at the source (ARC-08-S04) — `s***@corp.example.com`, never the account. */
         username?: string;
         /** The store's own record. STATUSES ONLY; the doctor reads it and never writes it. */

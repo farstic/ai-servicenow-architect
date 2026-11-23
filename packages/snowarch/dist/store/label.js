@@ -20,6 +20,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { applyDependencyRule, expandPreset, PRESETS } from '../utils/permissions.js';
+import { entryLoads } from './start.js';
 /**
  * `{ label }` when the store names a default, `null` otherwise — including when the file is
  * missing or malformed. A mirror that threw would make an unreadable store fail a step whose job
@@ -89,10 +90,18 @@ export function readStoreSummaries(storePath) {
     return Object.entries(instances).map(([label, raw]) => {
         const entry = raw;
         const preset = str(entry?.preset);
+        const environment = str(entry?.environment);
         // Named one at a time, never a spread: a spread of the entry would carry the credential block,
         // which is the rule this reader and its two siblings are built on. `effectiveFlags` is derived,
-        // not copied — six `'true'`/`'false'` strings and nothing from the entry itself.
-        return { label, environment: str(entry?.environment), preset,
-            effectiveFlags: effectiveFlagsOf(label, preset, raw) };
+        // not copied — six `'true'`/`'false'` strings and nothing from the entry itself. `loads` is a
+        // boolean the loader's own refusal rule derives from the non-secret fields (ARC-09-C309), or null when this build cannot tell.
+        const loads = preset !== null && KNOWN_PRESETS.includes(preset) && environment !== null
+            ? entryLoads(label, {
+                environment, preset,
+                flags: entry?.flags && typeof entry.flags === 'object' ? entry.flags : undefined,
+                prodWriteAck: entry?.prodWriteAck === true,
+            })
+            : null;
+        return { label, environment, preset, effectiveFlags: effectiveFlagsOf(label, preset, raw), loads };
     });
 }

@@ -15,6 +15,7 @@
 import { flagNames } from '../../../../packages/contract/lib/contract.mjs';
 import { modeLine as renderModeLine, MODE_VARIANTS } from '../text.mjs';
 import { projectEntryCarries } from '../settings-local.mjs';
+import { startInstance } from '../../../../packages/snowarch/dist/store/start.js';
 
 /** `2026-09-10 41 ok` / `2026-09-10 2 FAIL` — what the banner shows about the last run. */
 export function doctorStamp({ summary = {}, at = new Date() } = {}) {
@@ -22,6 +23,23 @@ export function doctorStamp({ summary = {}, at = new Date() } = {}) {
   return summary.fail > 0
     ? `doctor ${day} ${summary.fail} FAIL`
     : `doctor ${day} ${summary.ok ?? 0} ok`;
+}
+
+/**
+ * The instance a new session starts on, among the entries a run knows of (ARC-09-C309).
+ *
+ * The line named the FIRST entry it was given, so with a default that was not first (set with `set-default`) the banner said `Mode: live — alpha` about a
+ * session that starts on `beta`: a user could believe the session was on another instance, which is worse than a wording issue. The rule is one, in
+ * `store/start.ts` (ARC-09-C308), and the server's loader follows it: the default when it loads, else the first that loads. A run that probed has the server's own
+ * answer, `active`, and it wins; the rule over what the server loaded is the same answer for an answer that does not say. A run that did not probe asks the rule of
+ * the store's entries (`loads`, from `readStoreSummaries`). An entry that does not say whether it loads is taken to load, so that a caller that knows neither the
+ * default nor `loads` gets the first entry, as before. `null` when none loads.
+ */
+function startedOn(entries, defaultInstance) {
+  const active = entries.find((i) => i.active === true);
+  if (active) return active;
+  const label = startInstance(defaultInstance, entries.map((i) => ({ label: i.label, loads: i.loads !== false })));
+  return label === null ? null : entries.find((i) => i.label === label);
 }
 
 /**
@@ -40,6 +58,9 @@ export function doctorStamp({ summary = {}, at = new Date() } = {}) {
  */
 export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
   registration = 'project', probed = true,
+  // ARC-09-C309 — the store's default instance, so that the line can name the instance a new session starts on. Optional: a caller that does not say gets the
+  // first instance it gave, as it always did.
+  defaultInstance = null,
   // ARC-07-W17 — THE SPELLING IS A PARAMETER, because this function has no ctx. I wrote
   // `spell` here first on the strength of every other file in this directory having one, which
   // is the third time in this row I have referenced a ctx that is not in scope — and it would have
@@ -70,7 +91,7 @@ export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
       qualifier: MODE_VARIANTS.notBootstrapped(spell), instance: null, loaded, serverEnabled };
   }
   if (serverEnabled && loaded.length > 0) {
-    const first = loaded[0];
+    const first = startedOn(loaded, defaultInstance) ?? loaded[0];
     return { mode: 'live', variant: 'live', qualifier: null, loaded, serverEnabled,
       instance: { label: first.label, environment: first.environment, preset: first.preset } };
   }
@@ -87,7 +108,16 @@ export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
   // It is not a claim that the server loaded the entry — SV-02/SV-03 own that, on a full run —
   // and the variant says so, so nothing here asserts a probe that did not happen.
   if (!probed && serverEnabled && configured) {
-    const first = instances[0];
+    // ARC-09-C309 — THE LINE DOES NOT NAME AN INSTANCE THE SESSION WILL NOT USE. A store that says itself that no entry loads (every one carries `loads` and
+    // none is true) has no instance a session starts on, so the line is not live and names none; the full run says the same of the same store
+    // (`noInstanceLoaded`), and this one says where to look. An entry that does not say whether it loads is not believed to fail: a caller that knows
+    // neither the store nor the server's answer gets the first, as it always did.
+    if (instances.every((i) => i.loads === false)) {
+      return { mode: 'design-only', variant: 'noSavedInstanceLoads', loaded, serverEnabled,
+        qualifier: MODE_VARIANTS.noSavedInstanceLoads(spell), instance: null };
+    }
+    // The instance a new session starts on, by the loader's rule, from what the store says loads.
+    const first = startedOn(instances, defaultInstance) ?? instances[0];
     return { mode: 'live', variant: 'liveUnprobed', qualifier: null, loaded, serverEnabled,
       instance: { label: first.label, environment: first.environment, preset: first.preset } };
   }

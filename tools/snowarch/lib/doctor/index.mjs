@@ -42,7 +42,7 @@ import { effectiveDocsMode } from '../docs/sync.mjs';
 import { renderText, useColour } from './report-text.mjs';
 import { exitCodeFor, runChecks, selectSections } from './runner.mjs';
 import { maskForJson, storeMaskValues } from './json-boundary.mjs';
-import { readStoreSummaries } from '../../../../packages/snowarch/dist/store/label.js';
+import { readDefaultLabel, readStoreSummaries } from '../../../../packages/snowarch/dist/store/label.js';
 
 /**
  * ARC-07-W17 — A FUNCTION, and the reason is a cycle rather than a preference.
@@ -187,6 +187,16 @@ function storeSummaries(root, config) {
   }
 }
 
+/** The store's default instance, from the same store `storeSummaries` reads (ARC-09-C309): what the Mode line needs to name the instance a new session starts on. */
+function storeDefault(root) {
+  const path = process.env.SNOW_STORE || storePath(root);
+  try {
+    return readDefaultLabel(path)?.label ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function runDoctor({ root, config, registry = engineRegistry(), sections = null,
   quick = false, noNetwork = false, fix = false, section = null, writeCache = 'auto', exclude = [],
   env = process.env, home = '', now = () => Date.now(), started = null,
@@ -261,6 +271,7 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
   const derived = deriveMode({
     toggles: { enabled: serverEnabled(root, config) },
     instances: probed ? instances : fromStore,
+    defaultInstance: storeDefault(root),
     probed,
     bootstrapped: existsSync(statePath(root)),
     // ARC-08-C16 — which entry carries the server. Our own record, read from

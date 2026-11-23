@@ -123,6 +123,11 @@ export const MODE_VARIANTS = Object.freeze({
     needSpell(spell, 'MODE_VARIANTS.noInstanceLoaded');
     return 'server enabled but no instance is loaded (see SV-02/SV-03); run /snowarch setup-instance';
   },
+  // ARC-09-C309 — a quick run, which does not start the server, and a store that says itself that no entry loads (every one a production instance raised
+  // without the acknowledgement, say). The full run says `noInstanceLoaded` for the same store and SV-02/SV-03 name the cause there; the quick one names
+  // where to look. The architect's words (2026-11-22).
+  noSavedInstanceLoads: (spell) =>
+    `server enabled but no saved instance loads (${needSpell(spell, 'MODE_VARIANTS.noSavedInstanceLoads').cli} instance list says why)`,
   notBootstrapped: (spell) => 'this checkout has not been bootstrapped; run '
     + `${needSpell(spell, 'MODE_VARIANTS.notBootstrapped').bootstrap}`,
 });

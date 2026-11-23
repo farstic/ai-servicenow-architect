@@ -90,19 +90,29 @@ export async function runServerDoctor(opts: DoctorOptions = {}): Promise<DoctorR
     // `lastProbe` — the four fields ARC-07-S09's `--resume` branches on. The username is masked
     // HERE as well as by the engine's runner: this report is returned to callers that are not the
     // engine, and a shape that is only safe downstream is not a safe shape.
-    instances: instanceManager.listAll().map((i) => {
-      const stored = storeEntry(i.name);
-      return {
-        label: i.name,
-        environment: i.environment,
-        preset: i.preset,
-        status: i.status,
-        ...(stored?.auth?.username ? { username: maskUsername(stored.auth.username) } : {}),
-        ...(stored?.lastProbe ? { lastProbe: stored.lastProbe } : {}),
-        ...(i.reason ? { reason: i.reason } : {}),
-      };
-    }),
+    instances: doctorInstances(),
   };
+}
+
+/**
+ * The instances the report lists (ARC-09-C309): what the manager loaded, in store order, then what it refused, each with `active` — the one the server is
+ * on, which a new session starts on (`store/start.ts`). The engine's Mode line names it; it used to name the first of the list, which is not the default
+ * when the default is not first.
+ */
+export function doctorInstances(): DoctorReport['instances'] {
+  return instanceManager.listAll().map((i) => {
+    const stored = storeEntry(i.name);
+    return {
+      label: i.name,
+      environment: i.environment,
+      preset: i.preset,
+      status: i.status,
+      active: i.active,
+      ...(stored?.auth?.username ? { username: maskUsername(stored.auth.username) } : {}),
+      ...(stored?.lastProbe ? { lastProbe: stored.lastProbe } : {}),
+      ...(i.reason ? { reason: i.reason } : {}),
+    };
+  });
 }
 
 /** 0 = nothing failed, 1 = at least one FAIL, 3 = the run itself could not complete. */
