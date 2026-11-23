@@ -756,3 +756,26 @@ test('ARC-09-C306 — the commands that the running text names are the product\'
   assert.match(mentionProblems('./snowarch docs family')[0], /family is not a sub-command of docs/);
   assert.match(mentionProblems('./snowarch store restor')[0], /restor is not a sub-command of store/);
 });
+
+// ── ARC-09-C310: a Windows reader types npm.cmd ──────────────────────────────────────────────────────────────────────────────────────────────────
+// Windows PowerShell takes the script `npm.ps1` for the bare name, and the default policy blocks every script (docs/INSTALL-WINDOWS.md, step 2e). No command box of this page runs npm, npx or a
+// tool that npm installed (tests/windows-npm-shims.test.mjs holds that for the three guides). The page names the install of the SDK in running text, and a Windows reader types what that says.
+test('ARC-09-C310 — wherever the page names the install of the SDK it shows a Mac reader npm and a Windows reader npm.cmd', () => {
+  const MAC = 'npm i -g @servicenow/sdk';
+  const WIN = 'npm.cmd i -g @servicenow/sdk';
+  const named = [...markup.matchAll(/npm i -g @servicenow\/sdk/g)].length;
+  const mac = [...markup.matchAll(/<code class="ic os-mac">npm i -g @servicenow\/sdk<\/code>/g)].length;
+  const pairs = [...markup.matchAll(/<code class="ic os-mac">npm i -g @servicenow\/sdk<\/code><span class="os-or"> or <\/span><code class="ic os-win">npm\.cmd i -g @servicenow\/sdk<\/code>/g)].length;
+  assert.ok(named >= 2, 'the page no longer names the install of the SDK in its tables: the pattern found too few');
+  assert.equal(mac, named, 'the install is shown to a Windows reader as the bare npm: put it in an element for the Mac, and give the Windows reader npm.cmd');
+  assert.equal(pairs, named, 'a Mac reader\'s command has no Windows reader\'s command beside it');
+  // The two tables, in the words the architect approved (2026-11-23): the permission FLUENT, and the error FLUENT_NOT_INSTALLED.
+  assert.ok(markup.includes(`Needs the SDK installed for your user with <code class="ic os-mac">${MAC}</code><span class="os-or"> or </span><code class="ic os-win">${WIN}</code>`
+    + '<span class="os-win">, with <code class="ic">%APPDATA%\\npm</code> on PATH</span>.'));
+  assert.ok(markup.includes(`Install the ServiceNow SDK for your user: <code class="ic os-mac">${MAC}</code><span class="os-or"> or </span><code class="ic os-win">${WIN}</code>.`));
+  // The troubleshooting row is plain text with no switch for a computer, so it says both.
+  const rows = data.trouble.filter((r) => r.do.includes(MAC));
+  assert.ok(rows.length >= 1, 'no troubleshooting row names the install of the SDK');
+  for (const r of rows) assert.ok(r.do.includes(`in Windows PowerShell ${WIN}`), `${r.id}: the row does not tell a Windows reader to type npm.cmd`);
+  assert.equal(data.trouble.find((r) => r.id === 'fluent').do, `Install the ServiceNow SDK for your user: ${MAC}, or in Windows PowerShell ${WIN}, then open a new window.`);
+});
