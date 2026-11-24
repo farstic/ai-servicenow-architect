@@ -46,7 +46,10 @@ sub-command changes these two; edit the store entry if you need a different `max
 ## 3. The six flags in plain language (in brackets, the key as written in the store and the environment)
 
 - **WRITE** (`WRITE_ENABLED`) — create, update and delete records (incidents, catalog items, users, agile work, update
-  sets). Without it everything is read-only.
+  sets), and install a batch of applications and plugins through the CI/CD API (`snow_deploy_app_batch_install`; the
+  account needs the `sn_cicd.sys_ci_automation` or `admin` role). An install is captured in **no update set**, so the
+  update-set capture cannot apply to it, and its result says how to roll the batch back. Without WRITE everything is
+  read-only.
 - **CMDB_WRITE** (`CMDB_WRITE_ENABLED`) — additionally, CI and relationship reconciliation writes into the CMDB.
 - **SCRIPTING** (`SCRIPTING_ENABLED`) — unlocks *writing* Script Includes, Business Rules, Client Scripts, ACLs, UI
   Actions and update-set changes. ***Reading* them is always allowed.**
