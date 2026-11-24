@@ -94,7 +94,7 @@ afterEach(async () => {
 });
 
 describe('ARC-11-C6 — the class case: no licence, on every build', () => {
-  it('every tool is still listed, 399 of them: the refusal is at the call (R1), and a switch is refused too', async () => {
+  it('every tool is still listed, 400 of them: the refusal is at the call (R1), and a switch is refused too', async () => {
     writeStore();
     const client = await connect(SERVER);
     try {

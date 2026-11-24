@@ -3,6 +3,9 @@
 /**
  * ARC-09-C94 — a fake of the CI/CD API, at the one HTTP seam.
  *
+ * ARC-09-C312 adds the two the batch install speaks to besides progress: `POST /sn_cicd/app/batch/install` and
+ * `GET /sn_cicd/app/batch/results/{result_id}`.
+ *
  * The ATF exec tools speak to three endpoints of
  * vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md: `POST /sn_cicd/testsuite/run`,
  * `GET /sn_cicd/progress/{progress_id}` and `GET /sn_cicd/testsuite/results/{result_id}`, and the test
@@ -38,6 +41,10 @@ export interface CicdState {
   calls: CicdCall[];
   /** The answer to `POST /api/sn_cicd/testsuite/run`. */
   run?: CicdAnswer;
+  /** The answer to `POST /api/sn_cicd/app/batch/install` (ARC-09-C312). */
+  install?: CicdAnswer;
+  /** The answer to `GET /api/sn_cicd/app/batch/results/<id>` (ARC-09-C312). */
+  batchResults?: CicdAnswer;
   /** Successive answers to `GET /api/sn_cicd/progress/<id>`; the last one repeats. */
   progress: CicdAnswer[];
   /** The answer to `GET /api/sn_cicd/testsuite/results/<id>`. */
@@ -99,7 +106,9 @@ export function resetCicd(state: CicdState): void {
   state.calls.length = 0;
   state.progress.length = 0;
   state.run = undefined;
+  state.install = undefined;
   state.results = undefined;
+  state.batchResults = undefined;
   for (const k of Object.keys(state.tables)) delete state.tables[k];
   state.db = undefined;
 }
@@ -195,6 +204,8 @@ function answerFor(state: CicdState, method: string, path: string, query: Record
   const record = /^\/api\/now\/table\/([A-Za-z0-9_]+)(?:\/([0-9a-f]{32}))?$/.exec(path);
   if (state.db && record) return dbAnswer(state.db, method, record[1], record[2], query, body);
   if (method === 'POST' && path === '/api/sn_cicd/testsuite/run') return state.run ?? refused(400, ABSENT_MESSAGE);
+  if (method === 'POST' && path === '/api/sn_cicd/app/batch/install') return state.install ?? refused(400, ABSENT_MESSAGE);
+  if (method === 'GET' && path.startsWith('/api/sn_cicd/app/batch/results/')) return state.batchResults ?? refused(404, ABSENT_MESSAGE);
   if (method === 'GET' && path.startsWith('/api/sn_cicd/progress/')) {
     const next = state.progress.length > 1 ? state.progress.shift() : state.progress[0];
     return next ?? refused(404, ABSENT_MESSAGE);
