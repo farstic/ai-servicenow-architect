@@ -282,7 +282,7 @@ describe('(e) manifest, contract and catalogue agree', () => {
     expect(MANIFEST.map((t: { name: string }) => t.name).sort()).toEqual(cat);
     expect(CONTRACT.tools.map((t: { name: string }) => t.name).sort()).toEqual(cat);
     expect(CONTRACT.toolCount).toBe(cat.length);
-    expect(cat.length).toBe(399);
+    expect(cat.length).toBe(400);
   });
 
   it('every contract entry carries gate and mutates', () => {
@@ -434,7 +434,7 @@ describe('7 — a mutating name mutates, and every exception says why', () => {
     'switch', 'resolve', 'annotate', 'schedule', 'complete', 'retire', 'send', 'import',
     'configure', 'submit', 'order', 'assign', 'unassign', 'reconcile', 'close', 'approve',
     'reject', 'set', 'rollback', 'clone', 'upload', 'fire', 'register', 'commit', 'ensure',
-    'train', 'track', 'scan']);
+    'train', 'track', 'scan', 'install']);
   const exempt = new Map<string, string>(
     (EXCEPTIONS.suffixClasses as { id: string; tools: string[] }[])
       .flatMap((c) => c.tools.map((t) => [t, c.id] as const)));

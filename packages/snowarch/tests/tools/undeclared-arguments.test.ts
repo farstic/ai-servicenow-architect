@@ -40,9 +40,9 @@ async function attempt(name: string, args: Record<string, unknown>, client = new
 }
 
 describe('ARC-09-C121 — every schema says it takes nothing else', () => {
-  it('all 399 tools declare additionalProperties: false, and so does an object argument that declares its own properties', () => {
+  it('all 400 tools declare additionalProperties: false, and so does an object argument that declares its own properties', () => {
     const tools = collectToolCatalog();
-    expect(tools).toHaveLength(399);
+    expect(tools).toHaveLength(400);
     const open: string[] = [];
     for (const t of tools) {
       const schema = t.inputSchema as Schema;

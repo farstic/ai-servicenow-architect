@@ -283,6 +283,7 @@
       "mcp__servicenow__snow_csm_csm_case_add",
       "mcp__servicenow__snow_csm_csm_case_close",
       "mcp__servicenow__snow_csm_csm_case_modify",
+      "mcp__servicenow__snow_deploy_app_batch_install",
       "mcp__servicenow__snow_deploy_artifact_clone",
       "mcp__servicenow__snow_deploy_background_script_exec",
       "mcp__servicenow__snow_deploy_cmdb_data_import",

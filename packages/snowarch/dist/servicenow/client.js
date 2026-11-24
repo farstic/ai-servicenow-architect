@@ -1007,20 +1007,21 @@ export class ServiceNowClient {
         }
     }
     /**
-     * The CI/CD API, `/api/sn_cicd/<path>` (ARC-09-C94). Its endpoints take their arguments in the query
-     * string and carry no request body ("Request body ... None" on every page this server calls), and
-     * they answer `{ result: {...} }`; this returns the `result`
-     * (vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md).
+     * The CI/CD API, `/api/sn_cicd/<path>` (ARC-09-C94). The endpoints the ATF tools call take their arguments in
+     * the query string and carry no request body ("Request body ... None" on those pages), and they answer
+     * `{ result: {...} }`; this returns the `result`
+     * (vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md). The batch install takes a JSON body
+     * (ARC-09-C312): `body`, sent as `application/json`, for the one POST that has one.
      *
      * `retries` can only lower the client's own policy, as everywhere else: the call that STARTS
      * something is sent once, because a retry after an answer lost on the way back starts it twice.
      */
-    async callCicd(method, path, query = {}, retries) {
+    async callCicd(method, path, query = {}, retries, body) {
         await this.authenticate();
         const qs = new URLSearchParams(query).toString();
         const url = `${this.baseUrl}/api/sn_cicd/${path}${qs ? `?${qs}` : ''}`;
         logger.info(`Calling the CI/CD API: ${method} /api/sn_cicd/${path}`);
-        const response = await this.request(url, { method }, retries);
+        const response = await this.request(url, { method, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }, retries);
         return response?.result ?? {};
     }
     /**

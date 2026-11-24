@@ -12,7 +12,7 @@ the sitting records the Record column names are in the engineering checkout.
 - **named-only** — a record names it, and no sitting has yet confirmed a call.
 - **unverified** — nothing shows it has run against an instance.
 
-**live coverage: 399 tools in 37 families — verified-live 5, refused 0, named-only 25, unverified 369; 32 tools named in a record, 27 families with none; 34 families with no tool verified live.**
+**live coverage: 400 tools in 37 families — verified-live 5, refused 0, named-only 25, unverified 370; 32 tools named in a record, 27 families with none; 34 families with no tool verified live.**
 
 ## By family
 
@@ -34,7 +34,7 @@ the sitting records the Record column names are in the engineering checkout.
 | `ml` | 12 | 0 | 0 | 0 | 12 | 0 |
 | `atf` | 11 | 0 | 0 | 8 | 3 | 8 |
 | `csm` | 11 | 0 | 0 | 0 | 11 | 0 |
-| `deploy` | 10 | 0 | 0 | 0 | 10 | 0 |
+| `deploy` | 11 | 0 | 0 | 0 | 11 | 0 |
 | `itam` | 10 | 0 | 0 | 0 | 10 | 0 |
 | `mob` | 10 | 0 | 0 | 0 | 10 | 0 |
 | `na` | 10 | 0 | 0 | 0 | 10 | 0 |
@@ -55,7 +55,7 @@ the sitting records the Record column names are in the engineering checkout.
 | `tsk` | 4 | 0 | 0 | 0 | 4 | 0 |
 | `orch` | 3 | 0 | 0 | 1 | 2 | 1 |
 | `disco` | 1 | 0 | 0 | 1 | 0 | 1 |
-| **all** | **399** | **5** | **0** | **25** | **369** | **32** |
+| **all** | **400** | **5** | **0** | **25** | **370** | **32** |
 
 ## By tool
 
@@ -406,6 +406,7 @@ the sitting records the Record column names are in the engineering checkout.
 
 | Tool | Status | Record | Date | Instance family | Note | Named in |
 |---|---|---|---|---|---|---|
+| `snow_deploy_app_batch_install` | unverified | — | — | — | — | 0 |
 | `snow_deploy_artifact_clone` | unverified | — | — | — | — | 0 |
 | `snow_deploy_artifact_query` | unverified | — | — | — | — | 0 |
 | `snow_deploy_artifact_validate` | unverified | — | — | — | — | 0 |

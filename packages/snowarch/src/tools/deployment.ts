@@ -14,6 +14,8 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite, requireScripting } from '../utils/permissions.js';
+import { appBatchInstallDefinition, batchInstallArgs, installBatch } from './app-install.js';
+import { budgetArg } from './atf-cicd.js';
 import type { ToolDefinition } from './types.js';
 
 export function deploymentToolManifest(): ToolDefinition[] {
@@ -91,6 +93,8 @@ export function deploymentToolManifest(): ToolDefinition[] {
       gate: 'none',
       mutates: false,
     },
+    // ARC-09-C312: the one tool that installs an application, through the CI/CD API; its declaration and its logic are in app-install.ts.
+    appBatchInstallDefinition(),
   ];
 }
 
@@ -144,6 +148,11 @@ export async function dispatchDeploymentAction(
       }
       const app = await client.getRecord('sys_app', args.app_sys_id);
       return { app: app.name, version: app.version, scope: app.scope, validation: 'OK' };
+    }
+
+    case 'snow_deploy_app_batch_install': {
+      requireWrite();
+      return await installBatch(client, batchInstallArgs(args), budgetArg(args.budget_seconds));
     }
 
     case 'snow_deploy_deployment_rollback': {

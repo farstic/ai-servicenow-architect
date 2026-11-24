@@ -1,6 +1,6 @@
 import { ServiceNowError } from '../utils/errors.js';
 export const CICD_PAGE = 'vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md';
-const SPOKE_PAGE = 'vendor/ServiceNowDocs/markdown/integrate-applications/integration-hub/cicd-spoke.md';
+export const SPOKE_PAGE = 'vendor/ServiceNowDocs/markdown/integrate-applications/integration-hub/cicd-spoke.md';
 /** How long a run is waited for when the caller does not say, in seconds. */
 export const DEFAULT_BUDGET_SECONDS = 300;
 /**
@@ -38,9 +38,46 @@ export function budgetArg(value) {
     }
     return value;
 }
-const labelOf = (a) => String(a.status_label || STATUS_LABEL[String(a.status)] || 'unknown');
-const reasonOf = (a) => String(a.error || a.status_message || a.status_detail || `status ${labelOf(a)}, no reason given`);
+export const labelOf = (a) => String(a.status_label || STATUS_LABEL[String(a.status)] || 'unknown');
+export const reasonOf = (a) => String(a.error || a.status_message || a.status_detail || `status ${labelOf(a)}, no reason given`);
 const count = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+/**
+ * The kind of refusal a CI/CD call met: `absent` for the platform's answer to a path it does not serve (the message, not the
+ * status, tells the API's absence from an item's, PN-15), then the page's own rows: 403 the role, 404 not found, 405 "the
+ * functionality is inactive", 400. Every caller words its own remedy; the classes are one. An AUTHENTICATION_FAILED is not
+ * classified here: it passes through every caller untouched.
+ */
+export function classifyCicd(error) {
+    const status = error.details?.status;
+    if (ABSENT_PATH.test(error.message))
+        return { kind: 'absent', status };
+    if (status === 403)
+        return { kind: 'forbidden', status };
+    if (status === 404)
+        return { kind: 'not_found', status };
+    if (status === 405)
+        return { kind: 'inactive', status };
+    if (status === 400)
+        return { kind: 'bad_request', status };
+    return { kind: 'other', status };
+}
+/**
+ * Follow a CI/CD progress until it ends (Successful, Failed or Canceled) or the budget runs out, reading it every
+ * POLL_INTERVAL_MS (ARC-09-C94; the batch install follows its progress the same way, ARC-09-C312). Never cancels: when the
+ * budget ends first, the last answer comes back with `finished: false`.
+ */
+export async function followProgress(started, budgetSeconds, read) {
+    const deadline = Date.now() + budgetSeconds * 1000;
+    let progress = started;
+    while (!FINISHED.has(String(progress.status))) {
+        const left = deadline - Date.now();
+        if (left <= 0)
+            return { progress, finished: false };
+        await new Promise((resolve) => { setTimeout(resolve, Math.min(POLL_INTERVAL_MS, left)); });
+        progress = await read();
+    }
+    return { progress, finished: true };
+}
 /**
  * A CI/CD refusal as the remedy for it, in the terms of the step it stopped at. Before the run is
  * accepted nothing has started; after it, the run goes on whatever this server can read.
@@ -51,32 +88,32 @@ function refusal(error, step, suite, progressId) {
     // A failed sign-in has its own remedy in the always-loaded rule file; it passes through untouched.
     if (error.code === 'AUTHENTICATION_FAILED')
         return error;
-    const status = error.details?.status;
+    const { kind } = classifyCicd(error);
     const after = step === 'run'
         ? 'Nothing was run.'
         : `The run of test suite ${suite} was started (CI/CD progress id ${progressId}) and is not cancelled; `
             + `its ${step} could not be read.`;
-    if (ABSENT_PATH.test(error.message)) {
+    if (kind === 'absent') {
         return new ServiceNowError(`The CI/CD API is not served on this instance: /api/sn_cicd answered "${error.message}". The corpus documents `
             + `the CICD REST API as "a ServiceNow AI Platform feature active by default" (${SPOKE_PAGE}) and names no plugin `
             + `that provides it, so ask the instance administrator why /api/sn_cicd is not available here. ${after}`, 'NOT_FOUND', error.details);
     }
-    if (status === 403) {
+    if (kind === 'forbidden') {
         return new ServiceNowError(`The CI/CD API refused this account (HTTP 403: ${error.message}). "The sn_cicd.sys_ci_automation or admin role `
             + `is required to use this API" (${CICD_PAGE}): ask the instance administrator to grant sn_cicd.sys_ci_automation `
             + `to the account this server signs in as. ${after}`, 'INSUFFICIENT_PRIVILEGES', error.details);
     }
-    if (status === 404) {
+    if (kind === 'not_found') {
         return new ServiceNowError(step === 'run'
             ? `The CI/CD API found no test suite ${suite} (HTTP 404: ${error.message}); check the sys_id with `
                 + `snow_atf_atf_suites_index. ${after}`
             : `The CI/CD API found no ${step} for the run (HTTP 404: ${error.message}). ${after}`, 'NOT_FOUND', error.details);
     }
-    if (status === 405) {
+    if (kind === 'inactive') {
         return new ServiceNowError(`The CI/CD API answered HTTP 405 (${error.message}), which ${CICD_PAGE} documents as "Invalid method. The `
             + `functionality is inactive." Ask the instance administrator which CI/CD functionality is inactive here. ${after}`, 'REQUEST_FAILED', error.details);
     }
-    if (step === 'run' && status === 400) {
+    if (step === 'run' && kind === 'bad_request') {
         return new ServiceNowError(`The CI/CD API rejected the run of test suite ${suite} (HTTP 400: ${error.message}). ${after}`, 'INVALID_REQUEST', error.details);
     }
     if (step === 'run') {
@@ -114,15 +151,10 @@ export async function runSuite(client, suite, budgetSeconds) {
         throw new ServiceNowError(`The CI/CD API answered the run of test suite ${suite} with no progress id, so the run cannot be followed `
             + `(status ${labelOf(started)}). If it started, its result is a new sys_atf_test_suite_result record for the suite.`, 'REQUEST_FAILED');
     }
-    const deadline = Date.now() + budgetSeconds * 1000;
-    let progress = started;
-    while (!FINISHED.has(String(progress.status))) {
-        const left = deadline - Date.now();
-        if (left <= 0)
-            return unfinished(suite, progressId, progress, budgetSeconds);
-        await new Promise((resolve) => { setTimeout(resolve, Math.min(POLL_INTERVAL_MS, left)); });
-        progress = await cicd(() => client.callCicd('GET', `progress/${encodeURIComponent(progressId)}`), 'progress', suite, progressId);
-    }
+    const followed = await followProgress(started, budgetSeconds, () => cicd(() => client.callCicd('GET', `progress/${encodeURIComponent(progressId)}`), 'progress', suite, progressId));
+    if (!followed.finished)
+        return unfinished(suite, progressId, followed.progress, budgetSeconds);
+    const progress = followed.progress;
     const resultId = progress.links?.results?.id;
     if (typeof resultId !== 'string' || !resultId) {
         if (String(progress.status) === '3') {

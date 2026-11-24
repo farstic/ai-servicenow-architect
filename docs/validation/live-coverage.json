@@ -101,6 +101,7 @@
     "snow_csm_csm_contact_read": { "status": "unverified", "record": null, "date": null, "family": null },
     "snow_csm_csm_contacts_index": { "status": "unverified", "record": null, "date": null, "family": null },
     "snow_csm_csm_products_index": { "status": "unverified", "record": null, "date": null, "family": null },
+    "snow_deploy_app_batch_install": { "status": "unverified", "record": null, "date": null, "family": null },
     "snow_deploy_artifact_clone": { "status": "unverified", "record": null, "date": null, "family": null },
     "snow_deploy_artifact_query": { "status": "unverified", "record": null, "date": null, "family": null },
     "snow_deploy_artifact_validate": { "status": "unverified", "record": null, "date": null, "family": null },

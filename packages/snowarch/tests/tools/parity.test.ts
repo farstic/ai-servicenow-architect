@@ -72,6 +72,7 @@ describe('tool catalog parity (migration guard)', () => {
     'snow_us_capture_target_set',   // ARC-04-S07
     'snow_atf_atf_test_add',        // ARC-09-C95
     'snow_atf_atf_step_add',        // ARC-09-C95
+    'snow_deploy_app_batch_install', // ARC-09-C312
   ];
 
   /**
