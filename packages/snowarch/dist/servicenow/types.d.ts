@@ -108,6 +108,10 @@ export interface CicdResult {
             id?: string;
             url?: string;
         };
+        /** The batch install's rollback details (ARC-09-C312): an id, and no url. */
+        rollback?: {
+            id?: string;
+        };
     };
     test_suite_status?: string;
     test_suite_name?: string;

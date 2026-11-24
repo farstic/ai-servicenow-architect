@@ -1070,6 +1070,12 @@
       "mutates": false
     },
     {
+      "name": "snow_deploy_app_batch_install",
+      "gate": "write",
+      "mutates": true,
+      "table": "sys_batch_install_plan"
+    },
+    {
       "name": "snow_deploy_artifact_clone",
       "gate": "scripting",
       "mutates": true
@@ -2642,5 +2648,5 @@
   "toolPackage": "full",
   "storeSchemaVersion": 1,
   "maxRecordsDefault": 100,
-  "toolCount": 399
+  "toolCount": 400
 }

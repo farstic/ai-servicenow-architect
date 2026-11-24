@@ -163,15 +163,16 @@ export declare class ServiceNowClient {
      */
     callNowAssist(endpoint: string, payload: Record<string, any>): Promise<any>;
     /**
-     * The CI/CD API, `/api/sn_cicd/<path>` (ARC-09-C94). Its endpoints take their arguments in the query
-     * string and carry no request body ("Request body ... None" on every page this server calls), and
-     * they answer `{ result: {...} }`; this returns the `result`
-     * (vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md).
+     * The CI/CD API, `/api/sn_cicd/<path>` (ARC-09-C94). The endpoints the ATF tools call take their arguments in
+     * the query string and carry no request body ("Request body ... None" on those pages), and they answer
+     * `{ result: {...} }`; this returns the `result`
+     * (vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md). The batch install takes a JSON body
+     * (ARC-09-C312): `body`, sent as `application/json`, for the one POST that has one.
      *
      * `retries` can only lower the client's own policy, as everywhere else: the call that STARTS
      * something is sent once, because a retry after an answer lost on the way back starts it twice.
      */
-    callCicd(method: 'GET' | 'POST', path: string, query?: Record<string, string>, retries?: number): Promise<CicdResult>;
+    callCicd(method: 'GET' | 'POST', path: string, query?: Record<string, string>, retries?: number, body?: Record<string, unknown>): Promise<CicdResult>;
     /**
      * Run aggregate/stats query on a table (ServiceNow Reporting API)
      */

@@ -24,8 +24,10 @@
  * `snow_atf_atf_tests_index` (ARC-09-C113).
  */
 import type { ServiceNowClient } from '../servicenow/client.js';
-import type { ServiceNowRecord } from '../servicenow/types.js';
+import type { CicdResult, ServiceNowRecord } from '../servicenow/types.js';
+import { ServiceNowError } from '../utils/errors.js';
 export declare const CICD_PAGE = "vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md";
+export declare const SPOKE_PAGE = "vendor/ServiceNowDocs/markdown/integrate-applications/integration-hub/cicd-spoke.md";
 /** How long a run is waited for when the caller does not say, in seconds. */
 export declare const DEFAULT_BUDGET_SECONDS = 300;
 /**
@@ -33,6 +35,7 @@ export declare const DEFAULT_BUDGET_SECONDS = 300;
  * half an hour the run is better left to finish on the instance and its result record read later.
  */
 export declare const MAX_BUDGET_SECONDS = 1800;
+type Answer = CicdResult;
 export interface SuiteRun {
     /** `test_suite_status` when the run finished (the page's example says `success`); otherwise the CI/CD state, lower-cased. */
     outcome: string;
@@ -63,6 +66,29 @@ export interface SuiteRun {
 export declare function sysIdArg(value: unknown, argument?: string): string;
 /** `budget_seconds`, checked: from 1 to MAX_BUDGET_SECONDS, DEFAULT_BUDGET_SECONDS when absent. */
 export declare function budgetArg(value: unknown): number;
+export declare const labelOf: (a: Answer) => string;
+export declare const reasonOf: (a: Answer) => string;
+/** How a CI/CD refusal reads, in the page's terms: shared by every tool that calls the API (ARC-09-C312). */
+export type CicdFailureKind = 'absent' | 'forbidden' | 'not_found' | 'inactive' | 'bad_request' | 'other';
+/**
+ * The kind of refusal a CI/CD call met: `absent` for the platform's answer to a path it does not serve (the message, not the
+ * status, tells the API's absence from an item's, PN-15), then the page's own rows: 403 the role, 404 not found, 405 "the
+ * functionality is inactive", 400. Every caller words its own remedy; the classes are one. An AUTHENTICATION_FAILED is not
+ * classified here: it passes through every caller untouched.
+ */
+export declare function classifyCicd(error: ServiceNowError): {
+    kind: CicdFailureKind;
+    status?: number;
+};
+/**
+ * Follow a CI/CD progress until it ends (Successful, Failed or Canceled) or the budget runs out, reading it every
+ * POLL_INTERVAL_MS (ARC-09-C94; the batch install follows its progress the same way, ARC-09-C312). Never cancels: when the
+ * budget ends first, the last answer comes back with `finished: false`.
+ */
+export declare function followProgress(started: Answer, budgetSeconds: number, read: () => Promise<Answer>): Promise<{
+    progress: Answer;
+    finished: boolean;
+}>;
 /**
  * Start the suite, follow its progress until it finishes or the budget runs out, and read its results.
  * Never waits past the budget, and never cancels: a run still going when the budget ends is reported
@@ -111,3 +137,4 @@ export declare function suiteNames(client: ServiceNowClient, suites: string[]): 
     sys_id: string;
     name?: string;
 }>>;
+export {};

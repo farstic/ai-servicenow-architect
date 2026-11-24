@@ -9661,6 +9661,79 @@
     "mutates": false
   },
   {
+    "name": "snow_deploy_app_batch_install",
+    "description": "Install a batch of applications and plugins through the CI/CD API (POST /api/sn_cicd/app/batch/install), wait for it within budget_seconds, and return each package's state, the batch plan and the rollback id. The install is captured in no update set, so no update-set capture is possible and the result says how to roll back; it changes the whole instance, so name every package when asking for write approval. The account needs the sn_cicd.sys_ci_automation or admin role. **[Write]**",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A descriptive name for this batch (required)"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes about the batch install plan"
+        },
+        "packages": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The packages to install in this batch, one object each",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "The sys_id of the application (32 hexadecimal characters), or the identifier of the plugin"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "application",
+                  "plugin"
+                ],
+                "description": "The type of package"
+              },
+              "requested_version": {
+                "type": "string",
+                "description": "The version to install, such as 1.0.2 (required when type is application)"
+              },
+              "load_demo_data": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether to load demo data with the package (default false)"
+              },
+              "requested_customization_version": {
+                "type": "string",
+                "description": "The version of the customization of the application or plugin to install, such as 2.0.7"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Notes about this package"
+              }
+            },
+            "required": [
+              "id",
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "budget_seconds": {
+          "type": "number",
+          "description": "How long to wait for the outcome, in seconds, from 1 to 1800 (default: 300). An install still going when it runs out is reported with its ids, not cancelled."
+        }
+      },
+      "required": [
+        "name",
+        "packages"
+      ],
+      "additionalProperties": false
+    },
+    "gate": "write",
+    "mutates": true,
+    "table": "sys_batch_install_plan"
+  },
+  {
     "name": "snow_fluent_query",
     "description": "GlideQuery-style fluent query builder. Supports select, where, aggregate (COUNT/AVG/SUM/MIN/MAX), orderBy, limit, and groupBy. Returns records or aggregate results. Example: { table: \"incident\", where: [[\"active\",\"=\",true],[\"priority\",\"<\",3]], select: [\"number\",\"short_description\"], limit: 10 }",
     "inputSchema": {

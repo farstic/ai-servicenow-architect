@@ -13,7 +13,7 @@
 # The `./snowarch status` panel
 
 ```
-Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
+Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 400 tools (contract)
 Licence: missing
 Engine: snowarch 9.9.9 · contract deadbeefdead
 Docs: vendor/ServiceNowDocs @ 96d32129bb43 (australia) · full
