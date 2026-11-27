@@ -5,9 +5,9 @@
  *
  * Two users of 2.2.6 on Windows could not connect, although their passwords were right: their accounts lacked the role `snc_basic_auth_api_access`. Where the
  * restriction is enforcing, a Basic authentication call to the API is blocked unless the account has that role, is a web services access only account, or presents
- * a valid one-time password (vendor/ServiceNowDocs/markdown/platform-security/authentication/basic-auth-restriction.md). The product then answers 401: the wizard's
+ * a valid one-time password (vendor/ServiceNowDocs/markdown/platform-security/authentication/basic-auth-restriction.md). The product then reports a refused login: the wizard's
  * login check (question 6) says AUTHENTICATION_FAILED and `instance test` says `auth: auth failed`. Neither guide said that a right password can be refused, so a reader
- * retyped it (each failed login brings the account nearer to a lockout) and looped on `set-credentials`.
+ * retyped it and looped on `set-credentials`.
  *
  * What these tests hold, for the Windows guide and the macOS guide, each with its interactive page:
  *   1. the two messages the guides quote are the ones the product prints on a 401: derived from the registry and from the probe, and read from a real run of the
