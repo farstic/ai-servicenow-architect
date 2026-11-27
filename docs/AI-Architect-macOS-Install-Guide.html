@@ -872,7 +872,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
             <div class="dl">
               <div>What happens</div><div>The installer signs in and reads a few tables to learn what your account may do. It changes nothing on the instance.</div>
               <div>What to type</div><div>Nothing. The <code class="ic">[INFO]</code> lines are normal.</div>
-              <div>If it fails</div><div>The message says why. Most often the address, user name or password has a typo. Nothing has been saved: press <span class="key">Control</span>+<span class="key">C</span> and run <code class="ic">./bootstrap.sh</code> again.</div>
+              <div>If it fails</div><div>The message says why. Most often the address, user name or password has a typo. Nothing has been saved: press <span class="key">Control</span>+<span class="key">C</span> and run <code class="ic">./bootstrap.sh</code> again. If they are right (you can log in with them in the browser) and it still fails, see the Basic authentication row in "If something goes wrong".</div>
             </div>
           </div>
         </div>
@@ -2182,6 +2182,14 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
    "k": "login 401 unauthorized password credentials wizard instance authentication_failed"
   },
   {
+   "id": "basic-auth",
+   "see": "The login check (question 6) says AUTHENTICATION_FAILED — The instance rejected the credentials — wrong, expired, or the account is locked, or ./snowarch instance test pdi says auth: auth failed, although you can log in to the instance in the browser with the same user name and password (Basic authentication restriction)",
+   "do": "Do not retype the password; it is right. The instance blocks Basic authentication for API calls unless the account is allowed (ServiceNow's Basic authentication restriction). Ask the instance's administrator to allow your account: All › Basic Auth Restriction › Properties, table Identified Users, decision Maintain current login — Basic Auth API and UI login allowed. This gives your account the role snc_basic_auth_api_access; the administrator needs the security_admin role to change it. Do not ask for Convert to web service access only account: it blocks your own login in the browser. Then, in the wizard, press Control+C and run ./bootstrap.sh again; if it was instance test that failed, run it again. The other way: the administrator gives you an OAuth client ID and secret, and you choose 2 at question 4.",
+   "href": "#step-6d",
+   "link": "Step 6d",
+   "k": "login 401 unauthorized authentication_failed auth failed basic authentication restriction snc_basic_auth_api_access browser password correct administrator oauth"
+  },
+  {
    "id": "cloud-sync",
    "see": "WARN STORE_IN_CLOUD_SYNC_FOLDER, or: this checkout is inside a cloud-synced folder",
    "do": "Your AI-Arch folder is inside iCloud Drive, OneDrive, Dropbox, Google Drive or another sync folder, and your password file would be copied with it. At the wizard's question, press Return to stop; nothing is saved. Then download the AI Architect again into your home folder as in Step 4, and copy your licence again (Step 5).",
@@ -2296,6 +2304,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
    "proxy",
    "tls",
    "login-check",
+   "basic-auth",
    "cloud-sync",
    "unexpected"
   ],
