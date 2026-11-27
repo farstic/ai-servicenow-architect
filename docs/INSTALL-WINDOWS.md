@@ -506,7 +506,7 @@ On screen:
 
 - **What happens:** the installer signs in and reads a few tables to learn what your account may do. It changes nothing on the instance.
 - **What to type:** nothing. The `[INFO]` lines are normal.
-- **If it fails:** the message says why. Most often the address, user name or password has a typo. Nothing has been saved: press **Ctrl+C** and run `.\bootstrap.cmd` again.
+- **If it fails:** the message says why. Most often the address, user name or password has a typo. Nothing has been saved: press **Ctrl+C** and run `.\bootstrap.cmd` again. If they are right (you can log in with them in the browser) and it still fails, see the Basic authentication row in "If something goes wrong".
 
 #### Question 7 of 7 · Permissions
 
@@ -827,6 +827,7 @@ It shows a plan first and changes nothing until you accept it. Your instances an
 | A line in the installer's check (Step 6a) is not ok | The line says what to do. Do it, then run .\bootstrap.cmd again; it continues where it stopped. |
 | github.com is unreachable, or you are behind a company proxy | Ask your IT team for the proxy address, set it in the window as shown below, and run the installer again. |
 | The login check (question 6) fails | Check the address, user name and password. Press Ctrl+C and run .\bootstrap.cmd again. |
+| The login check (question 6) says `AUTHENTICATION_FAILED — The instance rejected the credentials — wrong, expired, or the account is locked`, or `.\snowarch.cmd instance test pdi` says `auth: auth failed`, although you can log in to the instance in the browser with the same user name and password (Basic authentication restriction) | Do not retype the password; it is right. The instance blocks Basic authentication for API calls unless the account is allowed (ServiceNow's Basic authentication restriction). Ask the instance's administrator to allow your account: **All › Basic Auth Restriction › Properties**, table **Identified Users**, decision **Maintain current login — Basic Auth API and UI login allowed**. This gives your account the role `snc_basic_auth_api_access`; the administrator needs the `security_admin` role to change it. Do not ask for **Convert to web service access only account**: it blocks your own login in the browser. Then, in the wizard, press Ctrl+C and run `.\bootstrap.cmd` again; if it was `instance test` that failed, run it again. The other way: the administrator gives you an OAuth client ID and secret, and you choose `2` at question 4. |
 | After the password is saved, the wizard says Its permissions could not be restricted | Your password is saved, but Windows would not let the installer lock the file, so other accounts on this computer might be able to read it. Run .\snowarch.cmd doctor --fix. It shows what it will change and changes it when you press Enter. If it cannot lock the file either, send the output of .\snowarch.cmd doctor (see "Asking for help"). |
 | /mcp shows no servicenow line | Claude was started outside your folder. Type /exit, then follow "Every day". |
 | The licence says expired or missing | See "Licence renewal" or Step 5. |
