@@ -387,7 +387,7 @@ On screen:
 release manifest: v2.2.5 fetched (473 files)
 [B01/09] workspace … ok (4 s)
 [docs] checkout --detach c85139f … 89.9 s
-[docs] 52,049 files · 293 MB working tree
+[docs] 52,049 files · 303 MB working tree
 citations: checked: 588 | dead: 0
 [B02/09] docs … ok (147 s)
 [B03/09] mode … ok (0.0 s)

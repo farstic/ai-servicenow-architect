@@ -281,15 +281,15 @@ was built, the doctor reports what was configured — never a password, never an
 
 ### What the corpus costs
 
-**The documentation costs about 490 MB on disk and about 30–45 seconds to fetch** — the whole corpus, all
-56 areas and 52,049 files, in a blobless checkout. Two measurements, because they count different things:
-the **working tree** is 297 MB on Linux and macOS and 293 MB on Windows, and **tree plus `.git`** is 476
-MB Ubuntu / 484 MB macOS / 482 MB Windows (29.8 s Ubuntu · 44.3 s macOS · 44.5 s Windows, the median of five
-runs, measured 2026-11-15 by `docs-real.yml`). The first is what you read, the second is what the disk loses.
-An install made before 2.2.5, which fetched only the areas the specialists cite, moves to the whole corpus
-once, on its upgrade to 2.2.5: about 150 MB more on disk, measured from a default 2.2.4 install (20 areas).
-`--docs sparse` keeps only the cited areas (about 365 MB on disk) and exists for CI; the Architect cannot
-read the other areas then. Every release re-measures all three platforms and attaches the same table as
+**The documentation costs about 490 MB on disk and about 30–45 seconds to fetch** — the whole corpus, all 56
+areas and 52,049 files, in a blobless checkout. Two measurements, because they count different things: the
+**working tree** is 297 MB on Linux and macOS and 303 MB on Windows, and **tree plus `.git`** is 490 MB Ubuntu
+/ 496 MB macOS / 497 MB Windows (run 46123223879 of 2026-11-28; times in that order, 29.8 / 44.3 / 44.5 s, the
+median of five runs measured 2026-11-15 by `docs-real.yml`). The first is what you read, the second is what
+the disk loses. An install made before 2.2.5, which fetched only the areas the specialists cite, moves to the
+whole corpus once, on its upgrade to 2.2.5: about 150 MB more on disk, measured from a default 2.2.4 install
+(20 areas). `--docs sparse` keeps only the cited areas (about 365 MB on disk) and exists for CI; the Architect
+cannot read the other areas then. Every release re-measures all three platforms and attaches the same table as
 `install-metrics.md` — [releases](https://github.com/farstic/snowarch/releases). The bootstrap also builds a
 names index of the whole corpus, which records which pages print a name: about 12 MB under
 `.local/corpus-names/`, about 20 seconds once for each docs pin, rebuilt by `docs sync` and `doctor --fix`.

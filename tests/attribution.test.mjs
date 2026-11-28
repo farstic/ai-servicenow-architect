@@ -51,10 +51,14 @@ test('the install figures are attributed to a measurement, not asserted from now
   const readme = `${read('README.md')}\n${read('docs/INSTALL.md')}`;
   // Every number in the install sentences carries where it came from. ARC-09-C244 made the whole corpus the
   // default and measured it on all three platforms in one `docs-real.yml` run: the tree you read against the tree
-  // plus `.git` the disk loses, both attributed to that measurement.
+  // plus `.git` the disk loses, both attributed to that measurement. The sizes follow the corpus at each pin: the
+  // bump to c85139f (PR 622) took them from one docs-real run, 46123223879 of 2026-11-28, and the page names it;
+  // the fetch times stay the median of five runs of 2026-11-15, and the same sentence says that, so each figure
+  // reads against the measurement it came from.
   assert.match(readme, /about 490 MB on disk/);
-  assert.match(readme, /286 MB on Linux and macOS/);
-  assert.match(readme, /51,186 files/);
+  assert.match(readme, /297 MB on Linux and macOS/);
+  assert.match(readme, /52,049 files/);
+  assert.match(readme, /run\s+46123223879\s+of\s+2026-11-28/);
   assert.match(readme, /measured\s+2026-11-15\s+by\s+`docs-real\.yml`/);
 });
 
