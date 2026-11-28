@@ -42,7 +42,7 @@ The Chief Architect is routing a CSM design where customer contacts include PII,
 - Do not copy PII into the incident or its work notes to bridge the domains — reference the shared service layer instead.
 
 ## Validation
-Run Access Simulator for an `itil`-only user against a case with PII to prove the fields are denied before go-live. (citation: markdown/platform-security/access-simulator.md)
+Run Access Simulator for an `itil`-only user against a case with PII to prove the fields are denied before go-live. (citation: markdown/platform-security/access-control/access-simulator.md)
 ```
 
 ---

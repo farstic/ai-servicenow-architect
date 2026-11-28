@@ -354,7 +354,7 @@ Cluster [`cmdb_ci_cluster`] and Cluster Node [`cmdb_ci_cluster_node`] are baseli
 - `em_event` — raw events from monitoring tools
 - `em_alert` — correlated alerts (aggregated events)
 - `em_match_rule` — event rules, which turn events into alerts *(citation: `markdown/it-operations-management/event-management/create-event-rules.md`)*
-- `em_alert_correlation_rule` — alert correlation rules, which group related alerts *(citation: `markdown/it-operations-management/event-management/r_InstalledWithEventManagement.md`)*
+- `em_alert_correlation_rule` — alert correlation rules, which group related alerts *(citation: `markdown/it-operations-management/event-management/r_TblsinstldwithEventMgmt.md`)*
 
 **Event flow:**
 1. **Connector pulls/pushes** — Service Graph Connector or event connector delivers events from external monitoring (Splunk, SCOM, AWS CloudWatch, etc.).
@@ -396,7 +396,7 @@ Cluster [`cmdb_ci_cluster`] and Cluster Node [`cmdb_ci_cluster_node`] are baseli
 | Custom Discovery probe duplicating baseline pattern | Maintenance burden, breaks on baseline pattern updates | Extend baseline pattern or use pattern override | `markdown/it-operations-management/discovery-and-service-mapping-patterns/` |
 | Custom MID Server script bypassing ECC queue | Security risk, breaks observability | Use ECC queue protocol | `markdown/it-operations-management/configure-a-mid-server.md` |
 | Custom service-map table | Duplicates `cmdb_rel_ci` semantics | Use `cmdb_rel_ci` with appropriate relationship types | `markdown/it-operations-management/service-mapping/` |
-| Custom event correlation table | Duplicates `em_alert_correlation_rule` | Configure alert correlation rules | `markdown/it-operations-management/event-management/r_InstalledWithEventManagement.md` |
+| Custom event correlation table | Duplicates `em_alert_correlation_rule` | Configure alert correlation rules | `markdown/it-operations-management/event-management/r_TblsinstldwithEventMgmt.md` |
 | Custom cloud-discovery connector | Breaks Cloud Discovery upgrade path | Use baseline Cloud Discovery patterns | `markdown/it-operations-management/cloud-discovery-workspace/` |
 | Custom CMDB Health rules table | baseline CMDB Health rules cover it | Configure CMDB Health rules | `markdown/servicenow-platform/configuration-management-database-cmdb/c_CMDBHealth.md` |
 | New top-level CI class without "new technology" justification | Almost always covered by baseline class hierarchy | Use the existing baseline class that fits; a class extending it is still a new table (Verdict C) | `markdown/servicenow-platform/configuration-management-database-cmdb/ci-class-manager-landing-page.md` |
