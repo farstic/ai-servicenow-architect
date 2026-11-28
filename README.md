@@ -84,8 +84,8 @@ Plan — Enter runs it as shown · type a number to choose that line's value · 
   Steps  B01 workspace · B02 docs · B05 tool list · B07 Claude settings · B09 summary
 release manifest: v2.1.0-rc.1 fetched (372 files)
 [B01/09] workspace … ok (2 s)
-[docs] 29.8 s · pin 96d3212 · full · complete
-[docs] 51,186 files · 286 MB working tree
+[docs] 29.8 s · pin c85139f · full · complete
+[docs] 52,049 files · 297 MB working tree
 citations: checked: 609 | dead: 0
 [B02/09] docs … ok (40 s)
 [B03/09] mode … ok (0.0 s)
@@ -282,8 +282,8 @@ was built, the doctor reports what was configured — never a password, never an
 ### What the corpus costs
 
 **The documentation costs about 490 MB on disk and about 30–45 seconds to fetch** — the whole corpus, all
-54 areas and 51,186 files, in a blobless checkout. Two measurements, because they count different things:
-the **working tree** is 286 MB on Linux and macOS and 293 MB on Windows, and **tree plus `.git`** is 476
+56 areas and 52,049 files, in a blobless checkout. Two measurements, because they count different things:
+the **working tree** is 297 MB on Linux and macOS and 293 MB on Windows, and **tree plus `.git`** is 476
 MB Ubuntu / 484 MB macOS / 482 MB Windows (29.8 s Ubuntu · 44.3 s macOS · 44.5 s Windows, the median of five
 runs, measured 2026-11-15 by `docs-real.yml`). The first is what you read, the second is what the disk loses.
 An install made before 2.2.5, which fetched only the areas the specialists cite, moves to the whole corpus

@@ -702,11 +702,11 @@ release manifest: v2.2.5 fetched (473 files)
 [B01/09] workspace … ok (4 s)
 [docs] clone (depth 1, blobless, full) … 1.1 s
 [docs] sparse disable (full mode) … 0.0 s
-[docs] checkout --detach 96d3212 … 42.0 s
-[docs] 45.3 s · pin 96d3212 · full · complete
+[docs] checkout --detach c85139f … 42.0 s
+[docs] 45.3 s · pin c85139f · full · complete
 docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE
-[docs] names index … 28.8 s · 75,431 names · 51,178 pages · coverage full
-[docs] 51,186 files · 286 MB working tree
+[docs] names index … 28.8 s · 76,558 names · 52,041 pages · coverage full
+[docs] 52,049 files · 297 MB working tree
 citations: checked: 609 | dead: 0
 [B02/09] docs … ok (75 s)
 [B03/09] mode … ok (0.0 s)
@@ -717,7 +717,7 @@ citations: checked: 609 | dead: 0
 
 (The release numbers in these examples come from an earlier release; yours name the release you downloaded.)
 
-This downloads all 51,178 pages of ServiceNow documentation that the Architect reads before it answers. The screen can sit still for a minute or two. Let it run. On the AI Architect's automatic macOS test this part took 75 seconds; in our Windows test it took two and a half minutes.
+This downloads all 52,041 pages of ServiceNow documentation that the Architect reads before it answers. The screen can sit still for a minute or two. Let it run. On the AI Architect's automatic macOS test this part took 75 seconds; in our Windows test it took two and a half minutes.
 
 ### 6d · The instance wizard: seven questions
 
@@ -980,7 +980,7 @@ On screen after step 3:
 Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)
 Licence: ok · LIC-2026-0000 · until 2026-12-31
 Integrity: verified · v2.2.5 · 473 files
-Docs: vendor/ServiceNowDocs @ 96d32129bb43 (australia) · full
+Docs: vendor/ServiceNowDocs @ c85139fe9661 (australia) · full
 ```
 
 > **You are done.** The AI Architect is installed, licensed and connected. The User Guide in your folder, `docs/USER-GUIDE.md`, shows how to work with it, with examples for analysts, architects and developers. Every command and setting is in `docs/AI-Architect-User-Guide.html`, which you open in your browser.
