@@ -673,7 +673,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
 
         <h3><b>6c</b>It downloads the documentation (2 to 3 minutes)</h3>
         <div data-term="docs" data-label="On screen"></div>
-        <p>This downloads all 51,178 pages of ServiceNow documentation that the Architect reads before it answers. The screen can sit still for a minute or two. Let it run. In our test it took two and a half minutes.</p>
+        <p>This downloads all 52,041 pages of ServiceNow documentation that the Architect reads before it answers. The screen can sit still for a minute or two. Let it run. In our test it took two and a half minutes.</p>
       </section>
 
       <!-- STEP 6d WIZARD -->
@@ -1299,7 +1299,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   "plan": "Installing the AI ServiceNow Architect into this folder only — nothing else on the machine changes.\nTwo choices below, then it runs on its own (a few minutes; live adds a short wizard).\n~ Plan — Enter runs it as shown · type a number to choose that line's value · \"?\" explains · q quits\n1  Mode   design-only    live needs a ServiceNow instance (wizard runs in this terminal); Node 26.13.0 found\n2  Docs   full           full = whole corpus · skip = none (the doctor will report FAIL)\nSteps  B01 workspace · B02 docs · B05 tool list · B07 Claude settings · B09 summary\n>",
   "modeMenu": "> [[1]]\nMode:\n[1] design-only — works from the ServiceNow docs and the specialist skills; no instance (current)\n[2] live — also connects one ServiceNow instance (the wizard asks for URL and login)",
   "planLive": "1  Mode   live           live needs a ServiceNow instance (wizard runs in this terminal); Node 26.13.0 found\n2  Docs   full           full = whole corpus · skip = none (the doctor will report FAIL)\nSteps  B01 workspace · B02 docs · B04 deps · B05 tool list · B06 instance · B07 Claude settings · B08 verify · B09 summary\n~ Mode → live · Enter runs it · 1 changes it again · q quits\n>",
-  "docs": "release manifest: v2.2.5 fetched (473 files)\n[B01/09] workspace … ok (4 s)\n[docs] checkout --detach 96d3212 … 89.9 s\n[docs] 51,186 files · 293 MB working tree\ncitations: checked: 588 | dead: 0\n[B02/09] docs … ok (147 s)\n[B03/09] mode … ok (0.0 s)\n[B04/09] deps … installing (npm ci)\n[B04/09] deps … ok (7 s)\n[B05/09] tool list … ok (0.0 s)",
+  "docs": "release manifest: v2.2.5 fetched (473 files)\n[B01/09] workspace … ok (4 s)\n[docs] checkout --detach c85139f … 89.9 s\n[docs] 52,049 files · 303 MB working tree\ncitations: checked: 588 | dead: 0\n[B02/09] docs … ok (147 s)\n[B03/09] mode … ok (0.0 s)\n[B04/09] deps … installing (npm ci)\n[B04/09] deps … ok (7 s)\n[B05/09] tool list … ok (0.0 s)",
   "wizard": "Instance wizard — seven steps (six questions and a login check).\n~ Have ready: the instance URL and a username + password for it. Nothing is saved until the end.",
   "q1": "[1/7] Label — a short name you will type in commands, e.g. pdi, acme-dev\nLabel [pdi] [[{label}]]",
   "q2": "[2/7] Instance URL\nInstance URL (https://\u003chost>, no path) [[{base}]]",
@@ -1313,7 +1313,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   "end": "[B07/09] Claude settings … ok (0.3 s)\n[B08/09] verify … ok (12 s)\n[B09/09] summary … ok (4 s)\nHealth check (quick): 16 ok · 1 warn (E-31 the licence) · 0 fail · 26 more run with .\\snowarch.cmd doctor\nMode: live — instance={label} (pdi) preset=custom\nNext: run `claude` in this folder: C:\\Users\\you\\AI-Arch\nYou will see one workspace-trust dialog — answer Yes.\n~ … a short list of commands for changing settings later …\nPress any key to continue . . .",
   "lic": "Licence: ok · {licId} · until 2026-12-31",
   "mcp": "Project MCPs (C:\\Users\\you\\AI-Arch\\.mcp.json)\n√   servicenow                  399 tools",
-  "status": "Mode: live — {label} (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v2.2.5 · 473 files\nDocs: vendor/ServiceNowDocs @ 96d32129bb43 (australia) · full"
+  "status": "Mode: live — {label} (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 399 tools (contract)\nLicence: ok · {licId} · until 2026-12-31\nIntegrity: verified · v2.2.5 · 473 files\nDocs: vendor/ServiceNowDocs @ c85139fe9661 (australia) · full"
  },
  "steps": [
   {
