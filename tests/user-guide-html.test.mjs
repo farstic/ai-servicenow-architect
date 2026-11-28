@@ -607,7 +607,8 @@ test('ARC-09-C306 — the page states the corpus once, in the words of the insta
   const sized = sentences.filter((x) => /\d+(?:\.\d+)?\s?(?:MB|GB|GiB|MiB)\b/.test(x) && /corpus|documentation|ServiceNowDocs|names index|working tree|on disk|checkout/i.test(x));
   assert.deepEqual(sized, [], 'a sentence gives a size of the corpus');
   assert.match(pageText, /What it costs on disk, and the time it takes to fetch, are in What the corpus costs in docs\/INSTALL\.md/, 'the page no longer sends the reader to the install page for the cost');
-  assert.deepEqual(pageText.match(/\b\d+ areas\b/g), ['54 areas'].slice(0, 1), 'a count of areas outside the one statement');
+  // The count is the install page's, as the statement above is: a literal here followed the corpus's areas by hand, and the c85139f bump (54 to 56 areas) was the first to find it out.
+  assert.deepEqual(pageText.match(/\b\d+ areas\b/g), [`${install.areas} areas`], 'a count of areas outside the one statement');
 });
 
 // ── nothing past the hooks, nothing past the licence, nothing of the engineering ─────────────────────────────────────────────────────────────────
