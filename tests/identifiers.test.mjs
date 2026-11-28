@@ -35,9 +35,11 @@ const EXPECTED = { 'example-field': 9, 'payload-key': 21, 'example-role': 3, 'sc
 // ARC-09-C166 moved `tool` from 18 to 28 and `marker` from 7 to 8: the Now Assist Specialist's build manifest names
 // the two AI Agent Studio build tools and the §2.2 calls (five sites in SKILL.md, five in EXAMPLES.md — Examples 2
 // and 4), and its instance model marks `sn_aia_version`, which the corpus does not print (PN-17).
-// The 96d3212 corpus bump (2026-11-15) took `glued` from 1 to 0: insurance-application-case-task-layers.md prints
-// `sn_ins_siu_task` on its own (line 410), so the one glued entry went stale and `docs verify` refused it.
-const EXCUSES = { tool: 28, marker: 8, proposed: 4, glob: 5, placeholder: 4, 'script-code': 19 };
+// The 96d3212 corpus bump (2026-11-15) took `glued` from 1 to 0: insurance-application-case-task-layers.md printed
+// `sn_ins_siu_task` on its own (line 410), so the one glued entry went stale and `docs verify` refused it. The c85139f bump (2026-11-28) took it
+// from 0 back to 1: that page is gone, and the corpus prints the name only glued to its label (`SIU Tasksn\_ins\_siu\_task`, in
+// components-installed-personal-lines-claims.md line 302 and components_installed_with_commercial_lines_claims.md line 301), so `docs verify` refused it as unexcused.
+const EXCUSES = { tool: 28, marker: 8, proposed: 4, glob: 5, glued: 1, placeholder: 4, 'script-code': 19 };
 const CAPITALS = {
   // ARC-09-C117 added LICENCE_NOT_VALID: the live-verification paragraph says no read runs under it.
   // ARC-09-C166 added NOW_ASSIST_ENABLED and WRITE_ENABLED: the build manifest names the two preset flags its tools need.
