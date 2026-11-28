@@ -1390,7 +1390,7 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
         <div class="tw trouble"><table>
           <thead><tr><th>Code</th><th>What to do</th></tr></thead>
           <tbody>
-            <tr><td><code class="ic">AUTHENTICATION_FAILED</code></td><td>It makes no further call to that instance: repeated failed logins can lock the account. <a href="#inst-test">Test the instance</a> once; if it fails, <a href="#set-cred">change the password</a>. Then say the credentials are fixed: it reloads before it tries again.</td></tr>
+            <tr><td><code class="ic">AUTHENTICATION_FAILED</code></td><td>It makes no further call to that instance: repeated failed logins can lock the account. <a href="#inst-test">Test the instance</a> once; if it fails, <a href="#set-cred">change the password</a>. Then say the credentials are fixed: it reloads before it tries again. If you can log in to the instance in the browser with the same user name and password, the password is right: ask the instance's administrator to allow your account for Basic authentication (the role <code class="ic">snc_basic_auth_api_access</code>), as in the install guide's Basic authentication row.</td></tr>
             <tr><td><code class="ic">CONNECTION_REFUSED</code></td><td>The instance may be asleep — a PDI sleeps when unused: wake it at developer.servicenow.com — or a firewall blocks it. Check the address and its port.</td></tr>
             <tr><td><code class="ic">CONNECTION_TIMEOUT</code></td><td>No answer in time. On a network with a proxy, set it (<a href="#network">Corporate networks</a>). An idle PDI may be asleep.</td></tr>
             <tr><td><code class="ic">DNS_FAILURE</code></td><td>The name does not resolve. Check the instance name first: a typo is the usual cause. On a company network it may resolve only on the VPN or through the proxy.</td></tr>
@@ -3421,18 +3421,18 @@ body[data-mode="design"] .live-only, body[data-mode="live"] .design-only { displ
   {
    "id": "auth-failed",
    "see": "AUTHENTICATION_FAILED",
-   "do": "Stop: repeated failed logins can lock the account. Test the instance once; if it fails, change the password, then tell the AI Architect the credentials are fixed.",
+   "do": "Stop: repeated failed logins can lock the account. Test the instance once; if it fails, change the password, then tell the AI Architect the credentials are fixed. If you can log in to the instance in the browser with the same user name and password, the password is right: ask the instance's administrator to allow your account for Basic authentication (the role snc_basic_auth_api_access), as in the install guide's Basic authentication row.",
    "href": "#set-cred",
    "link": "Change the user name or password",
-   "k": "401 login password authentication failed credentials locked"
+   "k": "401 login password authentication failed credentials locked basic authentication restriction snc_basic_auth_api_access"
   },
   {
    "id": "login-check",
    "see": "The login check ([6/7]) fails while you add an instance",
-   "do": "Check the address, user name and password. Run the add command again (not the installer). On a PDI use admin; elsewhere an account that may read users (itil or admin).",
+   "do": "Check the address, user name and password. Run the add command again (not the installer). On a PDI use admin; elsewhere an account that may read users (itil or admin). If you can log in to the instance in the browser with the same user name and password, the password is right: ask the instance's administrator to allow your account for Basic authentication (the role snc_basic_auth_api_access), as in the install guide's Basic authentication row.",
    "href": "#add-instance",
    "link": "Add an instance",
-   "k": "login 401 403 unauthorized password credentials wizard instance sys_user"
+   "k": "login 401 403 unauthorized password credentials wizard instance sys_user basic authentication restriction snc_basic_auth_api_access"
   },
   {
    "id": "label-exists",
